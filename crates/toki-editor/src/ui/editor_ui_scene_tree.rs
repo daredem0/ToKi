@@ -295,14 +295,18 @@ impl EditorUI {
                             .default_open(false)
                             .show(ui, |ui| {
                                 if let Some(game_state) = game_state {
-                                    let entity_ids = game_state.entity_manager().active_entities();
+                                    let entity_ids =
+                                        game_state.world().entity_manager().active_entities();
 
                                     if entity_ids.is_empty() {
                                         ui.label("No runtime entities");
                                     } else {
                                         for entity_id in &entity_ids {
                                             if let Some(entity) =
-                                                game_state.entity_manager().get_entity(*entity_id)
+                                                game_state
+                                                    .world()
+                                                    .entity_manager()
+                                                    .get_entity(*entity_id)
                                             {
                                                 let is_selected = matches!(
                                                     &self.selection,

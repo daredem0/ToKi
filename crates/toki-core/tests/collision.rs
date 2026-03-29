@@ -1,6 +1,8 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
+#[path = "support/game_state_compat.rs"]
+mod game_state_compat;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
@@ -8,6 +10,7 @@ use toki_core::assets::{
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, InputKey};
+use game_state_compat::GameStateCompatExt;
 
 /// Create a test tilemap with a mix of solid and non-solid tiles
 /// Layout:

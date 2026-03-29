@@ -1,4 +1,6 @@
 use glam::{IVec2, UVec2};
+#[path = "support/game_state_compat.rs"]
+mod game_state_compat;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
@@ -15,6 +17,7 @@ use toki_core::{
     scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind},
     GameState, InputKey, Scene,
 };
+use game_state_compat::GameStateCompatExt;
 use toki_test_fixtures::{scene_with_test_player, test_atlas, test_tilemap};
 
 fn create_test_tilemap() -> TileMap {

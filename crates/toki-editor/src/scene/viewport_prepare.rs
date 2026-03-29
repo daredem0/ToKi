@@ -1,5 +1,6 @@
 use super::*;
 use crate::editor_types::PlacementPreviewVisual;
+use toki_core::game::RenderQueryService;
 use toki_core::sprite_render::{
     collect_map_object_sprite_render_requests, format_sprite_resolve_failure, SpriteRenderOrigin,
 };
@@ -124,9 +125,12 @@ impl SceneViewport {
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
     ) {
-        let requests = self
-            .game_state
-            .get_sprite_render_requests()
+        let requests = RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+            .sprite_render_requests()
             .into_iter()
             .filter(|request| match request.origin {
                 SpriteRenderOrigin::AnimatedEntity(entity_id)
@@ -223,11 +227,17 @@ impl SceneViewport {
         let Some(drag_preview_data) = drag_preview_data else {
             return;
         };
-        let sprite_requests = self.game_state.get_sprite_render_requests();
+        let sprite_requests = RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .sprite_render_requests();
 
         for preview in drag_preview_data {
             let Some(entity) = self
                 .game_state
+                .world()
                 .entity_manager()
                 .get_entity(preview.entity_id)
             else {
@@ -337,7 +347,7 @@ impl SceneViewport {
     }
 
     pub(super) fn prepare_debug_shapes(&mut self, scene_data: &mut SceneData) {
-        if !self.game_state.is_debug_collision_rendering_enabled() {
+        if !self.game_state.runtime().debug_collision_rendering() {
             return;
         }
 
@@ -355,7 +365,12 @@ impl SceneViewport {
         let origin_color = [1.0, 1.0, 1.0, 0.9];
         let trigger_tile_color = [1.0, 1.0, 0.0, 0.6];
 
-        let renderable_entities = self.game_state.get_renderable_entities();
+        let queries = RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        );
+        let renderable_entities = queries.renderable_entities();
         for (entity_id, position, size) in renderable_entities {
             let debug_shape = toki_render::DebugShape {
                 shape_type: toki_render::DebugShapeType::Rectangle,
@@ -374,7 +389,7 @@ impl SceneViewport {
             );
         }
 
-        let entity_boxes = self.game_state.get_entity_collision_boxes();
+        let entity_boxes = queries.entity_collision_boxes();
         for (pos, size, is_trigger) in entity_boxes {
             let color = if is_trigger {
                 trigger_tile_color
@@ -398,8 +413,8 @@ impl SceneViewport {
             );
         }
 
-        for entity_id in self.game_state.entity_manager().active_entities() {
-            let Some(entity) = self.game_state.entity_manager().get_entity(entity_id) else {
+        for entity_id in self.game_state.world().entity_manager().active_entities() {
+            let Some(entity) = self.game_state.world().entity_manager().get_entity(entity_id) else {
                 continue;
             };
 
@@ -430,7 +445,12 @@ impl SceneViewport {
         let solid_tile_color = [0.0, 0.0, 1.0, 0.6];
         let trigger_tile_color = [1.0, 1.0, 0.0, 0.6];
 
-        let solid_tiles = self.game_state.get_solid_tile_positions(tilemap, atlas);
+        let queries = RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        );
+        let solid_tiles = queries.solid_tile_positions(tilemap, atlas);
         for (tile_x, tile_y) in solid_tiles {
             let world_pos = glam::Vec2::new(
                 (tile_x * tilemap.tile_size.x) as f32,
@@ -446,7 +466,7 @@ impl SceneViewport {
             scene_data.debug_shapes.push(debug_shape);
         }
 
-        let trigger_tiles = self.game_state.get_trigger_tile_positions(tilemap, atlas);
+        let trigger_tiles = queries.trigger_tile_positions(tilemap, atlas);
         for (tile_x, tile_y) in trigger_tiles {
             let world_pos = glam::Vec2::new(
                 (tile_x * tilemap.tile_size.x) as f32,

@@ -1,6 +1,5 @@
 use crate::entity::{Entity, EntityManager};
-use crate::game::GameState;
-use crate::game::RestoreError;
+use crate::game::{GameState, RestoreError};
 use crate::ids::SceneId;
 use crate::GameFlags;
 use serde::{Deserialize, Serialize};
@@ -76,11 +75,14 @@ impl SaveData {
     pub fn capture(game_state: &GameState, slot: u8) -> Result<Self, SerializationError> {
         validate_save_slot(slot)?;
         let active_scene_name = game_state
+            .scene()
             .scene_manager()
             .active_scene_name()
             .unwrap_or_default()
             .to_string();
         let (camera_position, camera_scale) = game_state
+            .scene()
+            .scene_manager()
             .active_scene()
             .map(|scene| (scene.camera_position, scene.camera_scale))
             .unwrap_or((None, None));
@@ -98,7 +100,11 @@ impl SaveData {
                 saved_at_unix_secs,
             },
             active_scene_name: active_scene_name.into(),
-            player: game_state.player_entity().cloned(),
+            player: game_state
+                .world()
+                .player_id()
+                .and_then(|player_id| game_state.world().entity_manager().get_entity(player_id))
+                .cloned(),
             flags: game_state.game_flags().clone(),
             camera: SavedCameraState {
                 position: camera_position,
@@ -109,6 +115,7 @@ impl SaveData {
                 .into_iter()
                 .map(|(scene_name, entity_id)| PersistedSceneEntityState {
                     entity: game_state
+                        .scene()
                         .scene_manager()
                         .get_scene(scene_name.as_str())
                         .and_then(|scene| scene.get_entity(entity_id))

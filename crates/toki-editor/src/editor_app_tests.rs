@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::CollisionBox;
+use toki_core::game::SceneSystem;
 use toki_core::entity::{
     AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, Entity, EntityAttributes,
     EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, MovementProfile,
@@ -903,18 +904,26 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
         .expect("scene preview game state should build");
 
     assert_eq!(
-        game_state.active_scene().map(|scene| scene.name.as_str()),
+        SceneSystem::active_scene(&game_state).map(|scene| scene.name.as_str()),
         Some("Main Scene")
     );
-    assert!(game_state.player_entity().is_some());
+    assert!(game_state
+        .world()
+        .player_id()
+        .and_then(|id| game_state.world().entity_manager().get_entity(id))
+        .is_some());
     assert!(
         game_state
-            .entities_owned()
+            .world()
+            .entity_manager()
+            .active_entities()
             .iter()
+            .filter_map(|&id| game_state.world().entity_manager().get_entity(id))
+            .cloned()
             .any(|entity| entity.id == 77),
         "authored scene entity should still be present in preview GameState"
     );
-    assert_eq!(game_state.entities().len(), 2);
+    assert_eq!(game_state.world().entity_manager().active_entities().len(), 2);
 }
 
 #[test]
@@ -999,7 +1008,12 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
         .expect("scene preview game state should build");
 
     let soldier = game_state
-        .entities_owned()
+        .world()
+        .entity_manager()
+        .active_entities()
+        .iter()
+        .filter_map(|&id| game_state.world().entity_manager().get_entity(id))
+        .cloned()
         .into_iter()
         .find(|entity| entity.definition_name.as_deref() == Some("soldier"))
         .expect("soldier should exist in preview");

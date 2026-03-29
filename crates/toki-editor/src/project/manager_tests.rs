@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
-use toki_core::game::{AudioChannel, AudioEvent};
+use toki_core::game::{AudioChannel, AudioEvent, GameSimulation, InputSystem, RuleSystem, SceneSystem};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::{GameState, InputKey, Scene};
 
@@ -18,6 +18,61 @@ const FULL_SURFACE_FIXTURE: &str =
     include_str!("../../tests/fixtures/scene_rules_full_surface.json");
 const ON_PLAYER_MOVE_RUNTIME_FIXTURE: &str =
     include_str!("../../tests/fixtures/scene_rules_on_player_move_runtime.json");
+
+trait GameStateEditorCompatExt {
+    fn add_scene(&mut self, scene: Scene);
+    fn load_scene(&mut self, scene_name: &str) -> Result<(), String>;
+    fn player_id(&self) -> Option<toki_core::entity::EntityId>;
+    fn entity_manager(&self) -> &toki_core::entity::EntityManager;
+    fn handle_key_press(&mut self, key: InputKey);
+    fn handle_key_release(&mut self, key: InputKey);
+    fn update(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> toki_core::GameUpdateResult<AudioEvent>;
+    fn set_rules(&mut self, rules: RuleSet);
+}
+
+impl GameStateEditorCompatExt for GameState {
+    fn add_scene(&mut self, scene: Scene) {
+        SceneSystem::add_scene(self, scene);
+    }
+
+    fn load_scene(&mut self, scene_name: &str) -> Result<(), String> {
+        SceneSystem::load(self, scene_name)
+    }
+
+    fn player_id(&self) -> Option<toki_core::entity::EntityId> {
+        self.world().player_id()
+    }
+
+    fn entity_manager(&self) -> &toki_core::entity::EntityManager {
+        self.world().entity_manager()
+    }
+
+    fn handle_key_press(&mut self, key: InputKey) {
+        InputSystem::handle_key_press(self.runtime_mut(), key);
+    }
+
+    fn handle_key_release(&mut self, key: InputKey) {
+        InputSystem::handle_key_release(self.runtime_mut(), key);
+    }
+
+    fn update(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> toki_core::GameUpdateResult<AudioEvent> {
+        GameSimulation::tick_fixed(self, world_bounds, tilemap, atlas)
+    }
+
+    fn set_rules(&mut self, rules: RuleSet) {
+        RuleSystem::set_rules(self, rules);
+    }
+}
 
 #[test]
 fn create_top_down_starter_project_populates_template_content() {

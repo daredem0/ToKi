@@ -1,8 +1,11 @@
 use glam::{IVec2, UVec2};
 use tempfile::NamedTempFile;
+#[path = "support/game_state_compat.rs"]
+mod game_state_compat;
 use toki_core::entity::*;
 use toki_core::serialization::*;
 use toki_core::{FlagValue, GameState, InputKey, Scene};
+use game_state_compat::GameStateCompatExt;
 use toki_test_fixtures::{save_test_state, test_entity, test_entity_definition};
 
 fn test_definition(name: &str, category: &str) -> EntityDefinition {

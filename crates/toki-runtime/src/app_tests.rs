@@ -8,6 +8,7 @@ use std::fs;
 use std::io::{Seek, Write};
 use std::path::PathBuf;
 use std::time::Duration;
+use toki_core::game::{GameSimulation, RenderQueryService, SceneSystem};
 use toki_core::math::projection::ProjectionParameter;
 use toki_core::menu::MenuSettings;
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
@@ -34,6 +35,15 @@ fn make_unique_temp_dir() -> std::path::PathBuf {
 fn load_project_scene(project_path: &std::path::Path, scene_name: &str) -> anyhow::Result<Scene> {
     let mut decoded_project_cache = super::DecodedProjectCache::default();
     App::load_project_scene_with_cache(project_path, scene_name, &mut decoded_project_cache)
+}
+
+fn player_position(state: &toki_core::GameState) -> glam::IVec2 {
+    RenderQueryService::new(
+        state.world().entity_manager(),
+        state.world().player_id(),
+        state.runtime().debug_collision_rendering(),
+    )
+    .player_position()
 }
 
 fn write_player_definition(project_path: &std::path::Path, name: &str) {
@@ -304,19 +314,19 @@ fn game_state_from_scene_uses_scene_data_without_fallback_entities() {
 
     let game_state = App::game_state_from_scene(scene.clone());
     assert_eq!(
-        game_state.scene_manager().active_scene_name(),
+        game_state.scene().scene_manager().active_scene_name(),
         Some("Gameplay")
     );
-    assert_eq!(game_state.rules(), &scene.rules);
-    assert_eq!(game_state.entity_manager().active_entities().len(), 0);
+    assert_eq!(game_state.scene().active_rules(), &scene.rules);
+    assert_eq!(game_state.world().entity_manager().active_entities().len(), 0);
 }
 
 #[test]
 fn fallback_game_state_spawns_player_and_npc() {
     let game_state = App::fallback_game_state();
-    assert!(game_state.player_id().is_some(), "player should exist");
+    assert!(game_state.world().player_id().is_some(), "player should exist");
     assert_eq!(
-        game_state.entity_manager().active_entities().len(),
+        game_state.world().entity_manager().active_entities().len(),
         2,
         "fallback state should spawn player and one npc"
     );
@@ -458,10 +468,10 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
 
     assert!(pack_mount.is_some(), "pack mount should be retained");
     assert_eq!(
-        game_state.scene_manager().active_scene_name(),
+        game_state.scene().scene_manager().active_scene_name(),
         Some("Main Scene")
     );
-    assert_eq!(game_state.entity_manager().active_entities().len(), 0);
+    assert_eq!(game_state.world().entity_manager().active_entities().len(), 0);
     assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
     assert_eq!(resources.get_tilemap().atlas, terrain_atlas_path);
     assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
@@ -573,12 +583,14 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
     let (_resources, game_state, _dialogs, _pack_mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
-    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
-    assert!(game_state.scene_manager().has_scene("Second"));
-    assert_eq!(game_state.player_position(), glam::IVec2::new(48, 64));
+    assert_eq!(game_state.scene().scene_manager().active_scene_name(), Some("Main"));
+    assert!(game_state.scene().scene_manager().has_scene("Second"));
+    assert_eq!(player_position(&game_state), glam::IVec2::new(48, 64));
     assert_eq!(
         game_state
-            .player_entity()
+            .world()
+            .player_id()
+            .and_then(|id| game_state.world().entity_manager().get_entity(id))
             .expect("scene player should exist")
             .definition_name
             .as_deref(),
@@ -684,10 +696,10 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         App::build_startup_state(&launch_options);
 
     assert_eq!(
-        game_state.scene_manager().active_scene_name(),
+        game_state.scene().scene_manager().active_scene_name(),
         Some("Main Scene")
     );
-    assert_eq!(game_state.player_position(), glam::IVec2::new(32, 48));
+    assert_eq!(player_position(&game_state), glam::IVec2::new(32, 48));
     assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
 }
 
@@ -851,9 +863,10 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         super::app_transition::SceneTransitionController::new(launch_options.transition.clone());
     let mut audio = FakeAudioSink;
 
-    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
+    assert_eq!(game_state.scene().scene_manager().active_scene_name(), Some("Main"));
 
-    let result = game_state.update(
+    let result = GameSimulation::tick_fixed(
+        &mut game_state,
         glam::UVec2::new(16, 16),
         resources.get_tilemap(),
         resources.get_terrain_atlas(),
@@ -862,6 +875,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         .scene_switch_request
         .expect("rule should emit scene-switch request");
     let target_track = game_state
+        .scene()
         .scene_manager()
         .get_scene(&request.scene_name)
         .and_then(|scene| scene.background_music_track_id.clone());
@@ -871,31 +885,29 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         transition.advance(50, &mut audio, launch_options.audio_mix.music_percent),
         super::app_transition::TransitionAdvance::None
     ));
-    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
+    assert_eq!(game_state.scene().scene_manager().active_scene_name(), Some("Main"));
     assert!(transition.fade_alpha() > 0.0);
 
     let request = match transition.advance(60, &mut audio, launch_options.audio_mix.music_percent) {
         super::app_transition::TransitionAdvance::ReadyToSwap(request) => request,
         other => panic!("expected ready-to-swap transition action, got {other:?}"),
     };
-    game_state
-        .transition_to_scene(&request.scene_name, &request.spawn_point_id)
+    SceneSystem::transition(&mut game_state, &request.scene_name, &request.spawn_point_id)
         .expect("scene transition should apply after fade-out");
     transition
         .complete_scene_switch(
             &mut audio,
             true,
-            game_state
-                .active_scene()
+            SceneSystem::active_scene(&game_state)
                 .and_then(|scene| scene.background_music_track_id.as_deref()),
         )
         .expect("fade-in should start");
 
     assert_eq!(
-        game_state.scene_manager().active_scene_name(),
+        game_state.scene().scene_manager().active_scene_name(),
         Some("Second")
     );
-    assert_eq!(game_state.player_position(), glam::IVec2::new(96, 48));
+    assert_eq!(player_position(&game_state), glam::IVec2::new(96, 48));
     assert!(transition.is_active());
 
     let _ = transition.advance(100, &mut audio, launch_options.audio_mix.music_percent);

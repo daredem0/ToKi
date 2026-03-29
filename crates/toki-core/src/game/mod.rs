@@ -127,8 +127,16 @@ impl WorldState {
         &self.entity_manager
     }
 
+    pub fn entity_manager_mut(&mut self) -> &mut EntityManager {
+        &mut self.entity_manager
+    }
+
     pub fn entity_definitions(&self) -> &HashMap<EntityDefName, EntityDefinition> {
         &self.entity_definitions
+    }
+
+    pub fn entity_definitions_mut(&mut self) -> &mut HashMap<EntityDefName, EntityDefinition> {
+        &mut self.entity_definitions
     }
 
     pub fn player_id(&self) -> Option<EntityId> {
@@ -161,8 +169,16 @@ impl SceneState {
         &self.scene_manager
     }
 
+    pub fn scene_manager_mut(&mut self) -> &mut SceneManager {
+        &mut self.scene_manager
+    }
+
     pub fn active_rules(&self) -> &RuleSet {
         &self.active_rules
+    }
+
+    pub fn active_rules_mut(&mut self) -> &mut RuleSet {
+        &mut self.active_rules
     }
 
     pub fn persistent_scene_entities(&self) -> &HashSet<(String, crate::entity::EntityId)> {
@@ -181,6 +197,10 @@ pub struct ProgressState {
 impl ProgressState {
     pub fn game_flags(&self) -> &GameFlags {
         &self.game_flags
+    }
+
+    pub fn game_flags_mut(&mut self) -> &mut GameFlags {
+        &mut self.game_flags
     }
 
     pub fn play_time_ms(&self) -> u64 {
@@ -257,13 +277,9 @@ pub struct GameSimulation;
 /// any runtime or windowing dependencies.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameState {
-    #[serde(flatten)]
     world: WorldState,
-    #[serde(flatten)]
     scene: SceneState,
-    #[serde(flatten)]
     progress: ProgressState,
-    #[serde(flatten)]
     runtime: RuntimeState,
 }
 
@@ -497,56 +513,6 @@ impl GameState {
 
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
         entity.effective_movement_profile()
-    }
-
-    /// Update game state by one tick
-    pub fn update(
-        &mut self,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        GameSimulation::tick_fixed(self, world_bounds, tilemap, atlas)
-    }
-
-    /// Update game state with delta time scaling.
-    ///
-    /// This method scales movement speed proportionally to the elapsed time,
-    /// allowing for variable frame rate game logic while maintaining consistent
-    /// perceived movement speed.
-    ///
-    /// # Arguments
-    /// * `delta_ms` - Elapsed time since last update in milliseconds
-    /// * `world_bounds` - World boundary constraints
-    /// * `tilemap` - Current tilemap for collision detection
-    /// * `atlas` - Atlas metadata for tile properties
-    pub fn update_with_delta(
-        &mut self,
-        delta_ms: f32,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        GameSimulation::tick_with_delta(self, delta_ms, world_bounds, tilemap, atlas)
-    }
-
-    /// Shared update implementation that scales movement and animation timing.
-    pub fn update_with_scale(
-        &mut self,
-        time_scale: f32,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        GameSimulation::tick(
-            self,
-            UpdateContext {
-                time_scale,
-                world_bounds,
-                tilemap,
-                atlas,
-            },
-        )
     }
 
     /// Helper to update player animation based on movement intent.

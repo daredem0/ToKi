@@ -536,10 +536,13 @@ impl SceneViewport {
 
         let mut entities = self
             .game_state
+            .world()
             .entity_manager()
             .active_entities()
             .into_iter()
-            .filter_map(|entity_id| self.game_state.entity_manager().get_entity(entity_id))
+            .filter_map(|entity_id| {
+                self.game_state.world().entity_manager().get_entity(entity_id)
+            })
             .collect::<Vec<_>>();
         entities.sort_by_key(|entity| {
             (

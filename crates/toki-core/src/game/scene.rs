@@ -3,7 +3,6 @@ use super::{GameState, ProgressState, RuntimeState, SceneState, WorldState};
 use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
 use crate::ids::EntityDefName;
 use crate::scene::Scene;
-use crate::scene_manager::SceneManager;
 use crate::sprite::SpriteInstance;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -420,97 +419,16 @@ impl GameState {
         }
     }
 
-    /// Get reference to all entities (legacy method - preserved for compatibility)
-    pub fn entities(&self) -> Vec<&Entity> {
-        self.world
-            .entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&id| self.world.entity_manager.get_entity(id))
-            .collect()
-    }
-
-    /// Get access to the entity manager
-    pub fn entity_manager(&self) -> &EntityManager {
-        &self.world.entity_manager
-    }
-
-    /// Get mutable access to the entity manager
-    pub fn entity_manager_mut(&mut self) -> &mut EntityManager {
-        &mut self.world.entity_manager
-    }
-
     /// Set the player entity ID directly (for testing purposes).
     #[cfg(test)]
     pub fn set_player_id(&mut self, id: EntityId) {
         self.world.player_id = Some(id);
     }
 
-    /// Get access to the scene manager
-    pub fn scene_manager(&self) -> &SceneManager {
-        &self.scene.scene_manager
-    }
-
-    /// Get mutable access to the scene manager
-    pub fn scene_manager_mut(&mut self) -> &mut SceneManager {
-        &mut self.scene.scene_manager
-    }
-
-    /// Load a scene and make it the active scene
-    /// This will clear current entities and load entities from the scene
-    pub fn load_scene(&mut self, scene_name: &str) -> Result<(), String> {
-        SceneSystem::load(self, scene_name)
-    }
-
-    pub fn transition_to_scene(
-        &mut self,
-        scene_name: &str,
-        spawn_point_id: &str,
-    ) -> Result<(), String> {
-        SceneSystem::transition(self, scene_name, spawn_point_id)
-    }
-
-    /// Add a scene to the scene manager
-    pub fn add_scene(&mut self, scene: Scene) {
-        SceneSystem::add_scene(self, scene);
-    }
-
-    /// Get reference to the current active scene
-    pub fn active_scene(&self) -> Option<&Scene> {
-        SceneSystem::active_scene(self)
-    }
-
-    /// Sync current entities back to the active scene
-    /// Useful for saving changes made during runtime back to scene data
-    pub fn sync_entities_to_active_scene(&mut self) {
-        SceneSystem::sync_entities_to_active_scene(self);
-    }
-
-    pub fn sync_persistent_entities_to_active_scene(&mut self) {
-        SceneSystem::sync_persistent_entities_to_active_scene(self);
-    }
-
-    /// Get the player entity ID
-    pub fn player_id(&self) -> Option<EntityId> {
-        self.world.player_id
-    }
-
-    /// Get reference to player entity
-    pub fn player_entity(&self) -> Option<&Entity> {
+    pub(crate) fn player_entity(&self) -> Option<&Entity> {
         self.world
             .player_id
             .and_then(|id| self.world.entity_manager.get_entity(id))
-    }
-
-    /// Get entities as owned Vec for camera system compatibility
-    pub fn entities_owned(&self) -> Vec<Entity> {
-        self.world
-            .entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&id| self.world.entity_manager.get_entity(id))
-            .cloned()
-            .collect()
     }
 
     fn apply_prepared_scene_load(
@@ -519,13 +437,13 @@ impl GameState {
         prepared: super::transition::PreparedSceneLoad,
     ) -> Result<(), String> {
         self.scene.scene_manager.set_active_scene(scene_name)?;
-        self.clear_runtime_inputs();
+        super::InputSystem::clear(&mut self.runtime);
         self.runtime.effects.pending_stat_changes.clear();
         self.runtime.effects.pending_despawns.clear();
         self.runtime.ai.delta_accumulator_ms = 0.0;
         self.world.entity_manager = prepared.entity_manager;
         self.world.player_id = prepared.player_id;
-        self.set_rules(prepared.rules);
+        super::RuleSystem::set_rules(self, prepared.rules);
         Ok(())
     }
 

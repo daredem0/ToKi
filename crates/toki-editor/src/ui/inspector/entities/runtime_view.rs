@@ -19,7 +19,7 @@ impl InspectorSystem {
             return;
         };
 
-        let Some(entity) = game_state.entity_manager().get_entity(entity_id) else {
+        let Some(entity) = game_state.world().entity_manager().get_entity(entity_id) else {
             ui.label("Entity not found in game state");
             return;
         };

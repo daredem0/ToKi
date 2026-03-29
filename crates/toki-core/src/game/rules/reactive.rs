@@ -68,7 +68,18 @@ mod tests {
     use crate::game::{AudioChannel, DamageEvent, GameState};
     use crate::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
+    use crate::game::RuleSystem;
     use super::RuleCommand;
+
+    trait GameStateReactiveRuleTestExt {
+        fn set_rules(&mut self, rules: RuleSet);
+    }
+
+    impl GameStateReactiveRuleTestExt for GameState {
+        fn set_rules(&mut self, rules: RuleSet) {
+            RuleSystem::set_rules(self, rules);
+        }
+    }
 
     #[test]
     fn reactive_rule_pipeline_collects_commands_from_frame_events_and_player_motion() {

@@ -484,13 +484,13 @@ impl DialogController {
         match condition {
             DialogCondition::HealthBelow { target, threshold } => {
                 resolve_dialog_target(game_state, context, *target)
-                    .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                    .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
                     .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
                     .is_some_and(|health| health < *threshold)
             }
             DialogCondition::HealthAbove { target, threshold } => {
                 resolve_dialog_target(game_state, context, *target)
-                    .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                    .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
                     .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
                     .is_some_and(|health| health > *threshold)
             }
@@ -499,20 +499,20 @@ impl DialogController {
                 item_id,
                 min_count,
             } => resolve_dialog_target(game_state, context, *target)
-                .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
                 .is_some_and(|entity| {
                     entity.attributes.inventory.item_count(item_id) >= *min_count
                 }),
             DialogCondition::EntityHasTag { target, tag } => {
                 resolve_dialog_target(game_state, context, *target)
-                    .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                    .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
                     .is_some_and(|entity| entity.tags.contains(tag))
             }
             DialogCondition::EntityIsKind {
                 target,
                 entity_kind,
             } => resolve_dialog_target(game_state, context, *target)
-                .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
                 .is_some_and(|entity| entity.entity_kind == *entity_kind),
             DialogCondition::FlagEquals { flag, value } => game_state.flag(flag) == Some(value),
             DialogCondition::FlagSet { flag } => game_state.game_flags().is_set(flag),
@@ -530,7 +530,7 @@ fn resolve_dialog_target(
     target: DialogConditionTarget,
 ) -> Option<crate::entity::EntityId> {
     match target {
-        DialogConditionTarget::Player => game_state.player_id(),
+        DialogConditionTarget::Player => game_state.world().player_id(),
         DialogConditionTarget::Interactor => context.interactor,
         DialogConditionTarget::Speaker => context.speaker,
     }
