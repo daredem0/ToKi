@@ -474,7 +474,7 @@ impl GameState {
             let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
-            let held_keys = self.held_keys_for_profile(Self::effective_movement_profile(entity));
+            let held_keys = self.held_keys_for_profile(entity.effective_movement_profile());
             let direction = Self::movement_delta_from_keys(&held_keys);
             intended_deltas.insert(entity_id, direction);
             self.apply_accumulated_movement_scaled(
@@ -500,7 +500,7 @@ impl GameState {
             let final_position = final_entity.position;
             let entity_moved = final_position != initial_position;
 
-            if Some(entity_id) == self.world.player_id {
+            if Some(entity_id) == self.world.player_id() {
                 result.player_moved = entity_moved;
             }
 
@@ -606,7 +606,7 @@ impl GameState {
             {
                 entity.position = candidate_position;
                 entity_audio.last_collision_state = false;
-                if Some(entity_id) == self.world.player_id {
+                if Some(entity_id) == self.world.player_id() {
                     moved_player = true;
                 }
             }

@@ -68,8 +68,6 @@ impl<'de> Deserialize<'de> for EntityManager {
     {
         let wire = EntityManagerWire::deserialize(deserializer)?;
         let mut manager = EntityManager::new();
-        manager.next_id = wire.next_id;
-        manager.player_id = wire.player_id;
         for stored in wire.entities {
             let entity_id = stored.entity.id;
             let audio_component = wire
@@ -83,10 +81,14 @@ impl<'de> Deserialize<'de> for EntityManager {
                 audio_component,
             });
         }
-        if manager.next_id == 1 {
-            manager.next_id = wire.next_id;
-        }
-        manager.player_id = wire.player_id.or(manager.player_id);
+        manager.next_id = wire.next_id.max(manager.next_id);
+        manager.player_id = manager
+            .storage
+            .entities()
+            .values()
+            .find(|entity| Self::tracks_player_role(entity))
+            .map(|entity| entity.id)
+            .or(wire.player_id);
         Ok(manager)
     }
 }
@@ -137,9 +139,8 @@ impl EntityManager {
         entity_kind: EntityKind,
         position: IVec2,
         size: UVec2,
-        mut attributes: EntityAttributes,
+        attributes: EntityAttributes,
     ) -> EntityId {
-        attributes.ensure_legacy_health_stat();
         let id = self.next_id;
         self.next_id += 1;
         let collision_box = if attributes.gameplay.solid {
@@ -153,7 +154,7 @@ impl EntityManager {
             position,
             size,
             entity_kind,
-            category: default_category_for_kind(&entity_kind).to_string(),
+            category: default_category_for_kind(entity_kind).to_string(),
             definition_name: None,
             persistent_across_saves: false,
             control_role: ControlRole::LegacyDefault,
@@ -185,19 +186,8 @@ impl EntityManager {
     pub fn clone_entity(&mut self, source_id: EntityId, position: IVec2) -> Option<EntityId> {
         let id = self.next_id;
         self.next_id += 1;
-        self.storage.clone_entity(source_id, id, position)?;
-        let entity = self
-            .storage
-            .get_entity(id)
-            .expect("cloned entity should exist")
-            .clone();
-        self.register_entity_indices_from_state(
-            entity.entity_kind,
-            id,
-            Self::tracks_player_role(&entity) && self.player_id.is_none(),
-            entity.attributes.behavior.active,
-        );
-        Some(id)
+        let bundle = self.storage.clone_spawn_bundle(source_id, id, position)?;
+        Some(self.add_spawn_bundle(bundle))
     }
 
     pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
@@ -208,8 +198,7 @@ impl EntityManager {
     }
 
     pub fn add_existing_stored_entity(&mut self, stored: StoredEntity) -> EntityId {
-        let mut entity = stored.entity;
-        entity.attributes.ensure_legacy_health_stat();
+        let entity = stored.entity;
         self.add_spawn_bundle(EntitySpawnBundle {
             audio_component: entity.audio.to_component(),
             entity,

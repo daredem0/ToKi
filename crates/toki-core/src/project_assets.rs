@@ -1,6 +1,9 @@
 use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use crate::dialog::DialogTree;
 use crate::entity::EntityDefinition;
+use crate::io::text::{
+    read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
+};
 use crate::palette::{load_palette_asset_from_path, Palette4};
 use crate::scene::Scene;
 use crate::CoreError;
@@ -112,7 +115,13 @@ fn load_project_scene_manifest(
         return Ok(ProjectSceneManifest::default());
     }
 
-    let content = fs::read_to_string(&project_file)?;
+    let content = read_text_file_with_limit(
+        &project_file,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            too_large_io_error(path, size_bytes, max_bytes, "project scene manifest")
+        },
+    )?;
     Ok(toml::from_str(&content).unwrap_or_default())
 }
 
@@ -193,19 +202,35 @@ pub fn discover_project_dialog_paths(
 }
 
 pub fn load_scene_from_path(path: &Path) -> Result<Scene, ProjectAssetError> {
-    let json = fs::read_to_string(path)?;
+    let json = read_text_file_with_limit(
+        path,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| too_large_io_error(path, size_bytes, max_bytes, "scene file"),
+    )?;
     Ok(serde_json::from_str::<Scene>(&json).map_err(CoreError::from)?)
 }
 
 pub fn load_entity_definition_from_path(
     path: &Path,
 ) -> Result<EntityDefinition, ProjectAssetError> {
-    let json = fs::read_to_string(path)?;
+    let json = read_text_file_with_limit(
+        path,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            too_large_io_error(path, size_bytes, max_bytes, "entity definition file")
+        },
+    )?;
     Ok(serde_json::from_str::<EntityDefinition>(&json).map_err(CoreError::from)?)
 }
 
 pub fn load_dialog_from_path(path: &Path) -> Result<DialogTree, ProjectAssetError> {
-    let json = fs::read_to_string(path)?;
+    let json = read_text_file_with_limit(
+        path,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            too_large_io_error(path, size_bytes, max_bytes, "dialog file")
+        },
+    )?;
     Ok(serde_json::from_str::<DialogTree>(&json).map_err(CoreError::from)?)
 }
 
@@ -244,7 +269,13 @@ pub fn find_first_json_file(dir: &Path) -> Result<Option<PathBuf>, ProjectAssetE
 pub fn classify_sprite_metadata_file(
     path: &Path,
 ) -> Result<SpriteMetadataFileKind, ProjectAssetError> {
-    let json_data = fs::read_to_string(path)?;
+    let json_data = read_text_file_with_limit(
+        path,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            too_large_io_error(path, size_bytes, max_bytes, "sprite metadata file")
+        },
+    )?;
 
     if let Ok(object_sheet) = serde_json::from_str::<ObjectSheetMeta>(&json_data) {
         if matches!(

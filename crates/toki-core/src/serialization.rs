@@ -1,6 +1,7 @@
 use crate::entity::{Entity, EntityManager, EntityWire, StoredEntity};
 use crate::game::{GameState, RestoreError};
 use crate::ids::SceneId;
+use crate::io::text::read_text_file_with_limit;
 use crate::scene::Scene;
 use crate::GameFlags;
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 pub const SAVE_DATA_VERSION: u32 = 1;
+pub const MIN_SUPPORTED_SAVE_DATA_VERSION: u32 = 1;
 pub const MAX_SAVE_SLOTS: u8 = 3;
 pub const MAX_SAVE_FILE_SIZE: u64 = 8 * 1024 * 1024;
 
@@ -74,6 +76,11 @@ pub struct SaveData {
     pub persisted_entities: Vec<PersistedSceneEntityState>,
 }
 
+#[derive(Debug, Deserialize)]
+struct SaveDataVersionHeader {
+    version: u32,
+}
+
 impl SaveData {
     pub fn capture(game_state: &GameState, slot: u8) -> Result<Self, SerializationError> {
         validate_save_slot(slot)?;
@@ -131,7 +138,7 @@ impl SaveData {
                         .scene_manager()
                         .get_scene(scene_name.as_str())
                         .and_then(|scene| scene.stored_entity(entity_id)),
-                    scene_name: scene_name.into(),
+                    scene_name,
                     entity_id,
                 })
                 .collect(),
@@ -139,8 +146,8 @@ impl SaveData {
     }
 }
 
-pub fn validate_version(version: u32) -> Result<(), SerializationError> {
-    if version == SAVE_DATA_VERSION {
+pub(crate) fn validate_version(version: u32) -> Result<(), SerializationError> {
+    if (MIN_SUPPORTED_SAVE_DATA_VERSION..=SAVE_DATA_VERSION).contains(&version) {
         Ok(())
     } else {
         Err(SerializationError::InvalidSaveVersion {
@@ -169,7 +176,14 @@ pub fn save_entity_to_file(entity: &Entity, path: &str) -> Result<(), Serializat
 }
 
 pub fn load_entity_from_file(path: &str) -> Result<Entity, SerializationError> {
-    let json = read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE)?;
+    let json =
+        read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE, |path, size_bytes, max_bytes| {
+            SerializationError::FileTooLarge {
+                path: path.display().to_string(),
+                size_bytes,
+                max_bytes,
+            }
+        })?;
     let entity: StoredEntity = serde_json::from_str::<EntityWire>(&json)?.into();
     Ok(entity.entity)
 }
@@ -181,7 +195,14 @@ pub fn save_scene(entity_manager: &EntityManager, path: &str) -> Result<(), Seri
 }
 
 pub fn load_scene(path: &str) -> Result<EntityManager, SerializationError> {
-    let json = read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE)?;
+    let json =
+        read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE, |path, size_bytes, max_bytes| {
+            SerializationError::FileTooLarge {
+                path: path.display().to_string(),
+                size_bytes,
+                max_bytes,
+            }
+        })?;
     let entity_manager: EntityManager = serde_json::from_str(&json)?;
     Ok(entity_manager)
 }
@@ -196,9 +217,18 @@ pub fn save_save_data(
 }
 
 pub fn load_save_data(path: impl AsRef<Path>) -> Result<SaveData, SerializationError> {
-    let json = read_text_file_with_limit(path.as_ref(), MAX_SAVE_FILE_SIZE)?;
+    let json = read_text_file_with_limit(
+        path.as_ref(),
+        MAX_SAVE_FILE_SIZE,
+        |path, size_bytes, max_bytes| SerializationError::FileTooLarge {
+            path: path.display().to_string(),
+            size_bytes,
+            max_bytes,
+        },
+    )?;
+    let header: SaveDataVersionHeader = serde_json::from_str(&json)?;
+    validate_version(header.version)?;
     let save_data: SaveData = serde_json::from_str(&json)?;
-    validate_version(save_data.version)?;
     Ok(save_data)
 }
 
@@ -250,20 +280,4 @@ pub fn list_save_slot_metadata(
     (1..=MAX_SAVE_SLOTS)
         .map(|slot| read_save_slot_metadata(save_root.as_ref(), slot))
         .collect()
-}
-
-fn read_text_file_with_limit(
-    path: impl AsRef<Path>,
-    max_bytes: u64,
-) -> Result<String, SerializationError> {
-    let path = path.as_ref();
-    let metadata = fs::metadata(path)?;
-    if metadata.len() > max_bytes {
-        return Err(SerializationError::FileTooLarge {
-            path: path.display().to_string(),
-            size_bytes: metadata.len(),
-            max_bytes,
-        });
-    }
-    Ok(fs::read_to_string(path)?)
 }

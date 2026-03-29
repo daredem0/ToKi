@@ -1,7 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::ids::SceneId;
 use crate::scene::Scene;
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SceneManagerError {
+    #[error("scene '{scene_name}' not found")]
+    MissingScene { scene_name: SceneId },
+}
 
 /// Manages all scenes within a GameState.
 ///
@@ -10,10 +17,10 @@ use crate::scene::Scene;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SceneManager {
     /// All available scenes by name
-    scenes: HashMap<String, Scene>,
+    scenes: HashMap<SceneId, Scene>,
 
     /// Currently active scene name
-    active_scene: Option<String>,
+    active_scene: Option<SceneId>,
 }
 
 impl Default for SceneManager {
@@ -33,13 +40,13 @@ impl SceneManager {
 
     /// Add or update a scene
     pub fn add_scene(&mut self, scene: Scene) {
-        let scene_name = scene.name.clone();
-        self.scenes.insert(scene_name, scene);
+        let scene_id = SceneId::from(scene.name.as_str());
+        self.scenes.insert(scene_id, scene);
     }
 
     /// Remove a scene
     pub fn remove_scene(&mut self, scene_name: &str) -> bool {
-        if Some(scene_name) == self.active_scene.as_deref() {
+        if self.active_scene.as_deref() == Some(scene_name) {
             self.active_scene = None;
         }
         self.scenes.remove(scene_name).is_some()
@@ -50,8 +57,16 @@ impl SceneManager {
         self.scenes.get(scene_name)
     }
 
+    pub fn get_scene_by_id(&self, scene_name: &SceneId) -> Option<&Scene> {
+        self.scenes.get(scene_name)
+    }
+
     /// Get a mutable reference to a scene
     pub fn get_scene_mut(&mut self, scene_name: &str) -> Option<&mut Scene> {
+        self.scenes.get_mut(scene_name)
+    }
+
+    pub fn get_scene_mut_by_id(&mut self, scene_name: &SceneId) -> Option<&mut Scene> {
         self.scenes.get_mut(scene_name)
     }
 
@@ -69,12 +84,18 @@ impl SceneManager {
     }
 
     /// Set the active scene
-    pub fn set_active_scene(&mut self, scene_name: &str) -> Result<(), String> {
+    pub fn set_active_scene(&mut self, scene_name: &SceneId) -> Result<(), SceneManagerError> {
         if !self.scenes.contains_key(scene_name) {
-            return Err(format!("Scene '{}' not found", scene_name));
+            return Err(SceneManagerError::MissingScene {
+                scene_name: scene_name.clone(),
+            });
         }
-        self.active_scene = Some(scene_name.to_string());
+        self.active_scene = Some(scene_name.clone());
         Ok(())
+    }
+
+    pub fn set_active_scene_by_name(&mut self, scene_name: &str) -> Result<(), SceneManagerError> {
+        self.set_active_scene(&scene_name.into())
     }
 
     /// Get the name of the active scene
@@ -82,15 +103,17 @@ impl SceneManager {
         self.active_scene.as_deref()
     }
 
-    /// Get all scene names
-    pub fn scene_names(&self) -> Vec<&str> {
-        self.scenes.keys().map(|s| s.as_str()).collect()
+    pub fn active_scene_id(&self) -> Option<&SceneId> {
+        self.active_scene.as_ref()
     }
 
-    pub fn scene_entries(&self) -> impl Iterator<Item = (&str, &Scene)> {
-        self.scenes
-            .iter()
-            .map(|(name, scene)| (name.as_str(), scene))
+    /// Get all scene names
+    pub fn scene_names(&self) -> Vec<&SceneId> {
+        self.scenes.keys().collect()
+    }
+
+    pub fn scene_entries(&self) -> impl Iterator<Item = (&SceneId, &Scene)> {
+        self.scenes.iter()
     }
 
     /// Check if a scene exists

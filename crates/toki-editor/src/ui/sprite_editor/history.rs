@@ -30,17 +30,15 @@ impl SpriteEditorHistory {
     }
 
     pub fn take_undo(&mut self) -> Option<SpriteCanvas> {
-        let command = self.history.take_undo()?;
-        let before = command.before.clone();
-        self.history.restore_redo(command);
-        Some(before)
+        self.history
+            .undo_entry()
+            .map(|command| command.before.clone())
     }
 
     pub fn take_redo(&mut self) -> Option<SpriteCanvas> {
-        let command = self.history.take_redo()?;
-        let after = command.after.clone();
-        self.history.restore_undo(command);
-        Some(after)
+        self.history
+            .redo_entry()
+            .map(|command| command.after.clone())
     }
 
     #[cfg_attr(not(test), allow(dead_code))]

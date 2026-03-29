@@ -54,3 +54,4 @@ strum = { version = "0.26", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3.21.0"
+toki-test-fixtures = { path = "../toki-test-fixtures", version = "0.2.2" }

@@ -19,7 +19,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use self::engine::RuleEngine;
+use self::engine::{RuleEngine, RuleEngineContext};
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
 use crate::flags::FlagValue;
@@ -39,7 +39,6 @@ mod engine;
 mod evaluation;
 mod reactive;
 mod spawning;
-mod target;
 mod tiles;
 mod transitions;
 
@@ -51,12 +50,11 @@ pub use events::{
 
 use super::{AudioChannel, AudioEvent, GameState};
 
-pub(super) type AppliedRuleCommandResult = (
-    Vec<(EntityId, AnimationState)>,
-    Option<PendingSceneSwitch>,
-    Option<PendingDialogStart>,
-    Option<crate::events::PersistenceRequest>,
-);
+pub(super) struct AppliedRuleCommandResult {
+    pub(super) pending_animations: Vec<(EntityId, AnimationState)>,
+    pub(super) pending_scene_switch: Option<PendingSceneSwitch>,
+    pub(super) pending_persistence: Option<crate::events::PersistenceRequest>,
+}
 
 pub struct RuleSystem;
 
@@ -242,15 +240,21 @@ pub(super) type PendingSceneSwitch = crate::events::SceneSwitchRequest;
 pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 
 impl GameState {
-    pub(super) fn rule_engine(&mut self) -> RuleEngine<'_> {
+    pub(super) fn with_rule_engine<R>(
+        &mut self,
+        build: impl FnOnce(&mut RuleEngine<'_>) -> R,
+    ) -> R {
         let held_keys = self.all_held_keys();
-        RuleEngine::new(
-            &self.world.entity_manager,
-            self.world.player_id,
-            held_keys,
-            &self.progress.game_flags,
-            &self.scene.active_rules,
+        let mut engine = RuleEngine::new(
+            RuleEngineContext {
+                entity_manager: &self.world.entity_manager,
+                player_id: self.world.player_id(),
+                held_keys: &held_keys,
+                game_flags: &self.progress.game_flags,
+                rules: &self.scene.active_rules,
+            },
             &mut self.runtime.rules,
-        )
+        );
+        build(&mut engine)
     }
 }

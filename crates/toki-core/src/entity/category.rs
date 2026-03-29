@@ -1,6 +1,6 @@
 use super::model::EntityKind;
 
-pub fn default_category_for_kind(entity_kind: &EntityKind) -> &'static str {
+pub fn default_category_for_kind(entity_kind: EntityKind) -> &'static str {
     match entity_kind {
         EntityKind::Player => "human",
         EntityKind::Npc => "creature",
@@ -13,13 +13,21 @@ pub fn default_category_for_kind(entity_kind: &EntityKind) -> &'static str {
 
 pub fn runtime_entity_kind_for_category(category: &str) -> EntityKind {
     match category.trim().to_ascii_lowercase().as_str() {
+        "human" | "humans" | "player" | "players" => EntityKind::Player,
         "item" | "items" => EntityKind::Item,
         "trigger" | "triggers" => EntityKind::Trigger,
         "projectile" | "projectiles" => EntityKind::Projectile,
         "decoration" | "decorations" | "building" | "buildings" | "plant" | "plants" => {
             EntityKind::Decoration
         }
-        _ => EntityKind::Npc,
+        "creature" | "creatures" => EntityKind::Npc,
+        unknown => {
+            tracing::warn!(
+                category = %unknown,
+                "Unknown runtime entity category; falling back to NPC"
+            );
+            EntityKind::Npc
+        }
     }
 }
 
@@ -29,22 +37,30 @@ mod tests {
 
     #[test]
     fn default_category_mapping_covers_all_runtime_kinds() {
-        assert_eq!(default_category_for_kind(&EntityKind::Player), "human");
-        assert_eq!(default_category_for_kind(&EntityKind::Npc), "creature");
-        assert_eq!(default_category_for_kind(&EntityKind::Item), "item");
+        assert_eq!(default_category_for_kind(EntityKind::Player), "human");
+        assert_eq!(default_category_for_kind(EntityKind::Npc), "creature");
+        assert_eq!(default_category_for_kind(EntityKind::Item), "item");
         assert_eq!(
-            default_category_for_kind(&EntityKind::Decoration),
+            default_category_for_kind(EntityKind::Decoration),
             "decoration"
         );
-        assert_eq!(default_category_for_kind(&EntityKind::Trigger), "trigger");
+        assert_eq!(default_category_for_kind(EntityKind::Trigger), "trigger");
         assert_eq!(
-            default_category_for_kind(&EntityKind::Projectile),
+            default_category_for_kind(EntityKind::Projectile),
             "projectile"
         );
     }
 
     #[test]
     fn category_string_mapping_supports_legacy_aliases() {
+        assert_eq!(
+            runtime_entity_kind_for_category("human"),
+            EntityKind::Player
+        );
+        assert_eq!(
+            runtime_entity_kind_for_category("player"),
+            EntityKind::Player
+        );
         assert_eq!(runtime_entity_kind_for_category("item"), EntityKind::Item);
         assert_eq!(
             runtime_entity_kind_for_category("triggers"),

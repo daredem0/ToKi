@@ -5,10 +5,6 @@ use std::path::Path;
 /// Errors that can occur during resource loading
 #[derive(Debug, thiserror::Error)]
 pub enum ResourceError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("JSON parsing error: {0}")]
-    Json(#[from] serde_json::Error),
     #[error("Failed to load atlas '{path}': {source}")]
     AtlasLoad {
         path: String,
@@ -21,8 +17,12 @@ pub enum ResourceError {
         #[source]
         source: CoreError,
     },
-    #[error("Asset validation error: {0}")]
-    Validation(String),
+    #[error("Tilemap validation failed for '{path}': {source}")]
+    TilemapValidation {
+        path: String,
+        #[source]
+        source: CoreError,
+    },
 }
 
 /// Resource management system that handles loading and providing access to game assets.
@@ -76,7 +76,10 @@ impl ResourceManager {
         // Validate the tilemap
         tilemap
             .validate()
-            .map_err(|e| ResourceError::Validation(format!("Tilemap validation failed: {}", e)))?;
+            .map_err(|source| ResourceError::TilemapValidation {
+                path: tilemap_path.display().to_string(),
+                source,
+            })?;
 
         Ok(Self {
             terrain_atlas,
@@ -114,7 +117,10 @@ impl ResourceManager {
         // Validate the tilemap
         tilemap
             .validate()
-            .map_err(|e| ResourceError::Validation(format!("Tilemap validation failed: {}", e)))?;
+            .map_err(|source| ResourceError::TilemapValidation {
+                path: tilemap_path.display().to_string(),
+                source,
+            })?;
 
         Ok(Self {
             terrain_atlas,

@@ -1,8 +1,9 @@
-use glam::{IVec2, UVec2};
+use glam::IVec2;
 use tempfile::tempdir;
-use toki_core::entity::{EntityAttributes, EntityKind};
+use toki_core::entity::EntityAttributes;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
+use toki_test_fixtures::test_npc_entity;
 
 use super::{EditorUI, MapEditorDraft, ProjectRequest, Selection};
 use crate::project::Project;
@@ -12,21 +13,11 @@ use crate::ui::sprite_editor::PixelColor;
 use crate::ui::undo_redo::EditorCommand;
 
 fn sample_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
-    toki_core::entity::Entity {
-        id,
-        position,
-        size: UVec2::new(16, 16),
-        entity_kind: EntityKind::Npc,
-        category: "creature".to_string(),
-        definition_name: Some("npc".to_string().into()),
-        persistent_across_saves: false,
-        control_role: toki_core::entity::ControlRole::None,
-        audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
-        collision_box: None,
-        movement_accumulator: glam::Vec2::ZERO,
-        tags: Vec::new(),
-    }
+    let mut entity = test_npc_entity(id);
+    entity.position = position;
+    entity.definition_name = Some("npc".to_string().into());
+    entity.attributes = EntityAttributes::default();
+    entity
 }
 
 #[test]

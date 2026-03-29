@@ -70,7 +70,7 @@ impl GameState {
             .filter_map(|&entity_id| {
                 let entity = self.world.entity_manager.get_entity(entity_id)?;
                 if matches!(
-                    Self::effective_movement_profile(entity),
+                    entity.effective_movement_profile(),
                     MovementProfile::PlayerWasd
                 ) {
                     Some(entity_id)

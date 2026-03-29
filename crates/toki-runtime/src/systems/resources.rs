@@ -329,6 +329,15 @@ fn load_palette_settings(
         return Ok((project_palettes, None));
     }
 
+    let metadata = std::fs::metadata(&project_file).map_err(|error| error.to_string())?;
+    if metadata.len() > 1024 * 1024 {
+        return Err(format!(
+            "project runtime settings are too large to load safely: {} ({} bytes, max {})",
+            project_file.display(),
+            metadata.len(),
+            1024 * 1024
+        ));
+    }
     let content = std::fs::read_to_string(&project_file).map_err(|error| error.to_string())?;
     let metadata =
         toml::from_str::<ProjectRuntimeMetadata>(&content).map_err(|error| error.to_string())?;

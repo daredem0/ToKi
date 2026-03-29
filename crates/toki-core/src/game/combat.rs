@@ -423,7 +423,7 @@ impl GameState {
                 let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                     continue;
                 };
-                if Self::effective_movement_profile(entity) != profile {
+                if entity.effective_movement_profile() != profile {
                     continue;
                 }
                 self.trigger_entity_primary_action(entity_id);

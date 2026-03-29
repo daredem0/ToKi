@@ -12,6 +12,7 @@ pub mod math {
     pub mod projection;
 }
 pub mod errors;
+pub(crate) mod io;
 pub use errors::CoreError;
 pub mod ids;
 pub use ids::{DialogId, EntityDefName, SceneId};

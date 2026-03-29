@@ -2946,7 +2946,11 @@ fn game_state_transition_to_scene_missing_spawn_fails_without_corrupting_state()
     let before_position = player_position(&game_state);
     let error = SceneSystem::transition(&mut game_state, "Scene B", "missing_spawn")
         .expect_err("missing spawn point should fail");
-    assert!(error.contains("missing_spawn"));
+    assert!(matches!(
+        error,
+        toki_core::game::SceneLoadError::MissingSpawnAnchor { ref spawn_point_id, .. }
+            if spawn_point_id == "missing_spawn"
+    ));
     assert_eq!(
         game_state.scene().scene_manager().active_scene_name(),
         Some("Scene A")
@@ -3122,7 +3126,7 @@ fn game_state_spawn_player_like_npc_uses_definition_metadata() {
         .expect("spawned npc should exist");
 
     assert_eq!(npc.definition_name.as_deref(), Some("player_like_npc"));
-    assert_eq!(npc.entity_kind, toki_core::entity::EntityKind::Npc);
+    assert_eq!(npc.entity_kind, toki_core::entity::EntityKind::Player);
 }
 
 #[test]

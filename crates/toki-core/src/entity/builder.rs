@@ -111,7 +111,7 @@ impl EntityBuilder {
     pub fn build(self) -> Entity {
         let category = self
             .category
-            .unwrap_or_else(|| default_category_for_kind(&self.entity_kind).to_string());
+            .unwrap_or_else(|| default_category_for_kind(self.entity_kind).to_string());
 
         Entity {
             id: self.id,

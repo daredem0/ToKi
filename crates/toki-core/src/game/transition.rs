@@ -3,18 +3,17 @@ use std::collections::HashMap;
 use crate::animation::AnimationState;
 use crate::collision::CollisionBox;
 use crate::entity::{
-    ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager,
-    OptionalEntityComponents, StoredEntity,
+    ControlRole, Entity, EntityDefinition, EntityKind, EntityManager, OptionalEntityComponents,
+    StoredEntity,
 };
 use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 use crate::scene::{Scene, SceneAnchorFacing};
 
-use super::GameState;
+use super::{GameState, SceneLoadError};
 
 pub(super) struct PreparedSceneLoad {
     pub(super) entity_manager: EntityManager,
-    pub(super) player_id: Option<EntityId>,
     pub(super) rules: RuleSet,
 }
 
@@ -32,7 +31,7 @@ impl<'a> SceneTransitionPlanner<'a> {
         scene: &Scene,
         transition_spawn_point_id: Option<&str>,
         preserved_player: Option<StoredEntity>,
-    ) -> Result<PreparedSceneLoad, String> {
+    ) -> Result<PreparedSceneLoad, SceneLoadError> {
         let mut entity_manager = EntityManager::new();
         let preserve_player_across_transition =
             transition_spawn_point_id.is_some() && preserved_player.is_some();
@@ -52,7 +51,7 @@ impl<'a> SceneTransitionPlanner<'a> {
             entity_manager.add_existing_stored_entity(StoredEntity::new(hydrated, components));
         }
 
-        let player_id = if let Some(player_entry) = &scene.player_entry {
+        if let Some(player_entry) = &scene.player_entry {
             let spawn_point_id = transition_spawn_point_id.unwrap_or(&player_entry.spawn_point_id);
             if let Some(preserved_player) = preserved_player.as_ref() {
                 let mut player = self.instantiate_scene_player_entry(
@@ -72,27 +71,26 @@ impl<'a> SceneTransitionPlanner<'a> {
                 if let Some(player) = entity_manager.get_entity_mut(player_id) {
                     player.entity_kind = EntityKind::Player;
                 }
-                Some(player_id)
             } else {
                 let (position, facing) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
                 let definition = self
                     .entity_definitions
                     .get(&player_entry.entity_definition_name)
-                    .ok_or_else(|| {
-                        format!(
-                            "Scene '{}' references missing player entity definition '{}'",
-                            scene.name, player_entry.entity_definition_name
-                        )
+                    .ok_or_else(|| SceneLoadError::MissingPlayerDefinition {
+                        scene_name: scene.name.as_str().into(),
+                        definition_name: player_entry.entity_definition_name.clone(),
                     })?;
                 let player_id = entity_manager
                     .spawn_from_definition(definition, position)
-                    .map_err(|error| error.to_string())?;
+                    .map_err(|source| SceneLoadError::EntityDefinitionCreate {
+                        definition_name: player_entry.entity_definition_name.clone(),
+                        source,
+                    })?;
                 entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
                 if let Some(player) = entity_manager.get_entity_mut(player_id) {
                     player.entity_kind = EntityKind::Player;
                     Self::reset_player_transient_state(player, facing);
                 }
-                Some(player_id)
             }
         } else if let Some(mut player) = preserved_player {
             if let Some(spawn_point_id) = transition_spawn_point_id {
@@ -106,14 +104,10 @@ impl<'a> SceneTransitionPlanner<'a> {
             if let Some(player) = entity_manager.get_entity_mut(player_id) {
                 player.entity_kind = EntityKind::Player;
             }
-            Some(player_id)
-        } else {
-            entity_manager.get_player_id()
-        };
+        }
 
         Ok(PreparedSceneLoad {
             entity_manager,
-            player_id,
             rules: scene.rules.clone(),
         })
     }
@@ -121,23 +115,24 @@ impl<'a> SceneTransitionPlanner<'a> {
     fn instantiate_scene_player_entry(
         &self,
         scene: &Scene,
-        entity_definition_name: &str,
+        entity_definition_name: &EntityDefName,
         spawn_point_id: &str,
         preserved_player: &StoredEntity,
-    ) -> Result<StoredEntity, String> {
+    ) -> Result<StoredEntity, SceneLoadError> {
         let definition = self
             .entity_definitions
             .get(entity_definition_name)
-            .ok_or_else(|| {
-                format!(
-                    "Scene '{}' references missing player entity definition '{}'",
-                    scene.name, entity_definition_name
-                )
+            .ok_or_else(|| SceneLoadError::MissingPlayerDefinition {
+                scene_name: scene.name.as_str().into(),
+                definition_name: entity_definition_name.clone(),
             })?;
         let (position, _) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
         let bundle = definition
             .create_spawn_bundle(position, preserved_player.entity.id)
-            .map_err(|error| error.to_string())?;
+            .map_err(|source| SceneLoadError::EntityDefinitionCreate {
+                definition_name: entity_definition_name.clone(),
+                source,
+            })?;
         let mut player = bundle.entity;
         player.control_role = ControlRole::PlayerCharacter;
         player.entity_kind = EntityKind::Player;
@@ -180,7 +175,7 @@ impl<'a> SceneTransitionPlanner<'a> {
         player: &mut Entity,
         scene: &Scene,
         spawn_point_id: &str,
-    ) -> Result<(), String> {
+    ) -> Result<(), SceneLoadError> {
         let (position, facing) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
         player.position = position;
         Self::reset_player_transient_state(player, facing);
@@ -257,13 +252,14 @@ impl<'a> SceneTransitionPlanner<'a> {
         &self,
         scene: &Scene,
         spawn_point_id: &str,
-    ) -> Result<(glam::IVec2, Option<SceneAnchorFacing>), String> {
-        let anchor = scene.get_anchor(spawn_point_id).ok_or_else(|| {
-            format!(
-                "Scene '{}' could not resolve spawn point '{}'",
-                scene.name, spawn_point_id
-            )
-        })?;
+    ) -> Result<(glam::IVec2, Option<SceneAnchorFacing>), SceneLoadError> {
+        let anchor =
+            scene
+                .get_anchor(spawn_point_id)
+                .ok_or_else(|| SceneLoadError::MissingSpawnAnchor {
+                    scene_name: scene.name.as_str().into(),
+                    spawn_point_id: spawn_point_id.to_string(),
+                })?;
         Ok((anchor.position, anchor.facing))
     }
 }
@@ -380,9 +376,13 @@ mod tests {
             )
             .expect("scene load should be prepared");
 
+        let prepared_player_id = prepared
+            .entity_manager
+            .get_player_id()
+            .expect("player should exist");
         let player = prepared
             .entity_manager
-            .get_entity(prepared.player_id.expect("player should exist"))
+            .get_entity(prepared_player_id)
             .expect("prepared player should exist");
         assert_eq!(player.position, glam::IVec2::new(32, 48));
         assert_eq!(player.attributes.current_stat("health"), Some(75));

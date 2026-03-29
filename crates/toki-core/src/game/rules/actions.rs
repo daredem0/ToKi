@@ -33,10 +33,35 @@ impl RuleEngine<'_> {
             info!(rule_id = %rule_id, action = ?action, "Rule action passed");
         }
         tracing::debug!("Buffering rule action: {:?}", action);
-        let _handled = self.buffer_audio_or_motion_action(action, context, command_buffer)
-            || self.buffer_scene_dialog_or_persistence_action(action, context, command_buffer)
-            || self.buffer_entity_mutation_action(action, context, command_buffer)
-            || self.buffer_inventory_or_flag_action(action, context, command_buffer);
+        match action {
+            RuleAction::PlaySound { .. }
+            | RuleAction::PlayMusic { .. }
+            | RuleAction::PlayAnimation { .. }
+            | RuleAction::SetVelocity { .. } => {
+                self.buffer_audio_or_motion_action(action, context, command_buffer);
+            }
+            RuleAction::SwitchScene { .. }
+            | RuleAction::StartDialog { .. }
+            | RuleAction::SaveGame { .. }
+            | RuleAction::LoadGame { .. } => {
+                self.buffer_scene_dialog_or_persistence_action(action, context, command_buffer);
+            }
+            RuleAction::Spawn { .. }
+            | RuleAction::DestroySelf { .. }
+            | RuleAction::DamageEntity { .. }
+            | RuleAction::HealEntity { .. }
+            | RuleAction::SetEntityActive { .. }
+            | RuleAction::TeleportEntity { .. } => {
+                self.buffer_entity_mutation_action(action, context, command_buffer);
+            }
+            RuleAction::AddInventoryItem { .. }
+            | RuleAction::RemoveInventoryItem { .. }
+            | RuleAction::SetFlag { .. }
+            | RuleAction::IncrementFlag { .. }
+            | RuleAction::ClearFlag { .. } => {
+                self.buffer_inventory_or_flag_action(action, context, command_buffer);
+            }
+        }
     }
 
     fn buffer_audio_or_motion_action(
@@ -44,25 +69,21 @@ impl RuleEngine<'_> {
         action: &RuleAction,
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
-    ) -> bool {
+    ) {
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 self.buffer_play_sound(channel, sound_id, command_buffer);
-                true
             }
             RuleAction::PlayMusic { track_id } => {
                 self.buffer_play_music(track_id, command_buffer);
-                true
             }
             RuleAction::PlayAnimation { target, state } => {
                 self.buffer_play_animation(*target, *state, context, command_buffer);
-                true
             }
             RuleAction::SetVelocity { target, velocity } => {
                 self.buffer_set_velocity(*target, velocity, context, command_buffer);
-                true
             }
-            _ => false,
+            _ => unreachable!("audio or motion helper only handles audio or motion actions"),
         }
     }
 
@@ -71,24 +92,8 @@ impl RuleEngine<'_> {
         action: &RuleAction,
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
-    ) -> bool {
+    ) {
         match action {
-            RuleAction::Spawn {
-                entity_type,
-                position,
-            } => {
-                command_buffer.push(RuleCommand::Spawn {
-                    entity_type: *entity_type,
-                    position: glam::IVec2::new(position[0], position[1]),
-                });
-                true
-            }
-            RuleAction::DestroySelf { target } => {
-                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::DestroySelf { entity_id }
-                });
-                true
-            }
             RuleAction::SwitchScene {
                 scene_name,
                 spawn_point_id,
@@ -106,7 +111,6 @@ impl RuleEngine<'_> {
                     transition: *transition,
                     duration_ms: *duration_ms,
                 });
-                true
             }
             RuleAction::StartDialog { dialog_id } => {
                 let dialog_id = dialog_id.trim();
@@ -119,17 +123,14 @@ impl RuleEngine<'_> {
                         },
                     });
                 }
-                true
             }
             RuleAction::SaveGame { slot } => {
                 command_buffer.push(RuleCommand::SaveGame { slot: *slot });
-                true
             }
             RuleAction::LoadGame { slot } => {
                 command_buffer.push(RuleCommand::LoadGame { slot: *slot });
-                true
             }
-            _ => false,
+            _ => unreachable!("scene, dialog, or persistence helper only handles matching actions"),
         }
     }
 
@@ -138,8 +139,22 @@ impl RuleEngine<'_> {
         action: &RuleAction,
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
-    ) -> bool {
+    ) {
         match action {
+            RuleAction::Spawn {
+                entity_type,
+                position,
+            } => {
+                command_buffer.push(RuleCommand::Spawn {
+                    entity_type: *entity_type,
+                    position: glam::IVec2::new(position[0], position[1]),
+                });
+            }
+            RuleAction::DestroySelf { target } => {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::DestroySelf { entity_id }
+                });
+            }
             RuleAction::DamageEntity { target, amount } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
                     RuleCommand::DamageEntity {
@@ -147,7 +162,6 @@ impl RuleEngine<'_> {
                         amount: *amount,
                     }
                 });
-                true
             }
             RuleAction::HealEntity { target, amount } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
@@ -156,7 +170,6 @@ impl RuleEngine<'_> {
                         amount: *amount,
                     }
                 });
-                true
             }
             RuleAction::SetEntityActive { target, active } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
@@ -165,7 +178,6 @@ impl RuleEngine<'_> {
                         active: *active,
                     }
                 });
-                true
             }
             RuleAction::TeleportEntity {
                 target,
@@ -179,9 +191,8 @@ impl RuleEngine<'_> {
                         tile_y: *tile_y,
                     }
                 });
-                true
             }
-            _ => false,
+            _ => unreachable!("entity mutation helper only handles entity mutation actions"),
         }
     }
 
@@ -190,7 +201,7 @@ impl RuleEngine<'_> {
         action: &RuleAction,
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
-    ) -> bool {
+    ) {
         match action {
             RuleAction::AddInventoryItem {
                 target,
@@ -204,7 +215,6 @@ impl RuleEngine<'_> {
                         count: *count,
                     }
                 });
-                true
             }
             RuleAction::RemoveInventoryItem {
                 target,
@@ -218,7 +228,6 @@ impl RuleEngine<'_> {
                         count: *count,
                     }
                 });
-                true
             }
             RuleAction::SetFlag { flag, value } => {
                 let flag = flag.trim();
@@ -228,7 +237,6 @@ impl RuleEngine<'_> {
                         value: value.clone(),
                     });
                 }
-                true
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 let flag = flag.trim();
@@ -238,7 +246,6 @@ impl RuleEngine<'_> {
                         amount: *amount,
                     });
                 }
-                true
             }
             RuleAction::ClearFlag { flag } => {
                 let flag = flag.trim();
@@ -247,9 +254,8 @@ impl RuleEngine<'_> {
                         flag: flag.to_string(),
                     });
                 }
-                true
             }
-            _ => false,
+            _ => unreachable!("inventory or flag helper only handles inventory or flag actions"),
         }
     }
 

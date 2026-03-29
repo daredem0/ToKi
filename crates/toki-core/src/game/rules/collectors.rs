@@ -34,16 +34,14 @@ impl RuleEngine<'_> {
         });
     }
 
-    pub(in crate::game::rules) fn execute_sorted_rule_indices<ShouldExecute, LogRule, LogAction>(
+    pub(in crate::game::rules) fn execute_sorted_rule_indices<LogRule, LogAction>(
         &mut self,
         sorted_indices: &[usize],
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
-        mut should_execute_rule: ShouldExecute,
         mut log_rule: LogRule,
         mut log_action: LogAction,
     ) where
-        ShouldExecute: FnMut(&crate::rules::Rule) -> bool,
         LogRule: FnMut(&crate::rules::Rule, bool),
         LogAction: FnMut(&str, &RuleAction),
     {
@@ -54,29 +52,25 @@ impl RuleEngine<'_> {
             // before calling self.buffer_rule_action below.
             let Some((actions, rule_id, rule_once, log_enabled)) = ({
                 let rule = &self.rules.rules[idx];
-                if !should_execute_rule(rule) {
+                if rule.log_enabled {
+                    info!(rule_id = %rule.id, trigger = ?rule.trigger, "Rule trigger passed");
+                }
+                let conditions_result = self.rule_conditions_match(
+                    &rule.id,
+                    rule.log_enabled,
+                    &rule.conditions,
+                    context,
+                );
+                log_rule(rule, conditions_result);
+                if !conditions_result {
                     None
                 } else {
-                    if rule.log_enabled {
-                        info!(rule_id = %rule.id, trigger = ?rule.trigger, "Rule trigger passed");
-                    }
-                    let conditions_result = self.rule_conditions_match(
-                        &rule.id,
+                    Some((
+                        rule.actions.clone(),
+                        rule.id.clone(),
+                        rule.once,
                         rule.log_enabled,
-                        &rule.conditions,
-                        context,
-                    );
-                    log_rule(rule, conditions_result);
-                    if !conditions_result {
-                        None
-                    } else {
-                        Some((
-                            rule.actions.clone(),
-                            rule.id.clone(),
-                            rule.once,
-                            rule.log_enabled,
-                        ))
-                    }
+                    ))
                 }
             }) else {
                 continue;
@@ -122,7 +116,6 @@ impl RuleEngine<'_> {
             &sorted_indices,
             &context,
             command_buffer,
-            |_| true,
             log_rule,
             log_action,
         );
@@ -387,8 +380,7 @@ impl RuleEngine<'_> {
         &mut self,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        let held_keys = self.held_keys.clone();
-        for input_key in held_keys {
+        for &input_key in self.held_keys {
             let trigger = RuleTrigger::OnKey {
                 key: crate::game::GameState::to_rule_key(input_key),
             };
@@ -403,8 +395,9 @@ impl GameState {
         trigger: RuleTrigger,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_trigger(trigger, command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_trigger(trigger, command_buffer);
+        });
     }
 
     pub(in crate::game) fn collect_rule_commands_for_interaction(
@@ -412,8 +405,9 @@ impl GameState {
         event: &InteractionEvent,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_interaction(event, command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_interaction(event, command_buffer);
+        });
     }
 
     pub(in crate::game) fn collect_rule_commands_for_dialog_completion(
@@ -421,8 +415,9 @@ impl GameState {
         event: &DialogCompletionEvent,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_dialog_completion(event, command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_dialog_completion(event, command_buffer);
+        });
     }
 
     pub(in crate::game) fn collect_rule_commands_for_collision(
@@ -430,8 +425,9 @@ impl GameState {
         event: &CollisionEvent,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_collision(event, command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_collision(event, command_buffer);
+        });
     }
 
     pub(in crate::game) fn collect_rule_commands_for_damage(
@@ -439,8 +435,9 @@ impl GameState {
         event: &DamageEvent,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_damage(event, command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_damage(event, command_buffer);
+        });
     }
 
     pub(in crate::game) fn collect_rule_commands_for_death(
@@ -448,15 +445,17 @@ impl GameState {
         event: &DeathEvent,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_death(event, command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_death(event, command_buffer);
+        });
     }
 
     pub(in crate::game) fn collect_rule_commands_for_key_triggers(
         &mut self,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.rule_engine()
-            .collect_rule_commands_for_key_triggers(command_buffer);
+        self.with_rule_engine(|engine| {
+            engine.collect_rule_commands_for_key_triggers(command_buffer);
+        });
     }
 }

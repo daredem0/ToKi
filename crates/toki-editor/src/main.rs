@@ -9,6 +9,7 @@ mod editor_tab_strip;
 mod editor_types;
 mod editor_viewport;
 mod fonts;
+mod io;
 mod logging;
 use logging::LogCapture;
 mod project;

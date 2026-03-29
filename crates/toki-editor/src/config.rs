@@ -3,6 +3,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::io::{read_text_file_with_limit, DEFAULT_TEXT_FILE_SIZE_LIMIT};
+
 const CONFIG_FILE_NAME: &str = "toki_editor_config.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,7 +211,8 @@ impl EditorConfig {
             return Ok(config);
         }
 
-        let json_data = fs::read_to_string(&config_path)?;
+        let json_data =
+            read_text_file_with_limit(&config_path, DEFAULT_TEXT_FILE_SIZE_LIMIT, "editor config")?;
         let config: EditorConfig = serde_json::from_str(&json_data)?;
 
         tracing::info!("Loaded editor config from {:?}", config_path);

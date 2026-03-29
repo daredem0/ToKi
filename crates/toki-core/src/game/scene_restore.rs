@@ -11,25 +11,28 @@ pub(super) fn restore_from_save_data(
     if scene_name.is_empty() {
         return Err(RestoreError::MissingActiveSceneName);
     }
+    let scene_id = save_data.active_scene_name.clone();
 
     restore_scene_snapshots(state, save_data);
     restore_legacy_persisted_entities(state, save_data);
-    restore_camera_state(state, save_data, scene_name);
+    restore_camera_state(state, save_data, &scene_id);
 
     let scene = state
         .scene
         .scene_manager
-        .get_scene(scene_name)
-        .ok_or_else(|| RestoreError::MissingScene(scene_name.to_string()))?
+        .get_scene_by_id(&scene_id)
+        .ok_or_else(|| RestoreError::MissingScene {
+            scene_name: scene_id.clone(),
+        })?
         .clone();
 
     let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
         .prepare_scene_load(&scene, None, save_data.player.clone())
-        .map_err(RestoreError::PrepareSceneLoad)?;
+        .map_err(|source| RestoreError::PrepareSceneLoad { source })?;
 
     state
-        .apply_prepared_scene_load(scene_name, prepared)
-        .map_err(RestoreError::ApplySceneLoad)?;
+        .apply_prepared_scene_load(&scene_id, prepared)
+        .map_err(|source| RestoreError::ApplySceneLoad { source })?;
 
     restore_saved_player(state, save_data);
     state.progress.game_flags = save_data.flags.clone();
@@ -57,11 +60,11 @@ fn restore_legacy_persisted_entities(state: &mut GameState, save_data: &SaveData
         state
             .scene
             .persistent_scene_entities
-            .insert((persisted.scene_name.to_string(), persisted.entity_id));
+            .insert((persisted.scene_name.clone(), persisted.entity_id));
         let Some(scene) = state
             .scene
             .scene_manager
-            .get_scene_mut(&persisted.scene_name)
+            .get_scene_mut_by_id(&persisted.scene_name)
         else {
             continue;
         };
@@ -85,8 +88,8 @@ fn restore_legacy_persisted_entities(state: &mut GameState, save_data: &SaveData
     }
 }
 
-fn restore_camera_state(state: &mut GameState, save_data: &SaveData, scene_name: &str) {
-    let Some(scene) = state.scene.scene_manager.get_scene_mut(scene_name) else {
+fn restore_camera_state(state: &mut GameState, save_data: &SaveData, scene_name: &crate::SceneId) {
+    let Some(scene) = state.scene.scene_manager.get_scene_mut_by_id(scene_name) else {
         return;
     };
     scene.camera_position = save_data.camera.position;
@@ -94,7 +97,8 @@ fn restore_camera_state(state: &mut GameState, save_data: &SaveData, scene_name:
 }
 
 fn restore_saved_player(state: &mut GameState, save_data: &SaveData) {
-    let (Some(saved_player), Some(player_id)) = (save_data.player.as_ref(), state.world.player_id)
+    let (Some(saved_player), Some(player_id)) =
+        (save_data.player.as_ref(), state.world.player_id())
     else {
         return;
     };
