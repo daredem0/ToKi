@@ -1008,7 +1008,7 @@ fn centered_logo_origin_is_centered_for_wide_window() {
         desired_height: 144,
     });
     let origin = App::centered_logo_origin_for_view(view, glam::UVec2::new(128, 108));
-    assert_eq!(origin, glam::IVec2::new(96, 18));
+    assert_eq!(origin, glam::IVec2::new(16, 18));
 }
 
 #[test]
@@ -1020,7 +1020,7 @@ fn centered_logo_origin_is_centered_for_tall_window() {
         desired_height: 144,
     });
     let origin = App::centered_logo_origin_for_view(view, glam::UVec2::new(128, 108));
-    assert_eq!(origin, glam::IVec2::new(16, 106));
+    assert_eq!(origin, glam::IVec2::new(16, 18));
 }
 
 #[test]

@@ -242,6 +242,20 @@ fn make_unique_temp_dir() -> std::path::PathBuf {
     dir
 }
 
+fn project_to_screen(
+    projection: glam::Mat4,
+    surface_width: f32,
+    surface_height: f32,
+    point: glam::Vec2,
+) -> glam::Vec2 {
+    let clip = projection * glam::Vec4::new(point.x, point.y, 0.0, 1.0);
+    let ndc = clip / clip.w;
+    glam::Vec2::new(
+        (ndc.x * 0.5 + 0.5) * surface_width,
+        (1.0 - (ndc.y * 0.5 + 0.5)) * surface_height,
+    )
+}
+
 #[test]
 fn rendering_system_defaults_and_no_gpu_error_paths() {
     let mut rendering = RenderingSystem::new();
@@ -267,6 +281,36 @@ fn rendering_system_defaults_and_no_gpu_error_paths() {
         sprite_err.to_string().contains("GPU not initialized"),
         "unexpected error: {sprite_err}"
     );
+}
+
+#[test]
+fn calculate_projection_centers_the_viewport_in_wide_windows() {
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(320, 144));
+
+    let projection = rendering.calculate_projection();
+    let top_left = project_to_screen(projection, 320.0, 144.0, glam::Vec2::ZERO);
+    let bottom_right = project_to_screen(projection, 320.0, 144.0, glam::Vec2::new(160.0, 144.0));
+
+    assert!((top_left.x - 80.0).abs() < 0.01);
+    assert!((top_left.y - 0.0).abs() < 0.01);
+    assert!((bottom_right.x - 240.0).abs() < 0.01);
+    assert!((bottom_right.y - 144.0).abs() < 0.01);
+}
+
+#[test]
+fn calculate_projection_centers_the_viewport_in_tall_windows() {
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(160, 320));
+
+    let projection = rendering.calculate_projection();
+    let top_left = project_to_screen(projection, 160.0, 320.0, glam::Vec2::ZERO);
+    let bottom_right = project_to_screen(projection, 160.0, 320.0, glam::Vec2::new(160.0, 144.0));
+
+    assert!((top_left.x - 0.0).abs() < 0.01);
+    assert!((top_left.y - 88.0).abs() < 0.01);
+    assert!((bottom_right.x - 160.0).abs() < 0.01);
+    assert!((bottom_right.y - 232.0).abs() < 0.01);
 }
 
 #[test]
