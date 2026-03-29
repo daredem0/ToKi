@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use toki_core::graphics::image::load_image_rgba8_from_bytes;
-use toki_core::math::projection::ProjectionParameter;
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 
 use super::{
@@ -48,7 +47,10 @@ impl SplashPolicy {
 }
 
 impl App {
-    pub(super) fn projection_view_size(parameters: ProjectionParameter) -> glam::Vec2 {
+    #[cfg(test)]
+    pub(super) fn projection_view_size(
+        parameters: toki_core::math::projection::ProjectionParameter,
+    ) -> glam::Vec2 {
         glam::Vec2::new(
             parameters.desired_width.max(1) as f32,
             parameters.desired_height.max(1) as f32,
@@ -107,7 +109,11 @@ impl App {
 
     pub(super) fn render_startup_splash(&mut self) {
         let logo_size = glam::UVec2::new(SPLASH_LOGO_WIDTH, SPLASH_LOGO_HEIGHT);
-        let view_size = Self::projection_view_size(self.rendering.projection_params());
+        let presentation = self.rendering.viewport_presentation();
+        let view_size = glam::Vec2::new(
+            presentation.layout.logical_viewport_size.x as f32,
+            presentation.layout.logical_viewport_size.y as f32,
+        );
         let logo_origin = Self::centered_logo_origin_for_view(view_size, logo_size);
         self.rendering.update_projection(glam::Mat4::IDENTITY);
         self.rendering.set_tilemap_render_enabled(false);

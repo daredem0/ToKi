@@ -11,8 +11,8 @@ pub struct PerformanceStats {
 }
 
 impl PerformanceStats {
-    pub fn format_line(&self) -> String {
-        format!(
+    pub fn format_line(&self, viewport_scale_factor: Option<f32>) -> String {
+        let base = format!(
             "FPS: {:.1} | Frame: {:.2}ms | Tick: {:.2}ms | Draw: {:.2}ms | CPU: {:.2}ms | Overhead: {:.2}ms",
             self.fps,
             self.frame_ms,
@@ -20,7 +20,13 @@ impl PerformanceStats {
             self.draw_ms,
             self.cpu_ms,
             self.overhead_ms
-        )
+        );
+
+        if let Some(scale_factor) = viewport_scale_factor {
+            format!("{base} | SF: {:.2}x", scale_factor)
+        } else {
+            base
+        }
     }
 }
 
@@ -42,6 +48,7 @@ pub struct PerformanceMonitor {
     last_frame_time: Instant,
     show_console_stats: bool,
     show_hud_stats: bool,
+    viewport_scale_factor: Option<f32>,
 }
 
 impl PerformanceMonitor {
@@ -57,6 +64,7 @@ impl PerformanceMonitor {
             last_frame_time: Instant::now(),
             show_console_stats: true,
             show_hud_stats: true,
+            viewport_scale_factor: None,
         }
     }
 
@@ -86,6 +94,10 @@ impl PerformanceMonitor {
     /// Check if console performance logging is enabled
     pub fn is_console_display_enabled(&self) -> bool {
         self.show_console_stats
+    }
+
+    pub fn set_viewport_scale_factor(&mut self, scale_factor: f32) {
+        self.viewport_scale_factor = Some(scale_factor.max(0.0));
     }
 
     /// Record the time interval between frames
@@ -142,7 +154,7 @@ impl PerformanceMonitor {
     /// Print comprehensive performance statistics
     fn print_performance_stats(&self) {
         if let Some(stats) = self.current_stats() {
-            println!("{}", stats.format_line());
+            println!("{}", stats.format_line(self.viewport_scale_factor));
         }
     }
 
@@ -203,7 +215,8 @@ impl PerformanceMonitor {
         if !self.show_hud_stats {
             return None;
         }
-        self.current_stats().map(|stats| stats.format_line())
+        self.current_stats()
+            .map(|stats| stats.format_line(self.viewport_scale_factor))
     }
 }
 

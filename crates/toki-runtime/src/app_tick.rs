@@ -151,6 +151,9 @@ impl App {
                     self.rendering.update_tilemap_vertices(&verts);
                 }
             }
+            let viewport_scale_factor = self.rendering.viewport_presentation().layout.resolved_scale;
+            self.performance
+                .set_viewport_scale_factor(viewport_scale_factor);
             WorldFramePresenter::new(
                 &self.game_system,
                 &mut self.resources,

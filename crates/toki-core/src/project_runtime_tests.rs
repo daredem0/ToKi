@@ -1,8 +1,9 @@
 use crate::menu::{MenuAppearance, MenuTextAppearance};
 use crate::project_runtime::{
-    PostProcessMode, ProjectFlagDefinition, ProjectPreset, ProjectRuntimeMetadata,
-    QuantizeStrategy, RuntimeConfigFile, RuntimeDisplaySettings, RuntimePostProcessSettings,
-    RuntimeSettings, SceneTransitionEffect,
+    default_runtime_viewport_mode, IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition,
+    ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
+    RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings, RuntimeViewportMode,
+    SceneTransitionEffect,
 };
 use crate::FlagValue;
 
@@ -21,6 +22,7 @@ fn runtime_display_settings_defaults_to_topdown_resolution() {
 
     assert_eq!(display.resolution_width, 160);
     assert_eq!(display.resolution_height, 144);
+    assert_eq!(display.viewport, default_runtime_viewport_mode());
 }
 
 #[test]
@@ -35,6 +37,61 @@ resolution_height = 224
 
     assert_eq!(display.resolution_width, 256);
     assert_eq!(display.resolution_height, 224);
+}
+
+#[test]
+fn runtime_display_settings_support_integer_scale_viewport_mode() {
+    let display: RuntimeDisplaySettings = toml::from_str(
+        r#"
+viewport = { mode = "integer_scale", factor = "auto" }
+"#,
+    )
+    .expect("viewport mode should deserialize");
+
+    assert_eq!(
+        display.viewport,
+        RuntimeViewportMode::IntegerScale {
+            factor: IntegerScaleFactor::Auto,
+        }
+    );
+}
+
+#[test]
+fn runtime_display_settings_support_aspect_fit_viewport_mode() {
+    let display: RuntimeDisplaySettings = toml::from_str(
+        r#"
+viewport = { mode = "aspect_fit", fit_percent = 100 }
+"#,
+    )
+    .expect("aspect fit viewport should deserialize");
+
+    assert_eq!(
+        display.viewport,
+        RuntimeViewportMode::AspectFit { fit_percent: 100 }
+    );
+}
+
+#[test]
+fn integer_scale_factor_serializes_as_expected_scalars() {
+    #[derive(serde::Serialize)]
+    struct Wrapper {
+        factor: IntegerScaleFactor,
+    }
+
+    assert_eq!(
+        toml::to_string(&Wrapper {
+            factor: IntegerScaleFactor::Auto
+        })
+        .expect("serialize auto"),
+        "factor = \"auto\"\n"
+    );
+    assert_eq!(
+        toml::to_string(&Wrapper {
+            factor: IntegerScaleFactor::Fixed(3)
+        })
+        .expect("serialize fixed"),
+        "factor = 3\n"
+    );
 }
 
 #[test]
@@ -61,6 +118,12 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.display.post_process.vignette_strength_percent, 60);
     assert_eq!(settings.display.resolution_width, 160);
     assert_eq!(settings.display.resolution_height, 144);
+    assert_eq!(
+        settings.display.viewport,
+        RuntimeViewportMode::IntegerScale {
+            factor: IntegerScaleFactor::Auto,
+        }
+    );
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
     assert_eq!(settings.dialog_appearance, MenuAppearance::default());
     assert!(settings.flags.declarations.is_empty());
@@ -99,6 +162,25 @@ fn runtime_metadata_supports_global_indexed_palette_override() {
     assert_eq!(
         metadata.runtime.display.indexed_palette_override.as_deref(),
         Some("gb_swamp")
+    );
+}
+
+#[test]
+fn runtime_metadata_supports_viewport_mode_settings() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r#"
+        [runtime.display.viewport]
+        mode = "integer_scale"
+        factor = 3
+        "#,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(
+        metadata.runtime.display.viewport,
+        RuntimeViewportMode::IntegerScale {
+            factor: IntegerScaleFactor::Fixed(3),
+        }
     );
 }
 

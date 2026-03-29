@@ -8,8 +8,9 @@ use toki_core::menu::{
     MenuAppearance, MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction,
 };
 use toki_core::project_runtime::{
-    PostProcessMode, QuantizeStrategy, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
-    RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup, RuntimePostProcessSettings,
+    IntegerScaleFactor, PostProcessMode, QuantizeStrategy, RuntimeConfigAudio,
+    RuntimeConfigDisplay, RuntimeConfigFile, RuntimeConfigPack, RuntimeConfigSplash,
+    RuntimeConfigStartup, RuntimePostProcessSettings, RuntimeViewportMode,
 };
 use toki_core::FlagValue;
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
@@ -159,6 +160,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
+                viewport: None,
                 vsync: None,
                 target_fps: None,
                 timing_mode: None,
@@ -232,6 +234,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
+                viewport: None,
                 vsync: None,
                 target_fps: None,
                 timing_mode: None,
@@ -474,6 +477,9 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
             resolution_width: 160,
             resolution_height: 144,
             zoom_percent: 100,
+            viewport: RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Auto,
+            },
             vsync: true,
             target_fps: 60,
             timing_mode: toki_core::TimingMode::Fixed,
@@ -496,6 +502,69 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
     assert!(updated.display.show_entity_health_bars);
     assert!(updated.display.show_ground_shadows);
     assert_eq!(updated.menu.pause_root_screen_id, "cli_pause");
+}
+
+#[test]
+fn apply_project_runtime_settings_updates_display_viewport_mode() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    std::fs::write(
+        dir.path().join("project.toml"),
+        r#"
+        [runtime.display.viewport]
+        mode = "aspect_fit"
+        fit_percent = 100
+        "#,
+    )
+    .expect("project");
+
+    let updated =
+        apply_project_runtime_settings_from_project_file_if_present(RuntimeLaunchOptions {
+            project_path: Some(dir.path().to_path_buf()),
+            ..RuntimeLaunchOptions::default()
+        });
+
+    assert_eq!(
+        updated.display.viewport,
+        RuntimeViewportMode::AspectFit { fit_percent: 100 }
+    );
+}
+
+#[test]
+fn apply_runtime_config_updates_display_viewport_mode() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let mut options = RuntimeLaunchOptions::default();
+
+    apply_runtime_config(
+        &mut options,
+        RuntimeConfigFile {
+            version: 1,
+            bundle_name: None,
+            pack: None,
+            startup: None,
+            splash: None,
+            audio: None,
+            display: Some(RuntimeConfigDisplay {
+                show_entity_health_bars: None,
+                show_ground_shadows: None,
+                indexed_palette_override: None,
+                post_process: None,
+                resolution_width: None,
+                resolution_height: None,
+                zoom_percent: None,
+                viewport: Some(RuntimeViewportMode::AspectFit { fit_percent: 100 }),
+                vsync: None,
+                target_fps: None,
+                timing_mode: None,
+            }),
+            menu: None,
+        },
+        temp.path(),
+    );
+
+    assert_eq!(
+        options.display.viewport,
+        RuntimeViewportMode::AspectFit { fit_percent: 100 }
+    );
 }
 
 #[test]

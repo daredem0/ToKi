@@ -8,7 +8,9 @@ use toki_core::camera::{Camera, CameraController, CameraMode};
 use toki_core::dialog_runtime::DialogController;
 use toki_core::game::SceneSystem;
 use toki_core::menu::{MenuAppearance, MenuController, MenuSettings};
-use toki_core::project_runtime::{RuntimeFlagSettings, RuntimePostProcessSettings};
+use toki_core::project_runtime::{
+    RuntimeFlagSettings, RuntimePostProcessSettings, RuntimeViewportMode,
+};
 use toki_core::TimingSystem;
 use toki_render::RenderError;
 
@@ -100,6 +102,8 @@ pub struct RuntimeDisplayOptions {
     pub resolution_height: u32,
     /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
     pub zoom_percent: u32,
+    /// Presentation policy for fitting the logical viewport into the window.
+    pub viewport: RuntimeViewportMode,
     /// Enable vsync (ties frame rate to display refresh rate).
     /// When enabled, frame limiter is bypassed.
     pub vsync: bool,
@@ -120,6 +124,7 @@ impl Default for RuntimeDisplayOptions {
             resolution_width: toki_core::project_runtime::default_resolution_width(),
             resolution_height: toki_core::project_runtime::default_resolution_height(),
             zoom_percent: toki_core::project_runtime::default_zoom_percent(),
+            viewport: toki_core::project_runtime::default_runtime_viewport_mode(),
             vsync: true,
             target_fps: 60,
             timing_mode: toki_core::TimingMode::default(),
@@ -328,6 +333,9 @@ impl App {
         let frame_limiter = Self::build_frame_limiter(&launch_options);
         let resolution_width = launch_options.display.resolution_width;
         let resolution_height = launch_options.display.resolution_height;
+        let mut rendering =
+            RenderingSystem::new_with_desired_resolution(resolution_width, resolution_height);
+        rendering.set_viewport_mode(launch_options.display.viewport);
 
         Self {
             // Core systems
@@ -339,10 +347,7 @@ impl App {
 
             // Grouped systems
             platform: PlatformSystem::new(),
-            rendering: RenderingSystem::new_with_desired_resolution(
-                resolution_width,
-                resolution_height,
-            ),
+            rendering,
             timing: TimingSystem::new(),
             frame_limiter,
             launch_options,

@@ -6,7 +6,10 @@ use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::palette::Palette4;
-use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
+use toki_core::project_runtime::{
+    IntegerScaleFactor, PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings,
+    RuntimeViewportMode,
+};
 use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{
     ResolvedSpriteRenderInstance, SpriteRenderMaterial, SpriteRenderOrigin, SpriteSortKey,
@@ -311,6 +314,58 @@ fn calculate_projection_centers_the_viewport_in_tall_windows() {
     assert!((top_left.y - 88.0).abs() < 0.01);
     assert!((bottom_right.x - 160.0).abs() < 0.01);
     assert!((bottom_right.y - 232.0).abs() < 0.01);
+}
+
+#[test]
+fn aspect_fit_projection_fills_window_height_when_it_is_the_limiting_dimension() {
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.set_viewport_mode(RuntimeViewportMode::AspectFit { fit_percent: 100 });
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(320, 200));
+
+    let projection = rendering.calculate_projection();
+    let top_left = project_to_screen(projection, 320.0, 200.0, glam::Vec2::ZERO);
+    let bottom_right = project_to_screen(projection, 320.0, 200.0, glam::Vec2::new(160.0, 144.0));
+
+    assert!((top_left.x - 48.88889).abs() < 0.05);
+    assert!((top_left.y - 0.0).abs() < 0.01);
+    assert!((bottom_right.x - 271.1111).abs() < 0.05);
+    assert!((bottom_right.y - 200.0).abs() < 0.01);
+}
+
+#[test]
+fn integer_scale_auto_projection_uses_largest_whole_number_factor() {
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.set_viewport_mode(RuntimeViewportMode::IntegerScale {
+        factor: IntegerScaleFactor::Auto,
+    });
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(800, 600));
+
+    let projection = rendering.calculate_projection();
+    let top_left = project_to_screen(projection, 800.0, 600.0, glam::Vec2::ZERO);
+    let bottom_right = project_to_screen(projection, 800.0, 600.0, glam::Vec2::new(160.0, 144.0));
+
+    assert!((top_left.x - 80.0).abs() < 0.01);
+    assert!((top_left.y - 12.0).abs() < 0.01);
+    assert!((bottom_right.x - 720.0).abs() < 0.01);
+    assert!((bottom_right.y - 588.0).abs() < 0.01);
+}
+
+#[test]
+fn integer_scale_fixed_projection_uses_requested_factor_when_available() {
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.set_viewport_mode(RuntimeViewportMode::IntegerScale {
+        factor: IntegerScaleFactor::Fixed(3),
+    });
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(800, 600));
+
+    let projection = rendering.calculate_projection();
+    let top_left = project_to_screen(projection, 800.0, 600.0, glam::Vec2::ZERO);
+    let bottom_right = project_to_screen(projection, 800.0, 600.0, glam::Vec2::new(160.0, 144.0));
+
+    assert!((top_left.x - 160.0).abs() < 0.01);
+    assert!((top_left.y - 84.0).abs() < 0.01);
+    assert!((bottom_right.x - 640.0).abs() < 0.01);
+    assert!((bottom_right.y - 516.0).abs() < 0.01);
 }
 
 #[test]
