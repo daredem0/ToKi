@@ -4531,6 +4531,7 @@ dependencies = [
  "toki-core",
  "toki-render",
  "toki-schemas",
+ "toki-test-fixtures",
  "toml",
  "tracing",
  "tracing-subscriber",
