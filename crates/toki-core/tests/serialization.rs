@@ -43,6 +43,13 @@ fn create_save_test_state() -> GameState {
     save_test_state()
 }
 
+fn player_definition(name: &str) -> EntityDefinition {
+    let mut definition = test_definition(name, "human");
+    definition.attributes.can_move = true;
+    definition.attributes.has_inventory = true;
+    definition
+}
+
 fn persistent_npc(id: u32, position: IVec2) -> Entity {
     let mut entity = create_test_entity();
     entity.id = id;
@@ -165,6 +172,65 @@ fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
         .expect("save should restore");
 
     assert!(restored.active_scene().and_then(|scene| scene.get_entity(2)).is_none());
+}
+
+#[test]
+fn restore_from_save_data_preserves_saved_player_in_scene_without_player_entry() {
+    let mut state = GameState::new_empty();
+    state.add_entity_definition(player_definition("player"));
+
+    let mut main_scene = Scene::new("main".to_string());
+    main_scene.anchors.push(toki_core::scene::SceneAnchor {
+        id: "main_spawn".to_string(),
+        kind: toki_core::scene::SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(16, 16),
+        facing: None,
+    });
+    main_scene.player_entry = Some(toki_core::scene::ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "main_spawn".to_string(),
+    });
+
+    let mut side_scene = Scene::new("side".to_string());
+    side_scene.anchors.push(toki_core::scene::SceneAnchor {
+        id: "door".to_string(),
+        kind: toki_core::scene::SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(96, 112),
+        facing: None,
+    });
+
+    state.add_scene(main_scene.clone());
+    state.add_scene(side_scene.clone());
+    state.load_scene("main").expect("main scene should load");
+    state
+        .transition_to_scene("side", "door")
+        .expect("side scene should load through transition");
+
+    let player_id = state.player_id().expect("player should exist after transition");
+    state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player entity should exist")
+        .position = IVec2::new(120, 144);
+
+    let save = SaveData::capture(&state, 1).expect("save should capture");
+
+    let mut restored = GameState::new_empty();
+    restored.add_entity_definition(player_definition("player"));
+    restored.add_scene(main_scene);
+    restored.add_scene(side_scene);
+    restored.load_scene("main").expect("startup scene should load");
+    restored
+        .restore_from_save_data(&save)
+        .expect("save should restore");
+
+    assert_eq!(
+        restored.active_scene().map(|scene| scene.name.as_str()),
+        Some("side")
+    );
+    let restored_player = restored.player_entity().expect("player should restore");
+    assert_eq!(restored_player.position, IVec2::new(120, 144));
+    assert_eq!(restored_player.entity_kind, EntityKind::Player);
 }
 
 #[test]
