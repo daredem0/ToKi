@@ -132,15 +132,15 @@ impl App {
             );
         }
         if self.splash_config.show_branding {
+            let ui_scale = presentation.runtime_ui_scale_factor();
             let branding_style = TextStyle {
                 font_family: "Sans".to_string(),
-                size_px: 16.0,
+                size_px: (32.0 * ui_scale).max(3.0),
                 weight: TextWeight::Bold,
                 ..TextStyle::default()
             };
             let surface_view_size = presentation.surface_viewport_size();
-            let surface_logo_origin =
-                presentation.logical_to_surface_position(logo_origin.as_vec2()).floor().as_ivec2();
+            let viewport_origin = presentation.surface_viewport_origin();
             let surface_logo_size = glam::UVec2::new(
                 (logo_size.x as f32 * presentation.layout.resolved_scale)
                     .round()
@@ -149,10 +149,16 @@ impl App {
                     .round()
                     .max(1.0) as u32,
             );
+            let surface_logo_origin =
+                Self::centered_logo_origin_for_view(surface_view_size, surface_logo_size);
             let version_style = Self::fitted_splash_version_style(
                 surface_view_size.x,
                 COMMUNITY_SPLASH_VERSION_TEXT,
             );
+            let version_style = TextStyle {
+                size_px: (version_style.size_px * ui_scale).max(3.0),
+                ..version_style
+            };
             let (branding_position, version_position) = Self::splash_branding_positions(
                 surface_view_size,
                 self.splash_logo_loaded,
@@ -164,7 +170,7 @@ impl App {
             self.rendering.add_text_item(
                 TextItem::new_screen(
                     COMMUNITY_SPLASH_BRANDING_TEXT,
-                    branding_position,
+                    branding_position + viewport_origin,
                     branding_style,
                 )
                 .with_anchor(TextAnchor::TopCenter)
@@ -173,7 +179,7 @@ impl App {
             self.rendering.add_text_item(
                 TextItem::new_screen(
                     COMMUNITY_SPLASH_VERSION_TEXT,
-                    version_position,
+                    version_position + viewport_origin,
                     version_style,
                 )
                 .with_max_width((surface_view_size.x - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0))

@@ -12,6 +12,19 @@ pub struct ViewportPresentation {
 }
 
 impl ViewportPresentation {
+    pub fn runtime_ui_scale_factor(&self) -> f32 {
+        let surface_size = self.surface_viewport_size();
+        let reference_size = glam::Vec2::new(
+            self.layout.logical_viewport_size.x as f32 * 7.0,
+            self.layout.logical_viewport_size.y as f32 * 7.0,
+        );
+        let size_ratio = (surface_size.x / reference_size.x)
+            .min(surface_size.y / reference_size.y)
+            .clamp(0.0, 1.0);
+
+        0.06 + 0.94 * size_ratio.powf(1.15)
+    }
+
     pub fn logical_viewport_size(&self) -> glam::Vec2 {
         glam::Vec2::new(
             self.layout.logical_viewport_size.x as f32,
@@ -205,5 +218,45 @@ mod tests {
         let text = block.text.as_ref().expect("text should exist");
         assert_eq!(text.position, glam::Vec2::new(100.0, 32.0));
         assert!((text.style.size_px - 8.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn runtime_ui_scale_factor_targets_scale_seven_as_full_size() {
+        let scale_one = resolve_fixed_viewport_presentation(
+            glam::UVec2::new(160, 144),
+            glam::UVec2::new(160, 144),
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(1),
+            },
+        );
+        let scale_three = resolve_fixed_viewport_presentation(
+            glam::UVec2::new(480, 432),
+            glam::UVec2::new(160, 144),
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(3),
+            },
+        );
+        let scale_four = resolve_fixed_viewport_presentation(
+            glam::UVec2::new(640, 576),
+            glam::UVec2::new(160, 144),
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(4),
+            },
+        );
+        let scale_seven = resolve_fixed_viewport_presentation(
+            glam::UVec2::new(1120, 1008),
+            glam::UVec2::new(160, 144),
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(7),
+            },
+        );
+
+        assert!(scale_one.runtime_ui_scale_factor() > 0.13);
+        assert!(scale_one.runtime_ui_scale_factor() < 0.19);
+        assert!(scale_three.runtime_ui_scale_factor() > 0.38);
+        assert!(scale_three.runtime_ui_scale_factor() < 0.45);
+        assert!(scale_four.runtime_ui_scale_factor() > 0.5);
+        assert!(scale_four.runtime_ui_scale_factor() < 0.59);
+        assert!((scale_seven.runtime_ui_scale_factor() - 1.0).abs() < 0.01);
     }
 }

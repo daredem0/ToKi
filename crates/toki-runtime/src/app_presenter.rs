@@ -62,15 +62,24 @@ impl<'a> WorldFramePresenter<'a> {
         self.rendering.clear_ui_shapes();
 
         if let Some(stats_line) = self.performance.stats_line() {
+            let ui_scale = self
+                .rendering
+                .viewport_presentation()
+                .runtime_ui_scale_factor();
             let hud_style = TextStyle {
                 font_family: "Sans".to_string(),
-                size_px: 14.0,
+                size_px: (20.0 * ui_scale).max(3.0),
                 weight: TextWeight::Bold,
                 ..TextStyle::default()
             };
-            let hud_text = TextItem::new_screen(stats_line, glam::Vec2::new(8.0, 8.0), hud_style)
-                .with_anchor(TextAnchor::TopLeft)
-                .with_layer(1);
+            let hud_padding = (8.0 * ui_scale).max(4.0);
+            let hud_text = TextItem::new_screen(
+                stats_line,
+                glam::Vec2::new(hud_padding, hud_padding),
+                hud_style,
+            )
+            .with_anchor(TextAnchor::TopLeft)
+            .with_layer(1);
             self.rendering.add_viewport_text_item(hud_text);
         }
     }
@@ -146,10 +155,14 @@ impl<'a> WorldFramePresenter<'a> {
     fn render_debug_collision_overlay(&mut self) {
         let queries = self.render_queries();
         let entity_boxes = queries.entity_collision_boxes();
-        let solid_tiles =
-            queries.solid_tile_positions(self.resources.get_tilemap(), self.resources.get_terrain_atlas());
-        let trigger_tiles =
-            queries.trigger_tile_positions(self.resources.get_tilemap(), self.resources.get_terrain_atlas());
+        let solid_tiles = queries.solid_tile_positions(
+            self.resources.get_tilemap(),
+            self.resources.get_terrain_atlas(),
+        );
+        let trigger_tiles = queries.trigger_tile_positions(
+            self.resources.get_tilemap(),
+            self.resources.get_terrain_atlas(),
+        );
 
         let entity_color = [1.0, 0.0, 0.0, 0.8];
         let solid_tile_color = [0.0, 0.0, 1.0, 0.6];
