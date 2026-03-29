@@ -2,6 +2,7 @@ use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuDialogLayout,
     MenuInput, MenuLayout,
 };
+use toki_core::game::RuleSystem;
 use toki_core::ui::UiCommand;
 use toki_core::DialogStartRequest;
 
@@ -95,7 +96,7 @@ impl App {
             return false;
         }
 
-        let inventory = self.game_system.player_inventory_entries();
+        let inventory = self.game_system.game_state.player_inventory_entries();
         let Some(menu_view) = self.menu_system.current_view(&inventory) else {
             return false;
         };
@@ -156,7 +157,7 @@ impl App {
             return false;
         }
 
-        let inventory = self.game_system.player_inventory_entries();
+        let inventory = self.game_system.game_state.player_inventory_entries();
         let Some(menu_view) = self.menu_system.current_view(&inventory) else {
             return false;
         };
@@ -219,8 +220,11 @@ impl App {
     ) {
         if let toki_core::dialog_runtime::DialogAdvanceResult::Closed(completion) = result {
             if let Some(outcome_id) = completion.outcome_id.as_deref() {
-                self.game_system
-                    .record_dialog_completion(&completion.dialog_id, outcome_id);
+                RuleSystem::record_dialog_completion(
+                    &mut self.game_system.game_state,
+                    completion.dialog_id.clone(),
+                    outcome_id,
+                );
             }
         }
     }
@@ -249,7 +253,7 @@ impl App {
             return;
         }
 
-        let inventory = self.game_system.player_inventory_entries();
+        let inventory = self.game_system.game_state.player_inventory_entries();
         let Some(view) = self.menu_system.current_view(&inventory) else {
             return;
         };

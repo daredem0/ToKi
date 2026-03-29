@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode};
 use toki_core::dialog_runtime::DialogController;
+use toki_core::game::SceneSystem;
 use toki_core::menu::{MenuAppearance, MenuController, MenuSettings};
 use toki_core::project_runtime::{RuntimeFlagSettings, RuntimePostProcessSettings};
 use toki_core::TimingSystem;
@@ -266,8 +267,7 @@ impl App {
         audio_system: &mut AudioManager,
         launch_options: &RuntimeLaunchOptions,
     ) {
-        if let Some(track_id) = game_system
-            .active_scene()
+        if let Some(track_id) = SceneSystem::active_scene(&game_system.game_state)
             .and_then(|scene| scene.background_music_track_id.as_deref())
         {
             if let Err(error) = scene_transition.prime_scene_music(

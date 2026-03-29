@@ -1,13 +1,14 @@
 use glam::{IVec2, UVec2};
-#[path = "support/game_state_compat.rs"]
-mod game_state_compat;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
 use toki_core::flags::FlagValue;
-use toki_core::game::{AudioChannel, AudioEvent};
+use toki_core::game::{
+    AudioChannel, AudioEvent, GameSimulation, InputSystem, RenderQueryService, RuleSystem,
+    SceneSystem,
+};
 use toki_core::rules::{
     InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
     RuleSpawnEntityType, RuleTarget, RuleTrigger,
@@ -17,7 +18,6 @@ use toki_core::{
     scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind},
     GameState, InputKey, Scene,
 };
-use game_state_compat::GameStateCompatExt;
 use toki_test_fixtures::{scene_with_test_player, test_atlas, test_tilemap};
 
 fn create_test_tilemap() -> TileMap {
@@ -84,6 +84,24 @@ fn base_rule(id: &str, trigger: RuleTrigger, priority: i32, actions: Vec<RuleAct
     }
 }
 
+fn render_queries(state: &GameState) -> RenderQueryService<'_> {
+    RenderQueryService::new(
+        state.world().entity_manager(),
+        state.world().player_id(),
+        state.runtime().debug_collision_rendering(),
+    )
+}
+
+fn player_position(state: &GameState) -> IVec2 {
+    render_queries(state).player_position()
+}
+
+fn player_entity(state: &GameState) -> Option<&toki_core::entity::Entity> {
+    state.world()
+        .player_id()
+        .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
+}
+
 fn scene_with_player(name: &str, position: IVec2) -> Scene {
     scene_with_test_player(name, position)
 }
@@ -100,7 +118,7 @@ fn spawn_anchor(id: &str, position: IVec2, facing: Option<SceneAnchorFacing>) ->
 #[test]
 fn on_start_rule_runs_once() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "start-beep",
             RuleTrigger::OnStart,
@@ -116,8 +134,8 @@ fn on_start_rule_runs_once() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let first = state.update(world_bounds, &tilemap, &atlas);
-    let second = state.update(world_bounds, &tilemap, &atlas);
+    let first = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let second = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
 
     assert_eq!(first.events.len(), 1);
     assert!(matches!(
@@ -134,14 +152,14 @@ fn on_start_rule_runs_once() {
 #[test]
 fn on_collision_rule_runs_when_movement_is_blocked() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "collision-rule",
             RuleTrigger::OnCollision { entity: None },
@@ -153,8 +171,8 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
         )],
     });
 
-    state.handle_key_press(InputKey::Right);
-    let blocked = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let blocked = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -164,8 +182,8 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_collision"
     )));
 
-    state.handle_key_release(InputKey::Right);
-    let no_collision = state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    let no_collision = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -176,14 +194,14 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
 #[test]
 fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "collision-rule",
             RuleTrigger::OnCollision { entity: None },
@@ -195,8 +213,8 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
         )],
     });
 
-    state.handle_key_press(InputKey::Right);
-    let first_blocked = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let first_blocked = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -206,7 +224,7 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_collision"
     )));
 
-    let sustained_blocked = state.update(
+    let sustained_blocked = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -223,9 +241,9 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
 #[test]
 fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -253,9 +271,9 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
     });
     controller.play(AnimationState::IdleRight);
 
-    state.spawn_player_like_npc(IVec2::new(66, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "damaged-rule",
             RuleTrigger::OnDamaged { entity: None },
@@ -267,11 +285,11 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
         )],
     });
 
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = state.update(
+    let update = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -286,9 +304,9 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
 #[test]
 fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -316,9 +334,9 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
     });
     controller.play(AnimationState::IdleRight);
 
-    state.spawn_player_like_npc(IVec2::new(66, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "damaged-rule",
             RuleTrigger::OnDamaged { entity: None },
@@ -330,16 +348,16 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
         )],
     });
 
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let first = state.update(
+    let first = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let second = state.update(
+    let second = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -361,9 +379,9 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
 #[test]
 fn on_death_rule_runs_when_primary_action_is_lethal() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -391,15 +409,15 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
     });
     controller.play(AnimationState::IdleRight);
 
-    let target_id = state.spawn_player_like_npc(IVec2::new(66, 60));
+    let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
     let target = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(target_id)
         .expect("target should exist");
     target.attributes.health = Some(10);
     target.attributes.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "death-rule",
             RuleTrigger::OnDeath { entity: None },
@@ -411,11 +429,11 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
         )],
     });
 
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = state.update(
+    let update = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -430,9 +448,9 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
 #[test]
 fn on_death_rule_only_fires_once_after_lethal_hit() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -460,15 +478,15 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
     });
     controller.play(AnimationState::IdleRight);
 
-    let target_id = state.spawn_player_like_npc(IVec2::new(66, 60));
+    let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
     let target = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(target_id)
         .expect("target should exist");
     target.attributes.health = Some(10);
     target.attributes.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "death-rule",
             RuleTrigger::OnDeath { entity: None },
@@ -480,16 +498,16 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
         )],
     });
 
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let first = state.update(
+    let first = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let second = state.update(
+    let second = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -511,8 +529,8 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
 #[test]
 fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(0, 0));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "trigger-rule",
             RuleTrigger::OnTrigger,
@@ -524,7 +542,7 @@ fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
         )],
     });
 
-    let first = state.update(
+    let first = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_trigger_test_tilemap(),
         &create_trigger_test_atlas(),
@@ -534,7 +552,7 @@ fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_trigger"
     )));
 
-    let second = state.update(
+    let second = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_trigger_test_tilemap(),
         &create_trigger_test_atlas(),
@@ -548,7 +566,7 @@ fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
 #[test]
 fn on_update_rule_runs_every_tick() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "tick-beep",
             RuleTrigger::OnUpdate,
@@ -564,8 +582,8 @@ fn on_update_rule_runs_every_tick() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let first = state.update(world_bounds, &tilemap, &atlas);
-    let second = state.update(world_bounds, &tilemap, &atlas);
+    let first = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let second = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
 
     assert_eq!(first.events.len(), 1);
     assert_eq!(second.events.len(), 1);
@@ -574,8 +592,8 @@ fn on_update_rule_runs_every_tick() {
 #[test]
 fn on_player_move_rule_runs_only_when_player_moves() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(10, 10));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "move-sfx",
             RuleTrigger::OnPlayerMove,
@@ -591,23 +609,23 @@ fn on_player_move_rule_runs_only_when_player_moves() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let idle = state.update(world_bounds, &tilemap, &atlas);
+    let idle = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(idle.events.is_empty());
 
-    state.handle_key_press(InputKey::Right);
-    let moved = state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let moved = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(moved.events.iter().any(|event| matches!(
         event,
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "player_moved"
     )));
 
-    state.handle_key_release(InputKey::Right);
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
 }
 
 #[test]
 fn target_exists_condition_gates_rule_execution() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "requires-player",
             RuleTrigger::OnUpdate,
@@ -618,7 +636,7 @@ fn target_exists_condition_gates_rule_execution() {
             }],
         )],
     });
-    state.rules_mut().rules[0].conditions = vec![RuleCondition::TargetExists {
+    state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::TargetExists {
         target: RuleTarget::Player,
     }];
 
@@ -626,11 +644,11 @@ fn target_exists_condition_gates_rule_execution() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let no_player = state.update(world_bounds, &tilemap, &atlas);
+    let no_player = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(no_player.events.is_empty());
 
-    state.spawn_player_at(IVec2::new(0, 0));
-    let with_player = state.update(world_bounds, &tilemap, &atlas);
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+    let with_player = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(with_player.events.iter().any(|event| matches!(
         event,
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_target_exists"
@@ -640,7 +658,7 @@ fn target_exists_condition_gates_rule_execution() {
 #[test]
 fn key_held_condition_matches_runtime_input_state() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "requires-right",
             RuleTrigger::OnUpdate,
@@ -651,7 +669,7 @@ fn key_held_condition_matches_runtime_input_state() {
             }],
         )],
     });
-    state.rules_mut().rules[0].conditions = vec![RuleCondition::KeyHeld {
+    state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::KeyHeld {
         key: RuleKey::Right,
     }];
 
@@ -659,26 +677,26 @@ fn key_held_condition_matches_runtime_input_state() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let without_key = state.update(world_bounds, &tilemap, &atlas);
+    let without_key = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(without_key.events.is_empty());
 
-    state.handle_key_press(InputKey::Right);
-    let with_key = state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let with_key = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(with_key.events.iter().any(|event| matches!(
         event,
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_key_held"
     )));
 
-    state.handle_key_release(InputKey::Right);
-    let released = state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    let released = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(released.events.is_empty());
 }
 
 #[test]
 fn entity_active_condition_checks_target_active_flag() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
-    state.set_rules(RuleSet {
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "requires-active-player",
             RuleTrigger::OnUpdate,
@@ -689,7 +707,7 @@ fn entity_active_condition_checks_target_active_flag() {
             }],
         )],
     });
-    state.rules_mut().rules[0].conditions = vec![RuleCondition::EntityActive {
+    state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::EntityActive {
         target: RuleTarget::Player,
         is_active: true,
     }];
@@ -699,22 +717,22 @@ fn entity_active_condition_checks_target_active_flag() {
     let atlas = create_test_atlas();
 
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .active = false;
 
-    let inactive = state.update(world_bounds, &tilemap, &atlas);
+    let inactive = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(inactive.events.is_empty());
 
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .active = true;
-    let active = state.update(world_bounds, &tilemap, &atlas);
+    let active = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(active.events.iter().any(|event| matches!(
         event,
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_active"
@@ -724,7 +742,7 @@ fn entity_active_condition_checks_target_active_flag() {
 #[test]
 fn flag_equals_condition_matches_current_flag_value() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "requires-quest-flag",
             RuleTrigger::OnUpdate,
@@ -735,12 +753,12 @@ fn flag_equals_condition_matches_current_flag_value() {
             }],
         )],
     });
-    state.rules_mut().rules[0].conditions = vec![RuleCondition::FlagEquals {
+    state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::FlagEquals {
         flag: "quest_stage".to_string(),
         value: FlagValue::String("done".to_string()),
     }];
 
-    let without_flag = state.update(
+    let without_flag = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -748,7 +766,7 @@ fn flag_equals_condition_matches_current_flag_value() {
     assert!(without_flag.events.is_empty());
 
     state.set_flag("quest_stage", FlagValue::String("done".to_string()));
-    let with_flag = state.update(
+    let with_flag = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -763,7 +781,7 @@ fn flag_equals_condition_matches_current_flag_value() {
 fn increment_flag_action_updates_integer_flags() {
     let mut state = GameState::new_empty();
     state.set_flag("coins", FlagValue::Int(2));
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "increment-coins".to_string(),
             enabled: true,
@@ -779,7 +797,7 @@ fn increment_flag_action_updates_integer_flags() {
         }],
     });
 
-    let _ = state.update(
+    let _ = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -792,7 +810,7 @@ fn increment_flag_action_updates_integer_flags() {
 fn clear_flag_action_removes_existing_flags() {
     let mut state = GameState::new_empty();
     state.set_flag("door_open", FlagValue::Bool(true));
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "clear-door".to_string(),
             enabled: true,
@@ -807,7 +825,7 @@ fn clear_flag_action_removes_existing_flags() {
         }],
     });
 
-    let _ = state.update(
+    let _ = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -819,7 +837,7 @@ fn clear_flag_action_removes_existing_flags() {
 #[test]
 fn on_key_rule_runs_only_while_matching_key_is_held() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "right-key-sfx",
             RuleTrigger::OnKey {
@@ -833,15 +851,15 @@ fn on_key_rule_runs_only_while_matching_key_is_held() {
         )],
     });
 
-    let none_pressed = state.update(
+    let none_pressed = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
     assert!(none_pressed.events.is_empty());
 
-    state.handle_key_press(InputKey::Right);
-    let pressed = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let pressed = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -852,8 +870,8 @@ fn on_key_rule_runs_only_while_matching_key_is_held() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "right_key"
     ));
 
-    state.handle_key_release(InputKey::Right);
-    let released = state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    let released = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -864,7 +882,7 @@ fn on_key_rule_runs_only_while_matching_key_is_held() {
 #[test]
 fn on_key_rule_ignores_non_matching_held_keys() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "up-only",
             RuleTrigger::OnKey { key: RuleKey::Up },
@@ -876,8 +894,8 @@ fn on_key_rule_ignores_non_matching_held_keys() {
         )],
     });
 
-    state.handle_key_press(InputKey::Left);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Left);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -888,7 +906,7 @@ fn on_key_rule_ignores_non_matching_held_keys() {
 #[test]
 fn play_music_action_emits_background_music_event() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "music-start",
             RuleTrigger::OnUpdate,
@@ -899,7 +917,7 @@ fn play_music_action_emits_background_music_event() {
         )],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -914,8 +932,8 @@ fn play_music_action_emits_background_music_event() {
 #[test]
 fn play_animation_action_overrides_default_animation_for_target() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(10, 10));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "force-walk-animation",
             RuleTrigger::OnUpdate,
@@ -927,12 +945,12 @@ fn play_animation_action_overrides_default_animation_for_target() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let player = state.player_entity().expect("player must exist");
+    let player = player_entity(&state).expect("player must exist");
     let animation = player
         .attributes
         .animation_controller
@@ -944,8 +962,8 @@ fn play_animation_action_overrides_default_animation_for_target() {
 #[test]
 fn play_animation_uses_priority_order_for_same_target() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(10, 10));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "high",
@@ -968,12 +986,12 @@ fn play_animation_uses_priority_order_for_same_target() {
         ],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let player = state.player_entity().expect("player must exist");
+    let player = player_entity(&state).expect("player must exist");
     let animation = player
         .attributes
         .animation_controller
@@ -985,7 +1003,7 @@ fn play_animation_uses_priority_order_for_same_target() {
 #[test]
 fn play_music_action_ignores_empty_track_id() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "music-empty",
             RuleTrigger::OnUpdate,
@@ -996,7 +1014,7 @@ fn play_music_action_ignores_empty_track_id() {
         )],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1007,7 +1025,7 @@ fn play_music_action_ignores_empty_track_id() {
 #[test]
 fn spawn_action_creates_entity_at_requested_position() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "spawn-npc",
             RuleTrigger::OnUpdate,
@@ -1019,17 +1037,16 @@ fn spawn_action_creates_entity_at_requested_position() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let mut npc_ids = state.entity_manager().entities_of_kind(&EntityKind::Npc);
+    let mut npc_ids = state.world().entity_manager().entities_of_kind(&EntityKind::Npc);
     npc_ids.sort_unstable();
     assert_eq!(npc_ids.len(), 1);
-    let spawned = state
-        .entity_manager()
+    let spawned = state.world().entity_manager()
         .get_entity(npc_ids[0])
         .expect("spawned npc should exist");
     assert_eq!(spawned.position, IVec2::new(42, 84));
@@ -1038,7 +1055,7 @@ fn spawn_action_creates_entity_at_requested_position() {
 #[test]
 fn spawn_actions_follow_rule_priority_order() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "low-spawn",
@@ -1061,22 +1078,20 @@ fn spawn_actions_follow_rule_priority_order() {
         ],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let mut npc_ids = state.entity_manager().entities_of_kind(&EntityKind::Npc);
+    let mut npc_ids = state.world().entity_manager().entities_of_kind(&EntityKind::Npc);
     npc_ids.sort_unstable();
     assert_eq!(npc_ids.len(), 2);
 
-    let first_spawn = state
-        .entity_manager()
+    let first_spawn = state.world().entity_manager()
         .get_entity(npc_ids[0])
         .expect("first spawned npc should exist");
-    let second_spawn = state
-        .entity_manager()
+    let second_spawn = state.world().entity_manager()
         .get_entity(npc_ids[1])
         .expect("second spawned npc should exist");
 
@@ -1088,8 +1103,8 @@ fn spawn_actions_follow_rule_priority_order() {
 #[test]
 fn destroy_self_action_removes_target_entity() {
     let mut state = GameState::new_empty();
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 60));
-    state.set_rules(RuleSet {
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 60));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "destroy-npc",
             RuleTrigger::OnUpdate,
@@ -1100,20 +1115,20 @@ fn destroy_self_action_removes_target_entity() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert!(state.entity_manager().get_entity(npc_id).is_none());
+    assert!(state.world().entity_manager().get_entity(npc_id).is_none());
 }
 
 #[test]
 fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
     let mut state = GameState::new_empty();
-    let npc_id = state.spawn_player_like_npc(IVec2::new(10, 10));
-    state.set_rules(RuleSet {
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(10, 10));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "high-destroy",
@@ -1135,14 +1150,14 @@ fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
         ],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     assert!(
-        state.entity_manager().get_entity(npc_id).is_none(),
+        state.world().entity_manager().get_entity(npc_id).is_none(),
         "entity should be removed before velocity application"
     );
 }
@@ -1150,7 +1165,7 @@ fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
 #[test]
 fn first_tick_emits_on_start_events_before_on_update_events() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "start-first",
@@ -1173,7 +1188,7 @@ fn first_tick_emits_on_start_events_before_on_update_events() {
         ],
     });
 
-    let first = state.update(
+    let first = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1192,7 +1207,7 @@ fn first_tick_emits_on_start_events_before_on_update_events() {
 #[test]
 fn rules_execute_in_priority_order() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "low",
@@ -1215,7 +1230,7 @@ fn rules_execute_in_priority_order() {
         ],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1235,7 +1250,7 @@ fn rules_execute_in_priority_order() {
 #[test]
 fn rules_with_same_priority_execute_in_stable_id_order() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "b_rule",
@@ -1258,7 +1273,7 @@ fn rules_with_same_priority_execute_in_stable_id_order() {
         ],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1288,11 +1303,11 @@ fn disabled_rule_is_not_executed() {
     disabled.enabled = false;
 
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![disabled],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1314,7 +1329,7 @@ fn once_on_update_rule_runs_only_first_tick() {
     once_rule.once = true;
 
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![once_rule],
     });
 
@@ -1322,8 +1337,8 @@ fn once_on_update_rule_runs_only_first_tick() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let first = state.update(world_bounds, &tilemap, &atlas);
-    let second = state.update(world_bounds, &tilemap, &atlas);
+    let first = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let second = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
 
     assert_eq!(first.events.len(), 1);
     assert!(second.events.is_empty());
@@ -1332,8 +1347,8 @@ fn once_on_update_rule_runs_only_first_tick() {
 #[test]
 fn set_velocity_action_moves_player_without_input() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(10, 10));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "move-player",
             RuleTrigger::OnUpdate,
@@ -1349,12 +1364,12 @@ fn set_velocity_action_moves_player_without_input() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    state.handle_key_release(InputKey::Right);
-    let before = state.player_position();
-    state.update(world_bounds, &tilemap, &atlas);
-    let after_first = state.player_position();
-    state.update(world_bounds, &tilemap, &atlas);
-    let after_second = state.player_position();
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    let before = player_position(&state);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let after_first = player_position(&state);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let after_second = player_position(&state);
 
     assert_eq!(after_first.x, before.x + 2);
     assert_eq!(after_second.x, after_first.x + 2);
@@ -1363,8 +1378,8 @@ fn set_velocity_action_moves_player_without_input() {
 #[test]
 fn higher_priority_velocity_command_wins_for_same_target() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(10, 10));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "high",
@@ -1387,13 +1402,13 @@ fn higher_priority_velocity_command_wins_for_same_target() {
         ],
     });
 
-    let before = state.player_position();
-    state.update(
+    let before = player_position(&state);
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let after = state.player_position();
+    let after = player_position(&state);
 
     assert_eq!(after.x, before.x + 4);
 }
@@ -1401,8 +1416,8 @@ fn higher_priority_velocity_command_wins_for_same_target() {
 #[test]
 fn same_priority_velocity_uses_id_tiebreaker() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(20, 20));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(20, 20));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "b_rule",
@@ -1425,13 +1440,13 @@ fn same_priority_velocity_uses_id_tiebreaker() {
         ],
     });
 
-    let before = state.player_position();
-    state.update(
+    let before = player_position(&state);
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let after = state.player_position();
+    let after = player_position(&state);
 
     // Same priority resolves by id ascending, so "a_rule" wins.
     assert_eq!(after.x, before.x + 6);
@@ -1441,8 +1456,8 @@ fn same_priority_velocity_uses_id_tiebreaker() {
 fn deterministic_execution_matches_across_identical_states() {
     fn build_state() -> GameState {
         let mut state = GameState::new_empty();
-        state.spawn_player_at(IVec2::new(40, 40));
-        state.set_rules(RuleSet {
+        SceneSystem::spawn_player_at(&mut state, IVec2::new(40, 40));
+        RuleSystem::set_rules(&mut state, RuleSet {
             rules: vec![
                 base_rule(
                     "start-sfx",
@@ -1484,11 +1499,11 @@ fn deterministic_execution_matches_across_identical_states() {
     let atlas = create_test_atlas();
 
     for _ in 0..3 {
-        let left_tick = left.update(world_bounds, &tilemap, &atlas);
-        let right_tick = right.update(world_bounds, &tilemap, &atlas);
+        let left_tick = GameSimulation::tick_fixed(&mut left, world_bounds, &tilemap, &atlas);
+        let right_tick = GameSimulation::tick_fixed(&mut right, world_bounds, &tilemap, &atlas);
         assert_eq!(left_tick.player_moved, right_tick.player_moved);
         assert_eq!(left_tick.events, right_tick.events);
-        assert_eq!(left.player_position(), right.player_position());
+        assert_eq!(player_position(&left), player_position(&right));
     }
 }
 
@@ -1575,26 +1590,25 @@ fn switch_scene_requests_deferred_runtime_transition_after_movement_processing()
         Some(SceneAnchorFacing::Right),
     ));
 
-    state.add_scene(scene_a);
-    state.add_scene(scene_b);
-    state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut state, scene_a);
+    SceneSystem::add_scene(&mut state, scene_b);
+    SceneSystem::load(&mut state, "Scene A")
         .expect("initial scene should load");
 
-    state.handle_key_press(InputKey::Right);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     assert_eq!(
-        state.scene_manager().active_scene_name(),
+        state.scene().scene_manager().active_scene_name(),
         Some("Scene A"),
         "core should defer the scene switch for the runtime layer"
     );
     assert_eq!(
-        state.player_position(),
+        player_position(&state),
         IVec2::new(2, 0),
         "movement processing should still complete before the deferred switch is emitted"
     );
@@ -1640,24 +1654,23 @@ fn switch_scene_uses_highest_priority_rule_target() {
         ],
     };
 
-    state.add_scene(scene_a);
+    SceneSystem::add_scene(&mut state, scene_a);
     let mut scene_b = Scene::new("Scene B".to_string());
     scene_b.add_anchor(spawn_anchor("spawn_b", IVec2::new(10, 0), None));
     let mut scene_c = Scene::new("Scene C".to_string());
     scene_c.add_anchor(spawn_anchor("spawn_c", IVec2::new(20, 0), None));
-    state.add_scene(scene_b);
-    state.add_scene(scene_c);
-    state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut state, scene_b);
+    SceneSystem::add_scene(&mut state, scene_c);
+    SceneSystem::load(&mut state, "Scene A")
         .expect("initial scene should load");
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(state.scene().scene_manager().active_scene_name(), Some("Scene A"));
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
@@ -1687,19 +1700,18 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
         )],
     };
 
-    state.add_scene(scene_a);
-    state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut state, scene_a);
+    SceneSystem::load(&mut state, "Scene A")
         .expect("initial scene should load");
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
-    assert_eq!(state.player_position(), IVec2::new(0, 0));
+    assert_eq!(state.scene().scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(player_position(&state), IVec2::new(0, 0));
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
@@ -1725,10 +1737,10 @@ fn start_dialog_action_emits_dialog_start_request() {
             }],
         )],
     };
-    state.add_scene(scene);
-    state.load_scene("Dialog Scene").expect("scene should load");
+    SceneSystem::add_scene(&mut state, scene);
+    SceneSystem::load(&mut state, "Dialog Scene").expect("scene should load");
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1752,10 +1764,10 @@ fn save_game_action_emits_persistence_request() {
             vec![RuleAction::SaveGame { slot: 2 }],
         )],
     };
-    state.add_scene(scene);
-    state.load_scene("Save Scene").expect("scene should load");
+    SceneSystem::add_scene(&mut state, scene);
+    SceneSystem::load(&mut state, "Save Scene").expect("scene should load");
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1779,10 +1791,10 @@ fn load_game_action_emits_persistence_request() {
             vec![RuleAction::LoadGame { slot: 3 }],
         )],
     };
-    state.add_scene(scene);
-    state.load_scene("Load Scene").expect("scene should load");
+    SceneSystem::add_scene(&mut state, scene);
+    SceneSystem::load(&mut state, "Load Scene").expect("scene should load");
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1813,17 +1825,17 @@ fn dialog_completion_trigger_can_drive_follow_up_rules() {
             }],
         )],
     };
-    state.add_scene(scene);
-    state.load_scene("Dialog Scene").expect("scene should load");
+    SceneSystem::add_scene(&mut state, scene);
+    SceneSystem::load(&mut state, "Dialog Scene").expect("scene should load");
 
-    state.record_dialog_completion("intro".to_string(), "accepted".to_string());
-    let _ = state.update(
+    RuleSystem::record_dialog_completion(&mut state, "intro".to_string(), "accepted".to_string());
+    let _ = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let player = state.player_entity().expect("player should exist");
+    let player = player_entity(&state).expect("player should exist");
     assert_eq!(player.attributes.inventory.item_count("gift"), 1);
 }
 
@@ -1845,20 +1857,19 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
         )],
     };
 
-    state.add_scene(scene_a);
-    state.add_scene(Scene::new("Scene B".to_string()));
-    state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut state, scene_a);
+    SceneSystem::add_scene(&mut state, Scene::new("Scene B".to_string()));
+    SceneSystem::load(&mut state, "Scene A")
         .expect("initial scene should load");
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
-    assert_eq!(state.player_position(), IVec2::new(0, 0));
+    assert_eq!(state.scene().scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(player_position(&state), IVec2::new(0, 0));
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
@@ -1873,8 +1884,8 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
 #[test]
 fn on_start_set_velocity_initializes_persistent_movement() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(30, 30));
-    state.set_rules(RuleSet {
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(30, 30));
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "start-velocity",
             RuleTrigger::OnStart,
@@ -1890,11 +1901,11 @@ fn on_start_set_velocity_initializes_persistent_movement() {
     let atlas = create_test_atlas();
     let world_bounds = UVec2::new(512, 512);
 
-    let before = state.player_position();
-    state.update(world_bounds, &tilemap, &atlas);
-    let after_first = state.player_position();
-    state.update(world_bounds, &tilemap, &atlas);
-    let after_second = state.player_position();
+    let before = player_position(&state);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let after_first = player_position(&state);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let after_second = player_position(&state);
 
     assert_eq!(after_first.x, before.x + 3);
     assert_eq!(after_second.x, after_first.x + 3);
@@ -1916,17 +1927,16 @@ fn load_scene_applies_scene_rules() {
         )],
     };
 
-    state.add_scene(scene);
-    state
-        .load_scene("Rule Scene")
+    SceneSystem::add_scene(&mut state, scene);
+    SceneSystem::load(&mut state, "Rule Scene")
         .expect("scene with rules should load");
 
     let world_bounds = UVec2::new(256, 256);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    let first = state.update(world_bounds, &tilemap, &atlas);
-    let second = state.update(world_bounds, &tilemap, &atlas);
+    let first = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    let second = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
 
     assert_eq!(first.events.len(), 1);
     assert!(matches!(
@@ -1943,12 +1953,11 @@ fn load_scene_applies_scene_rules() {
 #[test]
 fn sync_entities_to_active_scene_persists_rules() {
     let mut state = GameState::new_empty();
-    state.add_scene(Scene::new("Sync Scene".to_string()));
-    state
-        .load_scene("Sync Scene")
+    SceneSystem::add_scene(&mut state, Scene::new("Sync Scene".to_string()));
+    SceneSystem::load(&mut state, "Sync Scene")
         .expect("scene should load before syncing");
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "persist-me",
             RuleTrigger::OnUpdate,
@@ -1959,9 +1968,9 @@ fn sync_entities_to_active_scene_persists_rules() {
             }],
         )],
     });
-    state.sync_entities_to_active_scene();
+    SceneSystem::sync_entities_to_active_scene(&mut state);
 
-    let active_scene = state.active_scene().expect("active scene should exist");
+    let active_scene = SceneSystem::active_scene(&state).expect("active scene should exist");
     assert_eq!(active_scene.rules.rules.len(), 1);
     assert_eq!(active_scene.rules.rules[0].id, "persist-me");
 }
@@ -1975,15 +1984,15 @@ fn on_collision_with_trigger_self_condition_resolves_correctly() {
     // Tests that TriggerSelf resolves to the colliding entity
     // and can be used in conditions/actions
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
     // Rule uses TargetExists with TriggerSelf - should match when collision context is present
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "context-rule".to_string(),
             enabled: true,
@@ -2001,8 +2010,8 @@ fn on_collision_with_trigger_self_condition_resolves_correctly() {
         }],
     });
 
-    state.handle_key_press(InputKey::Right);
-    let blocked = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let blocked = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -2019,15 +2028,15 @@ fn on_collision_with_trigger_self_condition_resolves_correctly() {
 fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
     // For tile collisions, TriggerOther is None, so TargetExists should fail
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
     // Rule requires TriggerOther to exist - should NOT match for tile collision
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "require-other-rule".to_string(),
             enabled: true,
@@ -2045,8 +2054,8 @@ fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
         }],
     });
 
-    state.handle_key_press(InputKey::Right);
-    let blocked = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let blocked = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -2063,9 +2072,9 @@ fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
 fn on_damaged_with_trigger_self_refers_to_victim() {
     // Tests that TriggerSelf in OnDamaged refers to the damaged entity (victim)
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -2094,10 +2103,10 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
     controller.play(AnimationState::IdleRight);
 
     // Spawn NPC to the right of player
-    state.spawn_player_like_npc(IVec2::new(66, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
     // Rule uses TargetExists with TriggerSelf to verify victim is set
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "damage-context-rule".to_string(),
             enabled: true,
@@ -2115,11 +2124,11 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
         }],
     });
 
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = state.update(
+    let update = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2136,9 +2145,9 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
 fn on_damaged_with_trigger_other_refers_to_attacker() {
     // Tests that TriggerOther in OnDamaged refers to the attacker
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -2167,10 +2176,10 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
     controller.play(AnimationState::IdleRight);
 
     // Spawn NPC to the right of player
-    state.spawn_player_like_npc(IVec2::new(66, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
     // Rule uses TargetExists with TriggerOther to verify attacker is set
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "attacker-context-rule".to_string(),
             enabled: true,
@@ -2188,11 +2197,11 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
         }],
     });
 
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = state.update(
+    let update = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2210,7 +2219,7 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
 #[test]
 fn on_key_interact_fires_when_interact_key_is_held() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "interact-key-sfx",
             RuleTrigger::OnKey {
@@ -2224,8 +2233,8 @@ fn on_key_interact_fires_when_interact_key_is_held() {
         )],
     });
 
-    state.handle_key_press(InputKey::Interact);
-    let pressed = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let pressed = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2235,8 +2244,8 @@ fn on_key_interact_fires_when_interact_key_is_held() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "interact_sfx"
     )));
 
-    state.handle_key_release(InputKey::Interact);
-    let released = state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Interact);
+    let released = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2250,7 +2259,7 @@ fn on_key_interact_fires_when_interact_key_is_held() {
 #[test]
 fn on_key_attack_primary_fires_when_attack_primary_key_is_held() {
     let mut state = GameState::new_empty();
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "attack-primary-key-sfx",
             RuleTrigger::OnKey {
@@ -2264,8 +2273,8 @@ fn on_key_attack_primary_fires_when_attack_primary_key_is_held() {
         )],
     });
 
-    state.handle_key_press(InputKey::AttackPrimary);
-    let pressed = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::AttackPrimary);
+    let pressed = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2279,20 +2288,20 @@ fn on_key_attack_primary_fires_when_attack_primary_key_is_held() {
 #[test]
 fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Spawn NPC at overlapping position
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     // Mark NPC as interactable
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .interactable = true;
 
     // Rule fires on interact with NPC
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "npc-interact",
             RuleTrigger::OnInteract {
@@ -2308,8 +2317,8 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
     });
 
     // Press interact key
-    state.handle_key_press(InputKey::Interact);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2321,8 +2330,8 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
     )));
 
     // Release interact - should not fire again
-    state.handle_key_release(InputKey::Interact);
-    let no_interact = state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Interact);
+    let no_interact = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2336,18 +2345,18 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
 #[test]
 fn on_interact_does_not_fire_when_not_overlapping() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(50, 50));
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Spawn NPC far away
-    let npc_id = state.spawn_player_like_npc(IVec2::new(150, 150));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(150, 150));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .interactable = true;
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "npc-interact",
             RuleTrigger::OnInteract {
@@ -2362,8 +2371,8 @@ fn on_interact_does_not_fire_when_not_overlapping() {
         )],
     });
 
-    state.handle_key_press(InputKey::Interact);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2379,18 +2388,18 @@ fn on_interact_does_not_fire_when_not_overlapping() {
 #[test]
 fn on_interact_does_not_fire_when_entity_is_not_interactable() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(50, 50));
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Spawn NPC at overlapping position but NOT marked as interactable
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .interactable = false;
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "npc-interact",
             RuleTrigger::OnInteract {
@@ -2405,8 +2414,8 @@ fn on_interact_does_not_fire_when_entity_is_not_interactable() {
         )],
     });
 
-    state.handle_key_press(InputKey::Interact);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2422,19 +2431,19 @@ fn on_interact_does_not_fire_when_entity_is_not_interactable() {
 #[test]
 fn on_interact_provides_trigger_context() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Spawn interactable NPC
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .interactable = true;
 
     // Rule uses TriggerSelf (player) and TriggerOther (NPC)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "interact-context".to_string(),
             enabled: true,
@@ -2460,8 +2469,8 @@ fn on_interact_provides_trigger_context() {
         }],
     });
 
-    state.handle_key_press(InputKey::Interact);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2477,17 +2486,17 @@ fn on_interact_provides_trigger_context() {
 #[test]
 fn interaction_rules_respect_priority_ordering() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(50, 50));
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .interactable = true;
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "low-priority",
@@ -2516,8 +2525,8 @@ fn interaction_rules_respect_priority_ordering() {
         ],
     });
 
-    state.handle_key_press(InputKey::Interact);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2538,17 +2547,17 @@ fn interaction_rules_respect_priority_ordering() {
 #[test]
 fn on_damaged_fires_when_entity_takes_damage() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Give player health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(100);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "on-damaged",
             RuleTrigger::OnDamaged { entity: None },
@@ -2563,7 +2572,7 @@ fn on_damaged_fires_when_entity_takes_damage() {
     // Deal damage to player
     state.deal_damage_to_entity(player_id, 10, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2579,19 +2588,19 @@ fn on_damaged_fires_when_entity_takes_damage() {
 #[test]
 fn on_damaged_provides_trigger_context() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let attacker_id = state.spawn_player_like_npc(IVec2::new(60, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let attacker_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(60, 60));
 
     // Give player health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(100);
 
     // Rule uses TriggerSelf (victim) and TriggerOther (attacker)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "damaged-context".to_string(),
             enabled: true,
@@ -2617,7 +2626,7 @@ fn on_damaged_provides_trigger_context() {
     // Deal damage with attacker
     state.deal_damage_to_entity(player_id, 10, Some(attacker_id));
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2633,17 +2642,17 @@ fn on_damaged_provides_trigger_context() {
 #[test]
 fn on_death_fires_when_entity_dies() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Give player low health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(10);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "on-death",
             RuleTrigger::OnDeath { entity: None },
@@ -2658,7 +2667,7 @@ fn on_death_fires_when_entity_dies() {
     // Deal lethal damage to player
     state.deal_damage_to_entity(player_id, 100, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2674,19 +2683,19 @@ fn on_death_fires_when_entity_dies() {
 #[test]
 fn on_death_provides_trigger_context() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let attacker_id = state.spawn_player_like_npc(IVec2::new(60, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let attacker_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(60, 60));
 
     // Give player low health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(10);
 
     // Rule uses TriggerSelf (victim) and TriggerOther (attacker)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "death-context".to_string(),
             enabled: true,
@@ -2712,7 +2721,7 @@ fn on_death_provides_trigger_context() {
     // Deal lethal damage with attacker
     state.deal_damage_to_entity(player_id, 100, Some(attacker_id));
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2728,18 +2737,18 @@ fn on_death_provides_trigger_context() {
 #[test]
 fn on_death_fires_without_attacker() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Give player low health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(10);
 
     // Rule uses only TriggerSelf (victim) - no attacker requirement
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "death-no-attacker".to_string(),
             enabled: true,
@@ -2760,7 +2769,7 @@ fn on_death_fires_without_attacker() {
     // Deal lethal damage without attacker (environmental)
     state.deal_damage_to_entity(player_id, 100, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2780,25 +2789,25 @@ fn on_death_fires_without_attacker() {
 #[test]
 fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let npc_id = state.spawn_player_like_npc(IVec2::new(100, 100));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(100, 100));
 
     // Give both entities health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(100);
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .health = Some(100);
 
     // Rule only fires when player is damaged
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "player-damaged".to_string(),
             enabled: true,
@@ -2819,7 +2828,7 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
     // Deal damage to NPC - should NOT trigger
     state.deal_damage_to_entity(npc_id, 10, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2836,7 +2845,7 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
     // Now deal damage to player - SHOULD trigger
     state.deal_damage_to_entity(player_id, 10, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2854,25 +2863,25 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
 #[test]
 fn on_damaged_without_entity_filter_fires_for_all_entities() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let npc_id = state.spawn_player_like_npc(IVec2::new(100, 100));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(100, 100));
 
     // Give both entities health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(100);
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .health = Some(100);
 
     // Rule fires for ANY damage (no entity filter)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "any-damaged".to_string(),
             enabled: true,
@@ -2891,7 +2900,7 @@ fn on_damaged_without_entity_filter_fires_for_all_entities() {
     // Deal damage to NPC - should trigger
     state.deal_damage_to_entity(npc_id, 10, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2909,26 +2918,26 @@ fn on_damaged_without_entity_filter_fires_for_all_entities() {
 #[test]
 fn on_damaged_with_specific_entity_id_filter() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let npc1_id = state.spawn_player_like_npc(IVec2::new(100, 100));
-    let npc2_id = state.spawn_player_like_npc(IVec2::new(150, 150));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let npc1_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(100, 100));
+    let npc2_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(150, 150));
 
     // Give NPCs health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc1_id)
         .expect("npc1 should exist")
         .attributes
         .health = Some(100);
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc2_id)
         .expect("npc2 should exist")
         .attributes
         .health = Some(100);
 
     // Rule only fires when npc1 is damaged
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "npc1-damaged".to_string(),
             enabled: true,
@@ -2949,7 +2958,7 @@ fn on_damaged_with_specific_entity_id_filter() {
     // Deal damage to npc2 - should NOT trigger
     state.deal_damage_to_entity(npc2_id, 10, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2966,7 +2975,7 @@ fn on_damaged_with_specific_entity_id_filter() {
     // Deal damage to npc1 - SHOULD trigger
     state.deal_damage_to_entity(npc1_id, 10, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2984,25 +2993,25 @@ fn on_damaged_with_specific_entity_id_filter() {
 #[test]
 fn on_death_with_entity_filter_only_fires_for_matching_entity() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let npc_id = state.spawn_player_like_npc(IVec2::new(100, 100));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(100, 100));
 
     // Give both entities health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .health = Some(10);
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .health = Some(10);
 
     // Rule only fires when player dies
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "player-death".to_string(),
             enabled: true,
@@ -3023,7 +3032,7 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
     // Kill NPC - should NOT trigger
     state.deal_damage_to_entity(npc_id, 100, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3040,7 +3049,7 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
     // Kill player - SHOULD trigger
     state.deal_damage_to_entity(player_id, 100, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3058,19 +3067,19 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
 #[test]
 fn on_death_without_entity_filter_fires_for_all_entities() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(50, 50));
-    let npc_id = state.spawn_player_like_npc(IVec2::new(100, 100));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(100, 100));
 
     // Give NPC health
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
         .health = Some(10);
 
     // Rule fires for ANY death (no entity filter)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "any-death".to_string(),
             enabled: true,
@@ -3089,7 +3098,7 @@ fn on_death_without_entity_filter_fires_for_all_entities() {
     // Kill NPC - should trigger
     state.deal_damage_to_entity(npc_id, 100, None);
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3111,12 +3120,12 @@ fn on_death_without_entity_filter_fires_for_all_entities() {
 #[test]
 fn health_below_condition_matches_when_entity_health_is_below_threshold() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Set player health to 30 (below threshold of 50)
     // Note: must insert directly since player spawns with default health (100)
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -3124,7 +3133,7 @@ fn health_below_condition_matches_when_entity_health_is_below_threshold() {
         .current
         .insert("health".to_string(), 30);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "low-health-alert".to_string(),
             enabled: true,
@@ -3143,7 +3152,7 @@ fn health_below_condition_matches_when_entity_health_is_below_threshold() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3161,11 +3170,11 @@ fn health_below_condition_matches_when_entity_health_is_below_threshold() {
 #[test]
 fn health_below_condition_does_not_match_when_health_equals_threshold() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Set player health exactly at threshold
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -3173,7 +3182,7 @@ fn health_below_condition_does_not_match_when_health_equals_threshold() {
         .current
         .insert("health".to_string(), 50);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "low-health-alert".to_string(),
             enabled: true,
@@ -3192,7 +3201,7 @@ fn health_below_condition_does_not_match_when_health_equals_threshold() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3207,10 +3216,10 @@ fn health_below_condition_does_not_match_when_health_equals_threshold() {
 #[test]
 fn health_below_condition_does_not_match_when_health_is_above_threshold() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     // Player spawns with health 100 (above threshold of 50)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "low-health-alert".to_string(),
             enabled: true,
@@ -3229,7 +3238,7 @@ fn health_below_condition_does_not_match_when_health_is_above_threshold() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3244,11 +3253,11 @@ fn health_below_condition_does_not_match_when_health_is_above_threshold() {
 #[test]
 fn health_above_condition_matches_when_entity_health_is_above_threshold() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Set player health to 80 (above threshold of 50)
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -3256,7 +3265,7 @@ fn health_above_condition_matches_when_entity_health_is_above_threshold() {
         .current
         .insert("health".to_string(), 80);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "high-health".to_string(),
             enabled: true,
@@ -3275,7 +3284,7 @@ fn health_above_condition_matches_when_entity_health_is_above_threshold() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3293,11 +3302,11 @@ fn health_above_condition_matches_when_entity_health_is_above_threshold() {
 #[test]
 fn health_above_condition_does_not_match_when_health_equals_threshold() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Set player health exactly at threshold
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -3305,7 +3314,7 @@ fn health_above_condition_does_not_match_when_health_equals_threshold() {
         .current
         .insert("health".to_string(), 50);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "high-health".to_string(),
             enabled: true,
@@ -3324,7 +3333,7 @@ fn health_above_condition_does_not_match_when_health_equals_threshold() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3339,11 +3348,11 @@ fn health_above_condition_does_not_match_when_health_equals_threshold() {
 #[test]
 fn health_above_condition_does_not_match_when_health_is_below_threshold() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Set player health below threshold
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -3351,7 +3360,7 @@ fn health_above_condition_does_not_match_when_health_is_below_threshold() {
         .current
         .insert("health".to_string(), 30);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "high-health".to_string(),
             enabled: true,
@@ -3370,7 +3379,7 @@ fn health_above_condition_does_not_match_when_health_is_below_threshold() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3385,17 +3394,17 @@ fn health_above_condition_does_not_match_when_health_is_below_threshold() {
 #[test]
 fn health_condition_fails_safely_when_entity_has_no_health_stat() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Clear health stat to ensure it doesn't exist
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .stats = toki_core::entity::EntityStats::default();
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "health-check".to_string(),
             enabled: true,
@@ -3414,7 +3423,7 @@ fn health_condition_fails_safely_when_entity_has_no_health_stat() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3433,11 +3442,11 @@ fn health_condition_fails_safely_when_entity_has_no_health_stat() {
 #[test]
 fn trigger_other_is_player_matches_when_other_entity_is_player_in_collision() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
-    state.spawn_player_like_npc(IVec2::new(66, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
     // Rule: OnCollision when the other entity is the player
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "player-collision".to_string(),
             enabled: true,
@@ -3454,8 +3463,8 @@ fn trigger_other_is_player_matches_when_other_entity_is_player_in_collision() {
     });
 
     // Move player into NPC to trigger collision
-    state.handle_key_press(InputKey::Right);
-    let result = state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -3471,14 +3480,14 @@ fn trigger_other_is_player_matches_when_other_entity_is_player_in_collision() {
 #[test]
 fn trigger_other_is_player_does_not_match_when_other_is_not_player() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
 
     // Spawn two NPCs that will collide
-    let npc1 = state.spawn_player_like_npc(IVec2::new(80, 60));
-    state.spawn_player_like_npc(IVec2::new(96, 60));
+    let npc1 = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(80, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(96, 60));
 
     // Rule: OnDamaged when the attacker is the player
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "player-attack".to_string(),
             enabled: true,
@@ -3497,7 +3506,7 @@ fn trigger_other_is_player_does_not_match_when_other_is_not_player() {
     // Deal damage from NPC1 to NPC2 (neither is player)
     state.deal_damage_to_entity(npc1, 10, Some(npc1));
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3515,10 +3524,10 @@ fn trigger_other_is_player_does_not_match_when_other_is_not_player() {
 #[test]
 fn trigger_other_is_player_fails_safely_without_context() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Rule: OnUpdate with TriggerOtherIsPlayer (OnUpdate has no context)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "invalid-context".to_string(),
             enabled: true,
@@ -3534,7 +3543,7 @@ fn trigger_other_is_player_fails_safely_without_context() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3553,9 +3562,9 @@ fn trigger_other_is_player_fails_safely_without_context() {
 #[test]
 fn entity_is_kind_matches_player_kind() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "player-kind-check".to_string(),
             enabled: true,
@@ -3574,7 +3583,7 @@ fn entity_is_kind_matches_player_kind() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3592,9 +3601,9 @@ fn entity_is_kind_matches_player_kind() {
 #[test]
 fn entity_is_kind_does_not_match_wrong_kind() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "npc-kind-check".to_string(),
             enabled: true,
@@ -3613,7 +3622,7 @@ fn entity_is_kind_does_not_match_wrong_kind() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3628,11 +3637,11 @@ fn entity_is_kind_does_not_match_wrong_kind() {
 #[test]
 fn trigger_other_is_kind_matches_npc_on_damage() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
 
     // Setup player for attacking
     let player = state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -3661,9 +3670,9 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
     controller.play(AnimationState::IdleRight);
 
     // Spawn NPC that will be damaged
-    state.spawn_player_like_npc(IVec2::new(66, 60));
+    SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "damaged-by-npc-check".to_string(),
             enabled: true,
@@ -3684,11 +3693,11 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
     });
 
     // Player attacks NPC - attacker is Player, not NPC
-    state.handle_profile_action_press(
+    InputSystem::handle_profile_action_press(state.runtime_mut(), 
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3706,9 +3715,9 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
 #[test]
 fn trigger_other_is_kind_fails_safely_without_context() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "no-context".to_string(),
             enabled: true,
@@ -3726,7 +3735,7 @@ fn trigger_other_is_kind_fails_safely_without_context() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3745,16 +3754,16 @@ fn trigger_other_is_kind_fails_safely_without_context() {
 #[test]
 fn entity_has_tag_matches_when_entity_has_specified_tag() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Add tags to player
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .tags = vec!["hero".to_string(), "protagonist".to_string()];
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "hero-check".to_string(),
             enabled: true,
@@ -3773,7 +3782,7 @@ fn entity_has_tag_matches_when_entity_has_specified_tag() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3791,16 +3800,16 @@ fn entity_has_tag_matches_when_entity_has_specified_tag() {
 #[test]
 fn entity_has_tag_does_not_match_when_entity_lacks_tag() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Add different tags to player
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .tags = vec!["hero".to_string()];
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "villain-check".to_string(),
             enabled: true,
@@ -3819,7 +3828,7 @@ fn entity_has_tag_does_not_match_when_entity_lacks_tag() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3834,9 +3843,9 @@ fn entity_has_tag_does_not_match_when_entity_lacks_tag() {
 #[test]
 fn trigger_other_has_tag_fails_safely_without_context() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "no-context".to_string(),
             enabled: true,
@@ -3854,7 +3863,7 @@ fn trigger_other_has_tag_fails_safely_without_context() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3873,18 +3882,18 @@ fn trigger_other_has_tag_fails_safely_without_context() {
 #[test]
 fn has_inventory_item_matches_when_player_has_enough_items() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Give player inventory items
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .inventory
         .add_item("key", 3);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "key-check".to_string(),
             enabled: true,
@@ -3904,7 +3913,7 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3922,18 +3931,18 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
 #[test]
 fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Give player fewer items than required
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .inventory
         .add_item("key", 1);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "key-check".to_string(),
             enabled: true,
@@ -3953,7 +3962,7 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3968,10 +3977,10 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
 #[test]
 fn has_inventory_item_does_not_match_when_item_missing() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0));
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     // Player has no items in inventory by default
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "key-check".to_string(),
             enabled: true,
@@ -3991,7 +4000,7 @@ fn has_inventory_item_does_not_match_when_item_missing() {
         }],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4006,9 +4015,9 @@ fn has_inventory_item_does_not_match_when_item_missing() {
 #[test]
 fn on_tile_enter_fires_when_entity_enters_tile() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "enter-tile-1-0",
             RuleTrigger::OnTileEnter { x: 1, y: 0 },
@@ -4021,17 +4030,17 @@ fn on_tile_enter_fires_when_entity_enters_tile() {
     });
 
     // Initialize tile tracking with first update
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move player right to tile (1, 0) - player moves 2px per frame, needs ~8 frames to reach tile center
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut fired = false;
     for _ in 0..10 {
-        let result = state.update(
+        let result = GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4056,9 +4065,9 @@ fn on_tile_enter_fires_when_entity_enters_tile() {
 #[test]
 fn on_tile_enter_does_not_fire_when_staying_on_same_tile() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "enter-tile-0-0",
             RuleTrigger::OnTileEnter { x: 0, y: 0 },
@@ -4071,14 +4080,14 @@ fn on_tile_enter_does_not_fire_when_staying_on_same_tile() {
     });
 
     // First frame - no movement, already on tile
-    let first = state.update(
+    let first = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Second frame - still no movement
-    let second = state.update(
+    let second = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4097,9 +4106,9 @@ fn on_tile_enter_does_not_fire_when_staying_on_same_tile() {
 #[test]
 fn on_tile_enter_fires_only_on_transition() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "enter-tile-1-0",
             RuleTrigger::OnTileEnter { x: 1, y: 0 },
@@ -4112,17 +4121,17 @@ fn on_tile_enter_fires_only_on_transition() {
     });
 
     // Initialize tile tracking
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move to tile (1, 0)
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut entered = false;
     for _ in 0..10 {
-        let result = state.update(
+        let result = GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4139,8 +4148,8 @@ fn on_tile_enter_fires_only_on_transition() {
     }
 
     // Stay on tile (1, 0)
-    state.handle_key_release(InputKey::Right);
-    let second = state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    let second = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4156,9 +4165,9 @@ fn on_tile_enter_fires_only_on_transition() {
 #[test]
 fn on_tile_exit_fires_when_entity_leaves_tile() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "exit-tile-0-0",
             RuleTrigger::OnTileExit { x: 0, y: 0 },
@@ -4171,17 +4180,17 @@ fn on_tile_exit_fires_when_entity_leaves_tile() {
     });
 
     // Initialize tile tracking
-    let first = state.update(
+    let first = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move right to tile (1, 0), leaving (0, 0)
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut exited = false;
     for _ in 0..10 {
-        let result = state.update(
+        let result = GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4210,9 +4219,9 @@ fn on_tile_exit_fires_when_entity_leaves_tile() {
 #[test]
 fn on_tile_exit_does_not_fire_repeatedly() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "exit-tile-0-0",
             RuleTrigger::OnTileExit { x: 0, y: 0 },
@@ -4225,17 +4234,17 @@ fn on_tile_exit_does_not_fire_repeatedly() {
     });
 
     // Initialize tile tracking
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move to tile (1, 0), leaving (0, 0)
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut exited = false;
     for _ in 0..10 {
-        let result = state.update(
+        let result = GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4252,8 +4261,8 @@ fn on_tile_exit_does_not_fire_repeatedly() {
     }
 
     // Stay on tile (1, 0)
-    state.handle_key_release(InputKey::Right);
-    let second = state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    let second = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4269,9 +4278,9 @@ fn on_tile_exit_does_not_fire_repeatedly() {
 #[test]
 fn on_tile_enter_provides_trigger_self_context() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "enter-with-velocity".to_string(),
             enabled: true,
@@ -4288,16 +4297,16 @@ fn on_tile_enter_provides_trigger_self_context() {
     });
 
     // Initialize tile tracking
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move to tile (1, 0)
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     for _ in 0..10 {
-        state.update(
+        GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4305,9 +4314,9 @@ fn on_tile_enter_provides_trigger_self_context() {
     }
 
     // Entity should have velocity set by the rule
-    let _player = state.entity_manager().get_entity(player_id).unwrap();
+    let _player = state.world().entity_manager().get_entity(player_id).unwrap();
     // Velocity will be applied on next update, check rule runtime state
-    let velocity = state.get_rule_velocity(player_id);
+    let velocity = RuleSystem::rule_velocity(&state, player_id);
     assert_eq!(
         velocity,
         Some(IVec2::new(0, 5)),
@@ -4318,9 +4327,9 @@ fn on_tile_enter_provides_trigger_self_context() {
 #[test]
 fn on_tile_exit_provides_trigger_self_context() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
             id: "exit-with-velocity".to_string(),
             enabled: true,
@@ -4337,16 +4346,16 @@ fn on_tile_exit_provides_trigger_self_context() {
     });
 
     // Initialize tile tracking
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move to tile (1, 0), leaving (0, 0)
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     for _ in 0..10 {
-        state.update(
+        GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4354,7 +4363,7 @@ fn on_tile_exit_provides_trigger_self_context() {
     }
 
     // Entity should have velocity set by the rule
-    let velocity = state.get_rule_velocity(player_id);
+    let velocity = RuleSystem::rule_velocity(&state, player_id);
     assert_eq!(
         velocity,
         Some(IVec2::new(10, 0)),
@@ -4365,10 +4374,10 @@ fn on_tile_exit_provides_trigger_self_context() {
 #[test]
 fn multiple_entities_can_trigger_tile_events_independently() {
     let mut state = GameState::new_empty();
-    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
-    let _npc_id = state.spawn_player_like_npc(IVec2::new(0, 16)); // Tile (0, 1)
+    let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
+    let _npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(0, 16)); // Tile (0, 1)
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "enter-tile-1-0",
             RuleTrigger::OnTileEnter { x: 1, y: 0 },
@@ -4381,17 +4390,17 @@ fn multiple_entities_can_trigger_tile_events_independently() {
     });
 
     // Initialize tile tracking
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Move player to tile (1, 0) - first entry
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut first_enter_count = 0;
     for _ in 0..10 {
-        let result = state.update(
+        let result = GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4407,24 +4416,24 @@ fn multiple_entities_can_trigger_tile_events_independently() {
             })
             .count();
     }
-    state.handle_key_release(InputKey::Right);
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
 
     // Move player back to tile (0, 0)
-    state.handle_key_press(InputKey::Left);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Left);
     for _ in 0..10 {
-        state.update(
+        GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
         );
     }
-    state.handle_key_release(InputKey::Left);
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Left);
 
     // Move player to tile (1, 0) again - second entry
-    state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut second_enter_count = 0;
     for _ in 0..10 {
-        let result = state.update(
+        let result = GameSimulation::tick_fixed(&mut state, 
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4458,17 +4467,16 @@ fn multiple_entities_can_trigger_tile_events_independently() {
 #[test]
 fn damage_entity_reduces_health_by_specified_amount() {
     let mut state = GameState::new_empty();
-    let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     // Verify initial health
-    let initial_health = state
-        .entity_manager()
+    let initial_health = state.world().entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.health)
         .expect("Target should have health");
     assert_eq!(initial_health, 50);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "damage-target",
             RuleTrigger::OnUpdate,
@@ -4480,14 +4488,13 @@ fn damage_entity_reduces_health_by_specified_amount() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let new_health = state
-        .entity_manager()
+    let new_health = state.world().entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.health)
         .expect("Target should still exist");
@@ -4497,9 +4504,9 @@ fn damage_entity_reduces_health_by_specified_amount() {
 #[test]
 fn damage_entity_triggers_death_when_health_reaches_zero() {
     let mut state = GameState::new_empty();
-    let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
             base_rule(
                 "lethal-damage",
@@ -4522,14 +4529,14 @@ fn damage_entity_triggers_death_when_health_reaches_zero() {
         ],
     });
 
-    let result = state.update(
+    let result = GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Entity should be despawned
-    assert!(state.entity_manager().get_entity(target_id).is_none());
+    assert!(state.world().entity_manager().get_entity(target_id).is_none());
 
     // Death sound should have played
     assert!(result.events.iter().any(|e| matches!(
@@ -4541,10 +4548,10 @@ fn damage_entity_triggers_death_when_health_reaches_zero() {
 #[test]
 fn heal_entity_increases_health_by_specified_amount() {
     let mut state = GameState::new_empty();
-    let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     // Damage first to reduce health (NPC starts at 50)
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "damage-first",
             RuleTrigger::OnUpdate,
@@ -4555,21 +4562,20 @@ fn heal_entity_increases_health_by_specified_amount() {
             }],
         )],
     });
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let damaged_health = state
-        .entity_manager()
+    let damaged_health = state.world().entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.health)
         .unwrap();
     assert_eq!(damaged_health, 10);
 
     // Now heal
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "heal-target",
             RuleTrigger::OnUpdate,
@@ -4581,14 +4587,13 @@ fn heal_entity_increases_health_by_specified_amount() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let healed_health = state
-        .entity_manager()
+    let healed_health = state.world().entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.health)
         .unwrap();
@@ -4598,9 +4603,9 @@ fn heal_entity_increases_health_by_specified_amount() {
 #[test]
 fn heal_entity_does_not_exceed_base_health() {
     let mut state = GameState::new_empty();
-    let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "overheal-attempt",
             RuleTrigger::OnUpdate,
@@ -4612,14 +4617,13 @@ fn heal_entity_does_not_exceed_base_health() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let health = state
-        .entity_manager()
+    let health = state.world().entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.health)
         .unwrap();
@@ -4629,9 +4633,9 @@ fn heal_entity_does_not_exceed_base_health() {
 #[test]
 fn add_inventory_item_adds_to_empty_inventory() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "grant-key",
             RuleTrigger::OnUpdate,
@@ -4644,14 +4648,13 @@ fn add_inventory_item_adds_to_empty_inventory() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let inventory = &state
-        .entity_manager()
+    let inventory = &state.world().entity_manager()
         .get_entity(player_id)
         .unwrap()
         .attributes
@@ -4662,9 +4665,9 @@ fn add_inventory_item_adds_to_empty_inventory() {
 #[test]
 fn add_inventory_item_stacks_with_existing() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "grant-coins",
             RuleTrigger::OnUpdate,
@@ -4678,21 +4681,20 @@ fn add_inventory_item_stacks_with_existing() {
     });
 
     // Add first batch
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Add second batch
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let inventory = &state
-        .entity_manager()
+    let inventory = &state.world().entity_manager()
         .get_entity(player_id)
         .unwrap()
         .attributes
@@ -4703,18 +4705,18 @@ fn add_inventory_item_stacks_with_existing() {
 #[test]
 fn remove_inventory_item_reduces_count() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Add items first
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .inventory
         .add_item("potion", 5);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "use-potion",
             RuleTrigger::OnUpdate,
@@ -4727,14 +4729,13 @@ fn remove_inventory_item_reduces_count() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let inventory = &state
-        .entity_manager()
+    let inventory = &state.world().entity_manager()
         .get_entity(player_id)
         .unwrap()
         .attributes
@@ -4745,18 +4746,18 @@ fn remove_inventory_item_reduces_count() {
 #[test]
 fn remove_inventory_item_never_goes_negative() {
     let mut state = GameState::new_empty();
-    let player_id = state.spawn_player_at(IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
     // Add only 2 items
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .inventory
         .add_item("arrow", 2);
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "use-many-arrows",
             RuleTrigger::OnUpdate,
@@ -4769,14 +4770,13 @@ fn remove_inventory_item_never_goes_negative() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let inventory = &state
-        .entity_manager()
+    let inventory = &state.world().entity_manager()
         .get_entity(player_id)
         .unwrap()
         .attributes
@@ -4791,18 +4791,17 @@ fn remove_inventory_item_never_goes_negative() {
 #[test]
 fn set_entity_active_false_makes_entity_inactive() {
     let mut state = GameState::new_empty();
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     assert!(
-        state
-            .entity_manager()
+        state.world().entity_manager()
             .get_entity(npc_id)
             .unwrap()
             .attributes
             .active
     );
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "deactivate-npc",
             RuleTrigger::OnUpdate,
@@ -4814,30 +4813,30 @@ fn set_entity_active_false_makes_entity_inactive() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let entity = state.entity_manager().get_entity(npc_id).unwrap();
+    let entity = state.world().entity_manager().get_entity(npc_id).unwrap();
     assert!(!entity.attributes.active, "Entity should be inactive");
 }
 
 #[test]
 fn set_entity_active_true_makes_entity_active() {
     let mut state = GameState::new_empty();
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     // Deactivate first
     state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .unwrap()
         .attributes
         .active = false;
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "activate-npc",
             RuleTrigger::OnUpdate,
@@ -4849,25 +4848,25 @@ fn set_entity_active_true_makes_entity_active() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let entity = state.entity_manager().get_entity(npc_id).unwrap();
+    let entity = state.world().entity_manager().get_entity(npc_id).unwrap();
     assert!(entity.attributes.active, "Entity should be active");
 }
 
 #[test]
 fn teleport_entity_moves_to_specified_position() {
     let mut state = GameState::new_empty();
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
-    let initial_pos = state.entity_manager().get_entity(npc_id).unwrap().position;
+    let initial_pos = state.world().entity_manager().get_entity(npc_id).unwrap().position;
     assert_eq!(initial_pos, IVec2::new(50, 50));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "teleport-npc",
             RuleTrigger::OnUpdate,
@@ -4880,13 +4879,13 @@ fn teleport_entity_moves_to_specified_position() {
         )],
     });
 
-    state.update(
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let new_pos = state.entity_manager().get_entity(npc_id).unwrap().position;
+    let new_pos = state.world().entity_manager().get_entity(npc_id).unwrap().position;
     // tile_x=5, tile_y=6 with 16x16 tiles -> pixel position (80, 96)
     assert_eq!(new_pos, IVec2::new(80, 96));
 }
@@ -4894,10 +4893,10 @@ fn teleport_entity_moves_to_specified_position() {
 #[test]
 fn teleport_entity_works_with_trigger_self() {
     let mut state = GameState::new_empty();
-    let _npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    let player_id = state.spawn_player_at(IVec2::new(48, 48));
+    let _npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(48, 48));
 
-    state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
             "teleport-on-collision",
             RuleTrigger::OnCollision { entity: None },
@@ -4911,22 +4910,21 @@ fn teleport_entity_works_with_trigger_self() {
     });
 
     // Move player to collide with NPC, then check if teleport happened
-    state.handle_key_press(InputKey::Right);
-    state.update(
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    state.handle_key_release(InputKey::Right);
-    state.update(
+    InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(&mut state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let player_pos = state
-        .entity_manager()
+    let player_pos = state.world().entity_manager()
         .get_entity(player_id)
         .unwrap()
         .position;

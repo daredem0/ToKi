@@ -1,11 +1,9 @@
 use glam::{IVec2, UVec2};
 use tempfile::NamedTempFile;
-#[path = "support/game_state_compat.rs"]
-mod game_state_compat;
 use toki_core::entity::*;
+use toki_core::game::{InputSystem, RenderQueryService, SceneSystem};
 use toki_core::serialization::*;
 use toki_core::{FlagValue, GameState, InputKey, Scene};
-use game_state_compat::GameStateCompatExt;
 use toki_test_fixtures::{save_test_state, test_entity, test_entity_definition};
 
 fn test_definition(name: &str, category: &str) -> EntityDefinition {
@@ -58,6 +56,21 @@ fn persistent_npc(id: u32, position: IVec2) -> Entity {
     entity.position = position;
     entity.persistent_across_saves = true;
     entity
+}
+
+fn player_position(state: &GameState) -> IVec2 {
+    RenderQueryService::new(
+        state.world().entity_manager(),
+        state.world().player_id(),
+        state.runtime().debug_collision_rendering(),
+    )
+    .player_position()
+}
+
+fn player_entity(state: &GameState) -> Option<&Entity> {
+    state.world()
+        .player_id()
+        .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
 }
 
 #[test]
@@ -122,16 +135,14 @@ fn save_data_capture_persists_only_persistent_scene_entities() {
     transient.persistent_across_saves = false;
     scene.entities.push(persistent);
     scene.entities.push(transient);
-    game_state.add_scene(scene);
-    game_state.load_scene("main").expect("scene should load");
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, "main").expect("scene should load");
 
-    if let Some(entity) = game_state.entity_manager_mut().get_entity_mut(2) {
+    if let Some(entity) = game_state.world_mut().entity_manager_mut().get_entity_mut(2) {
         entity.position = IVec2::new(99, 88);
     }
-    game_state
-        .entity_manager_mut()
-        .despawn_entity(3);
-    game_state.sync_persistent_entities_to_active_scene();
+    game_state.world_mut().entity_manager_mut().despawn_entity(3);
+    SceneSystem::sync_persistent_entities_to_active_scene(&mut game_state);
 
     let save = SaveData::capture(&game_state, 1).expect("save should capture");
 
@@ -153,10 +164,10 @@ fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
     let mut game_state = GameState::new_empty();
     let mut scene = Scene::new("main".to_string());
     scene.entities.push(persistent_npc(2, IVec2::new(10, 10)));
-    game_state.add_scene(scene);
-    game_state.load_scene("main").expect("scene should load");
-    game_state.entity_manager_mut().despawn_entity(2);
-    game_state.sync_persistent_entities_to_active_scene();
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, "main").expect("scene should load");
+    game_state.world_mut().entity_manager_mut().despawn_entity(2);
+    SceneSystem::sync_persistent_entities_to_active_scene(&mut game_state);
 
     let save = SaveData::capture(&game_state, 1).expect("save should capture");
     assert_eq!(save.persisted_entities.len(), 1);
@@ -165,19 +176,24 @@ fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
     let mut restored = GameState::new_empty();
     let mut restored_scene = Scene::new("main".to_string());
     restored_scene.entities.push(persistent_npc(2, IVec2::new(10, 10)));
-    restored.add_scene(restored_scene);
-    restored.load_scene("main").expect("scene should load");
-    restored
-        .restore_from_save_data(&save)
+    SceneSystem::add_scene(&mut restored, restored_scene);
+    SceneSystem::load(&mut restored, "main").expect("scene should load");
+    toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save)
         .expect("save should restore");
 
-    assert!(restored.active_scene().and_then(|scene| scene.get_entity(2)).is_none());
+    assert!(
+        SceneSystem::active_scene(&restored)
+            .and_then(|scene| scene.get_entity(2))
+            .is_none()
+    );
 }
 
 #[test]
 fn restore_from_save_data_preserves_saved_player_in_scene_without_player_entry() {
     let mut state = GameState::new_empty();
-    state.add_entity_definition(player_definition("player"));
+    state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
 
     let mut main_scene = Scene::new("main".to_string());
     main_scene.anchors.push(toki_core::scene::SceneAnchor {
@@ -199,15 +215,15 @@ fn restore_from_save_data_preserves_saved_player_in_scene_without_player_entry()
         facing: None,
     });
 
-    state.add_scene(main_scene.clone());
-    state.add_scene(side_scene.clone());
-    state.load_scene("main").expect("main scene should load");
-    state
-        .transition_to_scene("side", "door")
+    SceneSystem::add_scene(&mut state, main_scene.clone());
+    SceneSystem::add_scene(&mut state, side_scene.clone());
+    SceneSystem::load(&mut state, "main").expect("main scene should load");
+    SceneSystem::transition(&mut state, "side", "door")
         .expect("side scene should load through transition");
 
-    let player_id = state.player_id().expect("player should exist after transition");
+    let player_id = state.world().player_id().expect("player should exist after transition");
     state
+        .world_mut()
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player entity should exist")
@@ -216,19 +232,20 @@ fn restore_from_save_data_preserves_saved_player_in_scene_without_player_entry()
     let save = SaveData::capture(&state, 1).expect("save should capture");
 
     let mut restored = GameState::new_empty();
-    restored.add_entity_definition(player_definition("player"));
-    restored.add_scene(main_scene);
-    restored.add_scene(side_scene);
-    restored.load_scene("main").expect("startup scene should load");
     restored
-        .restore_from_save_data(&save)
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
+    SceneSystem::add_scene(&mut restored, main_scene);
+    SceneSystem::add_scene(&mut restored, side_scene);
+    SceneSystem::load(&mut restored, "main").expect("startup scene should load");
+    toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save)
         .expect("save should restore");
 
     assert_eq!(
-        restored.active_scene().map(|scene| scene.name.as_str()),
+        SceneSystem::active_scene(&restored).map(|scene| scene.name.as_str()),
         Some("side")
     );
-    let restored_player = restored.player_entity().expect("player should restore");
+    let restored_player = player_entity(&restored).expect("player should restore");
     assert_eq!(restored_player.position, IVec2::new(120, 144));
     assert_eq!(restored_player.entity_kind, EntityKind::Player);
 }
@@ -285,18 +302,19 @@ fn test_empty_entity_manager() {
 #[test]
 fn test_game_state_roundtrip() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(IVec2::new(64, 128));
+    let player_id =
+        toki_core::game::SceneSystem::spawn_player_at(&mut game_state, IVec2::new(64, 128));
 
     // Add some input state (should be reset due to #[serde(default)])
-    game_state.handle_key_press(InputKey::Up);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
 
     // Test roundtrip
     let json = serde_json::to_string_pretty(&game_state).unwrap();
     let deserialized: GameState = serde_json::from_str(&json).unwrap();
 
     // Verify entity state preserved
-    assert_eq!(deserialized.player_id(), Some(player_id));
-    let player = deserialized.player_entity().unwrap();
+    assert_eq!(deserialized.world().player_id(), Some(player_id));
+    let player = player_entity(&deserialized).unwrap();
     assert_eq!(player.position, IVec2::new(64, 128));
     assert_eq!(player.entity_kind, EntityKind::Player);
 }
@@ -419,23 +437,21 @@ fn restore_from_save_data_rehydrates_existing_project_state() {
     }
 
     let mut restored = create_save_test_state();
-    restored.restore_from_save_data(&save_data).unwrap();
+    toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save_data).unwrap();
 
-    assert_eq!(restored.scene_manager().active_scene_name(), Some("main"));
-    assert_eq!(restored.player_position(), IVec2::new(80, 96));
+    assert_eq!(restored.scene().scene_manager().active_scene_name(), Some("main"));
+    assert_eq!(player_position(&restored), IVec2::new(80, 96));
     assert_eq!(
         restored.flag("chapter"),
         Some(&FlagValue::String("intro".to_string()))
     );
     assert_eq!(restored.play_time_ms(), 1_234);
     assert_eq!(
-        restored
-            .active_scene()
-            .and_then(|scene| scene.camera_position),
+        SceneSystem::active_scene(&restored).and_then(|scene| scene.camera_position),
         Some(IVec2::new(11, 12))
     );
     assert_eq!(
-        restored.active_scene().and_then(|scene| scene.camera_scale),
+        SceneSystem::active_scene(&restored).and_then(|scene| scene.camera_scale),
         Some(4)
     );
 }

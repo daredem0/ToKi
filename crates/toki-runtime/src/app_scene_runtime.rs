@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use toki_core::events::SceneSwitchRequest;
-use toki_core::game::SceneSystem;
+use toki_core::game::{RenderQueryService, SceneSystem};
 use toki_core::graphics::image::load_image_rgba8;
 use toki_core::palette::recolor_indexed_image;
 
@@ -66,7 +66,10 @@ impl<'a> SceneRuntimeCoordinator<'a> {
     pub(super) fn queue_scene_switch_request(&mut self, request: SceneSwitchRequest) {
         let target_track = self
             .game_system
-            .scene_named(&request.scene_name)
+            .game_state
+            .scene()
+            .scene_manager()
+            .get_scene(&request.scene_name)
             .and_then(|scene| scene.background_music_track_id.clone());
         self.scene_transition
             .request_scene_switch(request, target_track);
@@ -83,16 +86,21 @@ impl<'a> SceneRuntimeCoordinator<'a> {
                     &mut self.game_system.game_state,
                 );
                 if self.scene_persistence {
-                    self.game_system.sync_entities_to_active_scene();
+                    SceneSystem::sync_entities_to_active_scene(&mut self.game_system.game_state);
                 }
-                let switch_result = self
-                    .game_system
-                    .transition_to_scene(&request.scene_name, &request.spawn_point_id);
+                let switch_result = SceneSystem::transition(
+                    &mut self.game_system.game_state,
+                    &request.scene_name,
+                    &request.spawn_point_id,
+                );
                 match switch_result {
                     Ok(()) => {
                         self.handle_runtime_scene_change();
                         let active_track = self
                             .game_system
+                            .game_state
+                            .scene()
+                            .scene_manager()
                             .active_scene()
                             .and_then(|scene| scene.background_music_track_id.as_deref());
                         if let Err(error) = self.scene_transition.complete_scene_switch(
@@ -116,6 +124,9 @@ impl<'a> SceneRuntimeCoordinator<'a> {
                             self.audio_system,
                             false,
                             self.game_system
+                                .game_state
+                                .scene()
+                                .scene_manager()
                                 .active_scene()
                                 .and_then(|scene| scene.background_music_track_id.as_deref()),
                         ) {
@@ -133,7 +144,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
 
     fn handle_runtime_scene_change(&mut self) {
         let active_scene_name = self.game_system.active_scene_name().map(str::to_string);
-        let active_scene = self.game_system.active_scene().cloned();
+        let active_scene = SceneSystem::active_scene(&self.game_system.game_state).cloned();
 
         if let (Some(content_root), Some(scene_name), Some(scene)) = (
             self.content_root.as_deref(),
@@ -174,9 +185,18 @@ impl<'a> SceneRuntimeCoordinator<'a> {
         );
 
         let new_mode = if let Some(player_id) = self.game_system.player_id() {
+            let player_position = RenderQueryService::new(
+                self.game_system.game_state.world().entity_manager(),
+                self.game_system.game_state.world().player_id(),
+                self.game_system
+                    .game_state
+                    .runtime()
+                    .debug_collision_rendering(),
+            )
+            .player_position();
             self.camera_system
                 .camera_mut()
-                .center_on(self.game_system.player_position());
+                .center_on(player_position);
             toki_core::camera::CameraMode::FollowEntity(player_id)
         } else {
             toki_core::camera::CameraMode::FreeScroll

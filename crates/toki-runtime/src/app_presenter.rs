@@ -1,4 +1,4 @@
-use toki_core::game::GroundShadow;
+use toki_core::game::{GroundShadow, RenderQueryService};
 use toki_core::sprite_render::{
     collect_map_object_sprite_render_requests, format_sprite_resolve_failure,
     resolve_sprite_render_requests, sort_sprite_render_requests,
@@ -76,7 +76,7 @@ impl<'a> WorldFramePresenter<'a> {
     }
 
     fn render_world_sprites(&mut self) {
-        let mut requests = self.game_system.get_sprite_render_requests();
+        let mut requests = self.render_queries().sprite_render_requests();
         requests.extend(collect_map_object_sprite_render_requests(
             self.resources.get_tilemap(),
         ));
@@ -95,7 +95,7 @@ impl<'a> WorldFramePresenter<'a> {
     }
 
     fn render_ground_shadows(&mut self) {
-        for shadow in self.game_system.get_entity_ground_shadows() {
+        for shadow in self.render_queries().entity_ground_shadows() {
             for band in ground_shadow_bands(&shadow) {
                 self.rendering.add_filled_world_underlay_rect(
                     band.position.x,
@@ -109,7 +109,7 @@ impl<'a> WorldFramePresenter<'a> {
     }
 
     fn render_entity_health_bars(&mut self) {
-        for health_bar in self.game_system.get_entity_health_bars() {
+        for health_bar in self.render_queries().entity_health_bars() {
             let bar_width = health_bar.size.x.max(16) as f32;
             let bar_height = 3.0;
             let bar_x = health_bar.position.x as f32;
@@ -144,15 +144,12 @@ impl<'a> WorldFramePresenter<'a> {
     }
 
     fn render_debug_collision_overlay(&mut self) {
-        let entity_boxes = self.game_system.get_entity_collision_boxes();
-        let solid_tiles = self.game_system.get_solid_tile_positions(
-            self.resources.get_tilemap(),
-            self.resources.get_terrain_atlas(),
-        );
-        let trigger_tiles = self.game_system.get_trigger_tile_positions(
-            self.resources.get_tilemap(),
-            self.resources.get_terrain_atlas(),
-        );
+        let queries = self.render_queries();
+        let entity_boxes = queries.entity_collision_boxes();
+        let solid_tiles =
+            queries.solid_tile_positions(self.resources.get_tilemap(), self.resources.get_terrain_atlas());
+        let trigger_tiles =
+            queries.trigger_tile_positions(self.resources.get_tilemap(), self.resources.get_terrain_atlas());
 
         let entity_color = [1.0, 0.0, 0.0, 0.8];
         let solid_tile_color = [0.0, 0.0, 1.0, 0.6];
@@ -197,6 +194,17 @@ impl<'a> WorldFramePresenter<'a> {
                 trigger_tile_color,
             );
         }
+    }
+
+    fn render_queries(&self) -> RenderQueryService<'_> {
+        RenderQueryService::new(
+            self.game_system.game_state.world().entity_manager(),
+            self.game_system.game_state.world().player_id(),
+            self.game_system
+                .game_state
+                .runtime()
+                .debug_collision_rendering(),
+        )
     }
 }
 

@@ -1,8 +1,6 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
-#[path = "support/game_state_compat.rs"]
-mod game_state_compat;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
@@ -17,13 +15,13 @@ use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
     entity::{AiBehavior, AiConfig},
-    game::AudioChannel,
-    game::AudioEvent,
-    game::InputAction,
+    game::{
+        AudioChannel, AudioEvent, GameSimulation, InputAction, InputSystem, RenderQueryService,
+        RuleSystem, SceneSystem,
+    },
     scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry},
     GameState, InputKey,
 };
-use game_state_compat::GameStateCompatExt;
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
@@ -78,6 +76,59 @@ fn create_test_atlas() -> AtlasMeta {
         palette: None,
         tiles,
     }
+}
+
+fn render_queries(state: &GameState) -> RenderQueryService<'_> {
+    RenderQueryService::new(
+        state.world().entity_manager(),
+        state.world().player_id(),
+        state.runtime().debug_collision_rendering(),
+    )
+}
+
+fn player_position(state: &GameState) -> IVec2 {
+    render_queries(state).player_position()
+}
+
+fn player_entity(state: &GameState) -> Option<&toki_core::entity::Entity> {
+    state.world()
+        .player_id()
+        .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
+}
+
+fn sprite_render_requests(state: &GameState) -> Vec<toki_core::sprite_render::SpriteRenderRequest> {
+    render_queries(state).sprite_render_requests()
+}
+
+fn renderable_entities(
+    state: &GameState,
+) -> Vec<(toki_core::entity::EntityId, glam::IVec2, glam::UVec2)> {
+    render_queries(state).renderable_entities()
+}
+
+fn entity_health_bars(state: &GameState) -> Vec<toki_core::game::EntityHealthBar> {
+    render_queries(state).entity_health_bars()
+}
+
+fn entity_sprite_flip_x(state: &GameState, entity_id: toki_core::entity::EntityId) -> bool {
+    render_queries(state).entity_sprite_flip_x(entity_id)
+}
+
+fn current_sprite_frame(
+    state: &GameState,
+    atlas: &AtlasMeta,
+    texture_size: glam::UVec2,
+) -> toki_core::sprite::SpriteFrame {
+    render_queries(state).current_sprite_frame(atlas, texture_size)
+}
+
+fn active_entities(state: &GameState) -> Vec<&toki_core::entity::Entity> {
+    state.world()
+        .entity_manager()
+        .active_entities()
+        .iter()
+        .filter_map(|&id| state.world().entity_manager().get_entity(id))
+        .collect()
 }
 
 fn create_solid_test_atlas() -> AtlasMeta {
@@ -293,13 +344,13 @@ fn game_state_new_initializes_correctly() {
     let initial_position = sprite.position;
     let game_state = GameState::new(sprite);
 
-    assert_eq!(game_state.player_position(), initial_position);
+    assert_eq!(player_position(&game_state), initial_position);
     // Test EntityManager integration
-    assert_eq!(game_state.entities().len(), 1);
-    assert_eq!(game_state.player_id(), Some(1));
-    assert!(game_state.player_entity().is_some());
+    assert_eq!(active_entities(&game_state).len(), 1);
+    assert_eq!(game_state.world().player_id(), Some(1));
+    assert!(player_entity(&game_state).is_some());
     assert_eq!(
-        game_state.player_entity().unwrap().position,
+        player_entity(&game_state).unwrap().position,
         initial_position
     );
 }
@@ -334,114 +385,114 @@ fn input_key_enum_properties() {
 fn game_state_key_press_and_release() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
     // Press a key
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     // Should not move yet (requires update)
-    assert_eq!(game_state.player_position(), initial_position);
+    assert_eq!(player_position(&game_state), initial_position);
 
     // Update should process the input
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    let result = game_state.update(world_bounds, &tilemap, &atlas);
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     assert!(result.player_moved);
-    assert!(game_state.player_position().x > initial_position.x);
+    assert!(player_position(&game_state).x > initial_position.x);
 
     // Release the key
-    game_state.handle_key_release(InputKey::Right);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
 
     // Another update should not move further
-    let position_after_release = game_state.player_position();
-    let result_again = game_state.update(world_bounds, &tilemap, &atlas);
+    let position_after_release = player_position(&game_state);
+    let result_again = GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     assert!(!result_again.player_moved);
-    assert_eq!(game_state.player_position(), position_after_release);
+    assert_eq!(player_position(&game_state), position_after_release);
 }
 
 #[test]
 fn game_state_movement_up() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Up);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
     let world_bounds = UVec2::new(1000, 1000);
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
-    assert!(game_state.player_position().y < initial_position.y); // Y decreased (up)
-    assert_eq!(game_state.player_position().y, initial_position.y - 2); // Moved 2 pixels (default speed)
+    assert_eq!(player_position(&game_state).x, initial_position.x); // X unchanged
+    assert!(player_position(&game_state).y < initial_position.y); // Y decreased (up)
+    assert_eq!(player_position(&game_state).y, initial_position.y - 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
 fn game_state_movement_down() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Down);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
     let world_bounds = UVec2::new(1000, 1000);
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
-    assert!(game_state.player_position().y > initial_position.y); // Y increased (down)
-    assert_eq!(game_state.player_position().y, initial_position.y + 2); // Moved 2 pixels (default speed)
+    assert_eq!(player_position(&game_state).x, initial_position.x); // X unchanged
+    assert!(player_position(&game_state).y > initial_position.y); // Y increased (down)
+    assert_eq!(player_position(&game_state).y, initial_position.y + 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
 fn game_state_movement_left() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Left);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
     let world_bounds = UVec2::new(1000, 1000);
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     assert!(result.player_moved);
-    assert!(game_state.player_position().x < initial_position.x); // X decreased (left)
-    assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
-    assert_eq!(game_state.player_position().x, initial_position.x - 2); // Moved 2 pixels (default speed)
+    assert!(player_position(&game_state).x < initial_position.x); // X decreased (left)
+    assert_eq!(player_position(&game_state).y, initial_position.y); // Y unchanged
+    assert_eq!(player_position(&game_state).x, initial_position.x - 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
 fn game_state_movement_right() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
     let world_bounds = UVec2::new(1000, 1000);
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     assert!(result.player_moved);
-    assert!(game_state.player_position().x > initial_position.x); // X increased (right)
-    assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
-    assert_eq!(game_state.player_position().x, initial_position.x + 2); // Moved 2 pixels (default speed)
+    assert!(player_position(&game_state).x > initial_position.x); // X increased (right)
+    assert_eq!(player_position(&game_state).y, initial_position.y); // Y unchanged
+    assert_eq!(player_position(&game_state).x, initial_position.x + 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
 fn game_state_diagonal_movement() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
     // Press both up and right
-    game_state.handle_key_press(InputKey::Up);
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     let world_bounds = UVec2::new(1000, 1000);
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x + 2); // Moved right (2 pixels)
-    assert_eq!(game_state.player_position().y, initial_position.y - 2); // Moved up (2 pixels)
+    assert_eq!(player_position(&game_state).x, initial_position.x + 2); // Moved right (2 pixels)
+    assert_eq!(player_position(&game_state).y, initial_position.y - 2); // Moved up (2 pixels)
 }
 
 #[test]
@@ -450,21 +501,21 @@ fn game_state_world_bounds_left_boundary() {
     let mut game_state = GameState::new(sprite);
 
     // Move to near left edge
-    game_state.handle_key_press(InputKey::Left);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
     let world_bounds = UVec2::new(1000, 1000);
 
     // Move left repeatedly until at boundary
     for _ in 0..100 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Should be clamped at 0
-    assert_eq!(game_state.player_position().x, 0);
+    assert_eq!(player_position(&game_state).x, 0);
 
     // One more update should not move further
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!result.player_moved); // Should not report movement when clamped
-    assert_eq!(game_state.player_position().x, 0);
+    assert_eq!(player_position(&game_state).x, 0);
 }
 
 #[test]
@@ -473,21 +524,21 @@ fn game_state_world_bounds_top_boundary() {
     let mut game_state = GameState::new(sprite);
 
     // Move to near top edge
-    game_state.handle_key_press(InputKey::Up);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
     let world_bounds = UVec2::new(1000, 1000);
 
     // Move up repeatedly until at boundary
     for _ in 0..100 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Should be clamped at 0
-    assert_eq!(game_state.player_position().y, 0);
+    assert_eq!(player_position(&game_state).y, 0);
 
     // One more update should not move further
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!result.player_moved); // Should not report movement when clamped
-    assert_eq!(game_state.player_position().y, 0);
+    assert_eq!(player_position(&game_state).y, 0);
 }
 
 #[test]
@@ -495,21 +546,21 @@ fn game_state_world_bounds_right_boundary() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
     let world_bounds = UVec2::new(100, 1000); // Small world width
 
     // Move right repeatedly until at boundary
     for _ in 0..200 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Should be clamped at world_width - entity_size (16x16 from sprite)
-    let player_size = game_state.player_entity().unwrap().size;
+    let player_size = player_entity(&game_state).unwrap().size;
     let expected_max_x = world_bounds.x as i32 - player_size.x as i32;
-    assert_eq!(game_state.player_position().x, expected_max_x);
+    assert_eq!(player_position(&game_state).x, expected_max_x);
 
     // One more update should not move further
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!result.player_moved); // Should not report movement when clamped
 }
 
@@ -540,13 +591,13 @@ fn game_state_world_bounds_clamp_uses_footprint_not_full_sprite_size() {
         toki_core::project_content::build_game_state_from_scene(scene, [definition])
             .expect("scene should load");
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
     let world_bounds = UVec2::new(32, 128);
     for _ in 0..40 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
-    assert_eq!(game_state.player_position().x, 8);
+    assert_eq!(player_position(&game_state).x, 8);
 }
 
 #[test]
@@ -554,21 +605,21 @@ fn game_state_world_bounds_bottom_boundary() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
 
-    game_state.handle_key_press(InputKey::Down);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
     let world_bounds = UVec2::new(1000, 100); // Small world height
 
     // Move down repeatedly until at boundary
     for _ in 0..200 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Should be clamped at world_height - entity_size (16x16 from sprite)
-    let player_size = game_state.player_entity().unwrap().size;
+    let player_size = player_entity(&game_state).unwrap().size;
     let expected_max_y = world_bounds.y as i32 - player_size.y as i32;
-    assert_eq!(game_state.player_position().y, expected_max_y);
+    assert_eq!(player_position(&game_state).y, expected_max_y);
 
     // One more update should not move further
-    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!result.player_moved); // Should not report movement when clamped
 }
 
@@ -577,7 +628,7 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -636,20 +687,18 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_key_press(InputKey::Up);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Up);
-    let state_after_up = game_state
-        .player_entity()
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Up);
+    let state_after_up = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(state_after_up, Some(AnimationState::WalkUp));
 
-    game_state.handle_key_press(InputKey::Right);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Right);
-    let state_after_right = game_state
-        .player_entity()
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
+    let state_after_right = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(state_after_right, Some(AnimationState::WalkRight));
@@ -660,7 +709,7 @@ fn game_state_left_direction_requests_horizontal_flip() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -692,12 +741,12 @@ fn game_state_left_direction_requests_horizontal_flip() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_key_press(InputKey::Left);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Left);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Left);
 
-    let player_id = game_state.player_id().expect("player id should exist");
-    assert!(game_state.get_entity_sprite_flip_x(player_id));
+    let player_id = game_state.world().player_id().expect("player id should exist");
+    assert!(entity_sprite_flip_x(&game_state, player_id));
 }
 
 #[test]
@@ -705,7 +754,7 @@ fn game_state_attack_left_requests_horizontal_flip() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -724,8 +773,8 @@ fn game_state_attack_left_requests_horizontal_flip() {
     });
     controller.play(AnimationState::AttackLeft);
 
-    let player_id = game_state.player_id().expect("player id should exist");
-    assert!(game_state.get_entity_sprite_flip_x(player_id));
+    let player_id = game_state.world().player_id().expect("player id should exist");
+    assert!(entity_sprite_flip_x(&game_state, player_id));
 }
 
 #[test]
@@ -733,7 +782,7 @@ fn game_state_primary_action_plays_attack_clip_when_present() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -761,14 +810,13 @@ fn game_state_primary_action_plays_attack_clip_when_present() {
     });
     controller.play(AnimationState::IdleDown);
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
     let world_bounds = UVec2::new(128, 128);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    game_state.update(world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let current_state = game_state
-        .player_entity()
+    let current_state = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(current_state, Some(AnimationState::AttackDown));
@@ -779,7 +827,7 @@ fn game_state_primary_action_is_ignored_without_attack_clip() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -798,14 +846,13 @@ fn game_state_primary_action_is_ignored_without_attack_clip() {
     });
     controller.play(AnimationState::IdleDown);
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
     let world_bounds = UVec2::new(128, 128);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    game_state.update(world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let current_state = game_state
-        .player_entity()
+    let current_state = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(current_state, Some(AnimationState::IdleDown));
@@ -816,7 +863,7 @@ fn game_state_attack_animation_persists_while_clip_is_unfinished() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -848,12 +895,11 @@ fn game_state_attack_animation_persists_while_clip_is_unfinished() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let controller = game_state
-        .player_entity()
+    let controller = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::AttackDown);
@@ -865,7 +911,7 @@ fn game_state_returns_to_locomotion_after_attack_animation_finishes() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -897,13 +943,12 @@ fn game_state_returns_to_locomotion_after_attack_animation_finishes() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let controller = game_state
-        .player_entity()
+    let controller = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::IdleDown);
@@ -915,7 +960,7 @@ fn game_state_attack_animation_overrides_walk_while_movement_is_held() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -956,14 +1001,13 @@ fn game_state_attack_animation_overrides_walk_while_movement_is_held() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_key_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let controller = game_state
-        .player_entity()
+    let controller = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::AttackRight);
@@ -975,7 +1019,7 @@ fn game_state_returns_to_walk_after_attack_animation_finishes_with_movement_held
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1016,15 +1060,14 @@ fn game_state_returns_to_walk_after_attack_animation_finishes_with_movement_held
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_key_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let controller = game_state
-        .player_entity()
+    let controller = player_entity(&game_state)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::WalkRight);
@@ -1036,7 +1079,7 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1067,7 +1110,7 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
     let mut target_definition = test_definition("target", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(66, 60))
         .expect("target should spawn");
 
@@ -1075,11 +1118,10 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after non-lethal hit");
     assert_eq!(target.attributes.health, Some(15));
@@ -1091,7 +1133,7 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     player
@@ -1126,7 +1168,7 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
     let mut target_definition = test_definition("target_attack_power", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(66, 60))
         .expect("target should spawn");
 
@@ -1134,11 +1176,10 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after non-lethal hit");
     assert_eq!(target.attributes.health, Some(8));
@@ -1150,7 +1191,7 @@ fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1181,7 +1222,7 @@ fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
     let mut target_definition = test_definition("held_primary_target", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(66, 60))
         .expect("target should spawn");
 
@@ -1189,13 +1230,12 @@ fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after non-lethal hit");
     assert_eq!(target.attributes.health, Some(15));
@@ -1207,7 +1247,7 @@ fn game_state_primary_action_can_damage_again_after_release_and_repress() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1238,7 +1278,7 @@ fn game_state_primary_action_can_damage_again_after_release_and_repress() {
     let mut target_definition = test_definition("repress_primary_target", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(66, 60))
         .expect("target should spawn");
 
@@ -1246,14 +1286,13 @@ fn game_state_primary_action_can_damage_again_after_release_and_repress() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_profile_action_release(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_release(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after two non-lethal hits");
     assert_eq!(target.attributes.health, Some(5));
@@ -1265,7 +1304,7 @@ fn game_state_primary_action_does_not_damage_out_of_range_target() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1296,7 +1335,7 @@ fn game_state_primary_action_does_not_damage_out_of_range_target() {
     let mut target_definition = test_definition("far_target", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(82, 60))
         .expect("target should spawn");
 
@@ -1304,11 +1343,10 @@ fn game_state_primary_action_does_not_damage_out_of_range_target() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("out-of-range target should still exist");
     assert_eq!(target.attributes.health, Some(25));
@@ -1320,7 +1358,7 @@ fn game_state_primary_action_despawns_target_when_health_reaches_zero() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1351,7 +1389,7 @@ fn game_state_primary_action_despawns_target_when_health_reaches_zero() {
     let mut target_definition = test_definition("fragile_target", "creature");
     target_definition.attributes.health = Some(10);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(66, 60))
         .expect("target should spawn");
 
@@ -1359,11 +1397,11 @@ fn game_state_primary_action_despawns_target_when_health_reaches_zero() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     assert!(
-        game_state.entity_manager().get_entity(target_id).is_none(),
+        game_state.world().entity_manager().get_entity(target_id).is_none(),
         "lethal primary-action damage should despawn the target"
     );
 }
@@ -1423,20 +1461,18 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
         player_entry: None,
     };
 
-    game_state.add_scene(scene);
-    game_state
-        .load_scene("Legacy Arena")
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, "Legacy Arena")
         .expect("scene should load successfully");
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(128, 128),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(6)
         .expect("legacy health target should still exist after non-lethal hit");
     assert_eq!(target.attributes.health, Some(15));
@@ -1448,7 +1484,7 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     player.attributes.primary_projectile = Some(PrimaryProjectileDef {
@@ -1485,27 +1521,25 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
     });
     controller.play(AnimationState::IdleRight);
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(128, 128),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let projectile_ids = game_state
-        .entity_manager()
+    let projectile_ids = game_state.world().entity_manager()
         .active_entities()
         .into_iter()
         .filter(|&entity_id| {
-            game_state
-                .entity_manager()
+            game_state.world().entity_manager()
                 .get_entity(entity_id)
                 .is_some_and(|entity| entity.entity_kind == EntityKind::Projectile)
         })
         .collect::<Vec<_>>();
     assert_eq!(projectile_ids.len(), 1);
 
-    let renderables = game_state.get_sprite_render_requests();
+    let renderables = sprite_render_requests(&game_state);
     let projectile = renderables
         .iter()
         .find(|request| {
@@ -1528,7 +1562,7 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     player.attributes.primary_projectile = Some(PrimaryProjectileDef {
@@ -1569,10 +1603,9 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    let projectile_position = game_state
-        .get_sprite_render_requests()
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    let projectile_position = sprite_render_requests(&game_state)
         .into_iter()
         .find_map(|request| match request.origin {
             toki_core::sprite_render::SpriteRenderOrigin::Projectile(_) => Some(request.position),
@@ -1581,9 +1614,8 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
         .expect("projectile render request should exist");
     assert_eq!(projectile_position, IVec2::new(70, 60));
 
-    game_state.update(world_bounds, &tilemap, &atlas);
-    let projectile_position = game_state
-        .get_sprite_render_requests()
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    let projectile_position = sprite_render_requests(&game_state)
         .into_iter()
         .find_map(|request| match request.origin {
             toki_core::sprite_render::SpriteRenderOrigin::Projectile(_) => Some(request.position),
@@ -1592,11 +1624,10 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
         .expect("projectile render request should still exist");
     assert_eq!(projectile_position, IVec2::new(74, 60));
 
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
     assert!(
-        !game_state
-            .get_sprite_render_requests()
+        !sprite_render_requests(&game_state)
             .into_iter()
             .any(|request| matches!(
                 request.origin,
@@ -1611,7 +1642,7 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     player.attributes.primary_projectile = Some(PrimaryProjectileDef {
@@ -1651,7 +1682,7 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     let mut target_definition = test_definition("projectile_target", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(90, 60))
         .expect("target should spawn");
 
@@ -1659,20 +1690,18 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.update(world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_action_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputAction::Primary);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
-    let target = game_state
-        .entity_manager()
+    let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should survive non-lethal projectile damage");
     assert_eq!(target.attributes.health, Some(17));
     assert_eq!(target.attributes.current_stat("health"), Some(17));
     assert!(
-        !game_state
-            .get_sprite_render_requests()
+        !sprite_render_requests(&game_state)
             .into_iter()
             .any(|request| matches!(
                 request.origin,
@@ -1686,7 +1715,7 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
 fn game_state_collects_overlapping_pickup_into_inventory_and_despawns_item() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     let mut pickup_definition = test_definition("coin_pickup", "item");
     pickup_definition.attributes.health = None;
@@ -1697,23 +1726,22 @@ fn game_state_collects_overlapping_pickup_into_inventory_and_despawns_item() {
         count: 2,
     });
     let pickup_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&pickup_definition, IVec2::new(50, 60))
         .expect("pickup should spawn");
 
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(128, 128),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let player = game_state
-        .entity_manager()
+    let player = game_state.world().entity_manager()
         .get_entity(player_id)
         .expect("player should still exist");
     assert_eq!(player.attributes.inventory.item_count("coin"), 2);
     assert!(
-        game_state.entity_manager().get_entity(pickup_id).is_none(),
+        game_state.world().entity_manager().get_entity(pickup_id).is_none(),
         "pickup should despawn after collection"
     );
 }
@@ -1722,7 +1750,7 @@ fn game_state_collects_overlapping_pickup_into_inventory_and_despawns_item() {
 fn game_state_pickup_collection_stacks_and_does_not_double_collect() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     let mut pickup_definition = test_definition("coin_pickup_stack", "item");
     pickup_definition.attributes.health = None;
@@ -1734,36 +1762,33 @@ fn game_state_pickup_collection_stacks_and_does_not_double_collect() {
     });
 
     let first_pickup_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&pickup_definition, IVec2::new(50, 60))
         .expect("first pickup should spawn");
     let second_pickup_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&pickup_definition, IVec2::new(50, 60))
         .expect("second pickup should spawn");
 
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(128, 128),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(128, 128),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let player = game_state
-        .entity_manager()
+    let player = game_state.world().entity_manager()
         .get_entity(player_id)
         .expect("player should still exist");
     assert_eq!(player.attributes.inventory.item_count("coin"), 2);
-    assert!(game_state
-        .entity_manager()
+    assert!(game_state.world().entity_manager()
         .get_entity(first_pickup_id)
         .is_none());
-    assert!(game_state
-        .entity_manager()
+    assert!(game_state.world().entity_manager()
         .get_entity(second_pickup_id)
         .is_none());
 }
@@ -1828,11 +1853,11 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
     };
 
     let entity_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&static_pickup, IVec2::new(32, 48))
         .expect("static pickup should spawn");
 
-    let static_renderables = game_state.get_sprite_render_requests();
+    let static_renderables = sprite_render_requests(&game_state);
     let static_request = static_renderables
         .iter()
         .find(|request| {
@@ -1847,7 +1872,7 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
         }
     );
     assert_eq!(static_request.position, IVec2::new(32, 48));
-    assert_eq!(game_state.get_renderable_entities().len(), 1);
+    assert_eq!(renderable_entities(&game_state).len(), 1);
 }
 
 #[test]
@@ -1858,11 +1883,11 @@ fn game_state_entity_health_bars_include_visible_damageable_entities() {
     let mut target_definition = test_definition("health_bar_target", "creature");
     target_definition.attributes.health = Some(25);
     let target_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&target_definition, IVec2::new(66, 60))
         .expect("target should spawn");
 
-    let health_bars = game_state.get_entity_health_bars();
+    let health_bars = entity_health_bars(&game_state);
     let target_bar = health_bars
         .into_iter()
         .find(|bar| bar.entity_id == target_id)
@@ -1877,10 +1902,10 @@ fn game_state_entity_health_bars_include_visible_damageable_entities() {
 #[test]
 fn game_state_player_is_blocked_by_solid_entity_collision() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, IVec2::new(0, 0));
     let blocker_definition = test_definition("blocker", "creature");
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&blocker_definition, IVec2::new(16, 0))
         .expect("blocker should spawn");
 
@@ -1888,14 +1913,13 @@ fn game_state_player_is_blocked_by_solid_entity_collision() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
 
     assert!(!result.player_moved);
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(player_id)
             .expect("player should exist")
             .position,
@@ -1908,7 +1932,7 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
     let controller = player
@@ -1946,15 +1970,14 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
     });
     controller.play(AnimationState::IdleDown);
 
-    let player_id = game_state.player_id().expect("player id should exist");
-    let player_position = game_state
-        .entity_manager()
+    let player_id = game_state.world().player_id().expect("player id should exist");
+    let player_position = game_state.world().entity_manager()
         .get_entity(player_id)
         .expect("player should exist")
         .position;
     let blocker_definition = test_definition("blocker", "creature");
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&blocker_definition, player_position + IVec2::new(16, 0))
         .expect("blocker should spawn");
 
@@ -1962,13 +1985,12 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
-    let result = game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_profile_key_release(MovementProfile::PlayerWasd, InputKey::Right);
+    InputSystem::handle_profile_key_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_profile_key_release(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputKey::Right);
 
     assert!(!result.player_moved);
-    let player = game_state
-        .entity_manager()
+    let player = game_state.world().entity_manager()
         .get_entity(player_id)
         .expect("player should exist");
     let current_state = player
@@ -1984,11 +2006,11 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
 #[test]
 fn game_state_player_can_move_through_non_solid_entity() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, IVec2::new(0, 0));
     let mut non_solid_definition = test_definition("ghost", "creature");
     non_solid_definition.attributes.solid = false;
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&non_solid_definition, IVec2::new(16, 0))
         .expect("ghost should spawn");
 
@@ -1996,14 +2018,13 @@ fn game_state_player_can_move_through_non_solid_entity() {
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(world_bounds, &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
 
     assert!(result.player_moved);
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(player_id)
             .expect("player should exist")
             .position,
@@ -2014,7 +2035,7 @@ fn game_state_player_can_move_through_non_solid_entity() {
 #[test]
 fn game_state_player_is_blocked_by_solid_map_object_collision() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, IVec2::new(0, 0));
     let mut tilemap = create_test_tilemap();
     tilemap.objects.push(MapObjectInstance {
         sheet: PathBuf::from("fauna.json"),
@@ -2027,14 +2048,13 @@ fn game_state_player_is_blocked_by_solid_map_object_collision() {
     });
     let atlas = create_test_atlas();
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(UVec2::new(128, 128), &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, UVec2::new(128, 128), &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
 
     assert!(!result.player_moved);
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(player_id)
             .expect("player should exist")
             .position,
@@ -2051,37 +2071,34 @@ fn game_state_only_updates_npcs_with_wander_ai() {
     wandering_npc.attributes.ai_config =
         toki_core::entity::AiConfig::from_legacy_behavior(toki_core::entity::AiBehavior::Wander);
     let wandering_npc_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))
         .expect("wandering npc should spawn");
 
     let mut idle_npc = test_definition("idle_npc", "creature");
     idle_npc.attributes.ai_config = toki_core::entity::AiConfig::default();
     let idle_npc_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&idle_npc, IVec2::new(96, 96))
         .expect("idle npc should spawn");
 
-    let initial_wandering_position = game_state
-        .entity_manager()
+    let initial_wandering_position = game_state.world().entity_manager()
         .get_entity(wandering_npc_id)
         .expect("wandering npc exists")
         .position;
-    let initial_idle_position = game_state
-        .entity_manager()
+    let initial_idle_position = game_state.world().entity_manager()
         .get_entity(idle_npc_id)
         .expect("idle npc exists")
         .position;
 
     let mut wandering_npc_moved = false;
     for _ in 0..(60 * 12) {
-        game_state.update(
+        GameSimulation::tick_fixed(&mut game_state, 
             UVec2::new(512, 512),
             &create_test_tilemap(),
             &create_test_atlas(),
         );
-        if game_state
-            .entity_manager()
+        if game_state.world().entity_manager()
             .get_entity(wandering_npc_id)
             .expect("wandering npc exists")
             .position
@@ -2094,8 +2111,7 @@ fn game_state_only_updates_npcs_with_wander_ai() {
 
     assert!(wandering_npc_moved, "wander npc should eventually move");
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(idle_npc_id)
             .expect("idle npc exists")
             .position,
@@ -2108,56 +2124,56 @@ fn game_state_only_updates_npcs_with_wander_ai() {
 fn game_state_player_input_requires_player_wasd_movement_profile() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player id should exist");
+    let player_id = game_state.world().player_id().expect("player id should exist");
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .movement_profile = MovementProfile::None;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     assert!(!result.player_moved);
-    assert_eq!(game_state.player_position(), initial_position);
+    assert_eq!(player_position(&game_state), initial_position);
 }
 
 #[test]
 fn game_state_legacy_default_player_profile_still_moves() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player id should exist");
+    let player_id = game_state.world().player_id().expect("player id should exist");
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
         .movement_profile = MovementProfile::LegacyDefault;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x + 2); // 2 pixels (default speed)
+    assert_eq!(player_position(&game_state).x, initial_position.x + 2); // 2 pixels (default speed)
 }
 
 #[test]
 fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, IVec2::new(0, 0));
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -2166,12 +2182,12 @@ fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
     let mut controlled_npc = test_definition("controlled_npc", "creature");
     controlled_npc.attributes.movement_profile = MovementProfile::PlayerWasd;
     let npc_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&controlled_npc, IVec2::new(32, 32))
         .expect("controlled npc should spawn");
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2179,16 +2195,14 @@ fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
 
     assert!(!result.player_moved);
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(player_id)
             .expect("player should exist")
             .position,
         IVec2::new(0, 0)
     );
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(npc_id)
             .expect("npc should exist")
             .position,
@@ -2203,36 +2217,34 @@ fn game_state_multiple_player_wasd_entities_move_together() {
     let mut first = test_definition("first", "creature");
     first.attributes.movement_profile = MovementProfile::PlayerWasd;
     let first_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&first, IVec2::new(10, 10))
         .expect("first controlled entity should spawn");
 
     let mut second = test_definition("second", "creature");
     second.attributes.movement_profile = MovementProfile::PlayerWasd;
     let second_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&second, IVec2::new(40, 10))
         .expect("second controlled entity should spawn");
 
-    game_state.handle_key_press(InputKey::Down);
-    game_state.handle_key_press(InputKey::Right);
-    game_state.update(
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(first_id)
             .expect("first entity should exist")
             .position,
         IVec2::new(12, 12) // Moved 2 pixels diagonal (default speed)
     );
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(second_id)
             .expect("second entity should exist")
             .position,
@@ -2247,35 +2259,33 @@ fn game_state_profile_scoped_input_moves_only_matching_profile_entities() {
     let mut controlled = test_definition("controlled", "creature");
     controlled.attributes.movement_profile = MovementProfile::PlayerWasd;
     let controlled_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&controlled, IVec2::new(10, 10))
         .expect("controlled entity should spawn");
 
     let mut passive = test_definition("passive", "creature");
     passive.attributes.movement_profile = MovementProfile::None;
     let passive_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&passive, IVec2::new(40, 10))
         .expect("passive entity should spawn");
 
-    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
-    game_state.update(
+    InputSystem::handle_profile_key_press(game_state.runtime_mut(), MovementProfile::PlayerWasd, InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(controlled_id)
             .expect("controlled entity should exist")
             .position,
         IVec2::new(12, 10) // Moved 2 pixels right (default speed)
     );
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(passive_id)
             .expect("passive entity should exist")
             .position,
@@ -2307,15 +2317,13 @@ fn game_state_load_scene_uses_control_role_for_player_identity() {
         player_entry: None,
     };
 
-    game_state.add_scene(scene);
-    game_state
-        .load_scene("Arena")
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, "Arena")
         .expect("scene should load successfully");
 
-    assert_eq!(game_state.player_id(), Some(7));
+    assert_eq!(game_state.world().player_id(), Some(7));
     assert_eq!(
-        game_state
-            .player_entity()
+        player_entity(&game_state)
             .expect("player-character entity should be resolved")
             .category,
         "creature"
@@ -2325,7 +2333,9 @@ fn game_state_load_scene_uses_control_role_for_player_identity() {
 #[test]
 fn game_state_load_scene_spawns_player_from_scene_player_entry() {
     let mut game_state = GameState::new_empty();
-    game_state.add_entity_definition(player_definition("player"));
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
 
     let mut scene = Scene::new("Entry Scene".to_string());
     scene.add_anchor(scene_anchor(
@@ -2338,13 +2348,11 @@ fn game_state_load_scene_spawns_player_from_scene_player_entry() {
         spawn_point_id: "main_spawn".to_string(),
     });
 
-    game_state.add_scene(scene);
-    game_state
-        .load_scene("Entry Scene")
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, "Entry Scene")
         .expect("scene should load successfully");
 
-    let player = game_state
-        .player_entity()
+    let player = player_entity(&game_state)
         .expect("scene player should spawn");
     assert_eq!(player.position, IVec2::new(96, 48));
     assert_eq!(player.definition_name.as_deref(), Some("player"));
@@ -2361,8 +2369,12 @@ fn game_state_load_scene_spawns_player_from_scene_player_entry() {
 #[test]
 fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_transient_state() {
     let mut game_state = GameState::new_empty();
-    game_state.add_entity_definition(player_definition("player"));
-    game_state.add_entity_definition(player_definition("player_knight"));
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player_knight"));
 
     let mut scene_a = Scene::new("Scene A".to_string());
     let mut hero = player_definition("player")
@@ -2383,16 +2395,15 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
         spawn_point_id: "default_spawn".to_string(),
     });
 
-    game_state.add_scene(scene_a);
-    game_state.add_scene(scene_b);
-    game_state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut game_state, scene_a);
+    SceneSystem::add_scene(&mut game_state, scene_b);
+    SceneSystem::load(&mut game_state, "Scene A")
         .expect("initial scene should load");
 
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
     {
         let player = game_state
-            .entity_manager_mut()
+            .world_mut().entity_manager_mut()
             .get_entity_mut(player_id)
             .expect("player should exist");
         player.attributes.apply_stat_delta("health", -35);
@@ -2409,24 +2420,22 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
         controller.is_finished = true;
     }
     let audio = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio should exist");
     audio.footstep_distance_accumulator = 42.0;
     audio.last_collision_state = true;
 
-    game_state
-        .transition_to_scene("Scene B", "from_gate")
+    SceneSystem::transition(&mut game_state, "Scene B", "from_gate")
         .expect("scene transition should succeed");
 
     assert_eq!(
-        game_state.scene_manager().active_scene_name(),
+        game_state.scene().scene_manager().active_scene_name(),
         Some("Scene B")
     );
-    assert_eq!(game_state.player_id(), Some(player_id));
+    assert_eq!(game_state.world().player_id(), Some(player_id));
 
-    let player = game_state
-        .player_entity()
+    let player = player_entity(&game_state)
         .expect("player should still exist");
     assert_eq!(player.position, IVec2::new(128, 64));
     assert_eq!(player.definition_name.as_deref(), Some("player_knight"));
@@ -2443,8 +2452,7 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
     assert_eq!(controller.frame_timer, 0.0);
     assert!(!controller.is_finished);
 
-    let audio = game_state
-        .entity_manager()
+    let audio = game_state.world().entity_manager()
         .audio_component(player_id)
         .expect("player audio should exist after transition");
     assert_eq!(audio.footstep_distance_accumulator, 0.0);
@@ -2454,7 +2462,9 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
 #[test]
 fn game_state_transition_to_scene_resets_non_player_entities_on_return() {
     let mut game_state = GameState::new_empty();
-    game_state.add_entity_definition(player_definition("player"));
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
 
     let mut scene_a = Scene::new("Scene A".to_string());
     scene_a.add_anchor(scene_anchor("return_spawn", IVec2::new(16, 16), None));
@@ -2473,27 +2483,23 @@ fn game_state_transition_to_scene_resets_non_player_entities_on_return() {
     let mut scene_b = Scene::new("Scene B".to_string());
     scene_b.add_anchor(scene_anchor("entry_b", IVec2::new(96, 32), None));
 
-    game_state.add_scene(scene_a);
-    game_state.add_scene(scene_b);
-    game_state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut game_state, scene_a);
+    SceneSystem::add_scene(&mut game_state, scene_b);
+    SceneSystem::load(&mut game_state, "Scene A")
         .expect("initial scene should load");
 
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .position = IVec2::new(80, 80);
 
-    game_state
-        .transition_to_scene("Scene B", "entry_b")
+    SceneSystem::transition(&mut game_state, "Scene B", "entry_b")
         .expect("transition to scene B should succeed");
-    game_state
-        .transition_to_scene("Scene A", "return_spawn")
+    SceneSystem::transition(&mut game_state, "Scene A", "return_spawn")
         .expect("transition back should succeed");
 
-    let npc = game_state
-        .entity_manager()
+    let npc = game_state.world().entity_manager()
         .get_entity(npc_id)
         .expect("authored npc should be restored on return");
     assert_eq!(npc.position, IVec2::new(40, 40));
@@ -2502,7 +2508,9 @@ fn game_state_transition_to_scene_resets_non_player_entities_on_return() {
 #[test]
 fn game_state_transition_to_scene_preserves_non_player_entities_when_scene_is_synced() {
     let mut game_state = GameState::new_empty();
-    game_state.add_entity_definition(player_definition("player"));
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
 
     let mut scene_a = Scene::new("Scene A".to_string());
     scene_a.add_anchor(scene_anchor("return_spawn", IVec2::new(16, 16), None));
@@ -2521,31 +2529,27 @@ fn game_state_transition_to_scene_preserves_non_player_entities_when_scene_is_sy
     let mut scene_b = Scene::new("Scene B".to_string());
     scene_b.add_anchor(scene_anchor("entry_b", IVec2::new(96, 32), None));
 
-    game_state.add_scene(scene_a);
-    game_state.add_scene(scene_b);
-    game_state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut game_state, scene_a);
+    SceneSystem::add_scene(&mut game_state, scene_b);
+    SceneSystem::load(&mut game_state, "Scene A")
         .expect("initial scene should load");
 
     {
         let npc = game_state
-            .entity_manager_mut()
+            .world_mut().entity_manager_mut()
             .get_entity_mut(npc_id)
             .expect("npc should exist");
         npc.position = IVec2::new(80, 80);
         npc.attributes.active = false;
     }
-    game_state.sync_entities_to_active_scene();
+    SceneSystem::sync_entities_to_active_scene(&mut game_state);
 
-    game_state
-        .transition_to_scene("Scene B", "entry_b")
+    SceneSystem::transition(&mut game_state, "Scene B", "entry_b")
         .expect("transition to scene B should succeed");
-    game_state
-        .transition_to_scene("Scene A", "return_spawn")
+    SceneSystem::transition(&mut game_state, "Scene A", "return_spawn")
         .expect("transition back should succeed");
 
-    let npc = game_state
-        .entity_manager()
+    let npc = game_state.world().entity_manager()
         .get_entity(npc_id)
         .expect("synced npc should be restored on return");
     assert_eq!(npc.position, IVec2::new(80, 80));
@@ -2555,7 +2559,9 @@ fn game_state_transition_to_scene_preserves_non_player_entities_when_scene_is_sy
 #[test]
 fn game_state_transition_to_scene_missing_spawn_fails_without_corrupting_state() {
     let mut game_state = GameState::new_empty();
-    game_state.add_entity_definition(player_definition("player"));
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
 
     let mut scene_a = Scene::new("Scene A".to_string());
     let mut hero = player_definition("player")
@@ -2567,22 +2573,20 @@ fn game_state_transition_to_scene_missing_spawn_fails_without_corrupting_state()
 
     let scene_b = Scene::new("Scene B".to_string());
 
-    game_state.add_scene(scene_a);
-    game_state.add_scene(scene_b);
-    game_state
-        .load_scene("Scene A")
+    SceneSystem::add_scene(&mut game_state, scene_a);
+    SceneSystem::add_scene(&mut game_state, scene_b);
+    SceneSystem::load(&mut game_state, "Scene A")
         .expect("initial scene should load");
 
-    let before_position = game_state.player_position();
-    let error = game_state
-        .transition_to_scene("Scene B", "missing_spawn")
+    let before_position = player_position(&game_state);
+    let error = SceneSystem::transition(&mut game_state, "Scene B", "missing_spawn")
         .expect_err("missing spawn point should fail");
     assert!(error.contains("missing_spawn"));
     assert_eq!(
-        game_state.scene_manager().active_scene_name(),
+        game_state.scene().scene_manager().active_scene_name(),
         Some("Scene A")
     );
-    assert_eq!(game_state.player_position(), before_position);
+    assert_eq!(player_position(&game_state), before_position);
 }
 
 #[test]
@@ -2591,18 +2595,18 @@ fn game_state_sprite_animation_updates() {
     let mut game_state = GameState::new(sprite);
     let atlas = create_test_atlas();
     let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
-    let _initial_frame = game_state.current_sprite_frame(&atlas, texture_size);
+    let _initial_frame = current_sprite_frame(&game_state, &atlas, texture_size);
 
     let world_bounds = UVec2::new(1000, 1000);
 
     // Update multiple times to advance animation
     for _ in 0..10 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Animation should have progressed (frame or timing)
     // Note: Since animation depends on internal timing, we mainly test that it doesn't crash
-    let _current_frame = game_state.current_sprite_frame(&atlas, texture_size);
+    let _current_frame = current_sprite_frame(&game_state, &atlas, texture_size);
     // The exact frame depends on timing, so we just ensure it's callable
 }
 
@@ -2612,22 +2616,22 @@ fn game_state_entity_position_sync() {
     let mut game_state = GameState::new(sprite);
 
     // Move the player
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
     let world_bounds = UVec2::new(1000, 1000);
-    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     // Entity position should match player sprite position
-    let player_entity = game_state.player_entity().unwrap();
-    assert_eq!(player_entity.position, game_state.player_position());
+    let player = player_entity(&game_state).unwrap();
+    assert_eq!(player.position, player_position(&game_state));
 
     // Move again
-    game_state.handle_key_press(InputKey::Down);
-    game_state.handle_key_release(InputKey::Right);
-    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     // Should still be synchronized
-    let player_entity = game_state.player_entity().unwrap();
-    assert_eq!(player_entity.position, game_state.player_position());
+    let player = player_entity(&game_state).unwrap();
+    assert_eq!(player.position, player_position(&game_state));
 }
 
 #[test]
@@ -2636,26 +2640,26 @@ fn game_state_multiple_key_handling() {
     let mut game_state = GameState::new(sprite);
 
     // Press multiple keys
-    game_state.handle_key_press(InputKey::Up);
-    game_state.handle_key_press(InputKey::Right);
-    game_state.handle_key_press(InputKey::Down); // Conflicting with Up
-    game_state.handle_key_press(InputKey::Left); // Conflicting with Right
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down); // Conflicting with Up
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left); // Conflicting with Right
 
     let world_bounds = UVec2::new(1000, 1000);
-    let _initial_position = game_state.player_position();
-    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let _initial_position = player_position(&game_state);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     // All directions should be processed (net effect might cancel out)
     // This tests that multiple keys don't crash the system
-    let _final_position = game_state.player_position();
+    let _final_position = player_position(&game_state);
 
     // Release some keys
-    game_state.handle_key_release(InputKey::Down);
-    game_state.handle_key_release(InputKey::Left);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Down);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Left);
 
-    let position_before = game_state.player_position();
-    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
-    let position_after = game_state.player_position();
+    let position_before = player_position(&game_state);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let position_after = player_position(&game_state);
 
     // Should move up and right now
     assert!(position_after.x > position_before.x); // Right
@@ -2668,12 +2672,12 @@ fn game_state_entity_manager_access() {
     let mut game_state = GameState::new(sprite);
 
     // Should be able to access EntityManager
-    let entity_manager = game_state.entity_manager();
+    let entity_manager = game_state.world().entity_manager();
     assert_eq!(entity_manager.active_entities().len(), 1);
     assert!(entity_manager.get_player().is_some());
 
     // Should be able to spawn additional entities
-    let entity_manager = game_state.entity_manager_mut();
+    let entity_manager = game_state.world_mut().entity_manager_mut();
     let npc_id = entity_manager
         .spawn_from_definition(&test_definition("npc", "creature"), IVec2::new(100, 100))
         .expect("npc spawn from definition should succeed");
@@ -2691,7 +2695,7 @@ fn game_state_player_entity_attributes() {
     let sprite = create_test_sprite();
     let game_state = GameState::new(sprite);
 
-    let player_entity = game_state.player_entity().unwrap();
+    let player_entity = player_entity(&game_state).unwrap();
 
     // Check player entity has correct attributes from factory method
     assert_eq!(player_entity.attributes.health, Some(100));
@@ -2708,7 +2712,7 @@ fn game_state_player_entity_attributes() {
 fn game_state_new_uses_definition_based_player_creation() {
     let sprite = create_test_sprite();
     let game_state = GameState::new(sprite);
-    let player = game_state.player_entity().expect("player should exist");
+    let player = player_entity(&game_state).expect("player should exist");
 
     assert_eq!(player.definition_name.as_deref(), Some("player"));
 }
@@ -2716,9 +2720,8 @@ fn game_state_new_uses_definition_based_player_creation() {
 #[test]
 fn game_state_spawn_player_like_npc_uses_definition_metadata() {
     let mut game_state = GameState::new_empty();
-    let npc_id = game_state.spawn_player_like_npc(IVec2::new(120, 72));
-    let npc = game_state
-        .entity_manager()
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut game_state, IVec2::new(120, 72));
+    let npc = game_state.world().entity_manager()
         .get_entity(npc_id)
         .expect("spawned npc should exist");
 
@@ -2730,16 +2733,16 @@ fn game_state_spawn_player_like_npc_uses_definition_metadata() {
 fn game_state_emits_movement_audio_event_with_component_sound_id() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
     let player_audio = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio component should exist");
     player_audio.footstep_trigger_distance = 1.0;
     player_audio.movement_sound = Some("sfx_custom_step".to_string());
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2762,11 +2765,11 @@ fn game_state_emits_movement_audio_event_with_component_sound_id() {
 fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     {
         let player_audio = game_state
-            .entity_manager_mut()
+            .world_mut().entity_manager_mut()
             .audio_component_mut(player_id)
             .expect("player audio component should exist");
         player_audio.footstep_trigger_distance = 9999.0;
@@ -2775,7 +2778,7 @@ fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
     }
 
     let controller = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .and_then(|entity| entity.attributes.animation_controller.as_mut())
         .expect("player animation controller should exist");
@@ -2789,8 +2792,8 @@ fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2818,12 +2821,11 @@ fn game_state_emits_movement_audio_for_wander_ai_movement() {
     wandering_npc.audio.footstep_trigger_distance = 1.0;
     wandering_npc.audio.movement_sound = "sfx_wander_step".to_string();
     let wandering_npc_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))
         .expect("wandering npc should spawn");
 
-    let initial_position = game_state
-        .entity_manager()
+    let initial_position = game_state.world().entity_manager()
         .get_entity(wandering_npc_id)
         .expect("wandering npc should exist")
         .position;
@@ -2831,7 +2833,7 @@ fn game_state_emits_movement_audio_for_wander_ai_movement() {
     let mut moved = false;
     let mut emitted_sound = false;
     for _ in 0..(60 * 12) {
-        let result = game_state.update(
+        let result = GameSimulation::tick_fixed(&mut game_state, 
             UVec2::new(512, 512),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -2849,8 +2851,7 @@ fn game_state_emits_movement_audio_for_wander_ai_movement() {
         }) {
             emitted_sound = true;
         }
-        if game_state
-            .entity_manager()
+        if game_state.world().entity_manager()
             .get_entity(wandering_npc_id)
             .expect("wandering npc should exist")
             .position
@@ -2879,11 +2880,11 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
     mover.audio.footstep_trigger_distance = 1.0;
     mover.audio.movement_sound = "sfx_rule_step".to_string();
     let mover_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&mover, IVec2::new(16, 16))
         .expect("rule mover should spawn");
 
-    game_state.set_rules(RuleSet {
+    RuleSystem::set_rules(&mut game_state, RuleSet {
         rules: vec![Rule {
             id: "move_rule_mover".to_string(),
             enabled: true,
@@ -2899,7 +2900,7 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
         }],
     });
 
-    let result = game_state.update(
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2917,8 +2918,7 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
         )
     }));
     assert_eq!(
-        game_state
-            .entity_manager()
+        game_state.world().entity_manager()
             .get_entity(mover_id)
             .expect("rule mover should exist")
             .position,
@@ -2930,15 +2930,15 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
 fn game_state_emits_collision_audio_event_with_component_sound_id() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
     let player_audio = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .audio_component_mut(player_id)
         .expect("player audio component should exist");
     player_audio.collision_sound = Some("sfx_custom_collision".to_string());
 
-    game_state.handle_key_press(InputKey::Right);
-    let result = game_state.update(
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_solid_test_atlas(),
@@ -2965,185 +2965,185 @@ fn game_state_emits_collision_audio_event_with_component_sound_id() {
 fn game_state_entity_speed_controls_movement_distance() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player speed to 3.0 pixels per tick
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 3.0;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Right);
-    game_state.update(
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Should have moved 3 pixels (entity speed), not 1 pixel (old hardcoded)
-    assert_eq!(game_state.player_position().x, initial_position.x + 3);
+    assert_eq!(player_position(&game_state).x, initial_position.x + 3);
 }
 
 #[test]
 fn game_state_entity_speed_fractional_rounds_down() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player speed to 1.7 pixels per tick
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 1.7;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Down);
-    game_state.update(
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Should move 1 pixel (1.7 truncated to 1)
-    assert_eq!(game_state.player_position().y, initial_position.y + 1);
+    assert_eq!(player_position(&game_state).y, initial_position.y + 1);
 }
 
 #[test]
 fn game_state_entity_speed_below_one_accumulates_movement() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player speed to 0.5 pixels per tick
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 0.5;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Left);
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
 
     // First update: accumulate 0.5, not enough to move
-    let result1 = game_state.update(
+    let result1 = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
     assert!(!result1.player_moved);
-    assert_eq!(game_state.player_position(), initial_position);
+    assert_eq!(player_position(&game_state), initial_position);
 
     // Second update: accumulate another 0.5, now 1.0 - should move 1 pixel
-    let result2 = game_state.update(
+    let result2 = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
     assert!(result2.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x - 1);
+    assert_eq!(player_position(&game_state).x, initial_position.x - 1);
 }
 
 #[test]
 fn game_state_entity_speed_fractional_accumulates_remainder() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player speed to 1.5 pixels per tick
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 1.5;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Right);
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     // First update: 1.5 -> move 1, accumulate 0.5
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    assert_eq!(game_state.player_position().x, initial_position.x + 1);
+    assert_eq!(player_position(&game_state).x, initial_position.x + 1);
 
     // Second update: 0.5 + 1.5 = 2.0 -> move 2, accumulate 0
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    assert_eq!(game_state.player_position().x, initial_position.x + 3);
+    assert_eq!(player_position(&game_state).x, initial_position.x + 3);
 }
 
 #[test]
 fn game_state_entity_speed_accumulator_resets_on_direction_change() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player speed to 0.5 pixels per tick
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 0.5;
 
-    let initial_position = game_state.player_position();
-    game_state.handle_key_press(InputKey::Left);
+    let initial_position = player_position(&game_state);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
 
     // First update: accumulate 0.5 left
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    assert_eq!(game_state.player_position(), initial_position);
+    assert_eq!(player_position(&game_state), initial_position);
 
     // Change direction to right
-    game_state.handle_key_release(InputKey::Left);
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Left);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     // Second update: should start fresh at 0.5 right, not move
-    game_state.update(
+    GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    assert_eq!(game_state.player_position(), initial_position);
+    assert_eq!(player_position(&game_state), initial_position);
 
     // Third update: now 1.0 accumulated right, should move right
-    let result = game_state.update(
+    let result = GameSimulation::tick_fixed(&mut game_state, 
         UVec2::new(1000, 1000),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x + 1);
+    assert_eq!(player_position(&game_state).x, initial_position.x + 1);
 }
 
 #[test]
 fn game_state_entity_size_used_for_right_boundary_clamping() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player to have a 32x32 size (larger than default 16x16)
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .size = UVec2::new(32, 32);
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .collision_box
@@ -3151,7 +3151,7 @@ fn game_state_entity_size_used_for_right_boundary_clamping() {
         .expect("player collision should exist")
         .size = UVec2::new(32, 32);
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
@@ -3160,38 +3160,38 @@ fn game_state_entity_size_used_for_right_boundary_clamping() {
 
     // Also set speed high so we reach boundary quickly
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 10.0;
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
     let world_bounds = UVec2::new(100, 100);
 
     // Move right until boundary
     for _ in 0..50 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Should be clamped at world_width - entity_size (100 - 32 = 68)
-    assert_eq!(game_state.player_position().x, 68);
+    assert_eq!(player_position(&game_state).x, 68);
 }
 
 #[test]
 fn game_state_entity_size_used_for_bottom_boundary_clamping() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
 
     // Set player to have a 24x24 size
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .size = UVec2::new(24, 24);
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .collision_box
@@ -3199,7 +3199,7 @@ fn game_state_entity_size_used_for_bottom_boundary_clamping() {
         .expect("player collision should exist")
         .size = UVec2::new(24, 24);
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
@@ -3208,22 +3208,22 @@ fn game_state_entity_size_used_for_bottom_boundary_clamping() {
 
     // Set speed high
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
         .speed = 10.0;
 
-    game_state.handle_key_press(InputKey::Down);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
     let world_bounds = UVec2::new(100, 100);
 
     // Move down until boundary
     for _ in 0..50 {
-        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+        GameSimulation::tick_fixed(&mut game_state, world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
     // Should be clamped at world_height - entity_size (100 - 24 = 76)
-    assert_eq!(game_state.player_position().y, 76);
+    assert_eq!(player_position(&game_state).y, 76);
 }
 
 // ============================================================================
@@ -3243,27 +3243,27 @@ fn update_with_delta_at_default_timestep_matches_fixed_update() {
     let atlas = create_test_atlas();
 
     // Press right on both
-    fixed_state.handle_key_press(InputKey::Right);
-    delta_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(fixed_state.runtime_mut(), InputKey::Right);
+    InputSystem::handle_key_press(delta_state.runtime_mut(), InputKey::Right);
 
     // Update fixed state with update()
-    fixed_state.update(world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut fixed_state, world_bounds, &tilemap, &atlas);
 
     // Update delta state with update_with_delta at default timestep
-    delta_state.update_with_delta(DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut delta_state, DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
 
     // Positions should match
-    assert_eq!(fixed_state.player_position(), delta_state.player_position());
+    assert_eq!(player_position(&fixed_state), player_position(&delta_state));
 }
 
 #[test]
 fn update_with_delta_double_timestep_moves_further() {
     let mut game_state = GameState::new(create_test_sprite());
-    let player_id = game_state.player_id().unwrap();
+    let player_id = game_state.world().player_id().unwrap();
 
     // Set speed to 1.0 for predictable movement
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
@@ -3272,27 +3272,27 @@ fn update_with_delta_double_timestep_moves_further() {
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     // Update with 2x delta (33.33ms)
-    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut game_state, DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
 
     // Should have moved 2 pixels (speed 1.0 * 2.0 scale factor = 2 pixels)
-    let position_after = game_state.player_position();
+    let position_after = player_position(&game_state);
     assert_eq!(position_after.x - initial_position.x, 2);
 }
 
 #[test]
 fn update_with_delta_half_timestep_moves_less() {
     let mut game_state = GameState::new(create_test_sprite());
-    let player_id = game_state.player_id().unwrap();
+    let player_id = game_state.world().player_id().unwrap();
 
     // Speed = 2.0 means 2 pixels per frame at 60fps
     // At half delta (8.33ms), accumulator gets 1.0, which is 1 whole pixel
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
@@ -3301,15 +3301,15 @@ fn update_with_delta_half_timestep_moves_less() {
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     // Update with 0.5x delta (8.33ms)
-    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut game_state, DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
 
     // Should have moved 1 pixel (speed 2.0 * 0.5 scale = 1 pixel)
-    let position_after = game_state.player_position();
+    let position_after = player_position(&game_state);
     assert_eq!(position_after.x - initial_position.x, 1);
 }
 
@@ -3320,9 +3320,9 @@ fn game_state_ai_speed_below_one_accumulates_movement() {
     let atlas = create_test_atlas();
 
     let mut game_state = GameState::new(create_test_sprite());
-    let player_id = game_state.player_id().expect("player should exist");
+    let player_id = game_state.world().player_id().expect("player should exist");
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .position = IVec2::new(32, 32);
@@ -3335,21 +3335,19 @@ fn game_state_ai_speed_below_one_accumulates_movement() {
     chaser.attributes.speed = 0.5;
 
     let chaser_id = game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&chaser, IVec2::new(64, 32))
         .expect("chaser should spawn");
 
-    game_state.update(world_bounds, &tilemap, &atlas);
-    let first_position = game_state
-        .entity_manager()
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    let first_position = game_state.world().entity_manager()
         .get_entity(chaser_id)
         .expect("chaser should exist")
         .position;
     assert_eq!(first_position, IVec2::new(64, 32));
 
-    game_state.update(world_bounds, &tilemap, &atlas);
-    let second_position = game_state
-        .entity_manager()
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    let second_position = game_state.world().entity_manager()
         .get_entity(chaser_id)
         .expect("chaser should exist")
         .position;
@@ -3359,11 +3357,11 @@ fn game_state_ai_speed_below_one_accumulates_movement() {
 #[test]
 fn update_with_delta_accumulates_fractional_movement() {
     let mut game_state = GameState::new(create_test_sprite());
-    let player_id = game_state.player_id().unwrap();
+    let player_id = game_state.world().player_id().unwrap();
 
     // Speed = 1.0 means 1 pixel per frame at 60fps
     game_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
@@ -3372,18 +3370,18 @@ fn update_with_delta_accumulates_fractional_movement() {
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    let initial_position = game_state.player_position();
+    let initial_position = player_position(&game_state);
 
-    game_state.handle_key_press(InputKey::Right);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
     // Update with 0.5x delta twice - should accumulate to 1 pixel total
-    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
-    let position_after_first = game_state.player_position();
+    GameSimulation::tick_with_delta(&mut game_state, DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
+    let position_after_first = player_position(&game_state);
     // First update: accumulator = 0.5, no whole pixel
     assert_eq!(position_after_first.x - initial_position.x, 0);
 
-    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
-    let position_after_second = game_state.player_position();
+    GameSimulation::tick_with_delta(&mut game_state, DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
+    let position_after_second = player_position(&game_state);
     // Second update: accumulator = 1.0, extracts 1 whole pixel
     assert_eq!(position_after_second.x - initial_position.x, 1);
 }
@@ -3397,19 +3395,17 @@ fn update_with_delta_scales_animation_timing() {
     let atlas = create_test_atlas();
 
     // Get initial frame timer
-    let initial_frame_timer = game_state
-        .player_entity()
+    let initial_frame_timer = player_entity(&game_state)
         .and_then(|e| e.attributes.animation_controller.as_ref())
         .map(|c| c.frame_timer)
         .unwrap_or(0.0);
 
     // Update with 2x delta (33.33ms)
-    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut game_state, DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
 
     // Animation frame_timer should have advanced by approximately 33.33ms
     // (unless it wrapped around due to frame advancement)
-    let final_frame_timer = game_state
-        .player_entity()
+    let final_frame_timer = player_entity(&game_state)
         .and_then(|e| e.attributes.animation_controller.as_ref())
         .map(|c| c.frame_timer)
         .unwrap_or(0.0);
@@ -3440,25 +3436,23 @@ fn update_with_delta_keeps_ai_consistent_across_frame_chunking() {
     chaser.attributes.speed = 1.0;
 
     let single_frame_chaser = single_frame_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&chaser, IVec2::new(100, 60))
         .expect("chaser should spawn");
     let split_frame_chaser = split_frame_state
-        .entity_manager_mut()
+        .world_mut().entity_manager_mut()
         .spawn_from_definition(&chaser, IVec2::new(100, 60))
         .expect("chaser should spawn");
 
-    single_frame_state.update_with_delta(DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
-    split_frame_state.update_with_delta(DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
-    split_frame_state.update_with_delta(DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut single_frame_state, DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut split_frame_state, DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_with_delta(&mut split_frame_state, DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
 
-    let single_frame_position = single_frame_state
-        .entity_manager()
+    let single_frame_position = single_frame_state.world().entity_manager()
         .get_entity(single_frame_chaser)
         .expect("single-frame chaser should exist")
         .position;
-    let split_frame_position = split_frame_state
-        .entity_manager()
+    let split_frame_position = split_frame_state.world().entity_manager()
         .get_entity(split_frame_chaser)
         .expect("split-frame chaser should exist")
         .position;

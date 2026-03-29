@@ -18,7 +18,7 @@ pub fn build_game_state_from_project_content(
     let mut game_state = GameState::new_empty();
 
     for definition in entity_definitions {
-        game_state.add_entity_definition(definition);
+        game_state.world_mut().insert_entity_definition(definition);
     }
 
     for scene in scenes {
