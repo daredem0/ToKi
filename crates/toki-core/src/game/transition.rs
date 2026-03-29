@@ -85,10 +85,12 @@ impl<'a> SceneTransitionPlanner<'a> {
                 }
                 Some(player_id)
             }
-        } else if let (Some(spawn_point_id), Some(mut player)) =
-            (transition_spawn_point_id, preserved_player)
-        {
-            self.reposition_preserved_player(&mut player, scene, spawn_point_id)?;
+        } else if let Some(mut player) = preserved_player {
+            if let Some(spawn_point_id) = transition_spawn_point_id {
+                self.reposition_preserved_player(&mut player, scene, spawn_point_id)?;
+            } else {
+                Self::reset_player_transient_state(&mut player, None);
+            }
             let player_id = player.id;
             entity_manager.add_existing_entity(player);
             entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
