@@ -2,6 +2,7 @@
 name = "toki-test-fixtures"
 version = "0.2.2"
 edition = "2021"
+publish = false
 license = "MPL-2.0"
 description = "Shared test fixtures for ToKi crates."
 repository = "https://github.com/daredem0/ToKi"

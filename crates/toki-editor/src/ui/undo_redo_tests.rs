@@ -8,14 +8,23 @@ use tempfile::tempdir;
 use toki_core::entity::{Entity, EntityAttributes};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
-use toki_test_fixtures::test_npc_entity;
 
 fn sample_entity(id: u32, position: IVec2) -> Entity {
-    let mut entity = test_npc_entity(id);
-    entity.position = position;
-    entity.definition_name = Some("npc".to_string().into());
-    entity.attributes = EntityAttributes::default();
-    entity
+    Entity {
+        id,
+        position,
+        size: glam::UVec2::new(16, 16),
+        entity_kind: toki_core::entity::EntityKind::Npc,
+        category: "creature".to_string(),
+        definition_name: Some("npc".to_string().into()),
+        persistent_across_saves: false,
+        control_role: toki_core::entity::ControlRole::None,
+        audio: toki_core::entity::EntityAudioSettings::default(),
+        attributes: EntityAttributes::default(),
+        collision_box: None,
+        movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
+    }
 }
 
 fn sample_rule_set() -> RuleSet {

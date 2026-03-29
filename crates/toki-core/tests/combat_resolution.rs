@@ -1,4 +1,6 @@
 use glam::{IVec2, UVec2};
+mod support;
+use support::{test_atlas, test_entity_definition, test_tilemap};
 use toki_core::animation::{AnimationClip, AnimationState, LoopMode};
 use toki_core::entity::{MovementProfile, PrimaryProjectileDef};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -6,7 +8,6 @@ use toki_core::{
     game::{GameSimulation, InputAction, InputSystem, RenderQueryService},
     GameState,
 };
-use toki_test_fixtures::{test_atlas, test_entity_definition, test_tilemap};
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {

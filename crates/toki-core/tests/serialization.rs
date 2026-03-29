@@ -1,10 +1,11 @@
 use glam::{IVec2, UVec2};
+mod support;
+use support::{save_test_state, test_entity, test_entity_definition};
 use tempfile::NamedTempFile;
 use toki_core::entity::*;
 use toki_core::game::{InputSystem, RenderQueryService, SceneSystem};
 use toki_core::serialization::*;
 use toki_core::{FlagValue, GameState, InputKey, Scene};
-use toki_test_fixtures::{save_test_state, test_entity, test_entity_definition};
 
 fn test_definition(name: &str, category: &str) -> EntityDefinition {
     test_entity_definition(name, category)

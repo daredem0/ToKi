@@ -1,5 +1,7 @@
 use glam::IVec2;
+mod support;
 use std::collections::HashMap;
+use support::{test_atlas, test_tilemap};
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::entity::{
     AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile, MovementSoundTrigger,
@@ -9,7 +11,6 @@ use toki_core::game::{GameSimulation, InputSystem, RenderQueryService, RuleSyste
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 use toki_core::{scene::Scene, GameState, InputKey, DEFAULT_TIMESTEP_MS};
-use toki_test_fixtures::{test_atlas, test_tilemap};
 
 fn player_definition(name: &str) -> EntityDefinition {
     EntityDefinition {

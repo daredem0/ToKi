@@ -1,10 +1,11 @@
 use glam::{IVec2, UVec2};
+mod support;
+use support::{test_atlas, test_tilemap};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
     game::{GameSimulation, InputSystem, RenderQueryService},
     GameState, InputKey, DEFAULT_TIMESTEP_MS,
 };
-use toki_test_fixtures::{test_atlas, test_tilemap};
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
