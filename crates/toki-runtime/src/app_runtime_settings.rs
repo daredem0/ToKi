@@ -77,7 +77,7 @@ enum GraphicsSettingKey {
 }
 
 impl App {
-    fn rebuild_frame_timing_settings(&mut self) {
+    pub(super) fn rebuild_frame_timing_settings(&mut self) {
         self.frame_limiter = if self.launch_options.display.vsync {
             FrameLimiter::new_unlimited()
         } else {
@@ -553,20 +553,8 @@ impl App {
             3 => adjust_percent(&mut self.launch_options.audio_mix.collision_percent, delta),
             _ => return,
         }
-        self.audio_system
-            .set_master_volume_percent(self.launch_options.audio_mix.master_percent);
-        self.audio_system
-            .set_channel_volume_percent("music", self.launch_options.audio_mix.music_percent);
-        self.audio_system
-            .set_channel_volume_percent("music_a", self.launch_options.audio_mix.music_percent);
-        self.audio_system
-            .set_channel_volume_percent("music_b", self.launch_options.audio_mix.music_percent);
-        self.audio_system
-            .set_channel_volume_percent("movement", self.launch_options.audio_mix.movement_percent);
-        self.audio_system.set_channel_volume_percent(
-            "collision",
-            self.launch_options.audio_mix.collision_percent,
-        );
+        self.apply_live_audio_mix_settings();
+        self.persist_runtime_settings_if_possible();
     }
 
     fn adjust_graphics_setting(&mut self, selected_index: usize, direction: i32) {
@@ -660,6 +648,7 @@ impl App {
 
         self.rendering
             .set_post_process_settings(self.resolved_post_process_settings());
+        self.persist_runtime_settings_if_possible();
     }
 
     fn runtime_overlay_presentation(
@@ -799,6 +788,7 @@ impl App {
 
         self.rendering
             .set_post_process_settings(self.resolved_post_process_settings());
+        self.persist_runtime_settings_if_possible();
     }
 
 }

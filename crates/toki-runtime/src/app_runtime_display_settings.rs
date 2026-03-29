@@ -28,6 +28,7 @@ impl App {
         self.sync_runtime_viewport_to_window(world_bounds);
         self.refresh_tilemap_vertices_for_current_camera();
         self.platform.request_redraw();
+        self.persist_runtime_settings_if_possible();
     }
 
     pub(super) fn display_overlay_entries(
