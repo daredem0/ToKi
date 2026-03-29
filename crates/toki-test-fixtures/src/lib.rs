@@ -115,6 +115,22 @@ pub fn test_entity_definition(name: &str, category: &str) -> EntityDefinition {
 }
 
 pub fn test_entity() -> Entity {
+    test_entity_with_id(42)
+}
+
+pub fn test_entity_with_id(id: u32) -> Entity {
+    test_entity_with_kind(id, EntityKind::Player, ControlRole::PlayerCharacter)
+}
+
+pub fn test_npc_entity(id: u32) -> Entity {
+    test_entity_with_kind(id, EntityKind::Npc, ControlRole::None)
+}
+
+pub fn test_entity_with_kind(
+    id: u32,
+    entity_kind: EntityKind,
+    control_role: ControlRole,
+) -> Entity {
     let mut controller = AnimationController::new();
     let clip = AnimationClip {
         state: AnimationState::Walk,
@@ -155,14 +171,21 @@ pub fn test_entity() -> Entity {
     };
 
     Entity {
-        id: 42,
+        id,
         position: IVec2::new(10, 20),
         size: UVec2::new(16, 16),
-        entity_kind: EntityKind::Player,
-        category: "human".to_string(),
+        entity_kind,
+        category: match entity_kind {
+            EntityKind::Player => "human".to_string(),
+            EntityKind::Npc => "creature".to_string(),
+            EntityKind::Item => "item".to_string(),
+            EntityKind::Decoration => "decoration".to_string(),
+            EntityKind::Trigger => "trigger".to_string(),
+            EntityKind::Projectile => "projectile".to_string(),
+        },
         definition_name: Some("player".to_string().into()),
         persistent_across_saves: false,
-        control_role: ControlRole::PlayerCharacter,
+        control_role,
         audio: EntityAudioSettings {
             footstep_trigger_distance: 32.0,
             hearing_radius: 192,

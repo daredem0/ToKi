@@ -76,7 +76,7 @@ impl MapEditorHistory {
     }
 
     pub(crate) fn undo(&mut self, map_state: &mut MapEditorState) -> bool {
-        let Some(command) = self.history.take_undo() else {
+        let Some(command) = self.history.undo_entry() else {
             return false;
         };
         if apply_map_editor_tilemap_snapshot(
@@ -85,16 +85,15 @@ impl MapEditorHistory {
             command.is_draft,
             &command.before,
         ) {
-            self.history.restore_redo(command);
             true
         } else {
-            self.history.restore_undo(command);
+            self.history.revert_failed_undo();
             false
         }
     }
 
     pub(crate) fn redo(&mut self, map_state: &mut MapEditorState) -> bool {
-        let Some(command) = self.history.take_redo() else {
+        let Some(command) = self.history.redo_entry() else {
             return false;
         };
         if apply_map_editor_tilemap_snapshot(
@@ -103,10 +102,9 @@ impl MapEditorHistory {
             command.is_draft,
             &command.after,
         ) {
-            self.history.restore_undo(command);
             true
         } else {
-            self.history.restore_redo(command);
+            self.history.revert_failed_redo();
             false
         }
     }

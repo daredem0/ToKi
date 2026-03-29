@@ -2,9 +2,9 @@ use anyhow::Result;
 use jsonschema::JSONSchema;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 
+use crate::io::{read_text_file_with_limit, DEFAULT_TEXT_FILE_SIZE_LIMIT};
 use crate::project::ProjectAssets;
 
 pub struct AssetValidator {
@@ -80,7 +80,11 @@ impl AssetValidator {
         let file_path_str = file_path.to_string_lossy();
 
         // Read and parse JSON
-        let content = match fs::read_to_string(file_path) {
+        let content = match read_text_file_with_limit(
+            file_path,
+            DEFAULT_TEXT_FILE_SIZE_LIMIT,
+            "validation asset",
+        ) {
             Ok(content) => content,
             Err(e) => {
                 tracing::error!(

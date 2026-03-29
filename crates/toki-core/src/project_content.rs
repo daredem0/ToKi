@@ -1,11 +1,11 @@
 use crate::entity::EntityDefinition;
-use crate::game::SceneSystem;
+use crate::game::{SceneLoadError, SceneSystem};
 use crate::{GameState, Scene};
 
 pub fn build_game_state_from_scene(
     scene: Scene,
     entity_definitions: impl IntoIterator<Item = EntityDefinition>,
-) -> Result<GameState, String> {
+) -> Result<GameState, SceneLoadError> {
     let startup_scene_name = scene.name.clone();
     build_game_state_from_project_content([scene], entity_definitions, &startup_scene_name)
 }
@@ -14,7 +14,7 @@ pub fn build_game_state_from_project_content(
     scenes: impl IntoIterator<Item = Scene>,
     entity_definitions: impl IntoIterator<Item = EntityDefinition>,
     startup_scene_name: &str,
-) -> Result<GameState, String> {
+) -> Result<GameState, SceneLoadError> {
     let mut game_state = GameState::new_empty();
 
     for definition in entity_definitions {
@@ -146,7 +146,11 @@ mod tests {
         let error = build_game_state_from_scene(scene, std::iter::empty())
             .expect_err("scene should fail without required player definition");
 
-        assert!(error.contains("player"));
+        assert!(matches!(
+            error,
+            SceneLoadError::MissingPlayerDefinition { ref definition_name, .. }
+                if definition_name == "player"
+        ));
     }
 
     #[test]

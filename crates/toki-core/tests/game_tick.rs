@@ -61,3 +61,23 @@ fn default_delta_tick_matches_fixed_tick_movement() {
 
     assert_eq!(player_position(&fixed_state), player_position(&delta_state));
 }
+
+#[test]
+fn sub_frame_time_scale_still_accumulates_play_time() {
+    let mut state = GameState::new(create_test_sprite());
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = test_tilemap();
+    let atlas = test_atlas();
+
+    for _ in 0..10 {
+        GameSimulation::tick_with_delta(
+            &mut state,
+            DEFAULT_TIMESTEP_MS * 0.25,
+            world_bounds,
+            &tilemap,
+            &atlas,
+        );
+    }
+
+    assert!(state.play_time_ms() >= 40);
+}

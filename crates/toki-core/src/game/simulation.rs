@@ -15,14 +15,17 @@ struct TickPhaseState {
 impl TickPhaseState {
     fn new(state: &mut GameState, time_scale: f32) -> Self {
         let animation_delta_ms = (DEFAULT_TIMESTEP_MS * time_scale).max(0.0);
+        state.progress.play_time_remainder_ms += animation_delta_ms;
+        let play_time_increment = state.progress.play_time_remainder_ms.floor() as u64;
         state.progress.play_time_ms = state
             .progress
             .play_time_ms
-            .saturating_add(animation_delta_ms.round() as u64);
+            .saturating_add(play_time_increment);
+        state.progress.play_time_remainder_ms -= play_time_increment as f32;
 
         let initial_player_position = state
             .world
-            .player_id
+            .player_id()
             .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
             .map(|entity| entity.position)
             .unwrap_or(glam::IVec2::ZERO);
@@ -95,11 +98,11 @@ impl GameSimulation {
         let mut rule_commands = Vec::new();
         RuleSystem::begin_frame(state);
         RuleSystem::collect_frame_commands(state, &mut rule_commands);
-        let (pending_rule_animations, pending_scene_switch, _, pending_persistence) =
+        let command_result =
             RuleSystem::apply_commands(state, rule_commands, &mut phases.result, world.tilemap);
-        phases.pending_rule_animations = pending_rule_animations;
-        phases.pending_scene_switch = pending_scene_switch;
-        phases.pending_persistence = pending_persistence;
+        phases.pending_rule_animations = command_result.pending_animations;
+        phases.pending_scene_switch = command_result.pending_scene_switch;
+        phases.pending_persistence = command_result.pending_persistence;
         phases
     }
 
@@ -119,11 +122,9 @@ impl GameSimulation {
 
         let intended_player_delta = state
             .world
-            .player_id
+            .player_id()
             .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
-            .map(|entity| {
-                state.held_keys_for_profile(GameState::effective_movement_profile(entity))
-            })
+            .map(|entity| state.held_keys_for_profile(entity.effective_movement_profile()))
             .map(|keys| GameState::movement_delta_from_keys(&keys))
             .unwrap_or(glam::IVec2::ZERO);
 
@@ -166,22 +167,21 @@ impl GameSimulation {
             world.tilemap,
             world.atlas,
         );
-        let (mut reactive_animations, reactive_scene_switch, _, reactive_persistence) =
-            RuleSystem::apply_commands(
-                state,
-                reactive_rule_commands,
-                &mut phases.result,
-                world.tilemap,
-            );
+        let mut command_result = RuleSystem::apply_commands(
+            state,
+            reactive_rule_commands,
+            &mut phases.result,
+            world.tilemap,
+        );
         if phases.pending_scene_switch.is_none() {
-            phases.pending_scene_switch = reactive_scene_switch;
+            phases.pending_scene_switch = command_result.pending_scene_switch;
         }
         if phases.pending_persistence.is_none() {
-            phases.pending_persistence = reactive_persistence;
+            phases.pending_persistence = command_result.pending_persistence;
         }
         phases
             .pending_rule_animations
-            .append(&mut reactive_animations);
+            .append(&mut command_result.pending_animations);
     }
 
     fn finalize_tick(

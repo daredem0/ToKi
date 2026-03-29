@@ -2,6 +2,7 @@
 
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
+use crate::ids::EntityDefName;
 use glam::IVec2;
 
 use super::constants::{INITIAL_WAIT_MAX_FRAMES, INITIAL_WAIT_MIN_FRAMES};
@@ -47,7 +48,7 @@ pub enum SpawnMode {
     /// Clone an existing entity (copies all attributes including AI config)
     Clone { source_entity_id: EntityId },
     /// Create from an entity definition
-    FromDefinition { definition_name: String },
+    FromDefinition { definition_name: EntityDefName },
 }
 
 /// Runtime AI state for an entity.

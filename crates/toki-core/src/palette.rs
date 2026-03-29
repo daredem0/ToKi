@@ -125,7 +125,13 @@ pub fn resolve_palette(
 }
 
 pub fn load_palette_asset_from_path(path: &Path) -> Result<Palette4, CoreError> {
-    let content = fs::read_to_string(path)?;
+    let content = crate::io::text::read_text_file_with_limit(
+        path,
+        crate::io::text::DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            crate::io::text::too_large_io_error(path, size_bytes, max_bytes, "palette file")
+        },
+    )?;
     serde_json::from_str::<PaletteAssetFile>(&content).map_err(Into::into)
 }
 

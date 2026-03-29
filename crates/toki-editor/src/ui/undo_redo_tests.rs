@@ -3,28 +3,19 @@ use crate::project::{Project, SceneGraphLayout};
 use crate::ui::inspector::build_delete_scene_command;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
-use glam::{IVec2, UVec2};
+use glam::IVec2;
 use tempfile::tempdir;
-use toki_core::entity::{Entity, EntityAttributes, EntityKind};
+use toki_core::entity::{Entity, EntityAttributes};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
+use toki_test_fixtures::test_npc_entity;
 
 fn sample_entity(id: u32, position: IVec2) -> Entity {
-    Entity {
-        id,
-        position,
-        size: UVec2::new(16, 16),
-        entity_kind: EntityKind::Npc,
-        category: "creature".to_string(),
-        definition_name: Some("npc".to_string().into()),
-        persistent_across_saves: false,
-        control_role: toki_core::entity::ControlRole::None,
-        audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
-        collision_box: None,
-        movement_accumulator: glam::Vec2::ZERO,
-        tags: Vec::new(),
-    }
+    let mut entity = test_npc_entity(id);
+    entity.position = position;
+    entity.definition_name = Some("npc".to_string().into());
+    entity.attributes = EntityAttributes::default();
+    entity
 }
 
 fn sample_rule_set() -> RuleSet {
@@ -284,8 +275,7 @@ fn generic_history_pushes_trims_and_clears_redo() {
     history.push(3);
 
     assert_eq!(history.undo_len(), 2);
-    assert_eq!(history.take_undo(), Some(3));
-    history.restore_redo(3);
+    assert_eq!(history.undo_entry(), Some(3));
     assert_eq!(history.redo_len(), 1);
 
     history.push(4);

@@ -9,6 +9,29 @@ use toki_runtime::{
     RuntimeDisplayOptions, RuntimeLaunchOptions,
 };
 
+const MAX_RUNTIME_CONFIG_FILE_SIZE: u64 = 256 * 1024;
+const MAX_PROJECT_RUNTIME_FILE_SIZE: u64 = 1024 * 1024;
+
+fn read_text_file_with_limit(
+    path: &std::path::Path,
+    max_bytes: u64,
+    context: &str,
+) -> std::io::Result<String> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > max_bytes {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "{context} is too large to load safely: {} ({} bytes, max {})",
+                path.display(),
+                metadata.len(),
+                max_bytes
+            ),
+        ));
+    }
+    std::fs::read_to_string(path)
+}
+
 fn main() -> Result<()> {
     let mut env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
@@ -266,7 +289,7 @@ fn load_runtime_config_from_candidates(
         if !path.exists() {
             continue;
         }
-        match std::fs::read_to_string(path) {
+        match read_text_file_with_limit(path, MAX_RUNTIME_CONFIG_FILE_SIZE, "runtime config") {
             Ok(content) => match serde_json::from_str::<RuntimeConfigFile>(&content) {
                 Ok(config) => {
                     let dir = path.parent().map(std::path::Path::to_path_buf)?;
@@ -331,7 +354,11 @@ fn apply_project_runtime_settings_from_project_file_if_present(
         return launch_options;
     };
     let project_file = project_path.join("project.toml");
-    let Ok(content) = std::fs::read_to_string(&project_file) else {
+    let Ok(content) = read_text_file_with_limit(
+        &project_file,
+        MAX_PROJECT_RUNTIME_FILE_SIZE,
+        "project runtime settings",
+    ) else {
         return launch_options;
     };
     let Ok(metadata) = toml::from_str::<ProjectRuntimeMetadata>(&content) else {

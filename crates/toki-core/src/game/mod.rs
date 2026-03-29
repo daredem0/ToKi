@@ -5,13 +5,14 @@ use serde::{Deserialize, Serialize};
 use crate::ai::AiSystem;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
+use crate::entity::{EntityDefinition, EntityId, EntityManager};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::flags::{FlagValue, GameFlags};
 use crate::ids::EntityDefName;
 use crate::project_runtime::ProjectFlagDefinition;
 use crate::rules::RuleSet;
 use crate::scene_manager::SceneManager;
+use crate::SceneId;
 
 mod ai_runtime;
 mod animation;
@@ -46,8 +47,7 @@ pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,
 };
-pub use scene::RestoreError;
-pub use scene::SceneSystem;
+pub use scene::{RestoreError, SceneLoadError, SceneSystem};
 pub(crate) use world_context::WorldContext;
 
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
@@ -113,8 +113,6 @@ pub struct WorldState {
     entity_manager: EntityManager,
     #[serde(default)]
     entity_definitions: HashMap<EntityDefName, EntityDefinition>,
-    #[serde(default)]
-    player_id: Option<EntityId>,
 }
 
 impl WorldState {
@@ -135,7 +133,7 @@ impl WorldState {
     }
 
     pub fn player_id(&self) -> Option<EntityId> {
-        self.player_id
+        self.entity_manager.get_player_id()
     }
 
     pub fn insert_entity_definition(&mut self, definition: EntityDefinition) {
@@ -151,7 +149,7 @@ pub struct SceneState {
     #[serde(default)]
     active_rules: RuleSet,
     #[serde(skip, default)]
-    persistent_scene_entities: HashSet<(String, crate::entity::EntityId)>,
+    persistent_scene_entities: HashSet<(SceneId, crate::entity::EntityId)>,
 }
 
 impl SceneState {
@@ -171,7 +169,7 @@ impl SceneState {
         &mut self.active_rules
     }
 
-    pub fn persistent_scene_entities(&self) -> &HashSet<(String, crate::entity::EntityId)> {
+    pub fn persistent_scene_entities(&self) -> &HashSet<(SceneId, crate::entity::EntityId)> {
         &self.persistent_scene_entities
     }
 }
@@ -182,6 +180,8 @@ pub struct ProgressState {
     game_flags: GameFlags,
     #[serde(default)]
     play_time_ms: u64,
+    #[serde(skip, default)]
+    play_time_remainder_ms: f32,
 }
 
 impl ProgressState {
@@ -334,7 +334,7 @@ impl GameState {
         }
     }
 
-    pub fn persistent_scene_entity_keys(&self) -> Vec<(String, crate::entity::EntityId)> {
+    pub fn persistent_scene_entity_keys(&self) -> Vec<(SceneId, crate::entity::EntityId)> {
         let mut keys = self
             .scene
             .persistent_scene_entities
@@ -343,10 +343,6 @@ impl GameState {
             .collect::<Vec<_>>();
         keys.sort();
         keys
-    }
-
-    fn effective_movement_profile(entity: &Entity) -> MovementProfile {
-        entity.effective_movement_profile()
     }
 
     /// Helper to update player animation based on movement intent.
@@ -394,7 +390,7 @@ impl GameState {
     ) {
         let ai_updates = self.runtime.ai.system.update(
             &self.world.entity_manager,
-            self.world.player_id,
+            self.world.player_id(),
             world.bounds,
             world.tilemap,
             world.atlas,

@@ -1,3 +1,4 @@
+use crate::io::{read_text_file_with_limit, DEFAULT_TEXT_FILE_SIZE_LIMIT};
 use crate::rule_graph::RuleGraph;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -197,9 +198,8 @@ impl Project {
     /// Load project metadata from project.toml
     pub fn load_metadata(&mut self) -> Result<()> {
         let project_file = self.project_file_path();
-        let toml_content = std::fs::read_to_string(&project_file).map_err(|e| {
-            anyhow::anyhow!("Failed to read project file {:?}: {}", project_file, e)
-        })?;
+        let toml_content =
+            read_text_file_with_limit(&project_file, DEFAULT_TEXT_FILE_SIZE_LIMIT, "project file")?;
 
         self.metadata = toml::from_str(&toml_content)
             .map_err(|e| anyhow::anyhow!("Failed to parse project file: {}", e))?;

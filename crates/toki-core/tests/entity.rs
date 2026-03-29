@@ -553,6 +553,37 @@ fn test_multiple_players_not_allowed() {
 }
 
 #[test]
+fn clone_entity_preserves_indices_and_sparse_components() {
+    let mut manager = EntityManager::new();
+    let source_id = manager.spawn_player(IVec2::new(8, 12));
+    manager.storage_mut().components_mut().set_pickup(
+        source_id,
+        Some(PickupDef {
+            item_id: "coin".to_string(),
+            count: 2,
+        }),
+    );
+
+    let cloned_id = manager
+        .clone_entity(source_id, IVec2::new(40, 60))
+        .expect("clone should succeed");
+
+    assert_eq!(manager.get_player_id(), Some(source_id));
+    assert!(manager
+        .entities_of_kind(&EntityKind::Player)
+        .contains(&cloned_id));
+    assert_eq!(
+        manager
+            .storage()
+            .components()
+            .pickup(cloned_id)
+            .expect("clone pickup should exist")
+            .item_id,
+        "coin"
+    );
+}
+
+#[test]
 fn test_entity_position_and_size() {
     let mut manager = EntityManager::new();
 
@@ -582,7 +613,7 @@ fn test_spawn_from_definition_sets_definition_name_without_assigning_player_role
 
     let entity = manager.get_entity(entity_id).expect("entity should exist");
     assert_eq!(entity.definition_name.as_deref(), Some("player"));
-    assert_eq!(entity.entity_kind, EntityKind::Npc);
+    assert_eq!(entity.entity_kind, EntityKind::Player);
     assert_eq!(entity.position, IVec2::new(12, 34));
     assert_eq!(entity.effective_control_role(), ControlRole::None);
     assert_eq!(manager.get_player_id(), None);

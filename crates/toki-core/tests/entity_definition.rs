@@ -89,7 +89,7 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.position, position);
     assert_eq!(entity.size.x, 16);
     assert_eq!(entity.size.y, 16);
-    assert_eq!(entity.entity_kind, EntityKind::Npc);
+    assert_eq!(entity.entity_kind, EntityKind::Player);
     assert_eq!(entity.category, "human");
     assert_eq!(entity.control_role, ControlRole::LegacyDefault);
     assert_eq!(entity.effective_control_role(), ControlRole::None);

@@ -239,8 +239,9 @@ fn test_resource_manager_invalid_tilemap_validation() {
     assert!(result.is_err());
 
     match result.unwrap_err() {
-        ResourceError::Validation(msg) => {
-            assert!(msg.contains("Tilemap validation failed"));
+        ResourceError::TilemapValidation { path, source } => {
+            assert!(path.contains("test_map.json"));
+            assert!(format!("{source}").contains("Map size mismatch"));
         }
         _ => panic!("Expected validation error"),
     }
@@ -248,21 +249,16 @@ fn test_resource_manager_invalid_tilemap_validation() {
 
 #[test]
 fn test_resource_error_display() {
-    let io_error = ResourceError::Io(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "File not found",
-    ));
-    assert!(format!("{}", io_error).contains("IO error"));
-
-    let json_error: Result<serde_json::Value, _> = serde_json::from_str("invalid json");
-    let json_error = ResourceError::Json(json_error.unwrap_err());
-    assert!(format!("{}", json_error).contains("JSON parsing error"));
-
-    let validation_error = ResourceError::Validation("Test validation error".to_string());
-    assert_eq!(
-        format!("{}", validation_error),
-        "Asset validation error: Test validation error"
-    );
+    let validation_error = ResourceError::TilemapValidation {
+        path: "maps/test_map.json".to_string(),
+        source: toki_core::CoreError::InvalidMapSize {
+            expected: 4,
+            actual: 2,
+        },
+    };
+    let validation_display = format!("{}", validation_error);
+    assert!(validation_display.contains("Tilemap validation failed"));
+    assert!(validation_display.contains("maps/test_map.json"));
 
     let atlas_error = ResourceError::AtlasLoad {
         path: "terrain.json".to_string(),

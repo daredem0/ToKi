@@ -142,6 +142,7 @@ impl EditorApp {
         }
 
         build_game_state_from_scene(scene.clone(), entity_definitions)
+            .map_err(|error| error.to_string())
     }
 
     pub(super) fn load_scene_into_gamestate(

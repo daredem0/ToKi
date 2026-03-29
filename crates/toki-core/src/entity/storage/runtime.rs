@@ -1,4 +1,4 @@
-use super::{OptionalComponentRegistry, OptionalEntityComponents};
+use super::{EntitySpawnBundle, OptionalComponentRegistry, OptionalEntityComponents};
 use crate::entity::{Entity, EntityAudioComponent, EntityAudioSettings, EntityId, StoredEntity};
 use std::collections::HashMap;
 
@@ -70,22 +70,25 @@ impl EntityStorage {
             .map(|entity| StoredEntity::new(entity, self.components.optional_components(id)))
     }
 
-    pub fn clone_entity(
+    pub fn clone_spawn_bundle(
         &mut self,
         source_id: EntityId,
         new_id: EntityId,
         position: glam::IVec2,
-    ) -> Option<EntityId> {
+    ) -> Option<EntitySpawnBundle> {
         let source = self.entities.get(&source_id)?;
         let mut cloned = source.clone();
         cloned.id = new_id;
         cloned.position = position;
-        self.insert_spawn_bundle(
-            cloned,
-            source.audio.to_component(),
-            self.components.optional_components(source_id),
-        );
-        Some(new_id)
+        Some(EntitySpawnBundle {
+            entity: cloned,
+            audio_component: self
+                .audio_components
+                .get(&source_id)
+                .cloned()
+                .unwrap_or_else(|| source.audio.to_component()),
+            optional_components: self.components.optional_components(source_id),
+        })
     }
 
     pub fn audio_component(&self, id: EntityId) -> Option<&EntityAudioComponent> {
@@ -155,7 +158,14 @@ mod tests {
                 ..OptionalEntityComponents::default()
             },
         );
-        storage.clone_entity(1, 2, IVec2::new(9, 9));
+        let bundle = storage
+            .clone_spawn_bundle(1, 2, IVec2::new(9, 9))
+            .expect("clone bundle should exist");
+        storage.insert_spawn_bundle(
+            bundle.entity,
+            bundle.audio_component,
+            bundle.optional_components,
+        );
         assert!(storage.components().pickup(2).is_some());
         storage.remove_entity(1);
         assert!(storage.components().pickup(1).is_none());

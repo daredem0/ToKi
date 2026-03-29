@@ -1,10 +1,24 @@
 use std::collections::HashMap;
 
 use crate::ai::{AiSystem, AiUpdateResult, SpawnMode};
-use crate::entity::{EntityDefinition, EntityId, EntityManager};
+use crate::entity::{EntityDefinition, EntityDefinitionError, EntityId, EntityManager};
 use crate::ids::EntityDefName;
 
 use super::GameState;
+
+#[derive(Debug, thiserror::Error)]
+enum AiRuntimeError {
+    #[error("source entity {source_entity_id} not found")]
+    MissingSourceEntity { source_entity_id: EntityId },
+    #[error("entity definition '{definition_name}' not found")]
+    MissingEntityDefinition { definition_name: EntityDefName },
+    #[error("failed to create entity from definition '{definition_name}': {source}")]
+    SpawnFromDefinition {
+        definition_name: EntityDefName,
+        #[source]
+        source: EntityDefinitionError,
+    },
+}
 
 pub(super) struct AiRuntimeApplier<'a> {
     entity_manager: &'a mut EntityManager,
@@ -47,7 +61,9 @@ impl<'a> AiRuntimeApplier<'a> {
                 SpawnMode::Clone { source_entity_id } => self
                     .entity_manager
                     .clone_entity(*source_entity_id, spawn_request.position)
-                    .ok_or_else(|| format!("Source entity {} not found", source_entity_id)),
+                    .ok_or(AiRuntimeError::MissingSourceEntity {
+                        source_entity_id: *source_entity_id,
+                    }),
                 SpawnMode::FromDefinition { definition_name } => {
                     self.spawn_entity_from_definition_name(definition_name, spawn_request.position)
                 }
@@ -85,18 +101,23 @@ impl<'a> AiRuntimeApplier<'a> {
 
     fn spawn_entity_from_definition_name(
         &mut self,
-        definition_name: &str,
+        definition_name: &EntityDefName,
         position: glam::IVec2,
-    ) -> Result<EntityId, String> {
+    ) -> Result<EntityId, AiRuntimeError> {
         let definition = self
             .entity_definitions
             .get(definition_name)
-            .ok_or_else(|| format!("Entity definition '{}' not found", definition_name))?
+            .ok_or_else(|| AiRuntimeError::MissingEntityDefinition {
+                definition_name: definition_name.clone(),
+            })?
             .clone();
 
         self.entity_manager
             .spawn_from_definition(&definition, position)
-            .map_err(|error| error.to_string())
+            .map_err(|source| AiRuntimeError::SpawnFromDefinition {
+                definition_name: definition_name.clone(),
+                source,
+            })
     }
 }
 
@@ -188,7 +209,7 @@ mod tests {
                 parent_entity_ids: vec![7, 8],
                 separation_distance: 24.0,
                 mode: SpawnMode::FromDefinition {
-                    definition_name: "slime".to_string(),
+                    definition_name: "slime".into(),
                 },
             }),
         }]);

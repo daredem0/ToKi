@@ -1,10 +1,12 @@
 use crate::assets::atlas::AtlasMeta;
 use crate::entity::{EntityFootprint, EntityGrounding};
 use crate::graphics::vertex::QuadVertex;
+use crate::io::text::{
+    read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
+};
 use crate::CoreError;
 use glam::UVec2;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -65,7 +67,13 @@ impl MapObjectInstance {
 
 impl TileMap {
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, CoreError> {
-        let content = fs::read_to_string(path)?;
+        let content = read_text_file_with_limit(
+            path.as_ref(),
+            DEFAULT_TEXT_FILE_SIZE_LIMIT,
+            |path, size_bytes, max_bytes| {
+                too_large_io_error(path, size_bytes, max_bytes, "tilemap file")
+            },
+        )?;
         let map = serde_json::from_str::<TileMap>(&content)?;
         Ok(map)
     }

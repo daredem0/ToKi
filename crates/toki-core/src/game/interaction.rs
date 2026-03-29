@@ -25,7 +25,7 @@ impl GameState {
         }
 
         // Get the player
-        let Some(player_id) = self.world.player_id else {
+        let Some(player_id) = self.world.player_id() else {
             return;
         };
         let Some(player) = self.world.entity_manager.get_entity(player_id) else {

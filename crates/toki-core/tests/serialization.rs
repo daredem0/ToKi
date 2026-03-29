@@ -598,6 +598,19 @@ fn load_save_data_rejects_unsupported_version() {
 }
 
 #[test]
+fn load_save_data_accepts_min_supported_version() {
+    let game_state = create_save_test_state();
+    let temp_file = NamedTempFile::new().unwrap();
+
+    let mut save_data = SaveData::capture(&game_state, 1).unwrap();
+    save_data.version = MIN_SUPPORTED_SAVE_DATA_VERSION;
+    save_save_data(&save_data, temp_file.path()).unwrap();
+
+    let loaded = load_save_data(temp_file.path()).expect("min supported version should load");
+    assert_eq!(loaded.version, MIN_SUPPORTED_SAVE_DATA_VERSION);
+}
+
+#[test]
 fn load_save_data_rejects_oversized_files() {
     let temp_file = NamedTempFile::new().unwrap();
     std::fs::write(
