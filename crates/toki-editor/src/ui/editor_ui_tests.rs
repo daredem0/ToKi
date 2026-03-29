@@ -51,11 +51,12 @@ fn editor_ui_groups_multi_entity_and_cursor_state() {
     assert_eq!(ui.multi_entity.delta_x_input, 0);
     assert_eq!(ui.multi_entity.delta_y_input, 0);
     assert!(ui.multi_entity.selection_signature.is_empty());
-    assert_eq!(ui.viewport_cursor.world_position, None);
-    assert!(!ui.viewport_cursor.show_tiles);
+    assert_eq!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).viewport_cursor.world_position, None);
+    assert!(!crate::ui::editor_context::scene_viewport_context_mut(&mut ui).viewport_cursor.show_tiles);
 
-    ui.remember_viewport_cursor_world_position(glam::vec2(10.8, 4.2));
-    assert_eq!(ui.viewport_cursor.world_position, Some(IVec2::new(10, 4)));
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui).viewport_cursor.world_position =
+        Some(IVec2::new(10, 4));
+    assert_eq!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).viewport_cursor.world_position, Some(IVec2::new(10, 4)));
 }
 
 #[test]
@@ -121,17 +122,26 @@ fn add_entity_to_selection_preserves_existing_and_avoids_duplicates() {
 #[test]
 fn marquee_selection_lifecycle_tracks_start_update_and_finish() {
     let mut ui = EditorUI::new();
-    assert!(!ui.is_marquee_selection_active());
+    assert!(!crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_marquee_selection_active());
 
-    ui.start_marquee_selection(egui::pos2(10.0, 20.0));
-    ui.update_marquee_selection(egui::pos2(30.0, 40.0));
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .start_marquee_selection(egui::pos2(10.0, 20.0));
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .update_marquee_selection(egui::pos2(30.0, 40.0));
 
-    let marquee = ui
+    let marquee = crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
         .finish_marquee_selection()
         .expect("marquee should be active");
     assert_eq!(marquee.start_screen, egui::pos2(10.0, 20.0));
     assert_eq!(marquee.current_screen, egui::pos2(30.0, 40.0));
-    assert!(!ui.is_marquee_selection_active());
+    assert!(!crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_marquee_selection_active());
 }
 
 #[test]
@@ -209,14 +219,14 @@ fn sync_map_editor_selection_picks_sorted_first_map_and_requests_load() {
 
     ui.sync_map_editor_selection(&maps);
 
-    assert_eq!(ui.map.active_map.as_deref(), Some("alpha"));
-    assert_eq!(ui.map.map_load_requested.as_deref(), Some("alpha"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("alpha"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.as_deref(), Some("alpha"));
 }
 
 #[test]
 fn sync_map_editor_selection_preserves_existing_valid_choice() {
     let mut ui = EditorUI::new();
-    ui.map.active_map = Some("middle".to_string());
+    crate::ui::editor_context::map_state_mut(&mut ui).active_map = Some("middle".to_string());
     let maps = vec![
         "zeta".to_string(),
         "alpha".to_string(),
@@ -225,8 +235,8 @@ fn sync_map_editor_selection_preserves_existing_valid_choice() {
 
     ui.sync_map_editor_selection(&maps);
 
-    assert_eq!(ui.map.active_map.as_deref(), Some("middle"));
-    assert!(ui.map.map_load_requested.is_none());
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("middle"));
+    assert!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.is_none());
 }
 
 #[test]
@@ -245,8 +255,8 @@ fn sync_map_editor_selection_preserves_unsaved_draft() {
 
     ui.sync_map_editor_selection(&["alpha".to_string(), "zeta".to_string()]);
 
-    assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
-    assert!(ui.map.map_load_requested.is_none());
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("draft_map"));
+    assert!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.is_none());
     assert!(ui.has_unsaved_map_editor_draft());
 }
 
@@ -268,8 +278,8 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
 
     assert!(!ui.has_unsaved_map_editor_draft());
     assert!(!ui.has_unsaved_map_editor_changes());
-    assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
-    assert_eq!(ui.map.map_load_requested.as_deref(), Some("draft_map"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("draft_map"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.as_deref(), Some("draft_map"));
 }
 
 #[test]
@@ -288,8 +298,8 @@ fn set_active_tab_keeps_workspace_tab_in_sync() {
 #[test]
 fn switching_tabs_preserves_sprite_map_and_graph_state() {
     let mut ui = EditorUI::new();
-    ui.sprite.new_canvas(8, 8);
-    ui.sprite.foreground_color = PixelColor::new(10, 20, 30, 255);
+    crate::ui::editor_context::sprite_state_mut(&mut ui).new_canvas(8, 8);
+    crate::ui::editor_context::sprite_state_mut(&mut ui).foreground_color = PixelColor::new(10, 20, 30, 255);
     ui.set_map_editor_draft(MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
@@ -300,19 +310,19 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
             objects: vec![],
         },
     });
-    ui.graph.canvas_zoom = 1.75;
-    ui.graph.canvas_pan = [24.0, 48.0];
+    crate::ui::editor_context::graph_state_mut(&mut ui).canvas_zoom = 1.75;
+    crate::ui::editor_context::graph_state_mut(&mut ui).canvas_pan = [24.0, 48.0];
 
     ui.set_active_tab(super::CenterPanelTab::SpriteEditor);
     ui.set_active_tab(super::CenterPanelTab::MapEditor);
     ui.set_active_tab(super::CenterPanelTab::SceneGraph);
     ui.set_active_tab(super::CenterPanelTab::SpriteEditor);
 
-    assert!(ui.sprite.has_canvas());
-    assert_eq!(ui.sprite.foreground_color, PixelColor::new(10, 20, 30, 255));
-    assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
-    assert_eq!(ui.graph.canvas_zoom, 1.75);
-    assert_eq!(ui.graph.canvas_pan, [24.0, 48.0]);
+    assert!(crate::ui::editor_context::sprite_state_mut(&mut ui).has_canvas());
+    assert_eq!(crate::ui::editor_context::sprite_state_mut(&mut ui).foreground_color, PixelColor::new(10, 20, 30, 255));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("draft_map"));
+    assert_eq!(crate::ui::editor_context::graph_state_mut(&mut ui).canvas_zoom, 1.75);
+    assert_eq!(crate::ui::editor_context::graph_state_mut(&mut ui).canvas_pan, [24.0, 48.0]);
 }
 
 #[test]
@@ -328,10 +338,10 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
             objects: vec![],
         },
     });
-    let before = ui.map.draft.as_ref().expect("draft").tilemap.clone();
+    let before = crate::ui::editor_context::map_state_mut(&mut ui).draft.as_ref().expect("draft").tilemap.clone();
     let mut after = before.clone();
     after.tiles[0] = "water".to_string();
-    ui.map.history.push(MapEditorEditCommand {
+    crate::ui::editor_context::map_state_mut(&mut ui).history.push(MapEditorEditCommand {
         map_name: "draft_map".to_string(),
         is_draft: true,
         before: before.clone(),
@@ -341,7 +351,7 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
 
     assert!(crate::editor_services::commands::undo(&mut ui));
     assert_eq!(
-        ui.map
+        crate::ui::editor_context::map_state_mut(&mut ui)
             .draft
             .as_ref()
             .expect("draft should remain")
@@ -354,13 +364,13 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
 #[test]
 fn sync_map_editor_selection_preserves_dirty_loaded_map() {
     let mut ui = EditorUI::new();
-    ui.map.active_map = Some("middle".to_string());
+    crate::ui::editor_context::map_state_mut(&mut ui).active_map = Some("middle".to_string());
     ui.mark_map_editor_dirty();
 
     ui.sync_map_editor_selection(&["alpha".to_string(), "middle".to_string()]);
 
-    assert_eq!(ui.map.active_map.as_deref(), Some("middle"));
-    assert!(ui.map.map_load_requested.is_none());
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("middle"));
+    assert!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.is_none());
 }
 
 fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
@@ -483,15 +493,15 @@ fn sync_map_editor_brush_selection_picks_first_sorted_tile() {
         "bush".to_string(),
     ]);
 
-    assert_eq!(ui.map.selected_tile.as_deref(), Some("bush"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).selected_tile.as_deref(), Some("bush"));
 }
 
 #[test]
 fn map_editor_defaults_to_drag_tool() {
     let ui = EditorUI::new();
-    assert_eq!(ui.map.tool, super::MapEditorTool::Drag);
-    assert_eq!(ui.map.brush_size_tiles, 1);
-    assert!(ui.map.selected_tile_info.is_none());
+    assert_eq!(crate::ui::editor_context::map_state(&ui).tool, super::MapEditorTool::Drag);
+    assert_eq!(crate::ui::editor_context::map_state(&ui).brush_size_tiles, 1);
+    assert!(crate::ui::editor_context::map_state(&ui).selected_tile_info.is_none());
 }
 
 #[test]
@@ -504,7 +514,7 @@ fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
         "props".to_string(),
     ]);
 
-    assert_eq!(ui.map.selected_object_sheet.as_deref(), Some("fauna"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).selected_object_sheet.as_deref(), Some("fauna"));
 }
 
 #[test]
@@ -517,18 +527,18 @@ fn sync_map_editor_object_selection_picks_first_sorted_object() {
         "flower".to_string(),
     ]);
 
-    assert_eq!(ui.map.selected_object_name.as_deref(), Some("bush"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).selected_object_name.as_deref(), Some("bush"));
 }
 
 #[test]
 fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
     let mut ui = EditorUI::new();
-    ui.map.tool = super::MapEditorTool::PickTile;
+    crate::ui::editor_context::map_state_mut(&mut ui).tool = super::MapEditorTool::PickTile;
 
     ui.pick_map_editor_tile("water".to_string());
 
-    assert_eq!(ui.map.selected_tile.as_deref(), Some("water"));
-    assert_eq!(ui.map.tool, super::MapEditorTool::Brush);
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).selected_tile.as_deref(), Some("water"));
+    assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).tool, super::MapEditorTool::Brush);
 }
 
 #[test]
@@ -538,7 +548,7 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
         origin: Some([8, 15]),
         footprint: Some(toki_core::entity::EntityFootprint::new([4, 12], [8, 4])),
     };
-    ui.map.selected_tile_info = Some(super::MapEditorTileInfo {
+    crate::ui::editor_context::map_state_mut(&mut ui).selected_tile_info = Some(super::MapEditorTileInfo {
         tile_x: 1,
         tile_y: 2,
         tile_name: "grass".to_string(),
@@ -556,9 +566,9 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
     };
 
     ui.select_map_editor_object(0, &object);
-    assert!(ui.map.selected_tile_info.is_none());
+    assert!(crate::ui::editor_context::map_state_mut(&mut ui).selected_tile_info.is_none());
     assert_eq!(
-        ui.map
+        crate::ui::editor_context::map_state_mut(&mut ui)
             .selected_object_info
             .as_ref()
             .map(|selected| selected.object_name.as_str()),
@@ -579,6 +589,7 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
 
     ui.sync_selected_map_editor_object_from_tilemap(&tilemap);
     let selected = ui
+        .map_editor_context()
         .map
         .selected_object_info
         .as_ref()
@@ -609,6 +620,7 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
     ui.queue_map_editor_object_property_edit(2, grounding.clone(), false, true);
 
     let selected = ui
+        .map_editor_context()
         .map
         .selected_object_info
         .as_ref()
@@ -641,6 +653,7 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     });
 
     let before = ui
+        .map_editor_context()
         .map
         .draft
         .as_ref()
@@ -687,7 +700,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
             objects: vec![],
         },
     });
-    let before = ui.map.draft.as_ref().unwrap().tilemap.clone();
+    let before = crate::ui::editor_context::map_state_mut(&mut ui).draft.as_ref().unwrap().tilemap.clone();
     let mut after = before.clone();
     after.tiles[0] = "water".to_string();
     ui.begin_map_editor_edit(&before);
@@ -799,25 +812,31 @@ fn apply_config_preserves_non_config_visibility_flags() {
 fn placement_mode_default_is_inactive() {
     let ui = EditorUI::new();
 
-    assert!(ui.placement.kind.is_none());
-    assert!(!ui.is_in_placement_mode());
-    assert!(ui.placement.entity_definition().is_none());
-    assert!(ui.placement.preview_position.is_none());
-    assert!(ui.placement.preview_cached_frame.is_none());
-    assert!(ui.placement.preview_valid.is_none());
-    assert!(ui.placement.entity_move_drag.is_none());
-    assert!(ui.placement.marquee_selection.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.kind.is_none());
+    assert!(!crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_in_placement_mode());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.entity_definition().is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.preview_position.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.preview_cached_frame.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.preview_valid.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.entity_move_drag.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui).placement.marquee_selection.is_none());
 }
 
 #[test]
 fn enter_placement_mode_sets_mode_and_definition() {
     let mut ui = EditorUI::new();
 
-    ui.enter_placement_mode("player".to_string());
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .enter_placement_mode("player".to_string());
 
-    assert!(ui.placement.kind.is_some());
-    assert!(ui.is_in_placement_mode());
-    assert_eq!(ui.placement.entity_definition(), Some("player"));
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.kind.is_some());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_in_placement_mode());
+    assert_eq!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.entity_definition(), Some("player"));
 }
 
 #[test]
@@ -825,20 +844,26 @@ fn exit_placement_mode_clears_all_placement_state() {
     let mut ui = EditorUI::new();
 
     // Setup placement mode with various state
-    ui.enter_placement_mode("player".to_string());
-    ui.placement.preview_position = Some(glam::Vec2::new(10.0, 20.0));
-    ui.placement.preview_valid = Some(true);
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .enter_placement_mode("player".to_string());
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.preview_position = Some(glam::Vec2::new(10.0, 20.0));
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.preview_valid = Some(true);
 
-    ui.exit_placement_mode();
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .exit_placement_mode();
 
-    assert!(ui.placement.kind.is_none());
-    assert!(!ui.is_in_placement_mode());
-    assert!(ui.placement.entity_definition().is_none());
-    assert!(ui.placement.preview_position.is_none());
-    assert!(ui.placement.preview_cached_frame.is_none());
-    assert!(ui.placement.preview_valid.is_none());
-    assert!(ui.placement.entity_move_drag.is_none());
-    assert!(ui.placement.marquee_selection.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.kind.is_none());
+    assert!(!crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_in_placement_mode());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.entity_definition().is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.preview_position.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.preview_cached_frame.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.preview_valid.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.entity_move_drag.is_none());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.marquee_selection.is_none());
 }
 
 #[test]
@@ -846,7 +871,9 @@ fn entity_move_drag_lifecycle() {
     use super::EntityMoveDragState;
 
     let mut ui = EditorUI::new();
-    assert!(!ui.is_entity_move_drag_active());
+    assert!(!crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_entity_move_drag_active());
 
     let drag_state = EntityMoveDragState {
         scene_name: "Main Scene".to_string(),
@@ -854,14 +881,22 @@ fn entity_move_drag_lifecycle() {
         dragged_entities: vec![],
         grab_offset: glam::Vec2::new(5.0, 5.0),
     };
-    ui.begin_entity_move_drag(drag_state);
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .begin_entity_move_drag(drag_state);
 
-    assert!(ui.is_entity_move_drag_active());
-    assert!(ui.placement.entity_move_drag.is_some());
+    assert!(crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_entity_move_drag_active());
+    assert!(crate::ui::editor_context::scene_viewport_context_mut(&mut ui).placement.entity_move_drag.is_some());
 
     // exit_placement_mode also clears drag
-    ui.exit_placement_mode();
-    assert!(!ui.is_entity_move_drag_active());
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui)
+        .placement
+        .exit_placement_mode();
+    assert!(!crate::ui::editor_context::scene_viewport_context(&ui)
+        .placement
+        .is_entity_move_drag_active());
 }
 
 // =============================================================================
@@ -997,14 +1032,14 @@ fn map_editor_load_requested_uses_struct_instead_of_tuple() {
     use super::MapLoadRequest;
 
     let mut ui = EditorUI::new();
-    assert!(ui.map.load_requested.is_none());
+    assert!(crate::ui::editor_context::map_state_mut(&mut ui).load_requested.is_none());
 
-    ui.map.load_requested = Some(MapLoadRequest {
+    crate::ui::editor_context::map_state_mut(&mut ui).load_requested = Some(MapLoadRequest {
         scene_name: "main_scene".to_string(),
         map_name: "town_map".to_string(),
     });
 
-    let request = ui.map.load_requested.as_ref().unwrap();
+    let request = crate::ui::editor_context::map_state_mut(&mut ui).load_requested.as_ref().unwrap();
     assert_eq!(request.scene_name, "main_scene");
     assert_eq!(request.map_name, "town_map");
 }

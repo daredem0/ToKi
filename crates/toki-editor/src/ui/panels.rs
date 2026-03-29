@@ -264,7 +264,7 @@ impl PanelSystem {
     }
 
     fn paint_marquee_selection_overlay(ui: &egui::Ui, ui_state: &super::EditorUI) {
-        let Some(marquee) = ui_state.placement.marquee_selection.as_ref() else {
+        let Some(marquee) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.marquee_selection.as_ref() else {
             return;
         };
 

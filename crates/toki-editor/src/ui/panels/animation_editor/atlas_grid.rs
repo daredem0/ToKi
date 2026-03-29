@@ -15,17 +15,20 @@ struct AtlasGridGeometry {
 }
 
 pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let atlas_name = ui_state.animation.authoring.atlas_name.clone();
+    let atlas_name = crate::ui::editor_context::animation_state(ui_state)
+        .authoring
+        .atlas_name
+        .clone();
     if atlas_name.is_empty() {
         ui.label("No atlas selected. Select an atlas first.");
 
         // Atlas selector
         ui.horizontal(|ui| {
             ui.label("Atlas:");
-            let mut atlas = ui_state.animation.authoring.atlas_name.clone();
+            let mut atlas = crate::ui::editor_context::animation_state_mut(ui_state).authoring.atlas_name.clone();
             if ui.text_edit_singleline(&mut atlas).changed() {
-                ui_state.animation.authoring.atlas_name = atlas;
-                ui_state.animation.authoring.dirty = true;
+                crate::ui::editor_context::animation_state_mut(ui_state).authoring.atlas_name = atlas;
+                crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
             }
         });
         return;
@@ -34,17 +37,18 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     // Ensure atlas texture is loaded
     ensure_atlas_texture(ui_state, ctx);
 
-    let Some(texture) = &ui_state.animation.atlas_texture else {
+    let atlas_state = crate::ui::editor_context::animation_state(ui_state);
+    let Some(texture) = atlas_state.atlas_texture.clone() else {
         ui.label("Loading atlas...");
         return;
     };
 
-    let Some((cell_w, cell_h)) = ui_state.animation.atlas_cell_size else {
+    let Some((cell_w, cell_h)) = atlas_state.atlas_cell_size else {
         ui.label("Atlas metadata missing");
         return;
     };
 
-    let Some((img_w, img_h)) = ui_state.animation.atlas_image_size else {
+    let Some((img_w, img_h)) = atlas_state.atlas_image_size else {
         ui.label("Atlas image not loaded");
         return;
     };
@@ -52,19 +56,26 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     // Calculate grid dimensions
     let cols = img_w / cell_w;
     let rows = img_h / cell_h;
-    ui_state.animation.atlas_grid_size = Some((cols, rows));
-
-    let has_selected_clip = ui_state.animation.authoring.selected_clip_index.is_some();
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_grid_size = Some((cols, rows));
+    let has_selected_clip = crate::ui::editor_context::animation_state(ui_state)
+        .authoring
+        .selected_clip_index
+        .is_some();
 
     // Zoom controls
     ui.horizontal(|ui| {
         ui.label("Zoom:");
         if ui.button("-").clicked() {
-            ui_state.animation.atlas_viewport.zoom_out();
+            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_out();
         }
-        ui.label(format!("{:.1}x", ui_state.animation.atlas_viewport.zoom));
+        ui.label(format!(
+            "{:.1}x",
+            crate::ui::editor_context::animation_state(ui_state)
+                .atlas_viewport
+                .zoom
+        ));
         if ui.button("+").clicked() {
-            ui_state.animation.atlas_viewport.zoom_in();
+            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_in();
         }
         ui.separator();
         ui.label("Click cells to add frames to clip");
@@ -85,6 +96,7 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     {
         let delta = response.drag_delta();
         ui_state
+            .animation_editor_context_mut()
             .animation
             .atlas_viewport
             .pan_by(glam::Vec2::new(delta.x, delta.y));
@@ -95,38 +107,43 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
         if scroll_delta != 0.0 {
             if scroll_delta > 0.0 {
-                ui_state.animation.atlas_viewport.zoom_in();
+                crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_in();
             } else {
-                ui_state.animation.atlas_viewport.zoom_out();
+                crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_out();
             }
         }
 
         // Handle +/- keys for zoom
         if ui.input(|i| i.key_pressed(egui::Key::Plus) || i.key_pressed(egui::Key::Equals)) {
-            ui_state.animation.atlas_viewport.zoom_in();
+            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_in();
         }
         if ui.input(|i| i.key_pressed(egui::Key::Minus)) {
-            ui_state.animation.atlas_viewport.zoom_out();
+            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_out();
         }
     }
 
     // Update cursor position
     let cursor_canvas_pos = response.hover_pos().map(|hover_pos| {
         let canvas_pos = ui_state
+            .animation_editor_context()
             .animation
             .atlas_viewport
             .screen_to_canvas(glam::Vec2::new(hover_pos.x, hover_pos.y), rect);
         glam::IVec2::new(canvas_pos.x.floor() as i32, canvas_pos.y.floor() as i32)
     });
-    ui_state.animation.atlas_viewport.cursor_canvas_pos = cursor_canvas_pos;
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.cursor_canvas_pos = cursor_canvas_pos;
 
     // Draw background
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, egui::Color32::from_gray(40));
 
     // Draw atlas texture
-    let zoom = ui_state.animation.atlas_viewport.zoom;
-    let pan = ui_state.animation.atlas_viewport.pan;
+    let zoom = crate::ui::editor_context::animation_state(ui_state)
+        .atlas_viewport
+        .zoom;
+    let pan = crate::ui::editor_context::animation_state(ui_state)
+        .atlas_viewport
+        .pan;
 
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
     let canvas_screen_max = egui::pos2(
@@ -171,7 +188,7 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
 
     // Apply deferred add
     if let Some((col, row)) = add_frame {
-        ui_state.animation.authoring.add_frame_to_selected(col, row);
+        crate::ui::editor_context::animation_state_mut(ui_state).authoring.add_frame_to_selected(col, row);
     }
 
     // Draw canvas border
@@ -223,7 +240,10 @@ fn highlight_clip_frames(
     painter: &egui::Painter,
     geometry: &AtlasGridGeometry,
 ) {
-    if let Some(clip) = ui_state.animation.authoring.selected_clip() {
+    if let Some(clip) = crate::ui::editor_context::animation_state(ui_state)
+        .authoring
+        .selected_clip()
+    {
         for frame in &clip.frames {
             let col = frame.position[0];
             let row = frame.position[1];
@@ -295,28 +315,36 @@ fn handle_cell_interaction(
 
 /// Ensure the atlas texture is loaded
 fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let Some(png_path) = &ui_state.animation.atlas_texture_path else {
+    let atlas_state = crate::ui::editor_context::animation_state(ui_state);
+    let Some(png_path) = atlas_state.atlas_texture_path.clone() else {
         return;
     };
+    let atlas_color_mode = atlas_state.atlas_color_mode;
+    let atlas_palette_id = atlas_state.atlas_palette_id.clone();
+    let atlas_entity_palette_override = atlas_state.atlas_entity_palette_override.clone();
+    let atlas_default_palette = atlas_state.atlas_default_palette.clone();
+    let atlas_has_texture = atlas_state.atlas_texture.is_some();
+    let atlas_texture_cache_key = atlas_state.atlas_texture_cache_key.clone();
+    let available_palettes = ui_state.project.available_palettes.clone();
+    let indexed_palette_override = ui_state.project.indexed_palette_override.clone();
 
     let cache_key = texture_preview_cache_key(
-        png_path,
-        ui_state.animation.atlas_color_mode,
-        ui_state.animation.atlas_palette_id.as_deref(),
+        &png_path,
+        atlas_color_mode,
+        atlas_palette_id.as_deref(),
     );
-    if ui_state.animation.atlas_texture.is_some()
-        && ui_state.animation.atlas_texture_cache_key.as_deref() == Some(cache_key.as_str())
+    if atlas_has_texture && atlas_texture_cache_key.as_deref() == Some(cache_key.as_str())
     {
         return;
     }
 
     let Ok((decoded, palette_id)) = load_texture_preview_image(
-        png_path,
-        ui_state.animation.atlas_color_mode,
-        &ui_state.project.available_palettes,
-        ui_state.project.indexed_palette_override.as_deref(),
-        ui_state.animation.atlas_entity_palette_override.as_deref(),
-        ui_state.animation.atlas_default_palette.as_deref(),
+        &png_path,
+        atlas_color_mode,
+        &available_palettes,
+        indexed_palette_override.as_deref(),
+        atlas_entity_palette_override.as_deref(),
+        atlas_default_palette.as_deref(),
     ) else {
         tracing::error!(
             "Failed to load animation atlas preview image: {:?}",
@@ -325,10 +353,10 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         return;
     };
 
-    ui_state.animation.atlas_image_size = Some((decoded.width, decoded.height));
-    ui_state.animation.atlas_texture_cache_key = Some(texture_preview_cache_key(
-        png_path,
-        ui_state.animation.atlas_color_mode,
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_image_size = Some((decoded.width, decoded.height));
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_cache_key = Some(texture_preview_cache_key(
+        &png_path,
+        atlas_color_mode,
         palette_id.as_deref(),
     ));
 
@@ -342,7 +370,7 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         color_image,
         egui::TextureOptions::NEAREST,
     );
-    ui_state.animation.atlas_texture = Some(texture);
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture = Some(texture);
 
     tracing::info!("Loaded atlas texture: {}x{}", decoded.width, decoded.height);
 }

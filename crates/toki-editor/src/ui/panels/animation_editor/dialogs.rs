@@ -3,7 +3,9 @@
 use crate::ui::EditorUI;
 
 pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let available_states = ui_state.animation.authoring.available_states();
+    let available_states = crate::ui::editor_context::animation_state(ui_state)
+        .authoring
+        .available_states();
 
     egui::Window::new("New Animation Clip")
         .collapsible(false)
@@ -29,8 +31,8 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     });
 
                 if let Some(state) = created_state {
-                    ui_state.animation.authoring.create_clip(state);
-                    ui_state.animation.show_new_clip_dialog = false;
+                    crate::ui::editor_context::animation_state_mut(ui_state).authoring.create_clip(state);
+                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = false;
                 }
 
                 ui.separator();
@@ -39,28 +41,31 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
             // Custom state input
             ui.label("Or enter custom state name:");
             ui.horizontal(|ui| {
-                ui.text_edit_singleline(&mut ui_state.animation.new_clip_state_input);
-                let can_create = !ui_state.animation.new_clip_state_input.trim().is_empty()
-                    && !ui_state
-                        .animation
+                ui.text_edit_singleline(&mut crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input);
+                let new_clip_state_input = crate::ui::editor_context::animation_state(ui_state)
+                    .new_clip_state_input
+                    .trim()
+                    .to_string();
+                let can_create = !new_clip_state_input.is_empty()
+                    && !crate::ui::editor_context::animation_state(ui_state)
                         .authoring
-                        .has_clip_for_state(ui_state.animation.new_clip_state_input.trim());
+                        .has_clip_for_state(&new_clip_state_input);
 
                 if ui
                     .add_enabled(can_create, egui::Button::new("Create"))
                     .clicked()
                 {
-                    let state = ui_state.animation.new_clip_state_input.trim().to_string();
-                    ui_state.animation.authoring.create_clip(&state);
-                    ui_state.animation.new_clip_state_input.clear();
-                    ui_state.animation.show_new_clip_dialog = false;
+                    let state = crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input.trim().to_string();
+                    crate::ui::editor_context::animation_state_mut(ui_state).authoring.create_clip(&state);
+                    crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input.clear();
+                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = false;
                 }
             });
 
             ui.separator();
             if ui.button("Cancel").clicked() {
-                ui_state.animation.new_clip_state_input.clear();
-                ui_state.animation.show_new_clip_dialog = false;
+                crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input.clear();
+                crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = false;
             }
         });
 }

@@ -823,7 +823,7 @@ fn rename_flag_references(ui_state: &mut EditorUI, old_id: &str, new_id: &str) {
         }
     }
 
-    if let Some(dialog) = ui_state.dialog.draft.as_mut() {
+    if let Some(dialog) = crate::ui::editor_context::dialog_state_mut(ui_state).draft.as_mut() {
         for node in &mut dialog.nodes {
             rename_dialog_conditions(&mut node.conditions, old_id, new_id);
             match &mut node.kind {

@@ -13,14 +13,14 @@ impl InspectorSystem {
         ui.heading("Animation Editor");
         ui.separator();
 
-        if !ui_state.animation.has_entity() {
+        if !crate::ui::editor_context::animation_state_mut(ui_state).has_entity() {
             ui.label("No entity selected.");
             ui.label("Select an entity in the hierarchy to edit its animations.");
             return;
         }
 
         // Entity info
-        if let Some(name) = &ui_state.animation.active_entity {
+        if let Some(name) = &crate::ui::editor_context::animation_state_mut(ui_state).active_entity {
             ui.label(format!("Entity: {}", name));
         }
 
@@ -28,7 +28,7 @@ impl InspectorSystem {
 
         // Atlas info
         ui.label("Atlas:");
-        let atlas_name = &ui_state.animation.authoring.atlas_name;
+        let atlas_name = &crate::ui::editor_context::animation_state_mut(ui_state).authoring.atlas_name;
         if atlas_name.is_empty() {
             ui.label("(none selected)");
         } else {
@@ -42,22 +42,22 @@ impl InspectorSystem {
         ui.horizontal(|ui| {
             ui.label("Zoom:");
             ui.add(
-                egui::DragValue::new(&mut ui_state.animation.preview_zoom)
+                egui::DragValue::new(&mut crate::ui::editor_context::animation_state_mut(ui_state).preview_zoom)
                     .speed(0.1)
                     .range(0.5..=8.0)
                     .suffix("x"),
             );
         });
 
-        ui.checkbox(&mut ui_state.animation.show_grid, "Show Grid Overlay");
+        ui.checkbox(&mut crate::ui::editor_context::animation_state_mut(ui_state).show_grid, "Show Grid Overlay");
 
         ui.separator();
 
         // Playback info
         ui.label("Playback:");
-        ui.label(format!("Speed: {:.1}x", ui_state.animation.preview.speed()));
+        ui.label(format!("Speed: {:.1}x", crate::ui::editor_context::animation_state_mut(ui_state).preview.speed()));
 
-        if let Some(clip) = ui_state.animation.selected_clip() {
+        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).selected_clip() {
             ui.label(format!("Clip: {}", clip.state));
             ui.label(format!("Frames: {}", clip.frames.len()));
             ui.label(format!("Loop: {}", clip.loop_mode));

@@ -8,7 +8,7 @@ use super::io::{revert_entity, save_entity};
 pub fn render_save_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.separator();
 
-    let is_dirty = ui_state.entity_editor.is_dirty();
+    let is_dirty = crate::ui::editor_context::entity_editor_state(ui_state).is_dirty();
 
     ui.horizontal(|ui| {
         let save_enabled = is_dirty;
@@ -28,7 +28,7 @@ pub fn render_save_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     });
 
     // Show validation errors summary
-    if let Some(edit) = &ui_state.entity_editor.edit_state {
+    if let Some(edit) = &crate::ui::editor_context::entity_editor_state(ui_state).edit_state {
         if !edit.validation_errors.is_empty() {
             ui.colored_label(
                 egui::Color32::RED,

@@ -46,7 +46,7 @@ impl PanelSystem {
                 )
                 .clicked()
             {
-                ui_state.map.save_requested = true;
+                crate::ui::editor_context::map_state_mut(ui_state).save_requested = true;
             }
             ui.separator();
             ui.label("Map:");
@@ -62,11 +62,11 @@ impl PanelSystem {
                         }
                         for map_name in map_names {
                             let is_selected =
-                                ui_state.map.active_map.as_deref() == Some(map_name.as_str());
+                                crate::ui::editor_context::map_state_mut(ui_state).active_map.as_deref() == Some(map_name.as_str());
                             if ui.selectable_label(is_selected, map_name).clicked() && !is_selected
                             {
-                                ui_state.map.active_map = Some(map_name.clone());
-                                ui_state.map.map_load_requested = Some(map_name.clone());
+                                crate::ui::editor_context::map_state_mut(ui_state).active_map = Some(map_name.clone());
+                                crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = Some(map_name.clone());
                             }
                         }
                     }
@@ -74,15 +74,15 @@ impl PanelSystem {
 
             if ui_state.has_unsaved_map_editor_draft() {
                 ui.label("Unsaved draft");
-            } else if ui_state.map.dirty {
+            } else if crate::ui::editor_context::map_state_mut(ui_state).dirty {
                 ui.label("Unsaved changes");
-            } else if let Some(active_map) = ui_state.map.active_map.as_deref() {
+            } else if let Some(active_map) = crate::ui::editor_context::map_state_mut(ui_state).active_map.as_deref() {
                 ui.label(format!("Editing asset: {}", active_map));
             }
         });
         ui.horizontal(|ui| {
             ui.label("Tool:");
-            ui.label(match ui_state.map.tool {
+            ui.label(match crate::ui::editor_context::map_state_mut(ui_state).tool {
                 MapEditorTool::Drag => "Drag",
                 MapEditorTool::Brush => "Brush",
                 MapEditorTool::Fill => "Fill",
@@ -93,8 +93,8 @@ impl PanelSystem {
         });
         ui.separator();
 
-        if ui_state.map.show_new_map_dialog {
-            let mut open = ui_state.map.show_new_map_dialog;
+        if crate::ui::editor_context::map_state_mut(ui_state).show_new_map_dialog {
+            let mut open = crate::ui::editor_context::map_state_mut(ui_state).show_new_map_dialog;
             let mut create_clicked = false;
             let mut cancel_clicked = false;
             egui::Window::new("New Map")
@@ -103,18 +103,18 @@ impl PanelSystem {
                 .open(&mut open)
                 .show(ui.ctx(), |ui| {
                     ui.label("Name");
-                    ui.text_edit_singleline(&mut ui_state.map.new_map_name);
+                    ui.text_edit_singleline(&mut crate::ui::editor_context::map_state_mut(ui_state).new_map_name);
                     ui.separator();
                     ui.horizontal(|ui| {
                         ui.label("Map Size (tiles):");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state.map.new_map_width)
+                            egui::DragValue::new(&mut crate::ui::editor_context::map_state_mut(ui_state).new_map_width)
                                 .range(1..=512)
                                 .speed(1),
                         );
                         ui.label("×");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state.map.new_map_height)
+                            egui::DragValue::new(&mut crate::ui::editor_context::map_state_mut(ui_state).new_map_height)
                                 .range(1..=512)
                                 .speed(1),
                         );
@@ -122,13 +122,13 @@ impl PanelSystem {
                     ui.horizontal(|ui| {
                         ui.label("Tile Size (px):");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state.map.new_map_tile_width)
+                            egui::DragValue::new(&mut crate::ui::editor_context::map_state_mut(ui_state).new_map_tile_width)
                                 .range(1..=256)
                                 .speed(1),
                         );
                         ui.label("×");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state.map.new_map_tile_height)
+                            egui::DragValue::new(&mut crate::ui::editor_context::map_state_mut(ui_state).new_map_tile_height)
                                 .range(1..=256)
                                 .speed(1),
                         );
@@ -151,7 +151,7 @@ impl PanelSystem {
             if cancel_clicked {
                 open = false;
             }
-            ui_state.map.show_new_map_dialog = open;
+            crate::ui::editor_context::map_state_mut(ui_state).show_new_map_dialog = open;
         }
 
         let Some(viewport) = map_editor_viewport else {
@@ -195,7 +195,7 @@ impl PanelSystem {
         );
         let display_rect = viewport_ctx.display_rect();
 
-        match ui_state.map.tool {
+        match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
                 ui_state.cancel_map_editor_edit();
                 if response.drag_started() {
@@ -287,7 +287,7 @@ impl PanelSystem {
             );
         }
 
-        match ui_state.map.tool {
+        match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
                 if response.clicked() {
                     if let Some(selected_object_index) =
@@ -307,7 +307,7 @@ impl PanelSystem {
                             display_rect,
                             project_path,
                         ) {
-                            ui_state.map.selected_tile_info = tile_info;
+                            crate::ui::editor_context::map_state_mut(ui_state).selected_tile_info = tile_info;
                         }
                     } else {
                         ui_state.clear_map_editor_object_selection();
@@ -323,7 +323,8 @@ impl PanelSystem {
                         ui_state.cancel_map_editor_edit();
                     }
                 }
-                if let Some(selected_tile) = ui_state.map.selected_tile.clone() {
+                if let Some(selected_tile) = crate::ui::editor_context::map_state_mut(ui_state).selected_tile.clone() {
+                    let brush_size_tiles = crate::ui::editor_context::map_state(ui_state).brush_size_tiles;
                     if Self::handle_map_editor_brush_paint(
                         ui,
                         ui_state,
@@ -331,14 +332,14 @@ impl PanelSystem {
                         &response,
                         display_rect,
                         &selected_tile,
-                        ui_state.map.brush_size_tiles,
+                        brush_size_tiles,
                     ) {
                         ui_state.mark_map_editor_dirty();
                     }
                 }
             }
             MapEditorTool::Fill => {
-                if let Some(selected_tile) = ui_state.map.selected_tile.clone() {
+                if let Some(selected_tile) = crate::ui::editor_context::map_state_mut(ui_state).selected_tile.clone() {
                     if Self::handle_map_editor_fill_paint(
                         ui,
                         ui_state,

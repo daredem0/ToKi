@@ -55,7 +55,7 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         .show(ui, |ui| {
             for row in TOOL_ROWS {
                 for &(tool, label) in *row {
-                    ui.selectable_value(&mut ui_state.sprite.tool, tool, label);
+                    ui.selectable_value(&mut crate::ui::editor_context::sprite_state_mut(ui_state).tool, tool, label);
                 }
                 for _ in row.len()..3 {
                     ui.label("");
@@ -68,7 +68,7 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     use super::super::editor_ui::SpriteEditorTool;
 
-    match ui_state.sprite.tool {
+    match crate::ui::editor_context::sprite_state_mut(ui_state).tool {
         SpriteEditorTool::Drag => {
             ui.label("Primary drag pans the canvas.");
         }
@@ -111,18 +111,18 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         SpriteEditorTool::Rectangle => {
             ui.label("Click and drag to draw a rectangle.");
             render_brush_size(ui, ui_state);
-            ui.checkbox(&mut ui_state.sprite.shape_filled, "Filled");
+            ui.checkbox(&mut crate::ui::editor_context::sprite_state_mut(ui_state).shape_filled, "Filled");
         }
         SpriteEditorTool::Ellipse => {
             ui.label("Click and drag to draw an ellipse.");
             render_brush_size(ui, ui_state);
-            ui.checkbox(&mut ui_state.sprite.shape_filled, "Filled");
+            ui.checkbox(&mut crate::ui::editor_context::sprite_state_mut(ui_state).shape_filled, "Filled");
         }
     }
 
     // Symmetry controls for painting tools
     if matches!(
-        ui_state.sprite.tool,
+        crate::ui::editor_context::sprite_state_mut(ui_state).tool,
         SpriteEditorTool::Brush
             | SpriteEditorTool::Eraser
             | SpriteEditorTool::Line
@@ -132,11 +132,11 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.separator();
         ui.label("Symmetry:");
         ui.horizontal(|ui| {
-            ui.toggle_value(&mut ui_state.sprite.symmetry_horizontal, "Horizontal");
-            ui.toggle_value(&mut ui_state.sprite.symmetry_vertical, "Vertical");
+            ui.toggle_value(&mut crate::ui::editor_context::sprite_state_mut(ui_state).symmetry_horizontal, "Horizontal");
+            ui.toggle_value(&mut crate::ui::editor_context::sprite_state_mut(ui_state).symmetry_vertical, "Vertical");
         });
-        if ui_state.sprite.is_sheet() {
-            ui.checkbox(&mut ui_state.sprite.symmetry_per_tile, "Per tile");
+        if crate::ui::editor_context::sprite_state_mut(ui_state).is_sheet() {
+            ui.checkbox(&mut crate::ui::editor_context::sprite_state_mut(ui_state).symmetry_per_tile, "Per tile");
         }
     }
 
@@ -150,49 +150,51 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     render_viewport_controls(ui, ui_state);
 
     // Save controls
-    if ui_state.sprite.has_canvas() {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
         ui.separator();
         render_save_controls(ui, ui_state);
     }
 
-    if ui_state.sprite.active().dirty {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).active().dirty {
         ui.separator();
         ui.label("Canvas has unsaved changes.");
     }
 }
 
 fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let previous_mode = ui_state.sprite.color_mode;
+    let previous_mode = crate::ui::editor_context::sprite_state_mut(ui_state).color_mode;
     ui.label("Color Mode:");
     egui::ComboBox::from_id_salt("sprite_editor_color_mode")
-        .selected_text(match ui_state.sprite.color_mode {
+        .selected_text(match crate::ui::editor_context::sprite_state_mut(ui_state).color_mode {
             ColorMode::TrueColor => "TrueColor",
             ColorMode::PaletteIndexed => "PaletteIndexed",
         })
         .show_ui(ui, |ui| {
             ui.selectable_value(
-                &mut ui_state.sprite.color_mode,
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).color_mode,
                 ColorMode::TrueColor,
                 "TrueColor",
             );
             ui.selectable_value(
-                &mut ui_state.sprite.color_mode,
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).color_mode,
                 ColorMode::PaletteIndexed,
                 "PaletteIndexed",
             );
         });
 
-    if previous_mode != ui_state.sprite.color_mode {
-        if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
+    if previous_mode != crate::ui::editor_context::sprite_state_mut(ui_state).color_mode {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode == ColorMode::PaletteIndexed {
             ensure_valid_indexed_foreground_color(ui_state);
         }
-        ui_state.sprite.invalidate_all_canvas_textures();
+        crate::ui::editor_context::sprite_state_mut(ui_state).invalidate_all_canvas_textures();
     }
 
-    if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode == ColorMode::PaletteIndexed {
+        let available_palettes = ui_state.project.available_palettes.clone();
         ui_state
+            .sprite_editor_context_mut()
             .sprite
-            .sync_palette_selection(&ui_state.project.available_palettes);
+            .sync_palette_selection(&available_palettes);
         let palette_ids = ui_state
             .project
             .available_palettes
@@ -200,13 +202,14 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             .cloned()
             .collect::<Vec<_>>();
 
-        let previous_palette_id = ui_state.sprite.selected_palette_id.clone();
+        let previous_palette_id = crate::ui::editor_context::sprite_state_mut(ui_state).selected_palette_id.clone();
 
         ui.horizontal(|ui| {
             ui.label("Palette:");
             egui::ComboBox::from_id_salt("sprite_editor_palette_id")
                 .selected_text(
                     ui_state
+                        .sprite_editor_context()
                         .sprite
                         .selected_palette_id
                         .as_deref()
@@ -215,7 +218,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 .show_ui(ui, |ui| {
                     for palette_id in &palette_ids {
                         ui.selectable_value(
-                            &mut ui_state.sprite.selected_palette_id,
+                            &mut crate::ui::editor_context::sprite_state_mut(ui_state).selected_palette_id,
                             Some(palette_id.clone()),
                             palette_id,
                         );
@@ -224,12 +227,13 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         });
 
         ensure_valid_indexed_foreground_color(ui_state);
-        if previous_palette_id != ui_state.sprite.selected_palette_id {
-            ui_state.sprite.invalidate_all_canvas_textures();
+        if previous_palette_id != crate::ui::editor_context::sprite_state_mut(ui_state).selected_palette_id {
+            crate::ui::editor_context::sprite_state_mut(ui_state).invalidate_all_canvas_textures();
         }
 
-        if ui_state.sprite.has_canvas() {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
             let can_convert = ui_state
+                .sprite_editor_context()
                 .sprite
                 .selected_palette_id
                 .as_ref()
@@ -242,13 +246,14 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 );
             if response.clicked() {
                 if let Some(palette) = ui_state
+                    .sprite_editor_context()
                     .sprite
                     .selected_palette_id
                     .as_ref()
                     .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
                     .copied()
                 {
-                    ui_state.sprite.convert_active_canvas_to_palette(palette);
+                    crate::ui::editor_context::sprite_state_mut(ui_state).convert_active_canvas_to_palette(palette);
                 }
             }
         }
@@ -258,18 +263,18 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 fn render_save_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Asset:");
 
-    if ui_state.sprite.active().active_sprite.is_some() && ui.button("Save").clicked() {
-        if let Err(e) = ui_state.sprite.save_current_asset() {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).active().active_sprite.is_some() && ui.button("Save").clicked() {
+        if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).save_current_asset() {
             tracing::error!("Failed to save sprite: {}", e);
         }
     }
 
     if ui.button("Save As...").clicked() {
-        ui_state.sprite.begin_save_dialog();
+        crate::ui::editor_context::sprite_state_mut(ui_state).begin_save_dialog();
     }
 
     // Show current asset path if known
-    if let Some(path) = &ui_state.sprite.active().active_sprite {
+    if let Some(path) = &crate::ui::editor_context::sprite_state_mut(ui_state).active().active_sprite {
         ui.label(format!("File: {}", path));
     }
 }
@@ -278,7 +283,7 @@ fn render_brush_size(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.horizontal(|ui| {
         ui.label("Brush Size:");
         ui.add(
-            egui::DragValue::new(&mut ui_state.sprite.brush_size)
+            egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).brush_size)
                 .range(1..=32)
                 .speed(0.1),
         );
@@ -292,11 +297,11 @@ fn render_dither_selector(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.horizontal(|ui| {
         ui.label("Dither:");
         egui::ComboBox::from_id_salt("dither_pattern")
-            .selected_text(ui_state.sprite.dither_pattern.label())
+            .selected_text(crate::ui::editor_context::sprite_state_mut(ui_state).dither_pattern.label())
             .show_ui(ui, |ui| {
                 for pattern in DitherPattern::ALL {
                     ui.selectable_value(
-                        &mut ui_state.sprite.dither_pattern,
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state).dither_pattern,
                         pattern,
                         pattern.label(),
                     );
@@ -310,13 +315,13 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     ui.label("Color:");
 
-    if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode == ColorMode::PaletteIndexed {
         ensure_valid_indexed_foreground_color(ui_state);
-        if let Some(palette_id) = ui_state.sprite.selected_palette_id.clone() {
-            if let Some(palette) = ui_state.project.available_palettes.get(&palette_id) {
+        if let Some(palette_id) = crate::ui::editor_context::sprite_state_mut(ui_state).selected_palette_id.clone() {
+            if let Some(palette) = ui_state.project.available_palettes.get(&palette_id).copied() {
                 let selected_slot = indexed_slot_for_authored_color(
-                    ui_state.sprite.foreground_color,
-                    Some(*palette),
+                    crate::ui::editor_context::sprite_state(ui_state).foreground_color,
+                    Some(palette),
                 );
                 ui.horizontal_wrapped(|ui| {
                     for (slot, color) in palette.colors.iter().copied().enumerate() {
@@ -340,7 +345,7 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                             egui::StrokeKind::Outside,
                         );
                         if response.clicked() {
-                            ui_state.sprite.foreground_color = canonical_indexed_color(slot);
+                            crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = canonical_indexed_color(slot);
                         }
                     }
                 });
@@ -355,11 +360,11 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     // Convert to Color32 for egui color picker
-    let mut color = ui_state.sprite.foreground_color.to_color32();
+    let mut color = crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color.to_color32();
 
     ui.horizontal(|ui| {
         if ui.color_edit_button_srgba(&mut color).changed() {
-            ui_state.sprite.foreground_color = PixelColor::from_color32(color);
+            crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = PixelColor::from_color32(color);
         }
 
         // Show hex value
@@ -368,7 +373,7 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     });
 
     // Recent colors palette
-    if !ui_state.sprite.recent_colors.is_empty() {
+    if !crate::ui::editor_context::sprite_state_mut(ui_state).recent_colors.is_empty() {
         ui.add_space(4.0);
         ui.label("Recent:");
         render_recent_colors(ui, ui_state);
@@ -376,7 +381,7 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(canvas) = ui_state.sprite.active().canvas.as_ref() else {
+    let Some(canvas) = crate::ui::editor_context::sprite_state_mut(ui_state).active().canvas.as_ref() else {
         return;
     };
     let validation = validate_indexed_rgba8(canvas.pixels());
@@ -399,29 +404,31 @@ fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn ensure_valid_indexed_foreground_color(ui_state: &mut EditorUI) {
-    if ui_state.sprite.color_mode != ColorMode::PaletteIndexed {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode != ColorMode::PaletteIndexed {
         return;
     }
 
     let selected_palette = ui_state
+        .sprite_editor_context()
         .sprite
         .selected_palette_id
         .as_ref()
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
         .copied();
 
-    if indexed_slot_for_authored_color(ui_state.sprite.foreground_color, selected_palette).is_none()
+    if indexed_slot_for_authored_color(crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color, selected_palette).is_none()
     {
-        ui_state.sprite.foreground_color = canonical_indexed_color(3);
+        crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = canonical_indexed_color(3);
     }
 }
 
 fn render_recent_colors(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let size = egui::vec2(16.0, 16.0);
     let colors_per_row = 8;
+    let recent_colors = crate::ui::editor_context::sprite_state(ui_state).recent_colors.clone();
 
     ui.horizontal_wrapped(|ui| {
-        for (i, &color) in ui_state.sprite.recent_colors.iter().enumerate() {
+        for (i, &color) in recent_colors.iter().enumerate() {
             if i > 0 && i % colors_per_row == 0 {
                 ui.end_row();
             }
@@ -439,7 +446,7 @@ fn render_recent_colors(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             );
 
             if response.clicked() {
-                ui_state.sprite.foreground_color = color;
+                crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = color;
             }
 
             if response.hovered() {
@@ -453,31 +460,31 @@ fn render_recent_colors(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 fn render_viewport_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Viewport:");
 
-    let zoom = ui_state.sprite.active().viewport.zoom;
+    let zoom = crate::ui::editor_context::sprite_state_mut(ui_state).active().viewport.zoom;
     ui.horizontal(|ui| {
         ui.label(format!("Zoom: {}x", zoom as i32));
         if ui.button("-").clicked() {
-            ui_state.sprite.active_mut().viewport.zoom_out();
+            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().viewport.zoom_out();
         }
         if ui.button("+").clicked() {
-            ui_state.sprite.active_mut().viewport.zoom_in();
+            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().viewport.zoom_in();
         }
     });
 
     ui.checkbox(
-        &mut ui_state.sprite.active_mut().show_grid,
+        &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().show_grid,
         "Show Pixel Grid",
     );
     ui.checkbox(
-        &mut ui_state.sprite.active_mut().tile_preview,
+        &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().tile_preview,
         "Tile Preview",
     );
 
-    if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {
+    if let Some(pos) = crate::ui::editor_context::sprite_state_mut(ui_state).active().cursor_canvas_pos {
         ui.label(format!("Cursor: {}, {}", pos.x, pos.y));
     }
 
-    if let Some((w, h)) = ui_state.sprite.canvas_dimensions() {
+    if let Some((w, h)) = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_dimensions() {
         ui.label(format!("Canvas: {}x{}", w, h));
     }
 
@@ -499,14 +506,14 @@ fn render_canvas_transforms(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             .on_hover_text("Flip horizontally")
             .clicked()
         {
-            ui_state.sprite.flip_horizontal();
+            crate::ui::editor_context::sprite_state_mut(ui_state).flip_horizontal();
         }
         if ui
             .button("Flip V")
             .on_hover_text("Flip vertically")
             .clicked()
         {
-            ui_state.sprite.flip_vertical();
+            crate::ui::editor_context::sprite_state_mut(ui_state).flip_vertical();
         }
     });
 
@@ -516,19 +523,19 @@ fn render_canvas_transforms(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             .on_hover_text("Rotate 90° clockwise")
             .clicked()
         {
-            ui_state.sprite.rotate_clockwise();
+            crate::ui::editor_context::sprite_state_mut(ui_state).rotate_clockwise();
         }
         if ui
             .button("Rot CCW")
             .on_hover_text("Rotate 90° counter-clockwise")
             .clicked()
         {
-            ui_state.sprite.rotate_counter_clockwise();
+            crate::ui::editor_context::sprite_state_mut(ui_state).rotate_counter_clockwise();
         }
     });
 
     if ui.button("Resize...").clicked() {
-        ui_state.sprite.begin_resize_dialog();
+        crate::ui::editor_context::sprite_state_mut(ui_state).begin_resize_dialog();
     }
 }
 
@@ -536,42 +543,42 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Sprite Sheet:");
 
     ui.checkbox(
-        &mut ui_state.sprite.active_mut().show_cell_grid,
+        &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().show_cell_grid,
         "Show Cell Grid",
     );
 
-    let show_cell_grid = ui_state.sprite.active().show_cell_grid;
+    let show_cell_grid = crate::ui::editor_context::sprite_state_mut(ui_state).active().show_cell_grid;
     if show_cell_grid {
         ui.horizontal(|ui| {
             ui.label("Cell Width:");
             if ui
                 .add(
-                    egui::DragValue::new(&mut ui_state.sprite.active_mut().cell_size.x)
+                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().cell_size.x)
                         .range(1..=512)
                         .speed(1),
                 )
                 .changed()
             {
                 // Deselect cell if grid changed
-                ui_state.sprite.active_mut().selected_cell = None;
+                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selected_cell = None;
             }
         });
         ui.horizontal(|ui| {
             ui.label("Cell Height:");
             if ui
                 .add(
-                    egui::DragValue::new(&mut ui_state.sprite.active_mut().cell_size.y)
+                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().cell_size.y)
                         .range(1..=512)
                         .speed(1),
                 )
                 .changed()
             {
-                ui_state.sprite.active_mut().selected_cell = None;
+                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selected_cell = None;
             }
         });
 
         // Show cell count
-        if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
+        if let Some((cols, rows)) = crate::ui::editor_context::sprite_state_mut(ui_state).sheet_cell_count() {
             ui.label(format!("Grid: {}x{} ({} cells)", cols, rows, cols * rows));
         }
 
@@ -579,17 +586,17 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             if ui.button("+ Row").clicked() {
-                ui_state.sprite.append_row();
+                crate::ui::editor_context::sprite_state_mut(ui_state).append_row();
             }
             if ui.button("+ Column").clicked() {
-                ui_state.sprite.append_column();
+                crate::ui::editor_context::sprite_state_mut(ui_state).append_column();
             }
         });
 
         // Show selected cell info and operations
-        let selected_cell = ui_state.sprite.active().selected_cell;
+        let selected_cell = crate::ui::editor_context::sprite_state_mut(ui_state).active().selected_cell;
         if let Some(cell_idx) = selected_cell {
-            if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
+            if let Some((cols, rows)) = crate::ui::editor_context::sprite_state_mut(ui_state).sheet_cell_count() {
                 let col = cell_idx as u32 % cols;
                 let row = cell_idx as u32 / cols;
                 ui.label(format!(
@@ -602,14 +609,14 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 // Cell operations
                 ui.horizontal(|ui| {
                     if ui.button("Clear Cell").clicked() {
-                        ui_state.sprite.clear_selected_cell();
+                        crate::ui::editor_context::sprite_state_mut(ui_state).clear_selected_cell();
                     }
                     if ui
                         .button("Delete & Collapse")
                         .on_hover_text("Delete cell and shift remaining cells to fill the gap")
                         .clicked()
                     {
-                        ui_state.sprite.delete_cell_with_collapse();
+                        crate::ui::editor_context::sprite_state_mut(ui_state).delete_cell_with_collapse();
                     }
                 });
 
@@ -618,13 +625,13 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Swap with:");
                     ui.add(
-                        egui::DragValue::new(&mut ui_state.sprite.active_mut().swap_target_cell)
+                        egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().swap_target_cell)
                             .range(0..=(total_cells.saturating_sub(1)))
                             .speed(1),
                     );
-                    let target = ui_state.sprite.active().swap_target_cell as usize;
+                    let target = crate::ui::editor_context::sprite_state_mut(ui_state).active().swap_target_cell as usize;
                     if ui.button("Swap").clicked() && target != cell_idx {
-                        ui_state.sprite.swap_cells(cell_idx, target);
+                        crate::ui::editor_context::sprite_state_mut(ui_state).swap_cells(cell_idx, target);
                     }
                 });
             }

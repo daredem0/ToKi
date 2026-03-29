@@ -17,7 +17,11 @@ pub fn render_entity_browser(
 
     ui.separator();
 
-    let filtered = ui_state.entity_editor.filtered_entities();
+    let filtered = crate::ui::editor_context::entity_editor_state(ui_state)
+        .filtered_entities()
+        .into_iter()
+        .cloned()
+        .collect::<Vec<_>>();
     let entity_count = filtered.len();
 
     ui.label(format!("Entities: {}", entity_count));
@@ -31,12 +35,13 @@ pub fn render_entity_browser(
 fn render_search_box(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.horizontal(|ui| {
         ui.label("Search:");
-        ui.text_edit_singleline(&mut ui_state.entity_editor.filter.search_query);
+        ui.text_edit_singleline(&mut crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.search_query);
     });
 }
 
 fn render_category_filter(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let mut categories: Vec<String> = ui_state
+        .entity_editor_context()
         .entity_editor
         .all_categories()
         .into_iter()
@@ -47,31 +52,32 @@ fn render_category_filter(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.label("Category:");
         egui::ComboBox::from_id_salt("entity_category_filter")
             .selected_text(
-                if ui_state.entity_editor.filter.category_filter.is_empty() {
+                if crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter.is_empty() {
                     "All"
                 } else {
-                    &ui_state.entity_editor.filter.category_filter
+                    &crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter
                 },
             )
             .show_ui(ui, |ui| {
                 if ui
                     .selectable_label(
-                        ui_state.entity_editor.filter.category_filter.is_empty(),
+                        crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter.is_empty(),
                         "All",
                     )
                     .clicked()
                 {
-                    ui_state.entity_editor.filter.category_filter.clear();
+                    crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter.clear();
                 }
 
                 for category in &categories {
                     let is_selected = ui_state
+                        .entity_editor_context()
                         .entity_editor
                         .filter
                         .category_filter
                         .eq_ignore_ascii_case(category);
                     if ui.selectable_label(is_selected, category).clicked() {
-                        ui_state.entity_editor.filter.category_filter = category.clone();
+                        crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter = category.clone();
                     }
                 }
             });
@@ -79,15 +85,15 @@ fn render_category_filter(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_clear_filters_button(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    if ui_state.entity_editor.filter.is_active() && ui.button("Clear Filters").clicked() {
-        ui_state.entity_editor.filter.clear();
+    if crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.is_active() && ui.button("Clear Filters").clicked() {
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.clear();
     }
 }
 
 fn render_entity_list(
     ui: &mut egui::Ui,
     ui_state: &EditorUI,
-    filtered: &[&EntitySummary],
+    filtered: &[EntitySummary],
 ) -> (Option<String>, Option<EntitySummary>, Option<String>) {
     let mut select_entity: Option<String> = None;
     let mut duplicate_entity: Option<EntitySummary> = None;
@@ -99,6 +105,7 @@ fn render_entity_list(
         .show(ui, |ui| {
             for entity in filtered {
                 let is_selected = ui_state
+                    .entity_editor_context()
                     .entity_editor
                     .selected_entity
                     .as_ref()
@@ -140,6 +147,7 @@ fn handle_deferred_actions(
 ) {
     if let Some(name) = select_entity {
         if let Some(summary) = ui_state
+            .entity_editor_context()
             .entity_editor
             .entities
             .iter()
@@ -148,6 +156,7 @@ fn handle_deferred_actions(
         {
             if let Some(def) = load_entity_definition(&summary.file_path) {
                 ui_state
+                    .entity_editor_context_mut()
                     .entity_editor
                     .load_for_editing(def, summary.file_path);
             }
@@ -157,12 +166,13 @@ fn handle_deferred_actions(
 
     if let Some(source) = duplicate_entity {
         ui_state
+            .entity_editor_context_mut()
             .entity_editor
             .new_entity_dialog
             .open_for_duplicate(&source);
     }
 
     if let Some(name) = delete_entity {
-        ui_state.entity_editor.delete_confirmation.open(&name);
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).delete_confirmation.open(&name);
     }
 }

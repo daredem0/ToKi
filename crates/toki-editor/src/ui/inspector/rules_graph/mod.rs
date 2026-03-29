@@ -259,16 +259,18 @@ impl InspectorSystem {
     fn extract_map_size(ui_state: &EditorUI, scene_index: usize) -> Option<(u32, u32)> {
         let scene = ui_state.scenes.get(scene_index)?;
         let map_name = scene.maps.first()?;
-        if ui_state.map.active_map.as_ref() != Some(map_name) {
+        if crate::ui::editor_context::map_state(ui_state).active_map.as_ref() != Some(map_name) {
             return None;
         }
         ui_state
+            .map_editor_context()
             .map
             .draft
             .as_ref()
             .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
             .or_else(|| {
                 ui_state
+                    .map_editor_context()
                     .map
                     .pending_tilemap_sync
                     .as_ref()

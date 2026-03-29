@@ -139,7 +139,9 @@ impl EditorUI {
                 }
 
                 if let Some(entity_definition) = placement_request {
-                    self.enter_placement_mode(entity_definition);
+                    self.scene_viewport_context_mut()
+                        .placement
+                        .enter_placement_mode(entity_definition);
                 }
 
                 for (scene_name, entity_name) in entity_additions {

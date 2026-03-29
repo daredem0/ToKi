@@ -24,7 +24,7 @@ pub fn render_no_canvas_message(
                     .add_filter("PNG Image", &["png"])
                     .pick_file()
                 {
-                    if let Err(e) = ui_state.sprite.begin_new_canvas_from_image_dialog(&path) {
+                    if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).begin_new_canvas_from_image_dialog(&path) {
                         tracing::error!("Failed to prepare new canvas from image: {}", e);
                     }
                 }
@@ -36,7 +36,7 @@ pub fn render_no_canvas_message(
                 .clicked()
             {
                 if let Some(dir) = sprites_dir {
-                    ui_state.sprite.begin_load_dialog(dir);
+                    crate::ui::editor_context::sprite_state_mut(ui_state).begin_load_dialog(dir);
                 }
             }
         });
@@ -54,7 +54,7 @@ pub fn render_dual_viewports_horizontal(
     let splitter_width = 8.0;
     let usable_width = (available.x - splitter_width).max(200.0);
 
-    let split_ratio = ui_state.sprite.split_ratio.clamp(0.1, 0.9);
+    let split_ratio = crate::ui::editor_context::sprite_state_mut(ui_state).split_ratio.clamp(0.1, 0.9);
     let left_width = (usable_width * split_ratio).max(100.0);
     let right_width = (usable_width * (1.0 - split_ratio)).max(100.0);
 
@@ -64,7 +64,8 @@ pub fn render_dual_viewports_horizontal(
             ui.set_width(left_width);
             render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
             if ui_state
-                .sprite
+            .sprite_editor_context_mut()
+            .sprite
                 .canvas_state(CanvasSide::Left)
                 .canvas
                 .is_some()
@@ -79,8 +80,8 @@ pub fn render_dual_viewports_horizontal(
         let splitter_response = render_vertical_splitter(ui, available.y);
         if splitter_response.dragged() {
             let delta = splitter_response.drag_delta().x;
-            let new_ratio = ui_state.sprite.split_ratio + delta / usable_width;
-            ui_state.sprite.split_ratio = new_ratio.clamp(0.1, 0.9);
+            let new_ratio = crate::ui::editor_context::sprite_state_mut(ui_state).split_ratio + delta / usable_width;
+            crate::ui::editor_context::sprite_state_mut(ui_state).split_ratio = new_ratio.clamp(0.1, 0.9);
         }
 
         // Right canvas
@@ -88,7 +89,8 @@ pub fn render_dual_viewports_horizontal(
             ui.set_width(right_width);
             render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
             if ui_state
-                .sprite
+            .sprite_editor_context_mut()
+            .sprite
                 .canvas_state(CanvasSide::Right)
                 .canvas
                 .is_some()
@@ -112,7 +114,7 @@ pub fn render_dual_viewports_vertical(
     let splitter_height = 8.0;
     let usable_height = (available.y - splitter_height - 48.0).max(200.0);
 
-    let split_ratio = ui_state.sprite.split_ratio.clamp(0.1, 0.9);
+    let split_ratio = crate::ui::editor_context::sprite_state_mut(ui_state).split_ratio.clamp(0.1, 0.9);
     let top_height = (usable_height * split_ratio).max(100.0);
     let bottom_height = (usable_height * (1.0 - split_ratio)).max(100.0);
 
@@ -121,6 +123,7 @@ pub fn render_dual_viewports_vertical(
         ui.set_height(top_height);
         render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
         if ui_state
+            .sprite_editor_context_mut()
             .sprite
             .canvas_state(CanvasSide::Left)
             .canvas
@@ -136,8 +139,8 @@ pub fn render_dual_viewports_vertical(
     let splitter_response = render_horizontal_splitter(ui, available.x);
     if splitter_response.dragged() {
         let delta = splitter_response.drag_delta().y;
-        let new_ratio = ui_state.sprite.split_ratio + delta / usable_height;
-        ui_state.sprite.split_ratio = new_ratio.clamp(0.1, 0.9);
+        let new_ratio = crate::ui::editor_context::sprite_state_mut(ui_state).split_ratio + delta / usable_height;
+        crate::ui::editor_context::sprite_state_mut(ui_state).split_ratio = new_ratio.clamp(0.1, 0.9);
     }
 
     // Bottom canvas
@@ -145,6 +148,7 @@ pub fn render_dual_viewports_vertical(
         ui.set_height(bottom_height);
         render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
         if ui_state
+            .sprite_editor_context_mut()
             .sprite
             .canvas_state(CanvasSide::Right)
             .canvas
@@ -215,17 +219,17 @@ fn render_horizontal_splitter(ui: &mut egui::Ui, width: f32) -> egui::Response {
 
 /// Render a header for a canvas panel showing its side and active state
 fn render_canvas_panel_header(ui: &mut egui::Ui, ui_state: &mut EditorUI, side: CanvasSide) {
-    let is_active = ui_state.sprite.active_canvas == side;
+    let is_active = crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas == side;
     let label = side.label();
 
     ui.horizontal(|ui| {
         if is_active {
             ui.label(egui::RichText::new(format!("● {}", label)).strong());
         } else if ui.button(label).clicked() {
-            ui_state.sprite.set_active_canvas(side);
+            crate::ui::editor_context::sprite_state_mut(ui_state).set_active_canvas(side);
         }
 
-        if ui_state.sprite.canvas_state(side).dirty {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(side).dirty {
             ui.label("*");
         }
     });

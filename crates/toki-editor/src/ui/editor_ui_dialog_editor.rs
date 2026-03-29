@@ -110,12 +110,12 @@ impl DialogEditorState {
 
 pub(crate) fn sync_dialog_registry(ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
     let dialog_names = project_assets.get_dialog_names();
-    if ui_state.dialog.draft.is_none()
-        && ui_state.dialog.selected_dialog_id.is_none()
+    if crate::ui::editor_context::dialog_state(ui_state).draft.is_none()
+        && crate::ui::editor_context::dialog_state(ui_state).selected_dialog_id.is_none()
         && !dialog_names.is_empty()
     {
         if let Ok(Some(dialog)) = project_assets.load_dialog(&dialog_names[0]) {
-            ui_state.dialog.load_dialog(dialog);
+            crate::ui::editor_context::dialog_state_mut(ui_state).load_dialog(dialog);
         }
     }
 

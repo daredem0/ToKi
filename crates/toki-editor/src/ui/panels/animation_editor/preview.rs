@@ -8,12 +8,12 @@ pub fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: 
 
         ui.separator();
 
-        let has_clip = ui_state.animation.selected_clip().is_some();
-        let has_frames = ui_state.animation.frame_count() > 0;
+        let has_clip = crate::ui::editor_context::animation_state_mut(ui_state).selected_clip().is_some();
+        let has_frames = crate::ui::editor_context::animation_state_mut(ui_state).frame_count() > 0;
         let can_play = has_clip && has_frames;
 
         // Play/Pause button
-        let play_label = if ui_state.animation.is_playing() {
+        let play_label = if crate::ui::editor_context::animation_state_mut(ui_state).is_playing() {
             "Pause"
         } else {
             "Play"
@@ -22,7 +22,7 @@ pub fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: 
             .add_enabled(can_play, egui::Button::new(play_label))
             .clicked()
         {
-            ui_state.animation.preview.toggle_playback();
+            crate::ui::editor_context::animation_state_mut(ui_state).preview.toggle_playback();
         }
 
         // Stop button
@@ -30,7 +30,7 @@ pub fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: 
             .add_enabled(can_play, egui::Button::new("Stop"))
             .clicked()
         {
-            ui_state.animation.preview.stop();
+            crate::ui::editor_context::animation_state_mut(ui_state).preview.stop();
         }
 
         // Step buttons
@@ -39,10 +39,12 @@ pub fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: 
             .on_hover_text("Previous frame")
             .clicked()
         {
+            let frame_count = crate::ui::editor_context::animation_state(ui_state).frame_count();
             ui_state
-                .animation
+            .animation_editor_context_mut()
+            .animation
                 .preview
-                .step_backward(ui_state.animation.frame_count());
+                .step_backward(frame_count);
         }
 
         if ui
@@ -50,21 +52,23 @@ pub fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: 
             .on_hover_text("Next frame")
             .clicked()
         {
+            let frame_count = crate::ui::editor_context::animation_state(ui_state).frame_count();
             ui_state
-                .animation
+            .animation_editor_context_mut()
+            .animation
                 .preview
-                .step_forward(ui_state.animation.frame_count());
+                .step_forward(frame_count);
         }
 
         ui.separator();
 
         // Speed control with preset buttons
         ui.label("Speed:");
-        let current_speed = ui_state.animation.preview.speed();
+        let current_speed = crate::ui::editor_context::animation_state_mut(ui_state).preview.speed();
         for (label, speed_val) in [("0.5x", 0.5), ("1x", 1.0), ("2x", 2.0)] {
             let selected = (current_speed - speed_val).abs() < 0.01;
             if ui.selectable_label(selected, label).clicked() {
-                ui_state.animation.preview.set_speed(speed_val);
+                crate::ui::editor_context::animation_state_mut(ui_state).preview.set_speed(speed_val);
             }
         }
 
@@ -73,40 +77,40 @@ pub fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: 
             ui.separator();
             ui.label(format!(
                 "Frame: {} / {}",
-                ui_state.animation.preview.current_frame() + 1,
-                ui_state.animation.frame_count()
+                crate::ui::editor_context::animation_state_mut(ui_state).preview.current_frame() + 1,
+                crate::ui::editor_context::animation_state_mut(ui_state).frame_count()
             ));
         }
     });
 
     // Frame scrubbing slider
-    let frame_count = ui_state.animation.frame_count();
+    let frame_count = crate::ui::editor_context::animation_state_mut(ui_state).frame_count();
     if frame_count > 1 {
         ui.horizontal(|ui| {
             ui.label("Scrub:");
-            let mut current = ui_state.animation.preview.current_frame();
+            let mut current = crate::ui::editor_context::animation_state_mut(ui_state).preview.current_frame();
             let label = format!("{}/{}", current + 1, frame_count);
             let slider = egui::Slider::new(&mut current, 0..=(frame_count - 1))
                 .show_value(false)
                 .text(label);
             if ui.add(slider).changed() {
-                ui_state.animation.preview.go_to_frame(current, frame_count);
+                crate::ui::editor_context::animation_state_mut(ui_state).preview.go_to_frame(current, frame_count);
             }
         });
     }
 
     // Update playback if playing
-    if ui_state.animation.is_playing() {
-        if let Some(clip) = ui_state.animation.selected_clip().cloned() {
+    if crate::ui::editor_context::animation_state_mut(ui_state).is_playing() {
+        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).selected_clip().cloned() {
             let delta = ctx.input(|i| i.stable_dt);
-            ui_state.animation.preview.update(delta, &clip);
+            crate::ui::editor_context::animation_state_mut(ui_state).preview.update(delta, &clip);
             ctx.request_repaint();
         }
     }
 }
 
 pub fn render_preview_area(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(clip) = ui_state.animation.selected_clip().cloned() else {
+    let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).selected_clip().cloned() else {
         ui.centered_and_justified(|ui| {
             ui.label("Select a clip to preview");
         });
@@ -121,13 +125,14 @@ pub fn render_preview_area(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     let current_frame_idx = ui_state
-        .animation
+            .animation_editor_context_mut()
+            .animation
         .preview
         .current_frame()
         .min(clip.frames.len() - 1);
     let frame = &clip.frames[current_frame_idx];
     let frame_duration = clip.frame_duration_at(current_frame_idx);
-    let frame_progress = ui_state.animation.preview.frame_progress(&clip);
+    let frame_progress = crate::ui::editor_context::animation_state_mut(ui_state).preview.frame_progress(&clip);
 
     // Get available space for the preview
     let available = ui.available_size();
@@ -147,7 +152,7 @@ pub fn render_preview_area(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         }
 
         // Frame progress bar (compact, only when playing)
-        if ui_state.animation.is_playing() {
+        if crate::ui::editor_context::animation_state_mut(ui_state).is_playing() {
             let progress_bar = egui::ProgressBar::new(frame_progress).desired_width(60.0);
             ui.add(progress_bar);
         }
@@ -195,13 +200,13 @@ fn render_sprite_frame_scaled(
     max_width: f32,
     max_height: f32,
 ) -> bool {
-    let Some(texture) = &ui_state.animation.atlas_texture else {
+    let Some(texture) = &crate::ui::editor_context::animation_state(ui_state).atlas_texture else {
         return false;
     };
-    let Some((cell_w, cell_h)) = ui_state.animation.atlas_cell_size else {
+    let Some((cell_w, cell_h)) = crate::ui::editor_context::animation_state(ui_state).atlas_cell_size else {
         return false;
     };
-    let Some((img_w, img_h)) = ui_state.animation.atlas_image_size else {
+    let Some((img_w, img_h)) = crate::ui::editor_context::animation_state(ui_state).atlas_image_size else {
         return false;
     };
 

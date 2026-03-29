@@ -24,13 +24,14 @@ impl PanelSystem {
         if let Some(cfg) = config.as_deref_mut() {
             let mut toolbar_changed = false;
             let grid_size = Self::effective_grid_size(viewport, cfg);
+            let viewport_cursor = &mut ui_state.scene_viewport_context_mut().viewport_cursor;
             ui.horizontal(|ui| {
                 toolbar_changed = Self::render_grid_toolbar_contents(ui, cfg);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.checkbox(&mut ui_state.viewport_cursor.show_tiles, "P/T");
+                    ui.checkbox(&mut viewport_cursor.show_tiles, "P/T");
                     ui.label(Self::viewport_cursor_status_label(
-                        ui_state.viewport_cursor.world_position,
-                        ui_state.viewport_cursor.show_tiles,
+                        viewport_cursor.world_position,
+                        viewport_cursor.show_tiles,
                         grid_size,
                     ));
                 });
@@ -57,10 +58,22 @@ impl PanelSystem {
         let display_rect = viewport_ctx.display_rect();
 
         if let Some(world_pos) = viewport_ctx.hover_world_from_response(&response) {
-            ui_state.remember_viewport_cursor_world_position(world_pos);
+            ui_state.scene_viewport_context_mut().viewport_cursor.world_position =
+                Some(glam::IVec2::new(
+                    world_pos.x.floor() as i32,
+                    world_pos.y.floor() as i32,
+                ));
         }
 
-        if !ui_state.is_entity_move_drag_active() && !ui_state.is_scene_anchor_move_drag_active() {
+        if !ui_state
+            .scene_viewport_context()
+            .placement
+            .is_entity_move_drag_active()
+            && !ui_state
+                .scene_viewport_context()
+                .placement
+                .is_scene_anchor_move_drag_active()
+        {
             viewport.clear_suppressed_entity_rendering();
         }
 
@@ -69,7 +82,12 @@ impl PanelSystem {
             if let Some(drag_start_pos) = response.interact_pointer_pos() {
                 if !viewport_ctx.contains_screen_pos(drag_start_pos) {
                     viewport.stop_camera_drag();
-                } else if ctrl_pressed && !ui_state.is_in_placement_mode() {
+                } else if ctrl_pressed
+                    && !ui_state
+                        .scene_viewport_context()
+                        .placement
+                        .is_in_placement_mode()
+                {
                     SelectionInteraction::handle_marquee_drag_start(ui_state, drag_start_pos);
                     viewport.stop_camera_drag();
                 } else {
@@ -85,7 +103,12 @@ impl PanelSystem {
             }
         }
 
-        if ui_state.is_marquee_selection_active() && response.dragged() {
+        if ui_state
+            .scene_viewport_context()
+            .placement
+            .is_marquee_selection_active()
+            && response.dragged()
+        {
             if let Some(drag_pos) = response
                 .interact_pointer_pos()
                 .or_else(|| response.hover_pos())
@@ -95,7 +118,11 @@ impl PanelSystem {
         }
 
         if response.drag_stopped() {
-            if ui_state.is_marquee_selection_active() {
+            if ui_state
+                .scene_viewport_context()
+                .placement
+                .is_marquee_selection_active()
+            {
                 SelectionInteraction::handle_marquee_drag_release(
                     ui_state,
                     viewport,
@@ -117,9 +144,18 @@ impl PanelSystem {
             }
         }
 
-        if !ui_state.is_entity_move_drag_active()
-            && !ui_state.is_scene_anchor_move_drag_active()
-            && !ui_state.is_marquee_selection_active()
+        if !ui_state
+            .scene_viewport_context()
+            .placement
+            .is_entity_move_drag_active()
+            && !ui_state
+                .scene_viewport_context()
+                .placement
+                .is_scene_anchor_move_drag_active()
+            && !ui_state
+                .scene_viewport_context()
+                .placement
+                .is_marquee_selection_active()
         {
             CameraInteraction::handle_drag(viewport, &response, config.as_deref());
         } else {
@@ -132,7 +168,11 @@ impl PanelSystem {
             if let Some(click_pos) = response.hover_pos() {
                 if !viewport_ctx.contains_screen_pos(click_pos) {
                     // Ignore clicks in the letterboxed area.
-                } else if ui_state.is_in_placement_mode() {
+                } else if ui_state
+                    .scene_viewport_context()
+                    .placement
+                    .is_in_placement_mode()
+                {
                     PlacementInteraction::handle_click(
                         ui_state,
                         viewport,
