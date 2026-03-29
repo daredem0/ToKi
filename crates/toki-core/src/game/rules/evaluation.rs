@@ -74,6 +74,8 @@ impl RuleEngine<'_> {
                 min_count,
             } => self.resolve_entity(*target, context).is_some_and(|entity| {
                 self.entity_manager
+                    .storage()
+                    .components()
                     .inventory(entity.id)
                     .is_some_and(|inventory| inventory.item_count(item_id) >= *min_count)
             }),

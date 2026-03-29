@@ -30,7 +30,7 @@ pub fn render_delete_scene_button(
 ) -> bool {
     if ui.button("Delete Scene").clicked() {
         let scene_is_empty =
-            scene.maps.is_empty() && scene.entities.is_empty() && scene.rules.rules.is_empty();
+            scene.maps.is_empty() && scene.entities().is_empty() && scene.rules.rules.is_empty();
         if scene_is_empty {
             if let Some(project) = ctx.project.as_deref_mut() {
                 match build_delete_scene_command(ctx.ui_state, project, scene_name) {

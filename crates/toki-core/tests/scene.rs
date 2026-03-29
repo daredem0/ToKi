@@ -2,7 +2,7 @@ use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{
     AiConfig, ControlRole, Entity, EntityAttributes, EntityBehavior, EntityGameplay, EntityKind,
-    EntityOptionalComponents, EntityRendering, MovementProfile, PickupDef, StoredEntity,
+    EntityRendering, MovementProfile, OptionalEntityComponents, PickupDef, StoredEntity,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
@@ -70,7 +70,7 @@ fn test_scene_new() {
     assert_eq!(scene.name, "test_scene");
     assert!(scene.description.is_none());
     assert!(scene.maps.is_empty());
-    assert!(scene.entities.is_empty());
+    assert!(scene.entities().is_empty());
     assert!(scene.rules.rules.is_empty());
     assert!(scene.camera_position.is_none());
     assert!(scene.camera_scale.is_none());
@@ -87,7 +87,7 @@ fn test_scene_with_maps() {
     assert_eq!(scene.name, "test_scene");
     assert!(scene.description.is_none());
     assert_eq!(scene.maps, maps);
-    assert!(scene.entities.is_empty());
+    assert!(scene.entities().is_empty());
     assert!(scene.rules.rules.is_empty());
     assert!(scene.camera_position.is_none());
     assert!(scene.camera_scale.is_none());
@@ -104,9 +104,9 @@ fn test_scene_add_entity() {
     let returned_id = scene.add_entity(entity);
 
     assert_eq!(returned_id, 1);
-    assert_eq!(scene.entities.len(), 1);
-    assert_eq!(scene.entities[0].id, 1);
-    assert_eq!(scene.entities[0].position, IVec2::new(100, 200));
+    assert_eq!(scene.entities().len(), 1);
+    assert_eq!(scene.entities()[0].id, 1);
+    assert_eq!(scene.entities()[0].position, IVec2::new(100, 200));
 }
 
 #[test]
@@ -119,9 +119,9 @@ fn test_scene_add_multiple_entities() {
     scene.add_entity(entity1);
     scene.add_entity(entity2);
 
-    assert_eq!(scene.entities.len(), 2);
-    assert_eq!(scene.entities[0].id, 1);
-    assert_eq!(scene.entities[1].id, 2);
+    assert_eq!(scene.entities().len(), 2);
+    assert_eq!(scene.entities()[0].id, 1);
+    assert_eq!(scene.entities()[1].id, 2);
 }
 
 #[test]
@@ -136,8 +136,8 @@ fn test_scene_remove_entity() {
 
     let removed = scene.remove_entity(1);
     assert!(removed);
-    assert_eq!(scene.entities.len(), 1);
-    assert_eq!(scene.entities[0].id, 2);
+    assert_eq!(scene.entities().len(), 1);
+    assert_eq!(scene.entities()[0].id, 2);
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn test_scene_remove_nonexistent_entity() {
 
     let removed = scene.remove_entity(999);
     assert!(!removed);
-    assert_eq!(scene.entities.len(), 1);
+    assert_eq!(scene.entities().len(), 1);
 }
 
 #[test]
@@ -296,15 +296,15 @@ fn test_scene_serialization() {
     );
     assert_eq!(scene.anchors, deserialized.anchors);
     assert_eq!(scene.player_entry, deserialized.player_entry);
-    assert_eq!(scene.entities.len(), deserialized.entities.len());
-    assert_eq!(scene.entities[0].id, deserialized.entities[0].id);
+    assert_eq!(scene.entities().len(), deserialized.entities().len());
+    assert_eq!(scene.entities()[0].id, deserialized.entities()[0].id);
     assert_eq!(
-        scene.entities[0].position,
-        deserialized.entities[0].position
+        scene.entities()[0].position,
+        deserialized.entities()[0].position
     );
     assert_eq!(
-        scene.entities[0].control_role,
-        deserialized.entities[0].control_role
+        scene.entities()[0].control_role,
+        deserialized.entities()[0].control_role
     );
 }
 
@@ -322,8 +322,8 @@ fn test_scene_clone() {
     assert_eq!(scene.name, cloned_scene.name);
     assert_eq!(scene.description, cloned_scene.description);
     assert_eq!(scene.maps, cloned_scene.maps);
-    assert_eq!(scene.entities.len(), cloned_scene.entities.len());
-    assert_eq!(scene.entities[0].id, cloned_scene.entities[0].id);
+    assert_eq!(scene.entities().len(), cloned_scene.entities().len());
+    assert_eq!(scene.entities()[0].id, cloned_scene.entities()[0].id);
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn test_scene_rules_serialization_roundtrip() {
 fn test_scene_serialization_preserves_sparse_optional_components() {
     let mut scene = Scene::new("stored_entities".to_string());
     let entity = create_test_entity(9, IVec2::new(32, 48));
-    let mut components = EntityOptionalComponents::default();
+    let mut components = OptionalEntityComponents::default();
     components.pickup = Some(PickupDef {
         item_id: "coin".to_string(),
         count: 5,

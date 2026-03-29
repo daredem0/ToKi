@@ -230,7 +230,7 @@ pub fn build_scene_player_overlay_sprites(
     };
 
     if scene
-        .entities
+        .entities()
         .iter()
         .any(|entity| entity.control_role == ControlRole::PlayerCharacter)
     {

@@ -2,7 +2,7 @@ use glam::IVec2;
 use std::collections::HashMap;
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::entity::{
-    AttributesDef, AudioDef, CollisionDef, EntityDefinition, EntityOptionalComponents,
+    AttributesDef, AudioDef, CollisionDef, EntityDefinition, OptionalEntityComponents,
     MovementProfile, MovementSoundTrigger, RenderingDef, StoredEntity,
 };
 use toki_core::game::{
@@ -141,7 +141,7 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         .get_entity(player_id)
         .expect("player should exist")
         .clone();
-    let mut components = EntityOptionalComponents::default();
+    let mut components = OptionalEntityComponents::default();
     components.inventory = Some(Default::default());
     components
         .inventory
@@ -174,7 +174,7 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         state
             .world()
             .player_id()
-            .and_then(|player_id| state.world().entity_manager().inventory(player_id))
+            .and_then(|player_id| state.world().entity_manager().storage().components().inventory(player_id))
             .expect("player inventory should exist")
             .item_count("potion"),
         2

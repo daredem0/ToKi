@@ -3,13 +3,13 @@
 //! These types define the structure for loading entity definitions from files.
 
 use super::builder::EntityBuilder;
-use super::components::{EntityOptionalComponents, EntitySpawnBundle};
 use super::model::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
     EntityAudioSettings, EntityBehavior, EntityGameplay, EntityGrounding, EntityId, EntityKind,
     EntityRendering, EntityStats, MovementProfile, MovementSoundTrigger, StaticObjectRenderDef,
     HEALTH_STAT_ID,
 };
+use super::storage::{EntitySpawnBundle, OptionalEntityComponents};
 use super::runtime_entity_kind_for_category;
 use super::{Inventory, PickupDef, PrimaryProjectileDef};
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
@@ -306,7 +306,7 @@ impl EntityDefinition {
         &self,
         animation_controller: Option<AnimationController>,
         grounding: EntityGrounding,
-    ) -> (EntityAttributes, EntityOptionalComponents) {
+    ) -> (EntityAttributes, OptionalEntityComponents) {
         let stats = self.build_stats();
         let mut attributes = EntityAttributes {
             gameplay: EntityGameplay {
@@ -341,7 +341,7 @@ impl EntityDefinition {
         attributes.ensure_legacy_health_stat();
         (
             attributes,
-            EntityOptionalComponents {
+            OptionalEntityComponents {
                 primary_projectile: self.attributes.primary_projectile.clone(),
                 projectile: None,
                 pickup: self.attributes.pickup.clone(),

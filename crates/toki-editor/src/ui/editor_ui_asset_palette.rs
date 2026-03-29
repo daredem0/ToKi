@@ -199,7 +199,7 @@ impl EditorUI {
         };
 
         let new_id = self.scenes[scene_index]
-            .entities
+            .entities()
             .iter()
             .map(|entity| entity.id)
             .max()

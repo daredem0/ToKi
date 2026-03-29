@@ -107,7 +107,7 @@ impl EditorApp {
             definition_names.insert(player_entry.entity_definition_name.clone());
         }
 
-        for entity in &scene.entities {
+        for entity in scene.entities() {
             if let Some(definition_name) = entity.definition_name.as_ref() {
                 definition_names.insert(definition_name.clone());
             }

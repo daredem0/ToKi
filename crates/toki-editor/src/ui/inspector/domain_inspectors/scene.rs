@@ -56,7 +56,7 @@ impl SceneInspector {
 
     fn scene_has_authored_player_entity(scene: &toki_core::Scene) -> bool {
         scene
-            .entities
+            .entities()
             .iter()
             .any(|entity| entity.control_role == ControlRole::PlayerCharacter)
     }

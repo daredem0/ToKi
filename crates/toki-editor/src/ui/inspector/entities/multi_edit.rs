@@ -32,7 +32,7 @@ impl InspectorSystem {
         let selected_entities = {
             let scene = &ui_state.scenes[scene_index];
             scene
-                .entities
+                .entities()
                 .iter()
                 .filter(|entity| selected_set.contains(&entity.id))
                 .collect::<Vec<_>>()
@@ -149,11 +149,11 @@ impl InspectorSystem {
         };
 
         let before_entities = ui_state.scenes[scene_index]
-            .entities
+            .entities()
             .iter()
             .filter(|entity| selected_set.contains(&entity.id))
             .cloned()
-            .collect::<Vec<_>>();
+            .collect::<Vec<toki_core::entity::Entity>>();
 
         if before_entities.is_empty() {
             return false;

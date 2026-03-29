@@ -5,6 +5,7 @@ use crate::sprite::SpriteFrame;
 use crate::sprite_render::{
     SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteSortKey, SpriteVisualRef,
 };
+use std::collections::HashSet;
 
 use super::{EntityHealthBar, GameState};
 
@@ -114,6 +115,12 @@ impl<'a> RenderQueryService<'a> {
 
     pub fn renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
         let active_entities = self.entity_manager.active_entities();
+        let projectile_ids = self
+            .entity_manager
+            .storage()
+            .components()
+            .projectile_ids()
+            .collect::<HashSet<_>>();
         tracing::trace!(
             "Checking {} active entities for renderability",
             active_entities.len()
@@ -128,7 +135,7 @@ impl<'a> RenderQueryService<'a> {
                 let is_visible = entity.attributes.rendering.visible;
                 let is_renderable = entity.attributes.rendering.animation_controller.is_some()
                     || entity.attributes.rendering.static_object_render.is_some()
-                    || self.entity_manager.projectile(entity_id).is_some();
+                    || projectile_ids.contains(&entity_id);
 
                 tracing::trace!(
                     "Entity {}: visible={}, is_renderable={}",
@@ -191,6 +198,12 @@ impl<'a> RenderQueryService<'a> {
     }
 
     pub fn entity_ground_shadows(&self) -> Vec<GroundShadow> {
+        let projectile_ids = self
+            .entity_manager
+            .storage()
+            .components()
+            .projectile_ids()
+            .collect::<HashSet<_>>();
         self.entity_manager
             .active_entities_iter()
             .filter_map(|entity_id| {
@@ -201,7 +214,7 @@ impl<'a> RenderQueryService<'a> {
                 if !entity.attributes.rendering.has_shadow {
                     return None;
                 }
-                if self.entity_manager.projectile(entity_id).is_some() {
+                if projectile_ids.contains(&entity_id) {
                     return None;
                 }
                 if entity.attributes.rendering.animation_controller.is_none()
@@ -302,7 +315,12 @@ impl<'a> RenderQueryService<'a> {
                 continue;
             }
 
-            if let Some(projectile) = self.entity_manager.projectile(entity_id) {
+            if let Some(projectile) = self
+                .entity_manager
+                .storage()
+                .components()
+                .projectile(entity_id)
+            {
                 requests.push(SpriteRenderRequest {
                     origin: SpriteRenderOrigin::Projectile(entity_id),
                     sort_key: SpriteSortKey {
@@ -543,7 +561,7 @@ mod tests {
                 ..entity_attributes()
             },
         );
-        entity_manager.set_projectile(
+        entity_manager.storage_mut().components_mut().set_projectile(
             projectile_id,
             Some(ProjectileState {
                 sheet: "objects".to_string(),

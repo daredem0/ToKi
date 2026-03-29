@@ -254,10 +254,10 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
         .iter()
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
-    assert_eq!(scene.entities.len(), 1);
-    assert_eq!(scene.entities[0].position, IVec2::new(32, 48));
-    assert_eq!(scene.entities[0].category, "creature");
-    assert_eq!(scene.entities[0].definition_name.as_deref(), Some("sample"));
+    assert_eq!(scene.entities().len(), 1);
+    assert_eq!(scene.entities()[0].position, IVec2::new(32, 48));
+    assert_eq!(scene.entities()[0].category, "creature");
+    assert_eq!(scene.entities()[0].definition_name.as_deref(), Some("sample"));
     assert!(ui_state.scene_content_changed);
     assert!(ui_state.can_undo());
     // Placement mode exits at a higher level after successful click.
@@ -272,7 +272,7 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
         .iter()
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
-    assert!(scene.entities.is_empty());
+    assert!(scene.entities().is_empty());
 
     assert!(ui_state.redo());
     let scene = ui_state
@@ -280,7 +280,7 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
         .iter()
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
-    assert_eq!(scene.entities.len(), 1);
+    assert_eq!(scene.entities().len(), 1);
 }
 
 #[test]
@@ -355,7 +355,7 @@ fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
         .iter()
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
-    assert_eq!(scene.entities.len(), 0);
+    assert_eq!(scene.entities().len(), 0);
     assert!(!ui_state.scene_content_changed);
     assert!(ui_state
         .scene_viewport_context()

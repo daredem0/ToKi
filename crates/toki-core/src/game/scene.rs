@@ -68,8 +68,7 @@ impl SceneSystem {
     pub fn sync_entities_to_active_scene(state: &mut GameState) {
         let rules = state.scene.active_rules.clone();
         if let Some(active_scene) = state.scene.scene_manager.active_scene_mut() {
-            active_scene.entities.clear();
-            active_scene.components = crate::entity::EntityComponentStore::default();
+            active_scene.clear_entities();
 
             for entity_id in state.world.entity_manager.active_entities_iter() {
                 if let Some(stored) = state.world.entity_manager.stored_entity(entity_id) {
@@ -119,14 +118,19 @@ impl SceneSystem {
             for entity_id in tracked_ids {
                 match current_entities.get(&entity_id) {
                     Some(entity) => {
-                        if let Some(existing) = active_scene.get_entity_mut(entity_id) {
+                        if let Some(existing) = active_scene.entity_mut(entity_id) {
                             *existing = entity.clone();
                         } else {
                             active_scene.add_entity(entity.clone());
                         }
-                        active_scene.components.set_optional_components(
+                        active_scene.components_mut().apply_optional_components(
                             entity_id,
-                            state.world.entity_manager.components().optional_components(entity_id),
+                            state
+                                .world
+                                .entity_manager
+                                .storage()
+                                .components()
+                                .optional_components(entity_id),
                         );
                     }
                     None => {
@@ -164,12 +168,12 @@ impl SceneSystem {
 
                 match &persisted.entity {
                     Some(stored_entity) => {
-                        if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
+                        if let Some(existing) = scene.entity_mut(persisted.entity_id) {
                             *existing = stored_entity.entity.clone();
                         } else {
                             scene.add_entity(stored_entity.entity.clone());
                         }
-                        scene.components.set_optional_components(
+                        scene.components_mut().apply_optional_components(
                             persisted.entity_id,
                             stored_entity.components.clone(),
                         );
@@ -210,25 +214,22 @@ impl SceneSystem {
                 restored_player.entity_kind = EntityKind::Player;
                 *player = restored_player;
             }
-            if let Some(audio) = state.world.entity_manager.audio_component_mut(player_id) {
+            if let Some(audio) = state
+                .world
+                .entity_manager
+                .storage_mut()
+                .audio_component_mut(player_id)
+            {
                 *audio = saved_player.entity.audio.to_component();
             }
-            state
-                .world
-                .entity_manager_mut()
-                .set_inventory(player_id, saved_player.components.inventory.clone());
-            state
-                .world
-                .entity_manager_mut()
-                .set_primary_projectile(player_id, saved_player.components.primary_projectile.clone());
-            state
-                .world
-                .entity_manager_mut()
-                .set_projectile(player_id, saved_player.components.projectile.clone());
-            state
-                .world
-                .entity_manager_mut()
-                .set_pickup(player_id, saved_player.components.pickup.clone());
+            let components = state.world.entity_manager_mut().storage_mut().components_mut();
+            components.set_inventory(player_id, saved_player.components.inventory.clone());
+            components.set_primary_projectile(
+                player_id,
+                saved_player.components.primary_projectile.clone(),
+            );
+            components.set_projectile(player_id, saved_player.components.projectile.clone());
+            components.set_pickup(player_id, saved_player.components.pickup.clone());
         }
         state.progress.game_flags = save_data.flags.clone();
         state.progress.play_time_ms = save_data.metadata.play_time_ms;
@@ -322,7 +323,7 @@ impl GameState {
     }
 
     fn track_persistent_entities_for_scene(&mut self, scene: &Scene) {
-        for entity in &scene.entities {
+        for entity in scene.entities() {
             if entity.persistent_across_saves {
                 self.scene
                     .persistent_scene_entities
@@ -347,7 +348,7 @@ impl GameState {
                 .get_scene(&scene_name)
                 .map(|scene| {
                     scene
-                        .entities
+                        .entities()
                         .iter()
                         .filter(|entity| entity.persistent_across_saves)
                         .map(|entity| entity.id)

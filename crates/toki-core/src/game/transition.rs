@@ -4,7 +4,7 @@ use crate::animation::AnimationState;
 use crate::collision::CollisionBox;
 use crate::entity::{
     ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager,
-    EntityOptionalComponents, StoredEntity,
+    OptionalEntityComponents, StoredEntity,
 };
 use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
@@ -37,7 +37,7 @@ impl<'a> SceneTransitionPlanner<'a> {
         let preserve_player_across_transition =
             transition_spawn_point_id.is_some() && preserved_player.is_some();
 
-        for entity in &scene.entities {
+        for entity in scene.entities() {
             let authored_player = matches!(
                 entity.effective_control_role(),
                 ControlRole::PlayerCharacter
@@ -228,7 +228,7 @@ impl<'a> SceneTransitionPlanner<'a> {
 
     fn apply_durable_player_state(
         target: &mut Entity,
-        target_components: &mut EntityOptionalComponents,
+        target_components: &mut OptionalEntityComponents,
         source: &StoredEntity,
     ) {
         target.attributes.gameplay.health = source.entity.attributes.gameplay.health;
@@ -276,7 +276,7 @@ mod tests {
     use crate::animation::AnimationState;
     use crate::entity::{
         AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-        ControlRole, EntityDefinition, EntityOptionalComponents, MovementProfile,
+        ControlRole, EntityDefinition, OptionalEntityComponents, MovementProfile,
         MovementSoundTrigger, RenderingDef, StoredEntity,
     };
     use crate::entity::{EntityFootprint, EntityGrounding};
@@ -359,9 +359,9 @@ mod tests {
             .expect("player should instantiate");
         preserved.control_role = ControlRole::PlayerCharacter;
         preserved.attributes.apply_stat_delta("health", -25);
-        let mut preserved_components = EntityOptionalComponents {
+        let mut preserved_components = OptionalEntityComponents {
             inventory: Some(Default::default()),
-            ..EntityOptionalComponents::default()
+            ..OptionalEntityComponents::default()
         };
         preserved_components
             .inventory
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(
             prepared
                 .entity_manager
-                .inventory(player.id)
+                .storage().components().inventory(player.id)
                 .expect("player inventory should exist")
                 .item_count("coin"),
             2
@@ -474,7 +474,7 @@ mod tests {
         legacy_entity.collision_box = Some(crate::collision::CollisionBox::solid_box(
             legacy_entity.size,
         ));
-        scene.entities.push(legacy_entity);
+        scene.add_entity(legacy_entity);
 
         let prepared = planner
             .prepare_scene_load(&scene, None, None)

@@ -161,7 +161,7 @@ fn validate_save_slot(slot: u8) -> Result<(), SerializationError> {
 pub fn save_entity_to_file(entity: &Entity, path: &str) -> Result<(), SerializationError> {
     let wire = EntityWire::from(StoredEntity::new(
         entity.clone(),
-        crate::entity::EntityOptionalComponents::default(),
+        crate::entity::OptionalEntityComponents::default(),
     ));
     let json = serde_json::to_string_pretty(&wire)?;
     fs::write(path, json)?;

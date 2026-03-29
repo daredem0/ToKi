@@ -491,27 +491,19 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
     )
     .expect("project");
 
-    let main_scene = Scene {
-        name: "Main".to_string(),
-        description: None,
-        maps: vec!["demo_map".to_string()],
-        entities: vec![],
-        components: Default::default(),
-        rules: RuleSet::default(),
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: vec![SceneAnchor {
-            id: "entry".to_string(),
-            kind: SceneAnchorKind::SpawnPoint,
-            position: glam::IVec2::new(48, 64),
-            facing: Some(SceneAnchorFacing::Right),
-        }],
-        player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".into(),
-            spawn_point_id: "entry".to_string(),
-        }),
-    };
+    let mut main_scene = Scene::new("Main".to_string());
+    main_scene.maps = vec!["demo_map".to_string()];
+    main_scene.rules = RuleSet::default();
+    main_scene.anchors = vec![SceneAnchor {
+        id: "entry".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: glam::IVec2::new(48, 64),
+        facing: Some(SceneAnchorFacing::Right),
+    }];
+    main_scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "entry".to_string(),
+    });
     fs::write(
         project_dir
             .join("scenes")
@@ -614,27 +606,19 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
     )
     .expect("project");
 
-    let startup_scene = Scene {
-        name: "Main Scene".to_string(),
-        description: None,
-        maps: vec!["demo_map".to_string()],
-        entities: vec![],
-        components: Default::default(),
-        rules: RuleSet::default(),
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: vec![SceneAnchor {
-            id: "entry".to_string(),
-            kind: SceneAnchorKind::SpawnPoint,
-            position: glam::IVec2::new(32, 48),
-            facing: Some(SceneAnchorFacing::Down),
-        }],
-        player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".into(),
-            spawn_point_id: "entry".to_string(),
-        }),
-    };
+    let mut startup_scene = Scene::new("Main Scene".to_string());
+    startup_scene.maps = vec!["demo_map".to_string()];
+    startup_scene.rules = RuleSet::default();
+    startup_scene.anchors = vec![SceneAnchor {
+        id: "entry".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: glam::IVec2::new(32, 48),
+        facing: Some(SceneAnchorFacing::Down),
+    }];
+    startup_scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "entry".to_string(),
+    });
     fs::write(
         project_dir.join("scenes").join("Main Scene.json"),
         serde_json::to_string_pretty(&startup_scene).expect("serialize scene"),
@@ -737,14 +721,10 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
     )
     .expect("project");
 
-    let main_scene = Scene {
-        name: "Main".to_string(),
-        description: None,
-        maps: vec!["demo_map".to_string()],
-        entities: vec![],
-        components: Default::default(),
-        rules: RuleSet {
-            rules: vec![Rule {
+    let mut main_scene = Scene::new("Main".to_string());
+    main_scene.maps = vec!["demo_map".to_string()];
+    main_scene.rules = RuleSet {
+        rules: vec![Rule {
                 id: "switch_to_second".to_string(),
                 enabled: true,
                 priority: 0,
@@ -759,48 +739,36 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
                     duration_ms: None,
                 }],
             }],
-        },
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: vec![SceneAnchor {
-            id: "entry_a".to_string(),
-            kind: SceneAnchorKind::SpawnPoint,
-            position: glam::IVec2::new(16, 16),
-            facing: Some(SceneAnchorFacing::Down),
-        }],
-        player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".into(),
-            spawn_point_id: "entry_a".to_string(),
-        }),
     };
+    main_scene.anchors = vec![SceneAnchor {
+        id: "entry_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: glam::IVec2::new(16, 16),
+        facing: Some(SceneAnchorFacing::Down),
+    }];
+    main_scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "entry_a".to_string(),
+    });
     fs::write(
         project_dir.join("scenes").join("Main.json"),
         serde_json::to_string_pretty(&main_scene).expect("serialize main scene"),
     )
     .expect("write main scene");
 
-    let second_scene = Scene {
-        name: "Second".to_string(),
-        description: None,
-        maps: vec!["demo_map".to_string()],
-        entities: vec![],
-        components: Default::default(),
-        rules: RuleSet::default(),
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: vec![SceneAnchor {
-            id: "entry_b".to_string(),
-            kind: SceneAnchorKind::SpawnPoint,
-            position: glam::IVec2::new(96, 48),
-            facing: Some(SceneAnchorFacing::Right),
-        }],
-        player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".into(),
-            spawn_point_id: "entry_b".to_string(),
-        }),
-    };
+    let mut second_scene = Scene::new("Second".to_string());
+    second_scene.maps = vec!["demo_map".to_string()];
+    second_scene.rules = RuleSet::default();
+    second_scene.anchors = vec![SceneAnchor {
+        id: "entry_b".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: glam::IVec2::new(96, 48),
+        facing: Some(SceneAnchorFacing::Right),
+    }];
+    second_scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "entry_b".to_string(),
+    });
     fs::write(
         project_dir.join("scenes").join("Second.json"),
         serde_json::to_string_pretty(&second_scene).expect("serialize second scene"),

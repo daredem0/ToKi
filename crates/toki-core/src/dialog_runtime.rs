@@ -504,6 +504,8 @@ impl DialogController {
                     game_state
                         .world()
                         .entity_manager()
+                        .storage()
+                        .components()
                         .inventory(entity.id)
                         .is_some_and(|inventory| inventory.item_count(item_id) >= *min_count)
                 }),

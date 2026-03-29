@@ -42,11 +42,7 @@ impl InspectorSystem {
             .scenes
             .iter()
             .find(|scene| scene.name == active_scene_name)?;
-        scene
-            .entities
-            .iter()
-            .find(|entity| entity.id == entity_id)
-            .cloned()
+        scene.entity(entity_id).cloned()
     }
 
     pub(in super::super) fn apply_entity_property_draft_with_undo(
@@ -64,15 +60,10 @@ impl InspectorSystem {
         else {
             return false;
         };
-        let Some(entity_index) = ui_state.scenes[scene_index]
-            .entities
-            .iter()
-            .position(|entity| entity.id == entity_id)
-        else {
+        let scene = &ui_state.scenes[scene_index];
+        let Some(before) = scene.entity(entity_id).cloned() else {
             return false;
         };
-
-        let before = ui_state.scenes[scene_index].entities[entity_index].clone();
         let mut after = before.clone();
         let mut changed = Self::apply_entity_property_draft(&mut after, draft);
 
@@ -80,7 +71,7 @@ impl InspectorSystem {
         let mut after_entities = vec![after.clone()];
 
         if matches!(after.control_role, ControlRole::PlayerCharacter) {
-            for other in ui_state.scenes[scene_index].entities.iter() {
+            for other in scene.entities() {
                 if other.id == entity_id {
                     continue;
                 }

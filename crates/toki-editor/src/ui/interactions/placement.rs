@@ -284,7 +284,7 @@ impl PlacementInteraction {
             return false;
         };
 
-        let new_id = Self::next_entity_id(&ui_state.scenes[scene_index].entities);
+        let new_id = Self::next_entity_id(&ui_state.scenes[scene_index].entities());
 
         let entity = match entity_def.create_entity(world_pos_i32, new_id) {
             Ok(entity) => entity,

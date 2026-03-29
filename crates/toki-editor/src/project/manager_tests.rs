@@ -48,7 +48,7 @@ fn create_top_down_starter_project_populates_template_content() {
     let scene = &loaded_scenes[0];
     assert_eq!(scene.name, "main");
     assert_eq!(scene.maps, vec!["starter_overworld".to_string()]);
-    assert_eq!(scene.entities.len(), 2);
+    assert_eq!(scene.entities().len(), 2);
 
     let terrain_atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(
         project_path.join("assets/sprites/terrain.json"),
@@ -133,13 +133,10 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         .expect("project should be created");
     let project_path = parent.join("e2e_project");
 
-    let authored_scene = Scene {
-        name: "main".to_string(),
-        description: Some("integration test scene".to_string()),
-        maps: vec!["main_map".to_string()],
-        entities: Vec::new(),
-        components: Default::default(),
-        rules: RuleSet {
+    let mut authored_scene = Scene::new("main".to_string());
+    authored_scene.description = Some("integration test scene".to_string());
+    authored_scene.maps = vec!["main_map".to_string()];
+    authored_scene.rules = RuleSet {
             rules: vec![Rule {
                 id: "rule_1".to_string(),
                 enabled: true,
@@ -158,12 +155,6 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
                     },
                 ],
             }],
-        },
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: Vec::new(),
-        player_entry: None,
     };
 
     let scene_path = project_path.join("scenes").join("main.json");
