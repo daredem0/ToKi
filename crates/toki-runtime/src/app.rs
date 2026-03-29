@@ -1,4 +1,5 @@
 //! Simple winit window example.
+use serde::{Deserialize, Serialize};
 use winit::event_loop::EventLoop;
 
 use std::path::PathBuf;
@@ -44,6 +45,8 @@ mod app_presenter;
 mod app_runtime_settings;
 #[path = "app_runtime_display_settings.rs"]
 mod app_runtime_display_settings;
+#[path = "app_runtime_persistence.rs"]
+mod app_runtime_persistence;
 #[path = "app_scene_runtime.rs"]
 mod app_scene_runtime;
 #[path = "app_splash.rs"]
@@ -60,7 +63,7 @@ use app_splash::{ResolvedSplashConfig, SplashPolicy};
 use app_transition::SceneTransitionController;
 use toki_core::project_assets::first_existing_path;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeSplashOptions {
     pub duration_ms: u64,
     pub show_branding: bool,
@@ -75,7 +78,7 @@ impl Default for RuntimeSplashOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeAudioMixOptions {
     pub master_percent: u8,
     pub music_percent: u8,
@@ -94,7 +97,7 @@ impl Default for RuntimeAudioMixOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeDisplayOptions {
     pub show_entity_health_bars: bool,
     pub show_ground_shadows: bool,
@@ -141,7 +144,7 @@ impl RuntimeDisplayOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeTransitionOptions {
     pub fade_duration_ms: u32,
 }
@@ -313,7 +316,8 @@ impl App {
             .or(self.launch_options.project_path.as_deref())
     }
 
-    fn new(launch_options: RuntimeLaunchOptions) -> Self {
+    fn new(mut launch_options: RuntimeLaunchOptions) -> Self {
+        Self::apply_persisted_runtime_settings_from_disk(&mut launch_options);
         let splash_policy = SplashPolicy::Community;
         let splash_config = splash_policy.resolve(&launch_options.splash);
         let (resources, game_state, dialogs, pack_mount, asset_load_plan, decoded_project_cache) =

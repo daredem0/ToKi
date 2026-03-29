@@ -20,7 +20,7 @@ impl App {
             || matches!(event.key_without_modifiers(), Key::Named(named) if named == logical)
     }
 
-    fn resolve_save_root_from_base(
+    pub(super) fn resolve_save_root_from_base(
         base: Option<&std::path::Path>,
         cwd: Option<&std::path::Path>,
         project_path: Option<&std::path::Path>,
@@ -39,18 +39,24 @@ impl App {
     }
 
     pub(super) fn resolve_save_root(&self) -> std::path::PathBuf {
+        Self::resolve_save_root_for_launch_options(&self.launch_options)
+    }
+
+    pub(super) fn resolve_save_root_for_launch_options(
+        launch_options: &super::RuntimeLaunchOptions,
+    ) -> std::path::PathBuf {
         let data_dir = ProjectDirs::from("", "", "toki")
             .map(|dirs| dirs.data_local_dir().to_path_buf());
         Self::resolve_save_root_from_base(
             data_dir.as_deref(),
             std::env::current_dir().ok().as_deref(),
-            self.launch_options.project_path.as_deref(),
+            launch_options.project_path.as_deref(),
         )
     }
 
     pub(super) fn save_to_slot(&mut self, slot: u8) -> anyhow::Result<std::path::PathBuf> {
         let save_root = self.resolve_save_root();
-        let path = save_game_to_slot(&mut self.game_system.game_state, save_root, slot)?;
+        let path = save_game_to_slot(&mut self.game_system.game_state, &save_root, slot)?;
         tracing::info!(
             "Saved slot {} to '{}' (scene='{}')",
             slot,
@@ -63,7 +69,7 @@ impl App {
     pub(super) fn load_from_slot(&mut self, slot: u8) -> anyhow::Result<()> {
         let save_root = self.resolve_save_root();
         let save_path = save_slot_file_path(&save_root, slot)?;
-        let save_data = load_save_data_from_slot(save_root, slot)?;
+        let save_data = load_save_data_from_slot(&save_root, slot)?;
         let active_scene_name = save_data.active_scene_name.clone();
         SceneSystem::restore_from_save_data(&mut self.game_system.game_state, &save_data)
             .map_err(anyhow::Error::from)?;
