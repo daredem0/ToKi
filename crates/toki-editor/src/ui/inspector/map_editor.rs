@@ -1,7 +1,7 @@
 use super::*;
 
 impl InspectorSystem {
-    pub(super) fn render_map_editor_command_palette(
+    pub(crate) fn render_map_editor_command_palette(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         ctx: &egui::Context,

@@ -114,7 +114,7 @@ fn escape_requests_exit_confirmation_when_not_in_placement_mode() {
 #[test]
 fn escape_does_not_request_exit_when_sprite_editor_has_selection() {
     let mut app = EditorApp::new(None);
-    app.core.ui.workspace.center_panel_tab = CenterPanelTab::SpriteEditor;
+    app.core.ui.set_active_tab(CenterPanelTab::SpriteEditor);
     app.core.ui.sprite.new_canvas(8, 8);
     let mut selection = SelectionMask::new(8, 8);
     selection.select_pixel(1, 1);
@@ -128,7 +128,7 @@ fn escape_does_not_request_exit_when_sprite_editor_has_selection() {
 #[test]
 fn escape_does_not_request_exit_when_sprite_editor_has_floating_selection() {
     let mut app = EditorApp::new(None);
-    app.core.ui.workspace.center_panel_tab = CenterPanelTab::SpriteEditor;
+    app.core.ui.set_active_tab(CenterPanelTab::SpriteEditor);
     app.core.ui.sprite.new_canvas(8, 8);
     if let Some(canvas) = &mut app.core.ui.sprite.active_mut().canvas {
         canvas.set_pixel(1, 1, crate::ui::editor_ui::PixelColor::rgb(255, 0, 0));

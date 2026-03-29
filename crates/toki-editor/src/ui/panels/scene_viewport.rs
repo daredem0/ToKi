@@ -3,7 +3,7 @@ use crate::editor_viewport::EditorViewportContext;
 use crate::ui::EditorUI;
 
 impl PanelSystem {
-    pub(super) fn render_scene_viewport_tab(
+    pub(crate) fn render_scene_viewport_tab(
         ui: &mut egui::Ui,
         ui_state: &mut EditorUI,
         scene_viewport: Option<&mut SceneViewport>,

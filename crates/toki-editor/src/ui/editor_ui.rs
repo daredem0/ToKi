@@ -1,8 +1,12 @@
 use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
-use super::panels::{PanelSystem, ViewportPanelContext};
+use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
+use crate::ui::editor_context::{
+    default_active_context, default_parked_contexts, null_context, EditorContext,
+    EditorContextHost,
+};
 use crate::editor_tab_strip::EditorTabStripState;
 use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectTemplateKind;
@@ -81,7 +85,7 @@ pub enum Selection {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(clippy::enum_variant_names)]
 pub(crate) enum CenterPanelTab {
     SceneViewport,
@@ -551,34 +555,23 @@ pub struct EditorUI {
     pub project: ProjectEditorState,
 
     pub workspace: WorkspaceUiState,
-
-    // Map editor state
     pub map: MapEditorState,
-
-    // Sprite editor state
     pub sprite: SpriteEditorState,
-
-    // Animation editor state
     pub animation: AnimationEditorState,
-
-    // Dialog editor state
     pub dialog: DialogEditorState,
-
-    // Entity editor state
     pub entity_editor: EntityEditorState,
-
-    // Entity placement system
     pub placement: PlacementState,
-
-    // Scene graph editor state
     pub graph: GraphEditorState,
+    pub viewport_cursor: ViewportCursorState,
+    active_tab: CenterPanelTab,
+    active_context: Box<dyn EditorContext>,
+    parked_contexts: HashMap<CenterPanelTab, Box<dyn EditorContext>>,
 
     pub command_history: UndoRedoHistory, // Undo/redo command history for scene mutations
 
     // Multi-entity inspector draft state
     pub multi_entity: MultiEntityInspectorState,
     pub menu_preview_font_families: Vec<String>,
-    pub viewport_cursor: ViewportCursorState,
 }
 
 pub struct EditorRenderContext<'a> {
@@ -594,6 +587,72 @@ pub struct EditorRenderContext<'a> {
 }
 
 impl EditorUI {
+    pub fn active_tab(&self) -> CenterPanelTab {
+        self.active_tab
+    }
+
+    pub fn set_active_tab(&mut self, tab: CenterPanelTab) {
+        if self.active_tab == tab {
+            return;
+        }
+
+        let mut old_context = std::mem::replace(&mut self.active_context, null_context());
+        old_context.on_deactivate(self);
+        self.parked_contexts.insert(self.active_tab, old_context);
+
+        let mut new_context = self
+            .parked_contexts
+            .remove(&tab)
+            .unwrap_or_else(|| default_active_context(tab));
+        self.active_tab = tab;
+        self.workspace.center_panel_tab = tab;
+        new_context.on_activate(self);
+        self.active_context = new_context;
+    }
+
+    pub(crate) fn context<T: 'static>(&self, tab: CenterPanelTab) -> Option<&T> {
+        if self.active_tab == tab {
+            self.active_context.as_any().downcast_ref::<T>()
+        } else {
+            match self.parked_contexts.get(&tab) {
+                Some(context) => context.as_any().downcast_ref::<T>(),
+                None => None,
+            }
+        }
+    }
+
+    pub(crate) fn context_mut<T: 'static>(&mut self, tab: CenterPanelTab) -> Option<&mut T> {
+        if self.active_tab == tab {
+            self.active_context.as_any_mut().downcast_mut::<T>()
+        } else {
+            match self.parked_contexts.get_mut(&tab) {
+                Some(context) => context.as_any_mut().downcast_mut::<T>(),
+                None => None,
+            }
+        }
+    }
+
+    pub(crate) fn with_active_context<R>(
+        &mut self,
+        f: impl FnOnce(&mut dyn EditorContext, &mut EditorUI) -> R,
+    ) -> R {
+        let mut context = std::mem::replace(&mut self.active_context, null_context());
+        let result = f(context.as_mut(), self);
+        self.active_context = context;
+        result
+    }
+
+    pub(crate) fn active_context_ref(&self) -> &dyn EditorContext {
+        self.active_context.as_ref()
+    }
+
+    pub fn remember_viewport_cursor_world_position(&mut self, world_pos: glam::Vec2) {
+        self.viewport_cursor.world_position = Some(glam::IVec2::new(
+            world_pos.x.floor() as i32,
+            world_pos.y.floor() as i32,
+        ));
+    }
+
     pub fn new() -> Self {
         Self {
             // Scene management
@@ -612,27 +671,17 @@ impl EditorUI {
             project: ProjectEditorState::default(),
 
             workspace: WorkspaceUiState::default(),
-
-            // Map editor state
             map: MapEditorState::default(),
-
-            // Sprite editor state
             sprite: SpriteEditorState::default(),
-
-            // Animation editor state
             animation: AnimationEditorState::default(),
-
-            // Dialog editor state
             dialog: DialogEditorState::default(),
-
-            // Entity editor state
             entity_editor: EntityEditorState::default(),
-
-            // Entity placement system
             placement: PlacementState::default(),
-
-            // Scene graph editor state
             graph: GraphEditorState::default(),
+            viewport_cursor: ViewportCursorState::default(),
+            active_tab: CenterPanelTab::SceneViewport,
+            active_context: default_active_context(CenterPanelTab::SceneViewport),
+            parked_contexts: default_parked_contexts(CenterPanelTab::SceneViewport),
 
             command_history: UndoRedoHistory::default(),
             multi_entity: MultiEntityInspectorState::default(),
@@ -641,15 +690,7 @@ impl EditorUI {
                 "Serif".to_string(),
                 "Mono".to_string(),
             ],
-            viewport_cursor: ViewportCursorState::default(),
         }
-    }
-
-    pub fn remember_viewport_cursor_world_position(&mut self, world_pos: glam::Vec2) {
-        self.viewport_cursor.world_position = Some(glam::IVec2::new(
-            world_pos.x.floor() as i32,
-            world_pos.y.floor() as i32,
-        ));
     }
 
     // Scene management methods
@@ -824,23 +865,44 @@ impl EditorUI {
     }
 
     /// Render the entire UI
-    pub fn render(&mut self, ctx: &egui::Context, mut render_ctx: EditorRenderContext<'_>) {
-        let config_readonly = render_ctx.config.as_deref();
+    pub fn render(&mut self, ctx: &egui::Context, render_ctx: EditorRenderContext<'_>) {
+        let EditorRenderContext {
+            scene_viewport,
+            map_editor_viewport,
+            project,
+            project_assets,
+            available_map_names,
+            config,
+            log_capture,
+            renderer,
+            busy_logo_texture,
+        } = render_ctx;
+        let mut context_host = EditorContextHost {
+            scene_viewport,
+            map_editor_viewport,
+            project,
+            project_assets,
+            available_map_names,
+            config,
+            log_capture,
+            renderer,
+        };
+        let config_readonly = context_host.config.as_deref();
         MenuSystem::render_top_menu(
             self,
             ctx,
-            render_ctx.project.as_deref_mut(),
+            context_host.project.as_deref_mut(),
             config_readonly,
-            render_ctx.busy_logo_texture,
+            busy_logo_texture,
         );
 
         // Render log panel first to claim full width at bottom
         if self.visibility.show_console {
-            PanelSystem::render_log_panel(self, ctx, render_ctx.log_capture);
+            PanelSystem::render_log_panel(self, ctx, context_host.log_capture);
         }
 
         // Render hierarchy and inspector panels
-        let game_state = render_ctx.scene_viewport.as_ref().map(|v| v.game_state());
+        let game_state = context_host.scene_viewport.as_ref().map(|v| v.game_state());
 
         if self.visibility.show_hierarchy {
             self.render_hierarchy_and_maps_combined_panel(ctx, game_state, config_readonly);
@@ -851,30 +913,18 @@ impl EditorUI {
                 self,
                 ctx,
                 game_state,
-                render_ctx.project.as_deref_mut(),
-                render_ctx.project_assets.as_deref_mut(),
+                context_host.project.as_deref_mut(),
+                context_host.project_assets.as_deref_mut(),
                 config_readonly,
             );
         }
 
-        if self.workspace.center_panel_tab == CenterPanelTab::MenuEditor {
-            self.sync_menu_editor_selection(render_ctx.project.as_deref());
+        if self.active_tab() == CenterPanelTab::MenuEditor {
+            self.sync_menu_editor_selection(context_host.project.as_deref());
         }
 
         // Render viewport last (mutable access)
-        PanelSystem::render_viewport(
-            self,
-            ctx,
-            ViewportPanelContext {
-                scene_viewport: render_ctx.scene_viewport,
-                map_editor_viewport: render_ctx.map_editor_viewport,
-                project: render_ctx.project,
-                project_assets: render_ctx.project_assets,
-                available_map_names: render_ctx.available_map_names,
-                config: render_ctx.config,
-                renderer: render_ctx.renderer,
-            },
-        );
+        PanelSystem::render_viewport(self, ctx, &mut context_host);
     }
 
     /// Apply config settings to UI state

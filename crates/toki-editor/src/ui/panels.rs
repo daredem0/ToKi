@@ -12,6 +12,7 @@ use super::editor_domain::{
     RuleActionEditorKind as GraphActionKind, RuleConditionEditorKind as GraphConditionKind,
     RuleTriggerEditorKind as GraphTriggerKind,
 };
+use super::editor_context::EditorContextHost;
 use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
 use super::interactions::{
     CameraInteraction, MapObjectInteraction, MapPaintInteraction, PlacementInteraction,
@@ -31,34 +32,24 @@ use toki_core::rules::{
 };
 
 #[path = "panels/animation_editor/mod.rs"]
-mod animation_editor;
-mod dialog_editor;
+pub(crate) mod animation_editor;
+pub(crate) mod dialog_editor;
 #[path = "panels/entity_editor/mod.rs"]
-mod entity_editor;
+pub(crate) mod entity_editor;
 mod map_editor;
 mod map_editor_interactions;
 mod map_editor_preview;
-mod menu_editor;
+pub(crate) mod menu_editor;
 mod scene_graph;
 mod scene_graph_canvas;
 mod scene_graph_editors;
 mod scene_graph_layout;
 mod scene_graph_validation;
 mod scene_viewport;
-mod sprite_editor;
+pub(crate) mod sprite_editor;
 
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
-
-pub struct ViewportPanelContext<'a> {
-    pub scene_viewport: Option<&'a mut SceneViewport>,
-    pub map_editor_viewport: Option<&'a mut SceneViewport>,
-    pub project: Option<&'a mut crate::project::Project>,
-    pub project_assets: Option<&'a mut crate::project::ProjectAssets>,
-    pub available_map_names: Option<Vec<String>>,
-    pub config: Option<&'a mut EditorConfig>,
-    pub renderer: Option<&'a mut egui_wgpu::Renderer>,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GraphValidationSeverity {
@@ -164,77 +155,24 @@ impl PanelSystem {
     pub fn render_viewport(
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
-        panel_ctx: ViewportPanelContext<'_>,
+        host: &mut EditorContextHost<'_>,
     ) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            let mut selected_tab = ui_state.active_tab();
             render_tab_strip(
                 ui,
                 "center_panel_tabs",
                 &mut ui_state.workspace.center_panel_tab_strip,
-                &mut ui_state.workspace.center_panel_tab,
+                &mut selected_tab,
                 &Self::center_panel_tabs(),
             );
             ui.separator();
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::SceneGraph {
-                Self::render_scene_graph(ui, ui_state, false, panel_ctx.config.as_deref());
-                return;
+            if selected_tab != ui_state.active_tab() {
+                ui_state.set_active_tab(selected_tab);
             }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::SceneRules {
-                Self::render_scene_graph(ui, ui_state, true, panel_ctx.config.as_deref());
-                return;
-            }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor {
-                Self::render_map_editor(
-                    ui,
-                    ui_state,
-                    panel_ctx.map_editor_viewport,
-                    panel_ctx.available_map_names,
-                    panel_ctx.config,
-                    panel_ctx.renderer,
-                );
-                return;
-            }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::MenuEditor {
-                menu_editor::render_menu_editor(ui, ui_state, panel_ctx.project);
-                return;
-            }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::DialogEditor {
-                dialog_editor::render_dialog_editor(
-                    ui,
-                    ui_state,
-                    panel_ctx.project_assets,
-                    panel_ctx.project,
-                );
-                return;
-            }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::SpriteEditor {
-                sprite_editor::render_sprite_editor(ui, ui_state, ctx, panel_ctx.project);
-                return;
-            }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::AnimationEditor {
-                animation_editor::render_animation_editor(ui, ui_state, ctx, panel_ctx.project);
-                return;
-            }
-
-            if ui_state.workspace.center_panel_tab == CenterPanelTab::EntityEditor {
-                entity_editor::render_entity_editor(ui, ui_state, ctx, panel_ctx.project);
-                return;
-            }
-
-            Self::render_scene_viewport_tab(
-                ui,
-                ui_state,
-                panel_ctx.scene_viewport,
-                panel_ctx.config,
-                panel_ctx.renderer,
-            );
+            ui_state.with_active_context(|context, shell| {
+                context.render_center_panel(shell, ui, ctx, host);
+            });
         });
     }
 

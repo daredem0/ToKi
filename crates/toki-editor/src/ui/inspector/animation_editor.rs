@@ -6,7 +6,7 @@ use super::InspectorSystem;
 impl InspectorSystem {
     /// Render inspector panel when the Animation Editor tab is active.
     /// Shows clip settings, atlas info, and preview controls.
-    pub(super) fn render_animation_editor_inspector(
+    pub(crate) fn render_animation_editor_inspector(
         ui_state: &mut crate::ui::EditorUI,
         ui: &mut egui::Ui,
     ) {

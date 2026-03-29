@@ -27,7 +27,7 @@ enum DialogConditionKind {
     FlagGreaterThan,
 }
 
-pub(super) fn render_dialog_editor(
+pub(crate) fn render_dialog_editor(
     ui: &mut Ui,
     ui_state: &mut EditorUI,
     project_assets: Option<&mut ProjectAssets>,

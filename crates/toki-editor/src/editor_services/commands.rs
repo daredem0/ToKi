@@ -1,5 +1,5 @@
 use crate::project::Project;
-use crate::ui::editor_ui::{CenterPanelTab, EditorUI};
+use crate::ui::EditorUI;
 use crate::ui::undo_redo::EditorCommand;
 
 pub fn execute(ui_state: &mut EditorUI, command: EditorCommand) -> bool {
@@ -21,13 +21,8 @@ pub fn execute_with_project(
 }
 
 pub fn undo(ui_state: &mut EditorUI) -> bool {
-    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
-        && ui_state.map.history.can_undo()
-    {
-        let mut history = std::mem::take(&mut ui_state.map.history);
-        let undone = history.undo(ui_state);
-        ui_state.map.history = history;
-        return undone;
+    if ui_state.with_active_context(|context, shell| context.can_undo(shell)) {
+        return ui_state.with_active_context(|context, shell| context.undo(shell, None));
     }
 
     let mut history = std::mem::take(&mut ui_state.command_history);
@@ -37,13 +32,8 @@ pub fn undo(ui_state: &mut EditorUI) -> bool {
 }
 
 pub fn undo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool {
-    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
-        && ui_state.map.history.can_undo()
-    {
-        let mut history = std::mem::take(&mut ui_state.map.history);
-        let undone = history.undo(ui_state);
-        ui_state.map.history = history;
-        return undone;
+    if ui_state.with_active_context(|context, shell| context.can_undo(shell)) {
+        return ui_state.with_active_context(|context, shell| context.undo(shell, Some(project)));
     }
 
     let mut history = std::mem::take(&mut ui_state.command_history);
@@ -53,13 +43,8 @@ pub fn undo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool
 }
 
 pub fn redo(ui_state: &mut EditorUI) -> bool {
-    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
-        && ui_state.map.history.can_redo()
-    {
-        let mut history = std::mem::take(&mut ui_state.map.history);
-        let redone = history.redo(ui_state);
-        ui_state.map.history = history;
-        return redone;
+    if ui_state.with_active_context(|context, shell| context.can_redo(shell)) {
+        return ui_state.with_active_context(|context, shell| context.redo(shell, None));
     }
 
     let mut history = std::mem::take(&mut ui_state.command_history);
@@ -69,13 +54,8 @@ pub fn redo(ui_state: &mut EditorUI) -> bool {
 }
 
 pub fn redo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool {
-    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
-        && ui_state.map.history.can_redo()
-    {
-        let mut history = std::mem::take(&mut ui_state.map.history);
-        let redone = history.redo(ui_state);
-        ui_state.map.history = history;
-        return redone;
+    if ui_state.with_active_context(|context, shell| context.can_redo(shell)) {
+        return ui_state.with_active_context(|context, shell| context.redo(shell, Some(project)));
     }
 
     let mut history = std::mem::take(&mut ui_state.command_history);
@@ -85,17 +65,9 @@ pub fn redo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool
 }
 
 pub fn can_undo(ui_state: &EditorUI) -> bool {
-    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor {
-        ui_state.map.history.can_undo()
-    } else {
-        ui_state.command_history.can_undo()
-    }
+    ui_state.active_context_ref().can_undo(ui_state) || ui_state.command_history.can_undo()
 }
 
 pub fn can_redo(ui_state: &EditorUI) -> bool {
-    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor {
-        ui_state.map.history.can_redo()
-    } else {
-        ui_state.command_history.can_redo()
-    }
+    ui_state.active_context_ref().can_redo(ui_state) || ui_state.command_history.can_redo()
 }

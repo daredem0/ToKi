@@ -6,7 +6,7 @@ use super::InspectorSystem;
 impl InspectorSystem {
     /// Render inspector panel when the Entity Editor tab is active.
     /// Shows entity info, component toggles, and quick actions.
-    pub(super) fn render_entity_editor_inspector(
+    pub(crate) fn render_entity_editor_inspector(
         ui_state: &mut crate::ui::EditorUI,
         ui: &mut egui::Ui,
     ) {
@@ -37,8 +37,7 @@ impl InspectorSystem {
 
         if ui.button("Open in Animation Editor").clicked() {
             // Switch to animation editor tab (entity stays selected)
-            ui_state.workspace.center_panel_tab =
-                crate::ui::editor_ui::CenterPanelTab::AnimationEditor;
+            ui_state.set_active_tab(crate::ui::editor_ui::CenterPanelTab::AnimationEditor);
         }
 
         ui.separator();
