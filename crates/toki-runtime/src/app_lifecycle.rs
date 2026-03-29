@@ -49,8 +49,8 @@ impl App {
     }
 
     pub(super) fn save_to_slot(&mut self, slot: u8) -> anyhow::Result<std::path::PathBuf> {
-        SceneSystem::sync_persistent_entities_to_active_scene(&mut self.game_system.game_state);
-        let path = save_game_to_slot(&self.game_system.game_state, self.resolve_save_root(), slot)?;
+        let save_root = self.resolve_save_root();
+        let path = save_game_to_slot(&mut self.game_system.game_state, save_root, slot)?;
         tracing::info!(
             "Saved slot {} to '{}' (scene='{}')",
             slot,

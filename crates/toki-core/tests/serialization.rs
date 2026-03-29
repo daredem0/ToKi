@@ -251,6 +251,89 @@ fn restore_from_save_data_preserves_saved_player_in_scene_without_player_entry()
 }
 
 #[test]
+fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_scene() {
+    let mut state = GameState::new_empty();
+    state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
+
+    let mut main_scene = Scene::new("main".to_string());
+    main_scene.anchors.push(toki_core::scene::SceneAnchor {
+        id: "main_spawn".to_string(),
+        kind: toki_core::scene::SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(16, 16),
+        facing: None,
+    });
+    main_scene.player_entry = Some(toki_core::scene::ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "main_spawn".to_string(),
+    });
+
+    let mut side_scene = Scene::new("side".to_string());
+    side_scene.anchors.push(toki_core::scene::SceneAnchor {
+        id: "door".to_string(),
+        kind: toki_core::scene::SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(96, 112),
+        facing: None,
+    });
+    let mut wounded_npc = persistent_npc(2, IVec2::new(110, 120));
+    wounded_npc.persistent_across_saves = false;
+    wounded_npc.attributes.health = Some(100);
+    let mut dropped_item = create_test_entity();
+    dropped_item.id = 3;
+    dropped_item.entity_kind = EntityKind::Item;
+    dropped_item.control_role = ControlRole::None;
+    dropped_item.position = IVec2::new(132, 120);
+    side_scene.entities.push(wounded_npc);
+    side_scene.entities.push(dropped_item);
+
+    SceneSystem::add_scene(&mut state, main_scene.clone());
+    SceneSystem::add_scene(&mut state, side_scene.clone());
+    SceneSystem::load(&mut state, "main").expect("main scene should load");
+    SceneSystem::transition(&mut state, "side", "door")
+        .expect("side scene should load through transition");
+
+    let entity_manager = state.world_mut().entity_manager_mut();
+    entity_manager
+        .get_entity_mut(2)
+        .expect("npc should exist")
+        .attributes
+        .health = Some(25);
+    entity_manager.despawn_entity(3);
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    save_game_to_slot(&mut state, temp_dir.path(), 1).expect("slot save should succeed");
+    let save = load_save_data_from_slot(temp_dir.path(), 1).expect("slot load should succeed");
+
+    let mut restored = GameState::new_empty();
+    restored
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
+    SceneSystem::add_scene(&mut restored, main_scene);
+    SceneSystem::add_scene(&mut restored, side_scene);
+    SceneSystem::load(&mut restored, "main").expect("startup scene should load");
+    toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save)
+        .expect("save should restore");
+
+    assert_eq!(
+        SceneSystem::active_scene(&restored).map(|scene| scene.name.as_str()),
+        Some("side")
+    );
+    let restored_scene = SceneSystem::active_scene(&restored).expect("side scene should be active");
+    assert!(
+        restored_scene.get_entity(3).is_none(),
+        "despawned ground item should stay gone after load"
+    );
+    assert_eq!(
+        restored_scene
+            .get_entity(2)
+            .and_then(|entity| entity.attributes.health),
+        Some(25),
+        "damaged npc health should restore from the save"
+    );
+}
+
+#[test]
 fn test_entity_manager_roundtrip() {
     let manager = create_test_entity_manager();
     let original_player_id = manager.get_player_id().unwrap();
@@ -382,6 +465,8 @@ fn save_data_round_trips_with_versioned_metadata() {
     );
     assert_eq!(loaded.camera.position, Some(IVec2::new(6, 8)));
     assert_eq!(loaded.camera.scale, Some(3));
+    assert_eq!(loaded.scene_snapshots.len(), 1);
+    assert_eq!(loaded.scene_snapshots[0].name, "main");
 }
 
 #[test]
@@ -458,11 +543,11 @@ fn restore_from_save_data_rehydrates_existing_project_state() {
 
 #[test]
 fn save_slot_metadata_lists_existing_slots_and_empty_slots() {
-    let state = create_save_test_state();
+    let mut state = create_save_test_state();
     let temp_dir = tempfile::tempdir().unwrap();
 
-    let slot_one_path = save_game_to_slot(&state, temp_dir.path(), 1).unwrap();
-    let slot_three_path = save_game_to_slot(&state, temp_dir.path(), 3).unwrap();
+    let slot_one_path = save_game_to_slot(&mut state, temp_dir.path(), 1).unwrap();
+    let slot_three_path = save_game_to_slot(&mut state, temp_dir.path(), 3).unwrap();
     assert!(slot_one_path.ends_with("slot_1.json"));
     assert!(slot_three_path.ends_with("slot_3.json"));
 
@@ -475,10 +560,10 @@ fn save_slot_metadata_lists_existing_slots_and_empty_slots() {
 
 #[test]
 fn save_slot_helpers_reject_invalid_slot_numbers() {
-    let state = create_save_test_state();
+    let mut state = create_save_test_state();
     let temp_dir = tempfile::tempdir().unwrap();
 
-    let error = save_game_to_slot(&state, temp_dir.path(), 0).unwrap_err();
+    let error = save_game_to_slot(&mut state, temp_dir.path(), 0).unwrap_err();
     assert!(matches!(error, SerializationError::InvalidSaveSlot(0)));
 }
 

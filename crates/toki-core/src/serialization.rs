@@ -1,6 +1,7 @@
 use crate::entity::{Entity, EntityManager};
 use crate::game::{GameState, RestoreError};
 use crate::ids::SceneId;
+use crate::scene::Scene;
 use crate::GameFlags;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -67,6 +68,8 @@ pub struct SaveData {
     pub flags: GameFlags,
     #[serde(default)]
     pub camera: SavedCameraState,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scene_snapshots: Vec<Scene>,
     #[serde(default)]
     pub persisted_entities: Vec<PersistedSceneEntityState>,
 }
@@ -109,6 +112,16 @@ impl SaveData {
             camera: SavedCameraState {
                 position: camera_position,
                 scale: camera_scale,
+            },
+            scene_snapshots: {
+                let mut snapshots = game_state
+                    .scene()
+                    .scene_manager()
+                    .scene_entries()
+                    .map(|(_, scene)| scene.clone())
+                    .collect::<Vec<_>>();
+                snapshots.sort_by(|left, right| left.name.cmp(&right.name));
+                snapshots
             },
             persisted_entities: game_state
                 .persistent_scene_entity_keys()
@@ -196,7 +209,7 @@ pub fn save_slot_file_path(
 }
 
 pub fn save_game_to_slot(
-    game_state: &GameState,
+    game_state: &mut GameState,
     save_root: impl AsRef<Path>,
     slot: u8,
 ) -> Result<PathBuf, SerializationError> {
@@ -204,6 +217,7 @@ pub fn save_game_to_slot(
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+    crate::game::SceneSystem::sync_entities_to_active_scene(game_state);
     let save_data = SaveData::capture(game_state, slot)?;
     save_save_data(&save_data, &path)?;
     Ok(path)
