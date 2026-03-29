@@ -13,14 +13,14 @@ impl InspectorSystem {
         ui.heading("Entity Editor");
         ui.separator();
 
-        if !ui_state.entity_editor.has_entity() {
+        if !crate::ui::editor_context::entity_editor_state(ui_state).has_entity() {
             ui.label("No entity selected.");
             ui.label("Select an entity from the browser or create a new one.");
             return;
         }
 
         // Entity info
-        if let Some(summary) = ui_state.entity_editor.selected_entity_summary() {
+        if let Some(summary) = crate::ui::editor_context::entity_editor_state(ui_state).selected_entity_summary() {
             ui.label(format!("Name: {}", summary.name));
             ui.label(format!("Display: {}", summary.display_name));
             ui.label(format!("Category: {}", summary.category));
@@ -46,18 +46,18 @@ impl InspectorSystem {
         ui.label("Browser Statistics:");
         ui.label(format!(
             "Total entities: {}",
-            ui_state.entity_editor.entities.len()
+            crate::ui::editor_context::entity_editor_state(ui_state).entities.len()
         ));
 
-        let filtered_count = ui_state.entity_editor.filtered_entities().len();
-        if ui_state.entity_editor.filter.is_active() {
+        let filtered_count = crate::ui::editor_context::entity_editor_state(ui_state).filtered_entities().len();
+        if crate::ui::editor_context::entity_editor_state(ui_state).filter.is_active() {
             ui.label(format!("Filtered: {}", filtered_count));
         }
 
-        let category_count = ui_state.entity_editor.all_categories().len();
+        let category_count = crate::ui::editor_context::entity_editor_state(ui_state).all_categories().len();
         ui.label(format!("Categories: {}", category_count));
 
-        let tag_count = ui_state.entity_editor.all_tags().len();
+        let tag_count = crate::ui::editor_context::entity_editor_state(ui_state).all_tags().len();
         ui.label(format!("Unique tags: {}", tag_count));
 
         // Help

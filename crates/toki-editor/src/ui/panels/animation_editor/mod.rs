@@ -41,7 +41,7 @@ pub fn render_animation_editor(
     sync_preview_palette(ui_state);
 
     // Handle new clip dialog
-    if ui_state.animation.show_new_clip_dialog {
+    if crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog {
         dialogs::render_new_clip_dialog(ui_state, ctx);
     }
 
@@ -50,7 +50,7 @@ pub fn render_animation_editor(
     ui.separator();
 
     // Main content
-    if ui_state.animation.has_entity() {
+    if crate::ui::editor_context::animation_state_mut(ui_state).has_entity() {
         render_editor_content(ui, ui_state, ctx);
     } else {
         render_no_entity_message(ui);
@@ -74,7 +74,7 @@ fn sync_with_selection(ui_state: &mut EditorUI, project_path: Option<&Path>) {
     };
 
     // Check if we already have this entity loaded
-    if ui_state.animation.active_entity.as_ref() == Some(&entity_name) {
+    if crate::ui::editor_context::animation_state_mut(ui_state).active_entity.as_ref() == Some(&entity_name) {
         return;
     }
 
@@ -83,21 +83,28 @@ fn sync_with_selection(ui_state: &mut EditorUI, project_path: Option<&Path>) {
 }
 
 fn sync_preview_palette(ui_state: &mut EditorUI) {
+    let atlas_color_mode = crate::ui::editor_context::animation_state(ui_state).atlas_color_mode;
+    let atlas_entity_palette_override = crate::ui::editor_context::animation_state(ui_state)
+        .atlas_entity_palette_override
+        .clone();
+    let atlas_default_palette = crate::ui::editor_context::animation_state(ui_state)
+        .atlas_default_palette
+        .clone();
     let resolved = resolve_indexed_preview_palette(
-        ui_state.animation.atlas_color_mode,
+        atlas_color_mode,
         &ui_state.project.available_palettes,
         ui_state.project.indexed_palette_override.as_deref(),
-        ui_state.animation.atlas_entity_palette_override.as_deref(),
-        ui_state.animation.atlas_default_palette.as_deref(),
+        atlas_entity_palette_override.as_deref(),
+        atlas_default_palette.as_deref(),
     )
     .ok()
     .flatten()
     .map(|(palette_id, _)| palette_id);
 
-    if ui_state.animation.atlas_palette_id != resolved {
-        ui_state.animation.atlas_palette_id = resolved;
-        ui_state.animation.atlas_texture = None;
-        ui_state.animation.atlas_texture_cache_key = None;
+    if crate::ui::editor_context::animation_state_mut(ui_state).atlas_palette_id != resolved {
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_palette_id = resolved;
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture = None;
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_cache_key = None;
     }
 }
 
@@ -117,8 +124,8 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     let available_height = ui.available_height();
 
     // Get panel widths from state
-    let clip_list_width = ui_state.animation.clip_list_width;
-    let frame_sequence_width = ui_state.animation.frame_sequence_width;
+    let clip_list_width = crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width;
+    let frame_sequence_width = crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width;
     let separator_width = 8.0; // Width of draggable separator
     let center_width =
         (available_width - clip_list_width - frame_sequence_width - separator_width * 2.0)
@@ -137,7 +144,7 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         // Draggable separator between clip list and center
         let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
-            ui_state.animation.clip_list_width = (ui_state.animation.clip_list_width
+            crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width = (crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width
                 + sep_response.drag_delta().x)
                 .clamp(120.0, available_width * 0.4);
         }
@@ -155,7 +162,7 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
             // Dragging right makes frame panel smaller
-            ui_state.animation.frame_sequence_width = (ui_state.animation.frame_sequence_width
+            crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width = (crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width
                 - sep_response.drag_delta().x)
                 .clamp(150.0, available_width * 0.4);
         }
@@ -179,7 +186,7 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
     preview::render_preview_controls(ui, ui_state, ctx);
 
     // Get preview height from state
-    let preview_height = ui_state.animation.preview_height;
+    let preview_height = crate::ui::editor_context::animation_state_mut(ui_state).preview_height;
 
     // Preview area with stored height
     ui.group(|ui| {
@@ -191,7 +198,7 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
     // Draggable separator between preview and atlas
     let sep_response = render_horizontal_separator(ui, available_width);
     if sep_response.dragged() {
-        ui_state.animation.preview_height = (ui_state.animation.preview_height
+        crate::ui::editor_context::animation_state_mut(ui_state).preview_height = (crate::ui::editor_context::animation_state_mut(ui_state).preview_height
             + sep_response.drag_delta().y)
             .clamp(100.0, available_height - 150.0);
     }

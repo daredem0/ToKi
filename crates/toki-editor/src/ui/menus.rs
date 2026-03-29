@@ -75,7 +75,7 @@ impl MenuSystem {
                         .clicked()
                     {
                         tracing::debug!("Save Map clicked");
-                        ui_state.map.save_requested = true;
+                        crate::ui::editor_context::map_state_mut(ui_state).save_requested = true;
                     }
                     if ui
                         .add_enabled(

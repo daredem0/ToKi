@@ -31,9 +31,9 @@ pub fn render_sprite_editor(
     ui.separator();
 
     // Main content area - render based on layout mode
-    match ui_state.sprite.layout {
+    match crate::ui::editor_context::sprite_state_mut(ui_state).layout {
         DualCanvasLayout::Single => {
-            if ui_state.sprite.has_canvas() {
+            if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
                 canvas::render_canvas_viewport(ui, ui_state, ctx, None);
             } else {
                 layout::render_no_canvas_message(ui, ui_state, sprites_dir.as_deref());

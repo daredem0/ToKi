@@ -23,7 +23,7 @@ pub fn render_toolbar(
             .clicked()
         {
             if let Some(dir) = sprites_dir {
-                ui_state.sprite.begin_load_dialog(dir);
+                crate::ui::editor_context::sprite_state_mut(ui_state).begin_load_dialog(dir);
             }
         }
 
@@ -34,7 +34,7 @@ pub fn render_toolbar(
             .clicked()
         {
             if let Some(dir) = sprites_dir {
-                ui_state.sprite.begin_merge_dialog(dir);
+                crate::ui::editor_context::sprite_state_mut(ui_state).begin_merge_dialog(dir);
             }
         }
 
@@ -45,14 +45,14 @@ pub fn render_toolbar(
                 .add_filter("Images", &["png", "jpg", "jpeg", "bmp"])
                 .pick_file()
             {
-                if let Err(e) = ui_state.sprite.import_external_image(&path) {
+                if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).import_external_image(&path) {
                     tracing::error!("Failed to import image: {}", e);
                 }
             }
         }
 
         // Export as PNG
-        let has_canvas = ui_state.sprite.has_canvas();
+        let has_canvas = crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas();
         if ui
             .add_enabled(has_canvas, egui::Button::new("Export PNG..."))
             .clicked()
@@ -63,20 +63,20 @@ pub fn render_toolbar(
                 .set_file_name("sprite.png")
                 .save_file()
             {
-                if let Err(e) = ui_state.sprite.export_as_png(&path) {
+                if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).export_as_png(&path) {
                     tracing::error!("Failed to export image: {}", e);
                 }
             }
         }
 
-        if ui_state.sprite.has_canvas() && ui_state.sprite.active().dirty {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() && crate::ui::editor_context::sprite_state_mut(ui_state).active().dirty {
             ui.label("Unsaved changes");
         }
 
         ui.separator();
 
         // Layout toggle button
-        let layout_label = match ui_state.sprite.layout {
+        let layout_label = match crate::ui::editor_context::sprite_state_mut(ui_state).layout {
             DualCanvasLayout::Single => "Single",
             DualCanvasLayout::Horizontal => "Side-by-Side",
             DualCanvasLayout::Vertical => "Stacked",
@@ -86,13 +86,13 @@ pub fn render_toolbar(
             .on_hover_text("Click to cycle between Single, Side-by-Side, and Stacked layouts")
             .clicked()
         {
-            ui_state.sprite.cycle_layout();
+            crate::ui::editor_context::sprite_state_mut(ui_state).cycle_layout();
         }
 
         // Show active canvas indicator when in dual mode
-        if ui_state.sprite.layout != DualCanvasLayout::Single {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).layout != DualCanvasLayout::Single {
             ui.separator();
-            let active_label = match ui_state.sprite.active_canvas {
+            let active_label = match crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas {
                 crate::ui::editor_ui::CanvasSide::Left => "Left",
                 crate::ui::editor_ui::CanvasSide::Right => "Right",
             };
@@ -102,16 +102,16 @@ pub fn render_toolbar(
                 .on_hover_text("Switch active canvas")
                 .clicked()
             {
-                ui_state.sprite.switch_active_canvas();
+                crate::ui::editor_context::sprite_state_mut(ui_state).switch_active_canvas();
             }
         }
     });
 
     // Show current tool (like map editor)
-    if ui_state.sprite.has_canvas() {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
         ui.horizontal(|ui| {
             ui.label("Tool:");
-            ui.label(tool_label(ui_state.sprite.tool));
+            ui.label(tool_label(crate::ui::editor_context::sprite_state_mut(ui_state).tool));
         });
     }
 }

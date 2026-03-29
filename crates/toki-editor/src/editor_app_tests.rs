@@ -91,11 +91,20 @@ fn editor_shortcut_action_ignores_non_ctrl_sequences() {
 #[test]
 fn escape_exits_placement_mode_before_requesting_editor_close() {
     let mut app = EditorApp::new(None);
-    app.core.ui.enter_placement_mode("player".to_string());
+    app.core
+        .ui
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode("player".to_string());
 
     app.handle_escape_key();
 
-    assert!(!app.core.ui.is_in_placement_mode());
+    assert!(!app
+        .core
+        .ui
+        .scene_viewport_context()
+        .placement
+        .is_in_placement_mode());
     assert!(app.core.ui.project.pending_confirmation.is_none());
 }
 
@@ -115,10 +124,10 @@ fn escape_requests_exit_confirmation_when_not_in_placement_mode() {
 fn escape_does_not_request_exit_when_sprite_editor_has_selection() {
     let mut app = EditorApp::new(None);
     app.core.ui.set_active_tab(CenterPanelTab::SpriteEditor);
-    app.core.ui.sprite.new_canvas(8, 8);
+    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).new_canvas(8, 8);
     let mut selection = SelectionMask::new(8, 8);
     selection.select_pixel(1, 1);
-    app.core.ui.sprite.active_mut().selection = Some(selection);
+    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).active_mut().selection = Some(selection);
 
     app.handle_escape_key();
 
@@ -129,14 +138,14 @@ fn escape_does_not_request_exit_when_sprite_editor_has_selection() {
 fn escape_does_not_request_exit_when_sprite_editor_has_floating_selection() {
     let mut app = EditorApp::new(None);
     app.core.ui.set_active_tab(CenterPanelTab::SpriteEditor);
-    app.core.ui.sprite.new_canvas(8, 8);
-    if let Some(canvas) = &mut app.core.ui.sprite.active_mut().canvas {
+    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).new_canvas(8, 8);
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).active_mut().canvas {
         canvas.set_pixel(1, 1, crate::ui::editor_ui::PixelColor::rgb(255, 0, 0));
     }
     let mut selection = SelectionMask::new(8, 8);
     selection.select_pixel(1, 1);
-    app.core.ui.sprite.active_mut().selection = Some(selection);
-    assert!(app.core.ui.sprite.lift_selection());
+    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).active_mut().selection = Some(selection);
+    assert!(crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).lift_selection());
 
     app.handle_escape_key();
 
@@ -1344,7 +1353,10 @@ fn build_scene_anchor_overlay_lines_use_drag_preview_instead_of_original_anchor(
     });
     ui_state.scenes = vec![scene];
     ui_state.active_scene = Some("Main Scene".to_string());
-    ui_state.begin_scene_anchor_move_drag(crate::ui::editor_ui::SceneAnchorMoveDragState {
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .begin_scene_anchor_move_drag(crate::ui::editor_ui::SceneAnchorMoveDragState {
         scene_name: "Main Scene".to_string(),
         anchor: SceneAnchor {
             id: "spawn_point_1".to_string(),
@@ -1354,7 +1366,7 @@ fn build_scene_anchor_overlay_lines_use_drag_preview_instead_of_original_anchor(
         },
         grab_offset: glam::Vec2::ZERO,
     });
-    ui_state.placement.preview_position = Some(glam::Vec2::new(48.0, 64.0));
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui_state).placement.preview_position = Some(glam::Vec2::new(48.0, 64.0));
     let config = crate::config::EditorConfig::default();
 
     let lines = EditorApp::build_scene_anchor_overlay_lines(&ui_state, None, Some(&config));

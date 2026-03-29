@@ -52,35 +52,35 @@ fn render_dialog_main(
     project_assets: &mut ProjectAssets,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
 ) {
-    let Some(mut dialog) = ui_state.dialog.draft.take() else {
+    let Some(mut dialog) = crate::ui::editor_context::dialog_state_mut(ui_state).draft.take() else {
         ui.label("No dialog selected.");
         return;
     };
 
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(ui_state.dialog.dirty, egui::Button::new("Save Dialog"))
+            .add_enabled(crate::ui::editor_context::dialog_state_mut(ui_state).dirty, egui::Button::new("Save Dialog"))
             .clicked()
         {
             let validation = dialog.validate();
             if !validation.is_valid() {
-                ui_state.dialog.status_message = Some(format!(
+                crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(format!(
                     "Cannot save dialog with {} validation error(s)",
                     validation.errors.len()
                 ));
             } else if let Err(error) = project_assets.save_dialog(&dialog) {
-                ui_state.dialog.status_message =
+                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
                     Some(format!("Failed to save dialog '{}': {error}", dialog.id));
             } else {
-                ui_state.dialog.selected_dialog_id = Some(dialog.id.to_string());
-                ui_state.dialog.loaded_dialog_id = Some(dialog.id.to_string());
-                ui_state.dialog.dirty = false;
-                ui_state.dialog.status_message = Some("Dialog saved".to_string());
+                crate::ui::editor_context::dialog_state_mut(ui_state).selected_dialog_id = Some(dialog.id.to_string());
+                crate::ui::editor_context::dialog_state_mut(ui_state).loaded_dialog_id = Some(dialog.id.to_string());
+                crate::ui::editor_context::dialog_state_mut(ui_state).dirty = false;
+                crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some("Dialog saved".to_string());
                 sync_dialog_registry(ui_state, project_assets);
             }
         }
 
-        if let Some(status) = &ui_state.dialog.status_message {
+        if let Some(status) = &ui_state.dialog_editor_context().dialog.status_message {
             ui.label(status);
         }
     });
@@ -138,9 +138,9 @@ fn render_dialog_main(
     });
 
     if dirty {
-        ui_state.dialog.dirty = true;
+        crate::ui::editor_context::dialog_state_mut(ui_state).dirty = true;
     }
-    ui_state.dialog.draft = Some(dialog);
+    crate::ui::editor_context::dialog_state_mut(ui_state).draft = Some(dialog);
 }
 
 fn undeclared_flag_warnings(
@@ -232,7 +232,7 @@ fn render_node_list(
                     conditions: Vec::new(),
                     kind: default_node_kind(kind),
                 });
-                ui_state.dialog.select_dialog_node(new_id);
+                crate::ui::editor_context::dialog_state_mut(ui_state).select_dialog_node(new_id);
                 *dirty = true;
             }
         }
@@ -240,9 +240,9 @@ fn render_node_list(
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         for node in &dialog.nodes {
-            let selected = ui_state.dialog.selected_node_id.as_deref() == Some(node.id.as_str());
+            let selected = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.as_deref() == Some(node.id.as_str());
             if ui.selectable_label(selected, &node.id).clicked() {
-                ui_state.dialog.select_dialog_node(node.id.clone());
+                crate::ui::editor_context::dialog_state_mut(ui_state).select_dialog_node(node.id.clone());
             }
         }
     });
@@ -254,11 +254,12 @@ fn render_node_editor(
     dialog: &mut toki_core::dialog::DialogTree,
     dirty: &mut bool,
 ) {
-    let Some(selected_node_id) = ui_state.dialog.selected_node_id.clone() else {
+    let Some(selected_node_id) = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.clone() else {
         ui.label("Select a node.");
         return;
     };
     ui_state
+        .dialog_editor_context_mut()
         .dialog
         .sync_node_id_editor(Some(selected_node_id.as_str()));
     let Some(node_index) = dialog
@@ -278,18 +279,19 @@ fn render_node_editor(
             .add_enabled(dialog.nodes.len() > 1, delete_button)
             .clicked()
         {
-            match delete_selected_node(dialog, &mut ui_state.dialog.selected_node_id) {
+            match delete_selected_node(dialog, &mut crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id) {
                 Ok(status) => {
-                    let selected_after_delete = ui_state.dialog.selected_node_id.clone();
+                    let selected_after_delete = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.clone();
                     ui_state
+                        .dialog_editor_context_mut()
                         .dialog
                         .sync_node_id_editor(selected_after_delete.as_deref());
-                    ui_state.dialog.status_message = Some(status);
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(status);
                     *dirty = true;
                     deleted = true;
                 }
                 Err(error) => {
-                    ui_state.dialog.status_message = Some(error);
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(error);
                 }
             }
         }
@@ -303,28 +305,31 @@ fn render_node_editor(
 
     ui.horizontal(|ui| {
         ui.label("Node Id:");
-        let response = ui.text_edit_singleline(&mut ui_state.dialog.node_id_edit_value);
+        let response = ui.text_edit_singleline(&mut crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value);
         let apply_clicked = ui.small_button("Apply").clicked();
         let pressed_enter =
             response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
         if apply_clicked || pressed_enter {
+            let node_id_edit_value = crate::ui::editor_context::dialog_state(ui_state)
+                .node_id_edit_value
+                .clone();
             match rename_dialog_node_id(
                 dialog,
-                &mut ui_state.dialog.selected_node_id,
+                &mut crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id,
                 selected_node_id.as_str(),
-                &ui_state.dialog.node_id_edit_value,
+                &node_id_edit_value,
             ) {
                 Ok(Some(status)) => {
-                    let committed_id = ui_state.dialog.selected_node_id.clone().unwrap_or_default();
-                    ui_state.dialog.node_id_edit_target = Some(committed_id.clone());
-                    ui_state.dialog.node_id_edit_value = committed_id;
-                    ui_state.dialog.status_message = Some(status);
+                    let committed_id = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.clone().unwrap_or_default();
+                    crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_target = Some(committed_id.clone());
+                    crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value = committed_id;
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(status);
                     *dirty = true;
                     return;
                 }
                 Ok(None) => {}
                 Err(error) => {
-                    ui_state.dialog.status_message = Some(error);
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(error);
                 }
             }
         }

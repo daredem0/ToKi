@@ -10,14 +10,14 @@ pub fn handle_undo_redo_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     let shift = ui.input(|i| i.modifiers.shift);
 
     // Ctrl+Z for undo (without shift)
-    if ctrl && !shift && ui.input(|i| i.key_pressed(egui::Key::Z)) && ui_state.sprite.undo() {
+    if ctrl && !shift && ui.input(|i| i.key_pressed(egui::Key::Z)) && crate::ui::editor_context::sprite_state_mut(ui_state).undo() {
         invalidate_canvas_texture(ui_state);
     }
 
     // Ctrl+Y or Ctrl+Shift+Z for redo
     let redo_pressed = ui.input(|i| i.key_pressed(egui::Key::Y))
         || (shift && ui.input(|i| i.key_pressed(egui::Key::Z)));
-    if ctrl && redo_pressed && ui_state.sprite.redo() {
+    if ctrl && redo_pressed && crate::ui::editor_context::sprite_state_mut(ui_state).redo() {
         invalidate_canvas_texture(ui_state);
     }
 }
@@ -53,33 +53,34 @@ pub fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context)
 
     // Ctrl+C for copy
     if ctrl && c_pressed {
-        ui_state.sprite.copy_selection();
+        crate::ui::editor_context::sprite_state_mut(ui_state).copy_selection();
     }
 
     // Ctrl+X for cut
-    if ctrl && x_pressed && ui_state.sprite.cut_selection() {
+    if ctrl && x_pressed && crate::ui::editor_context::sprite_state_mut(ui_state).cut_selection() {
         invalidate_canvas_texture(ui_state);
     }
 
     // Delete for clearing selected pixels
-    if delete_pressed && ui_state.sprite.delete_selection() {
+    if delete_pressed && crate::ui::editor_context::sprite_state_mut(ui_state).delete_selection() {
         invalidate_canvas_texture(ui_state);
     }
 
     // Ctrl+V for paste
     if ctrl && v_pressed {
         let hovered = find_hovered_canvas(ui_state);
-        let paste_side = hovered.unwrap_or(ui_state.sprite.active_canvas);
-        let cursor_pos = ui_state.sprite.canvas_state(paste_side).cursor_canvas_pos;
+        let paste_side = hovered.unwrap_or(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas);
+        let cursor_pos = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(paste_side).cursor_canvas_pos;
 
         if cursor_pos.is_none() {
             ui_state
-                .sprite
+            .sprite_editor_context_mut()
+            .sprite
                 .canvas_state_mut(paste_side)
                 .cursor_canvas_pos = Some(glam::IVec2::new(0, 0));
         }
 
-        if ui_state.sprite.paste_at_cursor(paste_side) {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).paste_at_cursor(paste_side) {
             invalidate_canvas_texture_for_side(ui_state, paste_side);
         }
     }
@@ -88,6 +89,7 @@ pub fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context)
 /// Find which canvas the cursor is currently hovering over
 fn find_hovered_canvas(ui_state: &EditorUI) -> Option<CanvasSide> {
     if ui_state
+        .sprite_editor_context()
         .sprite
         .canvas_state(CanvasSide::Left)
         .cursor_canvas_pos
@@ -96,6 +98,7 @@ fn find_hovered_canvas(ui_state: &EditorUI) -> Option<CanvasSide> {
         return Some(CanvasSide::Left);
     }
     if ui_state
+        .sprite_editor_context()
         .sprite
         .canvas_state(CanvasSide::Right)
         .cursor_canvas_pos

@@ -39,7 +39,7 @@ impl Inspector for MapInspector {
             &self.map_name,
             ctx.config,
             self.scene_name.as_deref(),
-            &mut ctx.ui_state.map.load_requested,
+            &mut crate::ui::editor_context::map_state_mut(ctx.ui_state).load_requested,
         );
         false
     }

@@ -155,12 +155,13 @@ pub fn render_scene_anchors_list(
             &scene.anchors,
             SceneAnchorKind::SpawnPoint,
         );
-        ctx.ui_state.enter_scene_anchor_placement_mode(
-            crate::ui::editor_ui::SceneAnchorPlacementDraft {
+        ctx.ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
                 kind: SceneAnchorKind::SpawnPoint,
                 suggested_id: next_id,
-            },
-        );
+            });
     }
 }
 
@@ -213,15 +214,15 @@ fn extract_map_size(ctx: &InspectorContext<'_>, scene_index: usize) -> Option<(u
         .get(scene_index)
         .and_then(|scene| scene.maps.first())
         .and_then(|map_name| {
-            if ctx.ui_state.map.active_map.as_ref() == Some(map_name) {
-                ctx.ui_state
-                    .map
+            if crate::ui::editor_context::map_state(ctx.ui_state).active_map.as_ref()
+                == Some(map_name)
+            {
+                crate::ui::editor_context::map_state(ctx.ui_state)
                     .draft
                     .as_ref()
                     .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
                     .or_else(|| {
-                        ctx.ui_state
-                            .map
+                        crate::ui::editor_context::map_state(ctx.ui_state)
                             .pending_tilemap_sync
                             .as_ref()
                             .map(|tm| (tm.size.x, tm.size.y))
@@ -243,7 +244,10 @@ fn commit_rules_change(
 
     let before_graph = ctx.ui_state.rule_graph_for_scene(scene_name).cloned();
     let after_graph = RuleGraph::from_rule_set(&edited_rules);
-    let before_layout = ctx.ui_state.graph.layouts_by_scene.get(scene_name).cloned();
+    let before_layout = crate::ui::editor_context::graph_state(ctx.ui_state)
+        .layouts_by_scene
+        .get(scene_name)
+        .cloned();
     let (zoom, pan) = ctx.ui_state.graph_view_for_scene(scene_name);
     let _ = ctx.ui_state.execute_scene_rules_graph_command(
         scene_name,

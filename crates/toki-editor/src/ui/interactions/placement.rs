@@ -22,7 +22,7 @@ impl PlacementInteraction {
         rect: egui::Rect,
         config: Option<&EditorConfig>,
     ) {
-        if let Some(drag_state) = ui_state.placement.scene_anchor_move_drag.as_ref() {
+        if let Some(drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_move_drag.as_ref() {
             if let Some(hover_pos) = response.hover_pos() {
                 let display_rect = viewport.display_rect_in(rect);
                 let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, display_rect);
@@ -32,22 +32,27 @@ impl PlacementInteraction {
                     viewport.tilemap(),
                     config,
                 );
-                ui_state.placement.preview_position = Some(world_pos);
-                ui_state.placement.preview_valid = Some(true);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = Some(world_pos);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = Some(true);
                 viewport.mark_dirty();
             } else {
-                ui_state.placement.preview_position = None;
-                ui_state.placement.preview_valid = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = None;
                 viewport.mark_dirty();
             }
             return;
         }
 
-        if ui_state.is_in_placement_mode() {
+        if ui_state
+            .scene_viewport_context()
+            .placement
+            .is_in_placement_mode()
+        {
             if let Some(hover_pos) = response.hover_pos() {
                 let display_rect = viewport.display_rect_in(rect);
                 let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, display_rect);
                 let grab_offset = ui_state
+                    .scene_viewport_context()
                     .placement
                     .entity_move_drag
                     .as_ref()
@@ -59,15 +64,15 @@ impl PlacementInteraction {
                     viewport.tilemap(),
                     config,
                 );
-                ui_state.placement.preview_position = Some(world_pos);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = Some(world_pos);
 
                 let is_valid =
                     Self::check_placement_validity(ui_state, viewport, world_pos, config);
-                ui_state.placement.preview_valid = Some(is_valid);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = Some(is_valid);
                 viewport.mark_dirty();
             } else {
-                ui_state.placement.preview_position = None;
-                ui_state.placement.preview_valid = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = None;
                 viewport.mark_dirty();
             }
         }
@@ -90,7 +95,7 @@ impl PlacementInteraction {
             config,
         )
         .world_origin;
-        if let Some(entity_def_name) = ui_state.placement.entity_definition().map(str::to_string) {
+        if let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_definition().map(str::to_string) {
             tracing::info!(
                 "Placing entity '{}' at world coordinates ({}, {}) [converted from screen ({}, {})]",
                 entity_def_name,
@@ -101,12 +106,15 @@ impl PlacementInteraction {
             );
 
             if Self::try_place_entity(ui_state, &entity_def_name, world_pos, config, viewport) {
-                ui_state.exit_placement_mode();
+                ui_state
+                    .scene_viewport_context_mut()
+                    .placement
+                    .exit_placement_mode();
             }
             return;
         }
 
-        if let Some(anchor_draft) = ui_state.placement.scene_anchor_draft().cloned() {
+        if let Some(anchor_draft) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_draft().cloned() {
             tracing::info!(
                 "Placing scene anchor '{}' ({:?}) at world coordinates ({}, {})",
                 anchor_draft.suggested_id,
@@ -115,7 +123,10 @@ impl PlacementInteraction {
                 world_pos.y
             );
             if Self::try_place_scene_anchor(ui_state, anchor_draft, world_pos) {
-                ui_state.exit_placement_mode();
+                ui_state
+                    .scene_viewport_context_mut()
+                    .placement
+                    .exit_placement_mode();
             }
         }
     }
@@ -127,7 +138,10 @@ impl PlacementInteraction {
     ) -> bool {
         let Some(active_scene_name) = ui_state.active_scene.clone() else {
             tracing::error!("No active scene for scene anchor placement");
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             return false;
         };
         let Some(scene_index) = ui_state
@@ -136,7 +150,10 @@ impl PlacementInteraction {
             .position(|scene| scene.name == active_scene_name)
         else {
             tracing::error!("Active scene '{}' not found", active_scene_name);
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             return false;
         };
 
@@ -185,13 +202,19 @@ impl PlacementInteraction {
     ) -> bool {
         let Some(config) = config else {
             tracing::error!("No config available for entity creation");
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             return false;
         };
 
         let Some(project_path) = config.current_project_path() else {
             tracing::error!("No project path available for entity creation");
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             return false;
         };
 
@@ -203,7 +226,10 @@ impl PlacementInteraction {
                     entity_def_name,
                     msg
                 );
-                ui_state.exit_placement_mode();
+                ui_state
+                    .scene_viewport_context_mut()
+                    .placement
+                    .exit_placement_mode();
                 return false;
             }
         };
@@ -249,7 +275,10 @@ impl PlacementInteraction {
     ) -> bool {
         let Some(active_scene_name) = ui_state.active_scene.clone() else {
             tracing::error!("No active scene for entity placement");
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             return false;
         };
 
@@ -259,7 +288,10 @@ impl PlacementInteraction {
             .position(|s| s.name == active_scene_name)
         else {
             tracing::error!("Active scene '{}' not found", active_scene_name);
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             return false;
         };
 
@@ -269,7 +301,10 @@ impl PlacementInteraction {
             Ok(entity) => entity,
             Err(e) => {
                 tracing::error!("Failed to create entity '{}': {}", entity_def_name, e);
-                ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
                 return false;
             }
         };
@@ -310,10 +345,10 @@ impl PlacementInteraction {
         world_pos: glam::Vec2,
         config: Option<&EditorConfig>,
     ) -> bool {
-        if ui_state.placement.scene_anchor_draft().is_some() {
+        if crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_draft().is_some() {
             return true;
         }
-        let Some(entity_def_name) = ui_state.placement.entity_definition() else {
+        let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_definition() else {
             return false;
         };
 

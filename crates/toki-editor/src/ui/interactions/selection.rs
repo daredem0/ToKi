@@ -22,7 +22,15 @@ impl SelectionInteraction {
         ctrl_pressed: bool,
     ) {
         // Ignore plain click-selection while an explicit move drag operation is active.
-        if ui_state.is_entity_move_drag_active() || ui_state.is_scene_anchor_move_drag_active() {
+        if ui_state
+            .scene_viewport_context()
+            .placement
+            .is_entity_move_drag_active()
+            || ui_state
+                .scene_viewport_context()
+                .placement
+                .is_scene_anchor_move_drag_active()
+        {
             return;
         }
 
@@ -108,9 +116,18 @@ impl SelectionInteraction {
         config: Option<&EditorConfig>,
         ctrl_pressed: bool,
     ) {
-        if ui_state.is_in_placement_mode()
-            || ui_state.is_entity_move_drag_active()
-            || ui_state.is_scene_anchor_move_drag_active()
+        if ui_state
+            .scene_viewport_context()
+            .placement
+            .is_in_placement_mode()
+            || ui_state
+                .scene_viewport_context()
+                .placement
+                .is_entity_move_drag_active()
+            || ui_state
+                .scene_viewport_context()
+                .placement
+                .is_scene_anchor_move_drag_active()
             || ctrl_pressed
         {
             return;
@@ -152,9 +169,15 @@ impl SelectionInteraction {
             } else {
                 ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(entity_id));
             }
-            ui_state.enter_placement_mode(entity_def_name.clone());
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .enter_placement_mode(entity_def_name.clone());
             let grab_offset = world_pos - entity.position.as_vec2();
-            ui_state.begin_entity_move_drag(EntityMoveDragState {
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .begin_entity_move_drag(EntityMoveDragState {
                 scene_name: active_scene_name,
                 entity,
                 dragged_entities,
@@ -162,6 +185,7 @@ impl SelectionInteraction {
             });
             viewport.suppress_entity_rendering_many(
                 ui_state
+                    .scene_viewport_context()
                     .placement
                     .entity_move_drag
                     .as_ref()
@@ -195,7 +219,10 @@ impl SelectionInteraction {
             scene_name: scene_name.clone(),
             anchor_id: anchor_id.clone(),
         });
-        ui_state.begin_scene_anchor_move_drag(SceneAnchorMoveDragState {
+        ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .begin_scene_anchor_move_drag(SceneAnchorMoveDragState {
             scene_name,
             anchor,
             grab_offset,
@@ -203,11 +230,17 @@ impl SelectionInteraction {
     }
 
     pub fn handle_marquee_drag_start(ui_state: &mut EditorUI, drag_start_pos: egui::Pos2) {
-        ui_state.start_marquee_selection(drag_start_pos);
+        ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .start_marquee_selection(drag_start_pos);
     }
 
     pub fn handle_marquee_drag_update(ui_state: &mut EditorUI, drag_pos: egui::Pos2) {
-        ui_state.update_marquee_selection(drag_pos);
+        ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .update_marquee_selection(drag_pos);
     }
 
     pub fn handle_marquee_drag_release(
@@ -216,7 +249,11 @@ impl SelectionInteraction {
         rect: egui::Rect,
         ctrl_pressed: bool,
     ) {
-        let Some(marquee) = ui_state.finish_marquee_selection() else {
+        let Some(marquee) = ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .finish_marquee_selection()
+        else {
             return;
         };
 
@@ -237,8 +274,8 @@ impl SelectionInteraction {
         rect: egui::Rect,
         config: Option<&EditorConfig>,
     ) {
-        let Some(drag_state) = ui_state.placement.entity_move_drag.clone() else {
-            if let Some(anchor_drag_state) = ui_state.placement.scene_anchor_move_drag.clone() {
+        let Some(drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_move_drag.clone() else {
+            if let Some(anchor_drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_move_drag.clone() {
                 Self::handle_scene_anchor_drag_release(
                     ui_state,
                     viewport,
@@ -256,7 +293,10 @@ impl SelectionInteraction {
                 "Entity drag ended without pointer position - cancelling move for entity {}",
                 drag_state.entity.id
             );
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             viewport.clear_suppressed_entity_rendering();
             viewport.mark_dirty();
             return;
@@ -328,7 +368,10 @@ impl SelectionInteraction {
             );
         }
 
-        ui_state.exit_placement_mode();
+        ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .exit_placement_mode();
         viewport.clear_suppressed_entity_rendering();
         viewport.mark_dirty();
     }
@@ -346,7 +389,10 @@ impl SelectionInteraction {
                 "Scene anchor drag ended without pointer position - cancelling move for '{}'",
                 drag_state.anchor.id
             );
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             viewport.mark_dirty();
             return;
         };
@@ -372,7 +418,10 @@ impl SelectionInteraction {
                 "Scene anchor move drag drop failed - scene '{}' no longer present",
                 drag_state.scene_name
             );
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             viewport.mark_dirty();
             return;
         };
@@ -387,7 +436,10 @@ impl SelectionInteraction {
                 "Scene anchor move drag drop failed - anchor '{}' no longer present",
                 drag_state.anchor.id
             );
-            ui_state.exit_placement_mode();
+            ui_state
+                .scene_viewport_context_mut()
+                .placement
+                .exit_placement_mode();
             viewport.mark_dirty();
             return;
         };
@@ -411,7 +463,10 @@ impl SelectionInteraction {
             );
         }
 
-        ui_state.exit_placement_mode();
+        ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .exit_placement_mode();
         viewport.mark_dirty();
     }
 

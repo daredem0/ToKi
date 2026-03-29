@@ -233,7 +233,10 @@ fn load_entity_definition_fails_for_invalid_json() {
 #[test]
 fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
     let mut ui_state = EditorUI::new();
-    ui_state.enter_placement_mode("sample".to_string());
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode("sample".to_string());
     let entity_def = sample_entity_definition("sample");
 
     let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
@@ -258,7 +261,10 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
     assert!(ui_state.scene_content_changed);
     assert!(ui_state.can_undo());
     // Placement mode exits at a higher level after successful click.
-    assert!(ui_state.is_in_placement_mode());
+    assert!(ui_state
+        .scene_viewport_context()
+        .placement
+        .is_in_placement_mode());
 
     assert!(ui_state.undo());
     let scene = ui_state
@@ -281,7 +287,10 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
 fn create_entity_in_scene_exits_placement_mode_when_no_active_scene() {
     let mut ui_state = EditorUI::new();
     ui_state.active_scene = None;
-    ui_state.enter_placement_mode("sample".to_string());
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode("sample".to_string());
 
     let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
         &mut ui_state,
@@ -292,14 +301,20 @@ fn create_entity_in_scene_exits_placement_mode_when_no_active_scene() {
         None,
     );
     assert!(!placed);
-    assert!(!ui_state.is_in_placement_mode());
+    assert!(!ui_state
+        .scene_viewport_context()
+        .placement
+        .is_in_placement_mode());
 }
 
 #[test]
 fn create_entity_in_scene_exits_placement_mode_when_active_scene_missing() {
     let mut ui_state = EditorUI::new();
     ui_state.active_scene = Some("Missing Scene".to_string());
-    ui_state.enter_placement_mode("sample".to_string());
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode("sample".to_string());
 
     let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
         &mut ui_state,
@@ -310,13 +325,19 @@ fn create_entity_in_scene_exits_placement_mode_when_active_scene_missing() {
         None,
     );
     assert!(!placed);
-    assert!(!ui_state.is_in_placement_mode());
+    assert!(!ui_state
+        .scene_viewport_context()
+        .placement
+        .is_in_placement_mode());
 }
 
 #[test]
 fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
     let mut ui_state = EditorUI::new();
-    ui_state.enter_placement_mode("sample".to_string());
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode("sample".to_string());
     let (tilemap, atlas) = placement_collision_assets();
 
     let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
@@ -336,13 +357,19 @@ fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
         .expect("missing default scene");
     assert_eq!(scene.entities.len(), 0);
     assert!(!ui_state.scene_content_changed);
-    assert!(ui_state.is_in_placement_mode());
+    assert!(ui_state
+        .scene_viewport_context()
+        .placement
+        .is_in_placement_mode());
 }
 
 #[test]
 fn scene_anchor_placement_adds_anchor_and_selects_it() {
     let mut ui_state = EditorUI::new();
-    ui_state.enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
         kind: SceneAnchorKind::SpawnPoint,
         suggested_id: "spawn_point_1".to_string(),
     });

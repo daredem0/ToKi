@@ -40,12 +40,13 @@ impl PanelSystem {
             return;
         };
 
-        let mut connect_from = ui_state.graph.connect_from_node;
-        let mut connect_to = ui_state.graph.connect_to_node;
+        let mut connect_from = crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node;
+        let mut connect_to = crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node;
         let (mut graph_zoom, mut graph_pan) = ui_state.graph_view_for_scene(&active_scene_name);
         let before_rule_set = ui_state.scenes[scene_index].rules.clone();
         let before_graph_snapshot = ui_state.rule_graph_for_scene(&active_scene_name).cloned();
         let before_layout_snapshot = ui_state
+            .rule_graph_context_mut()
             .graph
             .layouts_by_scene
             .get(&active_scene_name)
@@ -351,10 +352,10 @@ impl PanelSystem {
             }
         }
 
-        ui_state.graph.connect_from_node = connect_from;
-        ui_state.graph.connect_to_node = connect_to;
-        ui_state.graph.canvas_zoom = graph_zoom;
-        ui_state.graph.canvas_pan = graph_pan;
+        crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node = connect_from;
+        crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node = connect_to;
+        crate::ui::editor_context::graph_state_mut(ui_state).canvas_zoom = graph_zoom;
+        crate::ui::editor_context::graph_state_mut(ui_state).canvas_pan = graph_pan;
         ui_state.set_graph_view_for_scene(&active_scene_name, graph_zoom, graph_pan);
         if scene_changed {
             ui_state.scene_content_changed = true;

@@ -34,10 +34,11 @@ impl InspectorSystem {
         ui.heading("Dialogs");
         if ui.button("New Dialog").clicked() {
             let existing = project_assets.get_dialog_names();
-            ui_state.dialog = DialogEditorState::new_dialog(&existing);
+            *crate::ui::editor_context::dialog_state_mut(ui_state) =
+                DialogEditorState::new_dialog(&existing);
         }
 
-        if let Some(status) = &ui_state.dialog.status_message {
+        if let Some(status) = &crate::ui::editor_context::dialog_state_mut(ui_state).status_message {
             ui.label(status);
         }
 
@@ -47,16 +48,16 @@ impl InspectorSystem {
             .show(ui, |ui| {
                 for dialog_id in dialog_names {
                     let is_selected =
-                        ui_state.dialog.selected_dialog_id.as_deref() == Some(&dialog_id);
+                        crate::ui::editor_context::dialog_state_mut(ui_state).selected_dialog_id.as_deref() == Some(&dialog_id);
                     if ui.selectable_label(is_selected, &dialog_id).clicked() {
                         match project_assets.load_dialog(&dialog_id) {
-                            Ok(Some(dialog)) => ui_state.dialog.load_dialog(dialog),
+                            Ok(Some(dialog)) => crate::ui::editor_context::dialog_state_mut(ui_state).load_dialog(dialog),
                             Ok(None) => {
-                                ui_state.dialog.status_message =
+                                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
                                     Some(format!("Dialog '{dialog_id}' no longer exists"));
                             }
                             Err(error) => {
-                                ui_state.dialog.status_message =
+                                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
                                     Some(format!("Failed to load dialog '{dialog_id}': {error}"));
                             }
                         }

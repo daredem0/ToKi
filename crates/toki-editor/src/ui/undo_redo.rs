@@ -655,27 +655,29 @@ fn apply_scene_rules_graph_snapshot(
     match graph {
         Some(graph) => {
             ui_state
+                .rule_graph_context_mut()
                 .graph
                 .rule_graphs_by_scene
                 .insert(scene_name.to_string(), graph);
         }
         None => {
-            ui_state.graph.rule_graphs_by_scene.remove(scene_name);
+            crate::ui::editor_context::graph_state_mut(ui_state).rule_graphs_by_scene.remove(scene_name);
         }
     }
 
     match layout {
         Some(layout) => {
             ui_state
+                .rule_graph_context_mut()
                 .graph
                 .layouts_by_scene
                 .insert(scene_name.to_string(), layout);
         }
         None => {
-            ui_state.graph.layouts_by_scene.remove(scene_name);
+            crate::ui::editor_context::graph_state_mut(ui_state).layouts_by_scene.remove(scene_name);
         }
     }
-    ui_state.graph.layout_dirty = true;
+    crate::ui::editor_context::graph_state_mut(ui_state).layout_dirty = true;
     true
 }
 

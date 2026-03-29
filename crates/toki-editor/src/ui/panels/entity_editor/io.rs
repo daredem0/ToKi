@@ -7,9 +7,9 @@ use toki_core::entity::EntityDefinition;
 use toki_core::project_assets::{classify_sprite_metadata_file, SpriteMetadataFileKind};
 
 pub fn refresh_entity_list(ui_state: &mut EditorUI, project_path: Option<&Path>) {
-    ui_state.entity_editor.entities.clear();
-    ui_state.entity_editor.available_sfx.clear();
-    ui_state.entity_editor.available_atlases.clear();
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).entities.clear();
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).available_sfx.clear();
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).available_atlases.clear();
 
     let Some(path) = project_path else {
         return;
@@ -17,30 +17,31 @@ pub fn refresh_entity_list(ui_state: &mut EditorUI, project_path: Option<&Path>)
 
     // Scan entities
     let entities_dir = path.join("entities");
-    ui_state.entity_editor.entities_dir = Some(entities_dir.clone());
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).entities_dir = Some(entities_dir.clone());
 
     if entities_dir.exists() {
-        scan_entities_directory(&entities_dir, &mut ui_state.entity_editor.entities);
+        scan_entities_directory(&entities_dir, &mut crate::ui::editor_context::entity_editor_state_mut(ui_state).entities);
     }
 
     // Sort by name
     ui_state
-        .entity_editor
+            .entity_editor_context_mut()
+            .entity_editor
         .entities
         .sort_by(|a, b| a.name.cmp(&b.name));
 
     // Scan SFX directory for available sound effects
     let sfx_dir = path.join("assets/audio/sfx");
     if sfx_dir.exists() {
-        scan_sfx_directory(&sfx_dir, &mut ui_state.entity_editor.available_sfx);
-        ui_state.entity_editor.available_sfx.sort();
+        scan_sfx_directory(&sfx_dir, &mut crate::ui::editor_context::entity_editor_state_mut(ui_state).available_sfx);
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).available_sfx.sort();
     }
 
     // Scan sprites directory for available atlases
     let sprites_dir = path.join("assets/sprites");
     if sprites_dir.exists() {
-        scan_atlas_directory(&sprites_dir, &mut ui_state.entity_editor.available_atlases);
-        ui_state.entity_editor.available_atlases.sort();
+        scan_atlas_directory(&sprites_dir, &mut crate::ui::editor_context::entity_editor_state_mut(ui_state).available_atlases);
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).available_atlases.sort();
     }
 }
 
@@ -128,7 +129,7 @@ pub fn load_entity_definition(file_path: &Path) -> Option<EntityDefinition> {
 }
 
 pub fn save_entity(ui_state: &mut EditorUI) {
-    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
         return;
     };
 
@@ -162,6 +163,7 @@ pub fn save_entity(ui_state: &mut EditorUI) {
     tracing::info!(
         "Saved entity definition: {}",
         ui_state
+            .entity_editor_context_mut()
             .entity_editor
             .edit_state
             .as_ref()
@@ -171,29 +173,35 @@ pub fn save_entity(ui_state: &mut EditorUI) {
 }
 
 fn update_browser_summary(ui_state: &mut EditorUI) {
-    let Some(edit) = ui_state.entity_editor.edit_state.as_ref() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state(ui_state).edit_state.as_ref() else {
         return;
     };
+    let file_path = edit.file_path.clone();
+    let summary_name = edit.definition.name.to_string();
+    let summary_display_name = if edit.definition.display_name.is_empty() {
+        edit.definition.name.to_string()
+    } else {
+        edit.definition.display_name.clone()
+    };
+    let summary_category = edit.definition.category.clone();
+    let summary_tags = edit.definition.tags.clone();
 
     if let Some(summary) = ui_state
-        .entity_editor
+            .entity_editor_context_mut()
+            .entity_editor
         .entities
         .iter_mut()
-        .find(|e| e.file_path == edit.file_path)
+        .find(|e| e.file_path == file_path)
     {
-        summary.name = edit.definition.name.to_string();
-        summary.display_name = if edit.definition.display_name.is_empty() {
-            edit.definition.name.to_string()
-        } else {
-            edit.definition.display_name.clone()
-        };
-        summary.category = edit.definition.category.clone();
-        summary.tags = edit.definition.tags.clone();
+        summary.name = summary_name;
+        summary.display_name = summary_display_name;
+        summary.category = summary_category;
+        summary.tags = summary_tags;
     }
 }
 
 pub fn revert_entity(ui_state: &mut EditorUI) {
-    let Some(edit) = &ui_state.entity_editor.edit_state else {
+    let Some(edit) = &crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state else {
         return;
     };
 
@@ -201,13 +209,13 @@ pub fn revert_entity(ui_state: &mut EditorUI) {
 
     // Reload from file
     if let Some(def) = load_entity_definition(&file_path) {
-        ui_state.entity_editor.load_for_editing(def, file_path);
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).load_for_editing(def, file_path);
         tracing::info!("Reverted entity changes");
     }
 }
 
 pub fn create_new_entity(ui_state: &mut EditorUI, project_path: &Path) {
-    let dialog = &ui_state.entity_editor.new_entity_dialog;
+    let dialog = &crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog;
     let name = dialog.name_input.trim().to_string();
     let display_name = if dialog.display_name_input.trim().is_empty() {
         name.clone()
@@ -252,11 +260,11 @@ pub fn create_new_entity(ui_state: &mut EditorUI, project_path: &Path) {
         file_path: file_path.clone(),
     };
 
-    ui_state.entity_editor.add_entity(summary);
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).add_entity(summary);
     ui_state.selection = Some(Selection::EntityDefinition(name.clone()));
 
     // Load for editing immediately
-    ui_state.entity_editor.load_for_editing(def, file_path);
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).load_for_editing(def, file_path);
 
     tracing::info!("Created new entity definition: {}", name);
 }
@@ -273,7 +281,7 @@ pub fn delete_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: 
         }
     }
 
-    ui_state.entity_editor.remove_entity(entity_name);
+    crate::ui::editor_context::entity_editor_state_mut(ui_state).remove_entity(entity_name);
 
     // Clear selection if we deleted the selected entity
     if ui_state

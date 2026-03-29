@@ -21,25 +21,25 @@ pub fn render_new_entity_dialog(
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Name (identifier):");
-                ui.text_edit_singleline(&mut ui_state.entity_editor.new_entity_dialog.name_input);
+                ui.text_edit_singleline(&mut crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.name_input);
             });
 
             ui.horizontal(|ui| {
                 ui.label("Display Name:");
                 ui.text_edit_singleline(
-                    &mut ui_state.entity_editor.new_entity_dialog.display_name_input,
+                    &mut crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.display_name_input,
                 );
             });
 
             ui.horizontal(|ui| {
                 ui.label("Description:");
             });
-            ui.text_edit_multiline(&mut ui_state.entity_editor.new_entity_dialog.description_input);
+            ui.text_edit_multiline(&mut crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.description_input);
 
             render_category_selector(ui, ui_state);
 
             // Show validation error
-            if let Some(error) = &ui_state.entity_editor.new_entity_dialog.error_message {
+            if let Some(error) = &crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.error_message {
                 ui.colored_label(egui::Color32::RED, error);
             }
 
@@ -56,15 +56,15 @@ pub fn render_new_entity_dialog(
         });
 
     if close_dialog {
-        ui_state.entity_editor.new_entity_dialog.close();
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.close();
     }
 
     if create_entity {
-        let existing = ui_state.entity_editor.existing_names();
-        if ui_state.entity_editor.new_entity_dialog.validate(&existing) {
+        let existing = crate::ui::editor_context::entity_editor_state_mut(ui_state).existing_names();
+        if crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.validate(&existing) {
             if let Some(path) = project_path {
                 create_new_entity(ui_state, path);
-                ui_state.entity_editor.new_entity_dialog.close();
+                crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.close();
             }
         }
     }
@@ -73,7 +73,7 @@ pub fn render_new_entity_dialog(
 fn render_category_selector(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     // Build category list: existing categories + predefined suggestions
     let mut all_categories: std::collections::HashSet<String> =
-        ui_state.entity_editor.all_categories();
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).all_categories();
     for category in EntityCategory::ALL {
         all_categories.insert(category.as_str().to_string());
     }
@@ -82,7 +82,7 @@ fn render_category_selector(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     ui.horizontal(|ui| {
         ui.label("Category:");
-        ui.text_edit_singleline(&mut ui_state.entity_editor.new_entity_dialog.category);
+        ui.text_edit_singleline(&mut crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.category);
     });
 
     ui.horizontal(|ui| {
@@ -92,7 +92,7 @@ fn render_category_selector(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             .show_ui(ui, |ui| {
                 for category in &category_list {
                     if ui.selectable_label(false, category).clicked() {
-                        ui_state.entity_editor.new_entity_dialog.category = category.clone();
+                        crate::ui::editor_context::entity_editor_state_mut(ui_state).new_entity_dialog.category = category.clone();
                     }
                 }
             });
@@ -105,7 +105,8 @@ pub fn render_delete_confirmation_dialog(
     project_path: Option<&Path>,
 ) {
     let entity_name = ui_state
-        .entity_editor
+            .entity_editor_context_mut()
+            .entity_editor
         .delete_confirmation
         .entity_name
         .clone();
@@ -136,13 +137,13 @@ pub fn render_delete_confirmation_dialog(
         });
 
     if close_dialog {
-        ui_state.entity_editor.delete_confirmation.close();
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).delete_confirmation.close();
     }
 
     if confirm_delete {
         if let Some(path) = project_path {
             super::io::delete_entity(ui_state, path, &entity_name);
         }
-        ui_state.entity_editor.delete_confirmation.close();
+        crate::ui::editor_context::entity_editor_state_mut(ui_state).delete_confirmation.close();
     }
 }

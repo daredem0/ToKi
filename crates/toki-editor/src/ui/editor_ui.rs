@@ -4,8 +4,9 @@ use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
 use crate::ui::editor_context::{
-    default_active_context, default_parked_contexts, null_context, EditorContext,
-    EditorContextHost,
+    default_active_context, default_parked_contexts, null_context, AnimationEditorContext,
+    DialogEditorContext, EditorContext, EditorContextHost, EntityEditorContext,
+    MapEditorContext, RuleGraphContext, SceneViewportContext, SpriteEditorContext,
 };
 use crate::editor_tab_strip::EditorTabStripState;
 use crate::editor_types::PlacementPreviewVisual;
@@ -41,7 +42,7 @@ pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;
 pub(crate) use editor_ui_dialog_editor::{sync_dialog_registry, DialogEditorState};
 pub(crate) use editor_ui_entity_editor::{
-    create_default_definition, EntityCategory, EntityEditState, EntityEditorState, EntitySummary,
+    create_default_definition, EntityCategory, EntityEditState, EntitySummary,
 };
 pub(crate) use editor_ui_graph::SceneRulesGraphCommandData;
 pub(crate) use editor_ui_map_editor::{
@@ -555,14 +556,6 @@ pub struct EditorUI {
     pub project: ProjectEditorState,
 
     pub workspace: WorkspaceUiState,
-    pub map: MapEditorState,
-    pub sprite: SpriteEditorState,
-    pub animation: AnimationEditorState,
-    pub dialog: DialogEditorState,
-    pub entity_editor: EntityEditorState,
-    pub placement: PlacementState,
-    pub graph: GraphEditorState,
-    pub viewport_cursor: ViewportCursorState,
     active_tab: CenterPanelTab,
     active_context: Box<dyn EditorContext>,
     parked_contexts: HashMap<CenterPanelTab, Box<dyn EditorContext>>,
@@ -587,6 +580,14 @@ pub struct EditorRenderContext<'a> {
 }
 
 impl EditorUI {
+    fn paired_rule_graph_tab(tab: CenterPanelTab) -> Option<CenterPanelTab> {
+        match tab {
+            CenterPanelTab::SceneGraph => Some(CenterPanelTab::SceneRules),
+            CenterPanelTab::SceneRules => Some(CenterPanelTab::SceneGraph),
+            _ => None,
+        }
+    }
+
     pub fn active_tab(&self) -> CenterPanelTab {
         self.active_tab
     }
@@ -598,11 +599,18 @@ impl EditorUI {
 
         let mut old_context = std::mem::replace(&mut self.active_context, null_context());
         old_context.on_deactivate(self);
+        if let Some(paired_tab) = Self::paired_rule_graph_tab(self.active_tab) {
+            self.parked_contexts.remove(&paired_tab);
+        }
         self.parked_contexts.insert(self.active_tab, old_context);
 
         let mut new_context = self
             .parked_contexts
             .remove(&tab)
+            .or_else(|| {
+                Self::paired_rule_graph_tab(tab)
+                    .and_then(|paired_tab| self.parked_contexts.remove(&paired_tab))
+            })
             .unwrap_or_else(|| default_active_context(tab));
         self.active_tab = tab;
         self.workspace.center_panel_tab = tab;
@@ -612,7 +620,14 @@ impl EditorUI {
 
     pub(crate) fn context<T: 'static>(&self, tab: CenterPanelTab) -> Option<&T> {
         if self.active_tab == tab {
-            self.active_context.as_any().downcast_ref::<T>()
+            self.active_context
+                .as_any()
+                .downcast_ref::<T>()
+                .or_else(|| {
+                    self.parked_contexts
+                        .get(&tab)
+                        .and_then(|context| context.as_any().downcast_ref::<T>())
+                })
         } else {
             match self.parked_contexts.get(&tab) {
                 Some(context) => context.as_any().downcast_ref::<T>(),
@@ -623,7 +638,14 @@ impl EditorUI {
 
     pub(crate) fn context_mut<T: 'static>(&mut self, tab: CenterPanelTab) -> Option<&mut T> {
         if self.active_tab == tab {
-            self.active_context.as_any_mut().downcast_mut::<T>()
+            self.active_context
+                .as_any_mut()
+                .downcast_mut::<T>()
+                .or_else(|| {
+                    self.parked_contexts
+                        .get_mut(&tab)
+                        .and_then(|context| context.as_any_mut().downcast_mut::<T>())
+                })
         } else {
             match self.parked_contexts.get_mut(&tab) {
                 Some(context) => context.as_any_mut().downcast_mut::<T>(),
@@ -636,9 +658,32 @@ impl EditorUI {
         &mut self,
         f: impl FnOnce(&mut dyn EditorContext, &mut EditorUI) -> R,
     ) -> R {
-        let mut context = std::mem::replace(&mut self.active_context, null_context());
-        let result = f(context.as_mut(), self);
-        self.active_context = context;
+        let active_tab = self.active_tab;
+        let active_context = std::mem::replace(&mut self.active_context, null_context());
+        let replaced = self.parked_contexts.insert(active_tab, active_context);
+        debug_assert!(
+            replaced.is_none(),
+            "active tab context should not already be parked"
+        );
+
+        let context_ptr = self
+            .parked_contexts
+            .get_mut(&active_tab)
+            .expect("active tab context should be temporarily parked")
+            .as_mut() as *mut dyn EditorContext;
+
+        // SAFETY: `context_ptr` points to the boxed context we just inserted into
+        // `parked_contexts` under `active_tab`. That box remains in the map for the
+        // entire duration of `f`, and we do not mutate the map entry itself before
+        // removing it afterwards. This lets the callback access the same active
+        // context both directly and through `EditorUI` context lookups.
+        let result = unsafe { f(&mut *context_ptr, self) };
+
+        let active_context = self
+            .parked_contexts
+            .remove(&active_tab)
+            .expect("active tab context should be restored after callback");
+        self.active_context = active_context;
         result
     }
 
@@ -646,11 +691,84 @@ impl EditorUI {
         self.active_context.as_ref()
     }
 
-    pub fn remember_viewport_cursor_world_position(&mut self, world_pos: glam::Vec2) {
-        self.viewport_cursor.world_position = Some(glam::IVec2::new(
-            world_pos.x.floor() as i32,
-            world_pos.y.floor() as i32,
-        ));
+    pub(crate) fn scene_viewport_context(&self) -> &SceneViewportContext {
+        self.context::<SceneViewportContext>(CenterPanelTab::SceneViewport)
+            .expect("scene viewport context should always exist")
+    }
+
+    pub(crate) fn scene_viewport_context_mut(&mut self) -> &mut SceneViewportContext {
+        self.context_mut::<SceneViewportContext>(CenterPanelTab::SceneViewport)
+            .expect("scene viewport context should always exist")
+    }
+
+    pub(crate) fn rule_graph_context(&self) -> &RuleGraphContext {
+        if self.active_tab == CenterPanelTab::SceneGraph || self.active_tab == CenterPanelTab::SceneRules {
+            self.context::<RuleGraphContext>(self.active_tab)
+                .expect("rule graph context should always exist")
+        } else if let Some(context) = self.context::<RuleGraphContext>(CenterPanelTab::SceneGraph) {
+            context
+        } else {
+            self.context::<RuleGraphContext>(CenterPanelTab::SceneRules)
+                .expect("rule graph context should always exist")
+        }
+    }
+
+    pub(crate) fn rule_graph_context_mut(&mut self) -> &mut RuleGraphContext {
+        if self.active_tab == CenterPanelTab::SceneGraph || self.active_tab == CenterPanelTab::SceneRules {
+            self.context_mut::<RuleGraphContext>(self.active_tab)
+                .expect("rule graph context should always exist")
+        } else if self.context::<RuleGraphContext>(CenterPanelTab::SceneGraph).is_some() {
+            self.context_mut::<RuleGraphContext>(CenterPanelTab::SceneGraph)
+                .expect("rule graph context should always exist")
+        } else {
+            self.context_mut::<RuleGraphContext>(CenterPanelTab::SceneRules)
+                .expect("rule graph context should always exist")
+        }
+    }
+
+    pub(crate) fn map_editor_context(&self) -> &MapEditorContext {
+        self.context::<MapEditorContext>(CenterPanelTab::MapEditor)
+            .expect("map editor context should always exist")
+    }
+
+    pub(crate) fn dialog_editor_context(&self) -> &DialogEditorContext {
+        self.context::<DialogEditorContext>(CenterPanelTab::DialogEditor)
+            .expect("dialog editor context should always exist")
+    }
+
+    pub(crate) fn dialog_editor_context_mut(&mut self) -> &mut DialogEditorContext {
+        self.context_mut::<DialogEditorContext>(CenterPanelTab::DialogEditor)
+            .expect("dialog editor context should always exist")
+    }
+
+    pub(crate) fn sprite_editor_context(&self) -> &SpriteEditorContext {
+        self.context::<SpriteEditorContext>(CenterPanelTab::SpriteEditor)
+            .expect("sprite editor context should always exist")
+    }
+
+    pub(crate) fn sprite_editor_context_mut(&mut self) -> &mut SpriteEditorContext {
+        self.context_mut::<SpriteEditorContext>(CenterPanelTab::SpriteEditor)
+            .expect("sprite editor context should always exist")
+    }
+
+    pub(crate) fn animation_editor_context(&self) -> &AnimationEditorContext {
+        self.context::<AnimationEditorContext>(CenterPanelTab::AnimationEditor)
+            .expect("animation editor context should always exist")
+    }
+
+    pub(crate) fn animation_editor_context_mut(&mut self) -> &mut AnimationEditorContext {
+        self.context_mut::<AnimationEditorContext>(CenterPanelTab::AnimationEditor)
+            .expect("animation editor context should always exist")
+    }
+
+    pub(crate) fn entity_editor_context(&self) -> &EntityEditorContext {
+        self.context::<EntityEditorContext>(CenterPanelTab::EntityEditor)
+            .expect("entity editor context should always exist")
+    }
+
+    pub(crate) fn entity_editor_context_mut(&mut self) -> &mut EntityEditorContext {
+        self.context_mut::<EntityEditorContext>(CenterPanelTab::EntityEditor)
+            .expect("entity editor context should always exist")
     }
 
     pub fn new() -> Self {
@@ -671,14 +789,6 @@ impl EditorUI {
             project: ProjectEditorState::default(),
 
             workspace: WorkspaceUiState::default(),
-            map: MapEditorState::default(),
-            sprite: SpriteEditorState::default(),
-            animation: AnimationEditorState::default(),
-            dialog: DialogEditorState::default(),
-            entity_editor: EntityEditorState::default(),
-            placement: PlacementState::default(),
-            graph: GraphEditorState::default(),
-            viewport_cursor: ViewportCursorState::default(),
             active_tab: CenterPanelTab::SceneViewport,
             active_context: default_active_context(CenterPanelTab::SceneViewport),
             parked_contexts: default_parked_contexts(CenterPanelTab::SceneViewport),
@@ -706,7 +816,7 @@ impl EditorUI {
     pub fn load_scenes_from_project(&mut self, loaded_scenes: Vec<Scene>) {
         tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
         self.scenes = loaded_scenes;
-        self.graph.rule_graphs_by_scene.clear();
+        self.rule_graph_context_mut().graph.rule_graphs_by_scene.clear();
         self.command_history.clear();
 
         let current_active_missing = self
@@ -793,54 +903,6 @@ impl EditorUI {
 
     pub(crate) fn clear_entity_selection_state(&mut self) {
         self.entity_selection = EntitySelectionState::default();
-    }
-
-    pub fn enter_placement_mode(&mut self, entity_definition: String) {
-        self.placement.enter_placement_mode(entity_definition);
-    }
-
-    pub fn enter_scene_anchor_placement_mode(&mut self, draft: SceneAnchorPlacementDraft) {
-        self.placement.enter_scene_anchor_placement_mode(draft);
-    }
-
-    pub fn exit_placement_mode(&mut self) {
-        self.placement.exit_placement_mode();
-    }
-
-    pub fn is_in_placement_mode(&self) -> bool {
-        self.placement.is_in_placement_mode()
-    }
-
-    pub fn begin_entity_move_drag(&mut self, drag_state: EntityMoveDragState) {
-        self.placement.begin_entity_move_drag(drag_state);
-    }
-
-    pub fn is_entity_move_drag_active(&self) -> bool {
-        self.placement.is_entity_move_drag_active()
-    }
-
-    pub fn begin_scene_anchor_move_drag(&mut self, drag_state: SceneAnchorMoveDragState) {
-        self.placement.begin_scene_anchor_move_drag(drag_state);
-    }
-
-    pub fn is_scene_anchor_move_drag_active(&self) -> bool {
-        self.placement.is_scene_anchor_move_drag_active()
-    }
-
-    pub fn start_marquee_selection(&mut self, start: egui::Pos2) {
-        self.placement.start_marquee_selection(start);
-    }
-
-    pub fn update_marquee_selection(&mut self, current: egui::Pos2) {
-        self.placement.update_marquee_selection(current);
-    }
-
-    pub fn finish_marquee_selection(&mut self) -> Option<MarqueeSelectionState> {
-        self.placement.finish_marquee_selection()
-    }
-
-    pub fn is_marquee_selection_active(&self) -> bool {
-        self.placement.is_marquee_selection_active()
     }
 
     pub fn add_entity_to_selection(&mut self, entity_id: EntityId) {

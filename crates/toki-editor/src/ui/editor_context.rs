@@ -1,9 +1,14 @@
-use super::editor_ui::{CenterPanelTab, EditorRenderContext, EditorUI};
+use super::editor_ui::{CenterPanelTab, EditorUI};
+use super::editor_ui::{
+    AnimationEditorState, DialogEditorState, GraphEditorState, MapEditorState, PlacementState,
+    ViewportCursorState,
+};
 use crate::config::EditorConfig;
 use crate::project::{Project, ProjectAssets};
 use crate::scene::SceneViewport;
 use crate::ui::inspector::InspectorSystem;
 use crate::ui::panels::PanelSystem;
+use crate::ui::{entity_editor::EntityEditorState, sprite_editor::SpriteEditorState};
 use std::any::Any;
 use std::collections::HashMap;
 
@@ -18,25 +23,9 @@ pub(crate) struct EditorContextHost<'a> {
     pub renderer: Option<&'a mut egui_wgpu::Renderer>,
 }
 
-impl<'a> EditorContextHost<'a> {
-    pub fn from_render_context(render_ctx: EditorRenderContext<'a>) -> Self {
-        Self {
-            scene_viewport: render_ctx.scene_viewport,
-            map_editor_viewport: render_ctx.map_editor_viewport,
-            project: render_ctx.project,
-            project_assets: render_ctx.project_assets,
-            available_map_names: render_ctx.available_map_names,
-            config: render_ctx.config,
-            log_capture: render_ctx.log_capture,
-            renderer: render_ctx.renderer,
-        }
-    }
-
-}
+impl<'a> EditorContextHost<'a> {}
 
 pub(crate) trait EditorContext: Any {
-    fn tab(&self) -> CenterPanelTab;
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -68,6 +57,10 @@ pub(crate) trait EditorContext: Any {
         false
     }
 
+    fn prefers_local_undo_redo(&self) -> bool {
+        false
+    }
+
     fn undo(&mut self, _shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
         false
     }
@@ -82,29 +75,198 @@ pub(crate) trait EditorContext: Any {
 }
 
 #[derive(Default)]
-pub(crate) struct SceneViewportContext;
+pub(crate) struct SceneViewportContext {
+    pub placement: PlacementState,
+    pub viewport_cursor: ViewportCursorState,
+}
+
 #[derive(Default)]
-pub(crate) struct RuleGraphContext;
+pub(crate) struct RuleGraphContext {
+    pub graph: GraphEditorState,
+}
+
 #[derive(Default)]
-pub(crate) struct MapEditorContext;
+pub(crate) struct MapEditorContext {
+    pub map: MapEditorState,
+}
+
 #[derive(Default)]
 pub(crate) struct MenuEditorContext;
+
 #[derive(Default)]
-pub(crate) struct DialogEditorContext;
+pub(crate) struct DialogEditorContext {
+    pub dialog: DialogEditorState,
+}
+
 #[derive(Default)]
-pub(crate) struct SpriteEditorContext;
+pub(crate) struct SpriteEditorContext {
+    pub sprite: SpriteEditorState,
+}
+
 #[derive(Default)]
-pub(crate) struct AnimationEditorContext;
+pub(crate) struct AnimationEditorContext {
+    pub animation: AnimationEditorState,
+}
+
 #[derive(Default)]
-pub(crate) struct EntityEditorContext;
+pub(crate) struct EntityEditorContext {
+    pub entity_editor: EntityEditorState,
+}
+
+impl SceneViewportContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::SceneViewport)
+            .expect("scene viewport context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::SceneViewport)
+            .expect("scene viewport context should always exist")
+    }
+}
+
+impl RuleGraphContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::SceneGraph)
+            .or_else(|| ui.context::<Self>(CenterPanelTab::SceneRules))
+            .expect("rule graph context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        if ui.active_tab() == CenterPanelTab::SceneGraph || ui.active_tab() == CenterPanelTab::SceneRules {
+            ui.context_mut::<Self>(ui.active_tab())
+                .expect("rule graph context should always exist")
+        } else {
+            if ui.context::<Self>(CenterPanelTab::SceneGraph).is_some() {
+                ui.context_mut::<Self>(CenterPanelTab::SceneGraph)
+                    .expect("rule graph context should always exist")
+            } else {
+                ui.context_mut::<Self>(CenterPanelTab::SceneRules)
+                    .expect("rule graph context should always exist")
+            }
+        }
+    }
+}
+
+impl MapEditorContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::MapEditor)
+            .expect("map editor context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::MapEditor)
+            .expect("map editor context should always exist")
+    }
+}
+
+impl DialogEditorContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::DialogEditor)
+            .expect("dialog editor context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::DialogEditor)
+            .expect("dialog editor context should always exist")
+    }
+}
+
+impl SpriteEditorContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::SpriteEditor)
+            .expect("sprite editor context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::SpriteEditor)
+            .expect("sprite editor context should always exist")
+    }
+}
+
+impl AnimationEditorContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::AnimationEditor)
+            .expect("animation editor context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::AnimationEditor)
+            .expect("animation editor context should always exist")
+    }
+}
+
+impl EntityEditorContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::EntityEditor)
+            .expect("entity editor context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::EntityEditor)
+            .expect("entity editor context should always exist")
+    }
+}
+
+pub(crate) fn scene_viewport_context(ui: &EditorUI) -> &SceneViewportContext {
+    SceneViewportContext::state(ui)
+}
+
+pub(crate) fn scene_viewport_context_mut(ui: &mut EditorUI) -> &mut SceneViewportContext {
+    SceneViewportContext::state_mut(ui)
+}
+
+pub(crate) fn graph_state(ui: &EditorUI) -> &GraphEditorState {
+    &RuleGraphContext::state(ui).graph
+}
+
+pub(crate) fn graph_state_mut(ui: &mut EditorUI) -> &mut GraphEditorState {
+    &mut RuleGraphContext::state_mut(ui).graph
+}
+
+pub(crate) fn map_state(ui: &EditorUI) -> &MapEditorState {
+    &MapEditorContext::state(ui).map
+}
+
+pub(crate) fn map_state_mut(ui: &mut EditorUI) -> &mut MapEditorState {
+    &mut MapEditorContext::state_mut(ui).map
+}
+
+pub(crate) fn dialog_state(ui: &EditorUI) -> &DialogEditorState {
+    &DialogEditorContext::state(ui).dialog
+}
+
+pub(crate) fn dialog_state_mut(ui: &mut EditorUI) -> &mut DialogEditorState {
+    &mut DialogEditorContext::state_mut(ui).dialog
+}
+
+pub(crate) fn sprite_state(ui: &EditorUI) -> &SpriteEditorState {
+    &SpriteEditorContext::state(ui).sprite
+}
+
+pub(crate) fn sprite_state_mut(ui: &mut EditorUI) -> &mut SpriteEditorState {
+    &mut SpriteEditorContext::state_mut(ui).sprite
+}
+
+pub(crate) fn animation_state(ui: &EditorUI) -> &AnimationEditorState {
+    &AnimationEditorContext::state(ui).animation
+}
+
+pub(crate) fn animation_state_mut(ui: &mut EditorUI) -> &mut AnimationEditorState {
+    &mut AnimationEditorContext::state_mut(ui).animation
+}
+
+pub(crate) fn entity_editor_state(ui: &EditorUI) -> &EntityEditorState {
+    &EntityEditorContext::state(ui).entity_editor
+}
+
+pub(crate) fn entity_editor_state_mut(ui: &mut EditorUI) -> &mut EntityEditorState {
+    &mut EntityEditorContext::state_mut(ui).entity_editor
+}
 
 struct NullEditorContext;
 
 impl EditorContext for NullEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::SceneViewport
-    }
-
     fn render_center_panel(
         &mut self,
         _shell: &mut EditorUI,
@@ -124,10 +286,6 @@ impl EditorContext for NullEditorContext {
 }
 
 impl EditorContext for SceneViewportContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::SceneViewport
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -154,10 +312,6 @@ impl EditorContext for SceneViewportContext {
 }
 
 impl EditorContext for RuleGraphContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::SceneGraph
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -183,10 +337,6 @@ impl EditorContext for RuleGraphContext {
 }
 
 impl EditorContext for MapEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::MapEditor
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -221,25 +371,29 @@ impl EditorContext for MapEditorContext {
         true
     }
 
-    fn can_undo(&self, shell: &EditorUI) -> bool {
-        shell.map.history.can_undo()
+    fn can_undo(&self, _shell: &EditorUI) -> bool {
+        self.map.history.can_undo()
     }
 
-    fn can_redo(&self, shell: &EditorUI) -> bool {
-        shell.map.history.can_redo()
+    fn can_redo(&self, _shell: &EditorUI) -> bool {
+        self.map.history.can_redo()
     }
 
-    fn undo(&mut self, shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
-        let mut history = std::mem::take(&mut shell.map.history);
-        let undone = history.undo(shell);
-        shell.map.history = history;
+    fn prefers_local_undo_redo(&self) -> bool {
+        true
+    }
+
+    fn undo(&mut self, _shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
+        let mut history = std::mem::take(&mut self.map.history);
+        let undone = history.undo(&mut self.map);
+        self.map.history = history;
         undone
     }
 
-    fn redo(&mut self, shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
-        let mut history = std::mem::take(&mut shell.map.history);
-        let redone = history.redo(shell);
-        shell.map.history = history;
+    fn redo(&mut self, _shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
+        let mut history = std::mem::take(&mut self.map.history);
+        let redone = history.redo(&mut self.map);
+        self.map.history = history;
         redone
     }
 
@@ -253,10 +407,6 @@ impl EditorContext for MapEditorContext {
 }
 
 impl EditorContext for MenuEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::MenuEditor
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -289,10 +439,6 @@ impl EditorContext for MenuEditorContext {
 }
 
 impl EditorContext for DialogEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::DialogEditor
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -335,10 +481,6 @@ impl EditorContext for DialogEditorContext {
 }
 
 impl EditorContext for SpriteEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::SpriteEditor
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -366,20 +508,24 @@ impl EditorContext for SpriteEditorContext {
         true
     }
 
-    fn can_undo(&self, shell: &EditorUI) -> bool {
-        shell.sprite.active().history.can_undo()
+    fn can_undo(&self, _shell: &EditorUI) -> bool {
+        self.sprite.active().history.can_undo()
     }
 
-    fn can_redo(&self, shell: &EditorUI) -> bool {
-        shell.sprite.active().history.can_redo()
+    fn can_redo(&self, _shell: &EditorUI) -> bool {
+        self.sprite.active().history.can_redo()
     }
 
-    fn undo(&mut self, shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
-        shell.sprite.undo()
+    fn prefers_local_undo_redo(&self) -> bool {
+        true
     }
 
-    fn redo(&mut self, shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
-        shell.sprite.redo()
+    fn undo(&mut self, _shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
+        self.sprite.undo()
+    }
+
+    fn redo(&mut self, _shell: &mut EditorUI, _project: Option<&mut Project>) -> bool {
+        self.sprite.redo()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -392,10 +538,6 @@ impl EditorContext for SpriteEditorContext {
 }
 
 impl EditorContext for AnimationEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::AnimationEditor
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,
@@ -433,10 +575,6 @@ impl EditorContext for AnimationEditorContext {
 }
 
 impl EditorContext for EntityEditorContext {
-    fn tab(&self) -> CenterPanelTab {
-        CenterPanelTab::EntityEditor
-    }
-
     fn render_center_panel(
         &mut self,
         shell: &mut EditorUI,

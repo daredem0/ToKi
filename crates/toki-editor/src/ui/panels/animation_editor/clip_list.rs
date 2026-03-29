@@ -14,7 +14,8 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let separator_height = 8.0;
 
     let content_height = available_height - header_height - button_height - separator_height;
-    let clip_list_height = (content_height * ui_state.animation.clip_list_ratio)
+    let clip_list_ratio = crate::ui::editor_context::animation_state(ui_state).clip_list_ratio;
+    let clip_list_height = (content_height * clip_list_ratio)
         .max(50.0)
         .min(content_height - bottom_section_min);
     let bottom_height = content_height - clip_list_height;
@@ -23,24 +24,26 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     // Add new clip button
     if ui.button("+ New Clip").clicked() {
-        ui_state.animation.show_new_clip_dialog = true;
+        crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = true;
     }
 
     ui.add_space(4.0);
 
     // Collect clip info to avoid borrow issues
     let clip_info: Vec<_> = ui_state
+        .animation_editor_context()
         .animation
         .authoring
         .clips
         .iter()
-        .enumerate()
-        .map(|(idx, clip)| {
-            let is_selected = ui_state.animation.authoring.selected_clip_index == Some(idx);
-            let is_default = clip.state == ui_state.animation.authoring.default_state;
-            (
-                idx,
-                clip.state.clone(),
+                .enumerate()
+                .map(|(idx, clip)| {
+                    let animation_state = crate::ui::editor_context::animation_state(ui_state);
+                    let is_selected = animation_state.authoring.selected_clip_index == Some(idx);
+                    let is_default = clip.state == animation_state.authoring.default_state;
+                    (
+                        idx,
+                        clip.state.clone(),
                 clip.frames.len(),
                 is_selected,
                 is_default,
@@ -77,20 +80,20 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     // Apply deferred actions
     if let Some(idx) = select_index {
-        ui_state.animation.authoring.select_clip(idx);
-        ui_state.animation.preview.stop();
+        crate::ui::editor_context::animation_state_mut(ui_state).authoring.select_clip(idx);
+        crate::ui::editor_context::animation_state_mut(ui_state).preview.stop();
     }
 
     if let Some(idx) = delete_index {
-        ui_state.animation.authoring.delete_clip(idx);
+        crate::ui::editor_context::animation_state_mut(ui_state).authoring.delete_clip(idx);
     }
 
     // Draggable separator between clip list and default state
     let sep_response = separators::render_horizontal_separator(ui, available_width);
     if sep_response.dragged() {
         let delta_ratio = sep_response.drag_delta().y / content_height;
-        ui_state.animation.clip_list_ratio =
-            (ui_state.animation.clip_list_ratio + delta_ratio).clamp(0.2, 0.9);
+        crate::ui::editor_context::animation_state_mut(ui_state).clip_list_ratio =
+            (crate::ui::editor_context::animation_state_mut(ui_state).clip_list_ratio + delta_ratio).clamp(0.2, 0.9);
     }
 
     // Default state selector
@@ -98,9 +101,14 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         egui::vec2(available_width, bottom_height),
         egui::Layout::top_down(egui::Align::LEFT),
         |ui| {
-            if !ui_state.animation.authoring.clips.is_empty() {
+            if !crate::ui::editor_context::animation_state(ui_state)
+                .authoring
+                .clips
+                .is_empty()
+            {
                 ui.label("Default State:");
                 let clip_states: Vec<String> = ui_state
+                    .animation_editor_context()
                     .animation
                     .authoring
                     .clips
@@ -108,7 +116,10 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     .map(|c| c.state.clone())
                     .collect();
 
-                let mut default_state = ui_state.animation.authoring.default_state.clone();
+                let mut default_state = crate::ui::editor_context::animation_state(ui_state)
+                    .authoring
+                    .default_state
+                    .clone();
                 egui::ComboBox::from_id_salt("anim_default_state")
                     .selected_text(&default_state)
                     .show_ui(ui, |ui| {
@@ -117,8 +128,8 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                                 .selectable_value(&mut default_state, state.clone(), state)
                                 .changed()
                             {
-                                ui_state.animation.authoring.default_state = default_state.clone();
-                                ui_state.animation.authoring.dirty = true;
+                                crate::ui::editor_context::animation_state_mut(ui_state).authoring.default_state = default_state.clone();
+                                crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
                             }
                         }
                     });
