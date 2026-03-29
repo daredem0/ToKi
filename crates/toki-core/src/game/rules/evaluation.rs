@@ -42,14 +42,14 @@ impl RuleEngine<'_> {
             }
             RuleCondition::EntityActive { target, is_active } => self
                 .resolve_entity(*target, context)
-                .is_some_and(|entity| entity.attributes.active == *is_active),
+                .is_some_and(|entity| entity.attributes.behavior.active == *is_active),
             RuleCondition::HealthBelow { target, threshold } => self
                 .resolve_entity(*target, context)
-                .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
+                .and_then(|entity| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
                 .is_some_and(|health| health < *threshold),
             RuleCondition::HealthAbove { target, threshold } => self
                 .resolve_entity(*target, context)
-                .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
+                .and_then(|entity| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
                 .is_some_and(|health| health > *threshold),
             RuleCondition::TriggerOtherIsPlayer => context
                 .trigger_other
@@ -73,7 +73,9 @@ impl RuleEngine<'_> {
                 item_id,
                 min_count,
             } => self.resolve_entity(*target, context).is_some_and(|entity| {
-                entity.attributes.inventory.item_count(item_id) >= *min_count
+                self.entity_manager
+                    .inventory(entity.id)
+                    .is_some_and(|inventory| inventory.item_count(item_id) >= *min_count)
             }),
             RuleCondition::FlagEquals { flag, value } => self.game_flags.get(flag) == Some(value),
             RuleCondition::FlagSet { flag } => self.game_flags.is_set(flag),

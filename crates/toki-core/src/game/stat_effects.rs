@@ -66,16 +66,20 @@ impl<'a> StatEffectService<'a> {
     }
 
     pub(super) fn add_inventory_item(&mut self, entity_id: EntityId, item_id: &str, count: u32) {
-        if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
-            entity.attributes.inventory.add_item(item_id, count);
+        if self.entity_manager.get_entity_mut(entity_id).is_some() {
+            self.entity_manager.ensure_inventory(entity_id).add_item(item_id, count);
         }
     }
 
     pub(super) fn remove_inventory_item(&mut self, entity_id: EntityId, item_id: &str, count: u32) {
-        let Some(entity) = self.entity_manager.get_entity_mut(entity_id) else {
+        let Some(_) = self.entity_manager.get_entity_mut(entity_id) else {
             return;
         };
-        let available = entity.attributes.inventory.item_count(item_id);
+        let available = self
+            .entity_manager
+            .inventory(entity_id)
+            .map(|inventory| inventory.item_count(item_id))
+            .unwrap_or(0);
         let to_remove = count.min(available);
         if to_remove == 0 {
             return;
@@ -83,15 +87,21 @@ impl<'a> StatEffectService<'a> {
 
         let new_count = available.saturating_sub(to_remove);
         if new_count == 0 {
-            entity.attributes.inventory.items.remove(item_id);
-        } else if let Some(entry) = entity.attributes.inventory.items.get_mut(item_id) {
+            if let Some(inventory) = self.entity_manager.inventory_mut(entity_id) {
+                inventory.items.remove(item_id);
+            }
+        } else if let Some(entry) = self
+            .entity_manager
+            .inventory_mut(entity_id)
+            .and_then(|inventory| inventory.items.get_mut(item_id))
+        {
             *entry = new_count;
         }
     }
 
     pub(super) fn set_entity_active(&mut self, entity_id: EntityId, active: bool) {
         if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
-            entity.attributes.active = active;
+            entity.attributes.behavior.active = active;
         }
     }
 
@@ -206,8 +216,11 @@ mod tests {
             glam::IVec2::new(0, 0),
             glam::UVec2::new(16, 16),
             crate::entity::EntityAttributes {
-                health: Some(50),
-                stats: EntityStats::from_legacy_health(Some(50)),
+                gameplay: crate::entity::EntityGameplay {
+                    health: Some(50),
+                    stats: EntityStats::from_legacy_health(Some(50)),
+                    ..crate::entity::EntityGameplay::default()
+                },
                 ..crate::entity::EntityAttributes::default()
             },
         );
@@ -241,8 +254,11 @@ mod tests {
             glam::IVec2::new(0, 0),
             glam::UVec2::new(16, 16),
             crate::entity::EntityAttributes {
-                health: Some(10),
-                stats: EntityStats::from_legacy_health(Some(10)),
+                gameplay: crate::entity::EntityGameplay {
+                    health: Some(10),
+                    stats: EntityStats::from_legacy_health(Some(10)),
+                    ..crate::entity::EntityGameplay::default()
+                },
                 ..crate::entity::EntityAttributes::default()
             },
         );

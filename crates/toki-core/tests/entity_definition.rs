@@ -95,18 +95,18 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.effective_control_role(), ControlRole::None);
 
     // Check attributes
-    assert_eq!(entity.attributes.health, Some(100));
-    assert_eq!(entity.attributes.speed, 2.0);
-    assert!(entity.attributes.solid);
-    assert!(entity.attributes.visible);
-    assert_eq!(entity.attributes.render_layer, 1);
-    assert!(entity.attributes.active);
-    assert!(entity.attributes.can_move);
+    assert_eq!(entity.attributes.gameplay.health, Some(100));
+    assert_eq!(entity.attributes.gameplay.speed, 2.0);
+    assert!(entity.attributes.gameplay.solid);
+    assert!(entity.attributes.rendering.visible);
+    assert_eq!(entity.attributes.rendering.render_layer, 1);
+    assert!(entity.attributes.behavior.active);
+    assert!(entity.attributes.behavior.can_move);
     assert_eq!(
-        entity.attributes.movement_profile,
+        entity.attributes.behavior.movement_profile,
         MovementProfile::LegacyDefault
     );
-    assert!(entity.attributes.has_inventory);
+    assert!(entity.attributes.behavior.has_inventory);
 
     // Check collision
     assert!(entity.collision_box.is_some());
@@ -133,8 +133,8 @@ fn test_entity_definition_create_entity_basic() {
     );
 
     // Check animation controller
-    assert!(entity.attributes.animation_controller.is_some());
-    let controller = entity.attributes.animation_controller.unwrap();
+    assert!(entity.attributes.rendering.animation_controller.is_some());
+    let controller = entity.attributes.rendering.animation_controller.unwrap();
     assert_eq!(controller.clips.len(), 2);
     assert!(controller.clips.contains_key(&AnimationState::Idle));
     assert!(controller.clips.contains_key(&AnimationState::Walk));
@@ -217,14 +217,14 @@ fn test_entity_definition_create_npc_entity() {
     assert_eq!(entity.effective_control_role(), ControlRole::None);
 
     // Check attributes specific to NPC
-    assert!(!entity.attributes.can_move);
-    assert!(!entity.attributes.has_inventory);
-    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::Wander);
+    assert!(!entity.attributes.behavior.can_move);
+    assert!(!entity.attributes.behavior.has_inventory);
+    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::Wander);
     assert_eq!(
-        entity.attributes.movement_profile,
+        entity.attributes.behavior.movement_profile,
         MovementProfile::LegacyDefault
     );
-    assert_eq!(entity.attributes.speed, 1.0);
+    assert_eq!(entity.attributes.gameplay.speed, 1.0);
 
     // Check no collision since disabled
     assert!(entity.collision_box.is_none());
@@ -285,9 +285,9 @@ fn test_entity_definition_missing_ai_fields_defaults_to_none() {
     let entity = entity_def
         .create_entity(IVec2::ZERO, 1)
         .expect("entity should still instantiate");
-    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::None);
+    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::None);
     assert_eq!(
-        entity.attributes.movement_profile,
+        entity.attributes.behavior.movement_profile,
         MovementProfile::LegacyDefault
     );
 }
@@ -421,7 +421,7 @@ fn test_entity_definition_supports_explicit_player_wasd_movement_profile() {
         .create_entity(IVec2::ZERO, 1)
         .expect("entity should instantiate");
     assert_eq!(
-        entity.attributes.movement_profile,
+        entity.attributes.behavior.movement_profile,
         MovementProfile::PlayerWasd
     );
 }
@@ -514,6 +514,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
         .expect("directional definition should parse");
     let controller = entity
         .attributes
+        .rendering
         .animation_controller
         .expect("controller should exist");
 
@@ -619,6 +620,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
         .expect("attack-capable definition should parse");
     let controller = entity
         .attributes
+        .rendering
         .animation_controller
         .expect("controller should exist");
 
@@ -694,7 +696,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
         .create_entity(IVec2::new(0, 0), 1)
         .expect("definition should create entity");
 
-    assert_eq!(entity.attributes.health, Some(25));
+    assert_eq!(entity.attributes.gameplay.health, Some(25));
     assert_eq!(entity.attributes.current_stat("health"), Some(25));
     assert_eq!(entity.attributes.base_stat("health"), Some(25));
 }
@@ -765,7 +767,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
         .create_entity(IVec2::new(0, 0), 1)
         .expect("definition should create entity");
 
-    assert_eq!(entity.attributes.health, Some(30));
+    assert_eq!(entity.attributes.gameplay.health, Some(30));
     assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), Some(30));
     assert_eq!(
         entity.attributes.current_stat(ATTACK_POWER_STAT_ID),
@@ -841,12 +843,12 @@ fn test_entity_definition_copies_authored_primary_projectile() {
         tags: vec![],
     };
 
-    let entity = entity_def
-        .create_entity(IVec2::new(0, 0), 1)
+    let bundle = entity_def
+        .create_spawn_bundle(IVec2::new(0, 0), 1)
         .expect("definition should create entity");
 
-    let projectile = entity
-        .attributes
+    let projectile = bundle
+        .optional_components
         .primary_projectile
         .expect("authored projectile should be copied to runtime entity");
     assert_eq!(projectile.sheet, "fauna");
@@ -916,24 +918,33 @@ fn test_entity_definition_copies_authored_pickup() {
         tags: vec![],
     };
 
-    let entity = entity_def
-        .create_entity(IVec2::new(0, 0), 1)
+    let bundle = entity_def
+        .create_spawn_bundle(IVec2::new(0, 0), 1)
         .expect("definition should create entity");
 
-    let pickup = entity
-        .attributes
+    let pickup = bundle
+        .optional_components
         .pickup
         .expect("authored pickup should be copied to runtime entity");
     assert_eq!(pickup.item_id, "coin");
     assert_eq!(pickup.count, 3);
-    assert_eq!(entity.attributes.inventory.item_count("coin"), 0);
-    let static_render = entity
+    assert_eq!(
+        bundle
+            .optional_components
+            .inventory
+            .unwrap_or_default()
+            .item_count("coin"),
+        0
+    );
+    let static_render = bundle
+        .entity
         .attributes
+        .rendering
         .static_object_render
         .expect("static object render should be copied");
     assert_eq!(static_render.sheet, "items");
     assert_eq!(static_render.object_name, "coin");
-    assert!(entity.attributes.animation_controller.is_none());
+    assert!(bundle.entity.attributes.rendering.animation_controller.is_none());
 }
 
 #[test]
@@ -1319,7 +1330,7 @@ fn create_entity_copies_has_shadow_from_definition_rendering() {
         .create_entity(glam::IVec2::new(0, 0), 1)
         .expect("entity should be created");
 
-    assert!(!entity.attributes.has_shadow);
+    assert!(!entity.attributes.rendering.has_shadow);
 }
 
 #[test]
@@ -1583,8 +1594,8 @@ fn test_entity_definition_with_ai_config() {
         .create_entity(IVec2::ZERO, 1)
         .expect("entity should instantiate");
 
-    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::Chase);
-    assert_eq!(entity.attributes.ai_config.detection_radius, 100);
+    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::Chase);
+    assert_eq!(entity.attributes.behavior.ai_config.detection_radius, 100);
 }
 
 #[test]
@@ -1648,7 +1659,7 @@ fn test_legacy_ai_behavior_backward_compatibility() {
         .create_entity(IVec2::ZERO, 1)
         .expect("legacy entity should instantiate");
 
-    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::Wander);
+    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::Wander);
 }
 
 #[test]
@@ -1708,7 +1719,7 @@ fn entity_definition_defaults_grounding_to_bottom_center_and_collision_footprint
         .expect("entity should build");
 
     assert_eq!(
-        entity.attributes.grounding.resolved_origin(entity.size),
+        entity.attributes.rendering.grounding.resolved_origin(entity.size),
         IVec2::new(16, 47)
     );
     assert_eq!(entity.resolved_footprint().offset, [8, 40]);
@@ -2079,6 +2090,7 @@ fn test_entity_definition_with_position_based_animations() {
 
     let controller = entity
         .attributes
+        .rendering
         .animation_controller
         .expect("should have animation controller");
 

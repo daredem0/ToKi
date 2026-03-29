@@ -9,7 +9,8 @@ use std::fs;
 use toki_core::animation::AnimationState;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
+    ControlRole, EntityAttributes, EntityBehavior, EntityGameplay, EntityKind, EntityManager,
+    EntityRendering, MovementSoundTrigger,
     ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
@@ -27,28 +28,30 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
         IVec2::new(10, 20),
         UVec2::new(16, 16),
         EntityAttributes {
-            health: Some(25),
-            stats: toki_core::entity::EntityStats::from_legacy_health(Some(25)),
-            speed: 3.0,
-            solid: true,
-            visible: true,
-            has_shadow: true,
-            palette_override: None,
-            animation_controller: None,
-            static_object_render: None,
-            grounding: Default::default(),
-            render_layer: 1,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig::from_legacy_behavior(AiBehavior::Wander),
-            movement_profile: MovementProfile::LegacyDefault,
-            primary_projectile: None,
-            projectile: None,
-            pickup: None,
-            inventory: toki_core::entity::Inventory::default(),
-            has_inventory: false,
+            gameplay: EntityGameplay {
+                health: Some(25),
+                stats: toki_core::entity::EntityStats::from_legacy_health(Some(25)),
+                speed: 3.0,
+                solid: true,
+            },
+            rendering: EntityRendering {
+                visible: true,
+                has_shadow: true,
+                palette_override: None,
+                animation_controller: None,
+                static_object_render: None,
+                grounding: Default::default(),
+                render_layer: 1,
+            },
+            behavior: EntityBehavior {
+                active: true,
+                can_move: true,
+                interactable: false,
+                interaction_reach: 0,
+                ai_config: AiConfig::from_legacy_behavior(AiBehavior::Wander),
+                movement_profile: MovementProfile::LegacyDefault,
+                has_inventory: false,
+            },
         },
     );
     let mut entity = manager
@@ -121,15 +124,15 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     assert!(changed);
     assert_eq!(entity.position, IVec2::new(100, 200));
     assert_eq!(entity.size, UVec2::new(1, 1));
-    assert!(!entity.attributes.visible);
-    assert!(!entity.attributes.has_shadow);
-    assert!(!entity.attributes.active);
-    assert!(!entity.attributes.solid);
-    assert!(!entity.attributes.can_move);
+    assert!(!entity.attributes.rendering.visible);
+    assert!(!entity.attributes.rendering.has_shadow);
+    assert!(!entity.attributes.behavior.active);
+    assert!(!entity.attributes.gameplay.solid);
+    assert!(!entity.attributes.behavior.can_move);
     assert_eq!(entity.control_role, ControlRole::PlayerCharacter);
-    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::None);
+    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::None);
     assert_eq!(
-        entity.attributes.movement_profile,
+        entity.attributes.behavior.movement_profile,
         MovementProfile::PlayerWasd
     );
     assert_eq!(
@@ -141,11 +144,11 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
         entity.audio.movement_sound.as_deref(),
         Some("sfx_custom_step")
     );
-    assert!(entity.attributes.has_inventory);
-    assert_eq!(entity.attributes.speed, 0.0);
-    assert_eq!(entity.attributes.render_layer, 8);
+    assert!(entity.attributes.behavior.has_inventory);
+    assert_eq!(entity.attributes.gameplay.speed, 0.0);
+    assert_eq!(entity.attributes.rendering.render_layer, 8);
     assert!(entity.persistent_across_saves);
-    assert_eq!(entity.attributes.health, Some(0));
+    assert_eq!(entity.attributes.gameplay.health, Some(0));
     assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), Some(0));
     assert_eq!(
         entity.attributes.current_stat(ATTACK_POWER_STAT_ID),
@@ -238,7 +241,7 @@ fn apply_entity_property_draft_disables_health_and_collision() {
     let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
 
     assert!(changed);
-    assert_eq!(entity.attributes.health, None);
+    assert_eq!(entity.attributes.gameplay.health, None);
     assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), None);
     assert_eq!(entity.attributes.current_stat(ATTACK_POWER_STAT_ID), None);
     assert!(entity.collision_box.is_none());
@@ -478,12 +481,12 @@ fn collect_multi_entity_common_state_reports_mixed_values() {
     let mut first = sample_entity_with_id(1);
     let mut second = sample_entity_with_id(2);
 
-    first.attributes.visible = true;
-    second.attributes.visible = false;
-    first.attributes.active = true;
-    second.attributes.active = true;
-    first.attributes.render_layer = 2;
-    second.attributes.render_layer = 2;
+    first.attributes.rendering.visible = true;
+    second.attributes.rendering.visible = false;
+    first.attributes.behavior.active = true;
+    second.attributes.behavior.active = true;
+    first.attributes.rendering.render_layer = 2;
+    second.attributes.rendering.render_layer = 2;
     second.collision_box = None;
 
     let entities = vec![&first, &second];
@@ -512,12 +515,12 @@ fn apply_multi_entity_batch_edit_updates_all_selected_entities() {
         | InspectorSystem::apply_multi_entity_batch_edit_to_entity(&mut second, edit);
 
     assert!(changed);
-    assert!(!first.attributes.visible);
-    assert!(!second.attributes.visible);
-    assert!(!first.attributes.active);
-    assert!(!second.attributes.active);
-    assert_eq!(first.attributes.render_layer, 7);
-    assert_eq!(second.attributes.render_layer, 7);
+    assert!(!first.attributes.rendering.visible);
+    assert!(!second.attributes.rendering.visible);
+    assert!(!first.attributes.behavior.active);
+    assert!(!second.attributes.behavior.active);
+    assert_eq!(first.attributes.rendering.render_layer, 7);
+    assert_eq!(second.attributes.rendering.render_layer, 7);
     assert_eq!(first.position, IVec2::new(12, 17));
     assert_eq!(second.position, IVec2::new(12, 17));
     assert!(first.collision_box.is_some());
@@ -581,13 +584,13 @@ fn apply_entity_property_draft_with_undo_round_trips() {
     let edited = InspectorSystem::find_selected_scene_entity(&ui_state, 7)
         .expect("entity should still exist");
     assert_eq!(edited.position, IVec2::new(99, -8));
-    assert!(!edited.attributes.visible);
+    assert!(!edited.attributes.rendering.visible);
 
     assert!(ui_state.undo());
     let restored = InspectorSystem::find_selected_scene_entity(&ui_state, 7)
         .expect("entity should still exist");
     assert_eq!(restored.position, IVec2::new(10, 20));
-    assert!(restored.attributes.visible);
+    assert!(restored.attributes.rendering.visible);
 }
 
 #[test]

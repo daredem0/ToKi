@@ -12,11 +12,12 @@ impl GameState {
             return Vec::new();
         };
 
-        let mut entries = player
-            .attributes
-            .inventory
-            .items
-            .iter()
+        let mut entries = self
+            .world
+            .entity_manager
+            .inventory(player.id)
+            .into_iter()
+            .flat_map(|inventory| inventory.items.iter())
             .map(|(item_id, count)| crate::menu::InventoryEntry {
                 item_id: item_id.clone(),
                 count: *count,
@@ -35,7 +36,7 @@ impl GameState {
             .filter(|&entity_id| {
                 self.world.entity_manager
                     .get_entity(entity_id)
-                    .is_some_and(|entity| entity.attributes.has_inventory)
+                    .is_some_and(|entity| entity.attributes.behavior.has_inventory)
             })
             .collect::<Vec<_>>();
         collector_ids.sort_unstable();
@@ -48,7 +49,7 @@ impl GameState {
             .filter(|&entity_id| {
                 self.world.entity_manager
                     .get_entity(entity_id)
-                    .and_then(|entity| entity.attributes.pickup.as_ref())
+                    .and_then(|entity| self.world.entity_manager.pickup(entity.id))
                     .is_some()
             })
             .collect::<Vec<_>>();
@@ -65,7 +66,7 @@ impl GameState {
                 let Some(pickup_entity) = self.world.entity_manager.get_entity(pickup_id) else {
                     continue;
                 };
-                let Some(pickup) = pickup_entity.attributes.pickup.as_ref() else {
+                let Some(pickup) = self.world.entity_manager.pickup(pickup_id) else {
                     continue;
                 };
                 if pickup.count == 0 || pickup.item_id.is_empty() {
@@ -94,18 +95,25 @@ impl GameState {
             let Some(collector) = self.world.entity_manager.get_entity_mut(collector_id) else {
                 continue;
             };
-            if !collector.attributes.has_inventory {
+            if !collector.attributes.behavior.has_inventory {
                 continue;
             }
 
-            collector.attributes.inventory.add_item(&item_id, count);
+            self.world
+                .entity_manager
+                .ensure_inventory(collector_id)
+                .add_item(&item_id, count);
             tracing::debug!(
                 "Entity {} collected pickup {} item_id={} count={} new_count={}",
                 collector_id,
                 pickup_id,
                 item_id,
                 count,
-                collector.attributes.inventory.item_count(&item_id)
+                self.world
+                    .entity_manager
+                    .inventory(collector_id)
+                    .map(|inventory| inventory.item_count(&item_id))
+                    .unwrap_or(0)
             );
 
             self.world.entity_manager.despawn_entity(pickup_id);

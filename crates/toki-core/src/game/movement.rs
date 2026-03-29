@@ -143,7 +143,7 @@ impl GameState {
             };
 
             let current_position = entity.position;
-            let entity_speed = entity.attributes.speed * ctx.time_scale;
+            let entity_speed = entity.attributes.gameplay.speed * ctx.time_scale;
             let mut accumulator = entity.movement_accumulator;
 
             let pixels_x =
@@ -494,7 +494,7 @@ impl GameState {
                 .world
                 .entity_manager
                 .get_entity_mut(entity_id)
-                .and_then(|entity| entity.attributes.animation_controller.as_mut())
+                .and_then(|entity| entity.attributes.rendering.animation_controller.as_mut())
             {
                 if !Self::action_animation_locks_locomotion(animation_controller) {
                     let actual_delta = final_position - initial_position;

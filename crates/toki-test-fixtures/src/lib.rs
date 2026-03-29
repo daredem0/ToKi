@@ -128,28 +128,30 @@ pub fn test_entity() -> Entity {
     controller.add_clip(clip);
 
     let attributes = EntityAttributes {
-        health: Some(100),
-        stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
-        speed: 5.0,
-        solid: true,
-        visible: true,
-        has_shadow: true,
-        palette_override: None,
-        animation_controller: Some(controller),
-        static_object_render: None,
-        grounding: Default::default(),
-        render_layer: 2,
-        active: true,
-        can_move: true,
-        interactable: false,
-        interaction_reach: 0,
-        ai_config: AiConfig::default(),
-        movement_profile: MovementProfile::PlayerWasd,
-        primary_projectile: None,
-        projectile: None,
-        pickup: None,
-        inventory: toki_core::entity::Inventory::default(),
-        has_inventory: true,
+        gameplay: toki_core::entity::EntityGameplay {
+            health: Some(100),
+            stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
+            speed: 5.0,
+            solid: true,
+        },
+        rendering: toki_core::entity::EntityRendering {
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            animation_controller: Some(controller),
+            render_layer: 2,
+            static_object_render: None,
+            grounding: Default::default(),
+        },
+        behavior: toki_core::entity::EntityBehavior {
+            active: true,
+            can_move: true,
+            interactable: false,
+            interaction_reach: 0,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::PlayerWasd,
+            has_inventory: true,
+        },
     };
 
     Entity {

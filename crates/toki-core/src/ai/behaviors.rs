@@ -42,7 +42,7 @@ impl BehaviorUpdate for ChaseHandler {
     ) -> Option<AiUpdateResult> {
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.ai_config.detection_radius;
+        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
 
         if distance_between(current_position, player_pos) > detection_radius as f32 {
             return IdleWanderHandler.update(entity, entity_id, player_position, ctx, ai_state);
@@ -68,7 +68,7 @@ impl BehaviorUpdate for RunHandler {
     ) -> Option<AiUpdateResult> {
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.ai_config.detection_radius;
+        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
 
         if distance_between(current_position, player_pos) > detection_radius as f32 {
             return IdleWanderHandler.update(entity, entity_id, player_position, ctx, ai_state);
@@ -205,7 +205,7 @@ impl IdleWanderHandler {
                     candidate == step.current_position
                         || ctx.is_movement_valid(entity, entity_id, candidate)
                 });
-        let new_remaining = step.remaining_distance - entity.attributes.speed.max(0.0);
+        let new_remaining = step.remaining_distance - entity.attributes.gameplay.speed.max(0.0);
 
         if can_move && new_remaining > 0.0 {
             ai_state.wander_phase = WanderPhase::Walking {

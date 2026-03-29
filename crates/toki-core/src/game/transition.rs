@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use crate::animation::AnimationState;
 use crate::collision::CollisionBox;
-use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
+use crate::entity::{
+    ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager,
+    EntityOptionalComponents, StoredEntity,
+};
 use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 use crate::scene::{Scene, SceneAnchorFacing};
@@ -28,7 +31,7 @@ impl<'a> SceneTransitionPlanner<'a> {
         &self,
         scene: &Scene,
         transition_spawn_point_id: Option<&str>,
-        preserved_player: Option<Entity>,
+        preserved_player: Option<StoredEntity>,
     ) -> Result<PreparedSceneLoad, String> {
         let mut entity_manager = EntityManager::new();
         let preserve_player_across_transition =
@@ -44,7 +47,9 @@ impl<'a> SceneTransitionPlanner<'a> {
             {
                 continue;
             }
-            entity_manager.add_existing_entity(self.hydrate_legacy_scene_entity(entity));
+            let hydrated = self.hydrate_legacy_scene_entity(entity);
+            let components = scene.optional_components(entity.id);
+            entity_manager.add_existing_stored_entity(StoredEntity::new(hydrated, components));
         }
 
         let player_id = if let Some(player_entry) = &scene.player_entry {
@@ -56,9 +61,13 @@ impl<'a> SceneTransitionPlanner<'a> {
                     spawn_point_id,
                     preserved_player,
                 )?;
-                let player_id = player.id;
-                self.reset_spawned_player_transient_state(&mut player, scene, spawn_point_id);
-                entity_manager.add_existing_entity(player);
+                let player_id = player.entity.id;
+                self.reset_spawned_player_transient_state(
+                    &mut player.entity,
+                    scene,
+                    spawn_point_id,
+                );
+                entity_manager.add_existing_stored_entity(player);
                 entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
                 if let Some(player) = entity_manager.get_entity_mut(player_id) {
                     player.entity_kind = EntityKind::Player;
@@ -87,12 +96,12 @@ impl<'a> SceneTransitionPlanner<'a> {
             }
         } else if let Some(mut player) = preserved_player {
             if let Some(spawn_point_id) = transition_spawn_point_id {
-                self.reposition_preserved_player(&mut player, scene, spawn_point_id)?;
+                self.reposition_preserved_player(&mut player.entity, scene, spawn_point_id)?;
             } else {
-                Self::reset_player_transient_state(&mut player, None);
+                Self::reset_player_transient_state(&mut player.entity, None);
             }
-            let player_id = player.id;
-            entity_manager.add_existing_entity(player);
+            let player_id = player.entity.id;
+            entity_manager.add_existing_stored_entity(player);
             entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
             if let Some(player) = entity_manager.get_entity_mut(player_id) {
                 player.entity_kind = EntityKind::Player;
@@ -114,8 +123,8 @@ impl<'a> SceneTransitionPlanner<'a> {
         scene: &Scene,
         entity_definition_name: &str,
         spawn_point_id: &str,
-        preserved_player: &Entity,
-    ) -> Result<Entity, String> {
+        preserved_player: &StoredEntity,
+    ) -> Result<StoredEntity, String> {
         let definition = self
             .entity_definitions
             .get(entity_definition_name)
@@ -126,13 +135,15 @@ impl<'a> SceneTransitionPlanner<'a> {
                 )
             })?;
         let (position, _) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
-        let mut player = definition
-            .create_entity(position, preserved_player.id)
+        let bundle = definition
+            .create_spawn_bundle(position, preserved_player.entity.id)
             .map_err(|error| error.to_string())?;
+        let mut player = bundle.entity;
         player.control_role = ControlRole::PlayerCharacter;
         player.entity_kind = EntityKind::Player;
-        Self::apply_durable_player_state(&mut player, preserved_player);
-        Ok(player)
+        let mut components = bundle.optional_components;
+        Self::apply_durable_player_state(&mut player, &mut components, preserved_player);
+        Ok(StoredEntity::new(player, components))
     }
 
     fn hydrate_legacy_scene_entity(&self, entity: &Entity) -> Entity {
@@ -144,13 +155,13 @@ impl<'a> SceneTransitionPlanner<'a> {
         };
 
         let mut hydrated = entity.clone();
-        if !hydrated.attributes.grounding.is_empty() {
+        if !hydrated.attributes.rendering.grounding.is_empty() {
             return hydrated;
         }
 
         if let Some(collision_box) = hydrated.collision_box.as_ref() {
             if Self::is_legacy_default_collision(entity, collision_box) {
-                hydrated.attributes.grounding = definition.get_grounding();
+                hydrated.attributes.rendering.grounding = definition.get_grounding();
                 hydrated.collision_box = definition.get_collision_box();
             }
         }
@@ -190,7 +201,9 @@ impl<'a> SceneTransitionPlanner<'a> {
 
     fn reset_player_transient_state(player: &mut Entity, anchor_facing: Option<SceneAnchorFacing>) {
         player.movement_accumulator = glam::Vec2::ZERO;
-        if let Some(animation_controller) = player.attributes.animation_controller.as_mut() {
+        if let Some(animation_controller) =
+            player.attributes.rendering.animation_controller.as_mut()
+        {
             let facing = anchor_facing
                 .map(Self::scene_anchor_facing_to_animation_state)
                 .or_else(|| {
@@ -213,13 +226,22 @@ impl<'a> SceneTransitionPlanner<'a> {
         }
     }
 
-    fn apply_durable_player_state(target: &mut Entity, source: &Entity) {
-        target.attributes.health = source.attributes.health;
-        target.attributes.stats = source.attributes.stats.clone();
-        target.attributes.inventory = source.attributes.inventory.clone();
-        target.attributes.has_inventory = target.attributes.has_inventory
-            || source.attributes.has_inventory
-            || !source.attributes.inventory.is_empty();
+    fn apply_durable_player_state(
+        target: &mut Entity,
+        target_components: &mut EntityOptionalComponents,
+        source: &StoredEntity,
+    ) {
+        target.attributes.gameplay.health = source.entity.attributes.gameplay.health;
+        target.attributes.gameplay.stats = source.entity.attributes.gameplay.stats.clone();
+        target.attributes.behavior.has_inventory = target.attributes.behavior.has_inventory
+            || source.entity.attributes.behavior.has_inventory
+            || source
+                .components
+                .inventory
+                .as_ref()
+                .is_some_and(|inventory| !inventory.is_empty());
+        target_components.inventory = source.components.inventory.clone();
+        target_components.primary_projectile = source.components.primary_projectile.clone();
     }
 
     fn scene_anchor_facing_to_animation_state(facing: SceneAnchorFacing) -> AnimationState {
@@ -254,7 +276,8 @@ mod tests {
     use crate::animation::AnimationState;
     use crate::entity::{
         AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-        ControlRole, EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef,
+        ControlRole, EntityDefinition, EntityOptionalComponents, MovementProfile,
+        MovementSoundTrigger, RenderingDef, StoredEntity,
     };
     use crate::entity::{EntityFootprint, EntityGrounding};
     use crate::scene::{Scene, SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
@@ -336,13 +359,30 @@ mod tests {
             .expect("player should instantiate");
         preserved.control_role = ControlRole::PlayerCharacter;
         preserved.attributes.apply_stat_delta("health", -25);
-        preserved.attributes.inventory.add_item("coin", 2);
-        if let Some(controller) = preserved.attributes.animation_controller.as_mut() {
+        let mut preserved_components = EntityOptionalComponents {
+            inventory: Some(Default::default()),
+            ..EntityOptionalComponents::default()
+        };
+        preserved_components
+            .inventory
+            .as_mut()
+            .expect("inventory should exist")
+            .add_item("coin", 2);
+        if let Some(controller) = preserved
+            .attributes
+            .rendering
+            .animation_controller
+            .as_mut()
+        {
             controller.play(AnimationState::AttackLeft);
         }
 
         let prepared = planner
-            .prepare_scene_load(&scene, Some("gate"), Some(preserved))
+            .prepare_scene_load(
+                &scene,
+                Some("gate"),
+                Some(StoredEntity::new(preserved, preserved_components)),
+            )
             .expect("scene load should be prepared");
 
         let player = prepared
@@ -351,7 +391,14 @@ mod tests {
             .expect("prepared player should exist");
         assert_eq!(player.position, glam::IVec2::new(32, 48));
         assert_eq!(player.attributes.current_stat("health"), Some(75));
-        assert_eq!(player.attributes.inventory.item_count("coin"), 2);
+        assert_eq!(
+            prepared
+                .entity_manager
+                .inventory(player.id)
+                .expect("player inventory should exist")
+                .item_count("coin"),
+            2
+        );
         assert_eq!(player.control_role, ControlRole::PlayerCharacter);
     }
 
@@ -423,7 +470,7 @@ mod tests {
         let mut legacy_entity = definition
             .create_entity(glam::IVec2::new(48, 128), 14)
             .expect("entity should instantiate");
-        legacy_entity.attributes.grounding = EntityGrounding::default();
+        legacy_entity.attributes.rendering.grounding = EntityGrounding::default();
         legacy_entity.collision_box = Some(crate::collision::CollisionBox::solid_box(
             legacy_entity.size,
         ));
@@ -444,7 +491,7 @@ mod tests {
             .expect("player entity should be present");
 
         assert_eq!(
-            entity.attributes.grounding.footprint,
+            entity.attributes.rendering.grounding.footprint,
             Some(EntityFootprint::new([4, 12], [8, 4]))
         );
         let collision_box = entity

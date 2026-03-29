@@ -248,10 +248,10 @@ fn test_spawn_player() {
         player.effective_control_role(),
         ControlRole::PlayerCharacter
     );
-    assert_eq!(player.attributes.health, Some(100));
-    assert_eq!(player.attributes.speed, 2.0);
-    assert!(player.attributes.active);
-    assert!(player.attributes.can_move);
+    assert_eq!(player.attributes.gameplay.health, Some(100));
+    assert_eq!(player.attributes.gameplay.speed, 2.0);
+    assert!(player.attributes.behavior.active);
+    assert!(player.attributes.behavior.can_move);
 
     // Check lookup tables
     assert_eq!(
@@ -275,8 +275,11 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         control_role: ControlRole::PlayerCharacter,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes {
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::PlayerWasd,
+            behavior: EntityBehavior {
+                ai_config: AiConfig::default(),
+                movement_profile: MovementProfile::PlayerWasd,
+                ..EntityBehavior::default()
+            },
             ..EntityAttributes::default()
         },
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
@@ -311,10 +314,16 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         control_role: ControlRole::None,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes {
-            health: Some(25),
-            stats: EntityStats::default(),
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::None,
+            gameplay: EntityGameplay {
+                health: Some(25),
+                stats: EntityStats::default(),
+                ..EntityGameplay::default()
+            },
+            behavior: EntityBehavior {
+                ai_config: AiConfig::default(),
+                movement_profile: MovementProfile::None,
+                ..EntityBehavior::default()
+            },
             ..EntityAttributes::default()
         },
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
@@ -327,7 +336,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         .get_entity(entity_id)
         .expect("existing entity should be stored");
 
-    assert_eq!(loaded.attributes.health, Some(25));
+    assert_eq!(loaded.attributes.gameplay.health, Some(25));
     assert_eq!(loaded.attributes.current_stat(HEALTH_STAT_ID), Some(25));
     assert_eq!(loaded.attributes.base_stat(HEALTH_STAT_ID), Some(25));
 }
@@ -403,12 +412,12 @@ fn test_entity_active_status() {
     // Deactivate entity
     manager.set_entity_active(entity_id, false);
     assert_eq!(manager.active_entities().len(), 0);
-    assert!(!manager.get_entity(entity_id).unwrap().attributes.active);
+    assert!(!manager.get_entity(entity_id).unwrap().attributes.behavior.active);
 
     // Reactivate entity
     manager.set_entity_active(entity_id, true);
     assert_eq!(manager.active_entities(), vec![entity_id]);
-    assert!(manager.get_entity(entity_id).unwrap().attributes.active);
+    assert!(manager.get_entity(entity_id).unwrap().attributes.behavior.active);
 }
 
 #[test]
@@ -423,6 +432,7 @@ fn test_visible_entities() {
         .get_entity_mut(invisible_id)
         .unwrap()
         .attributes
+        .rendering
         .visible = false;
 
     let visible_entities = manager.visible_entities();
@@ -435,14 +445,14 @@ fn test_visible_entities() {
 fn test_entity_attributes_defaults() {
     let attributes = EntityAttributes::default();
 
-    assert_eq!(attributes.health, None);
-    assert_eq!(attributes.speed, 2.0);
-    assert!(attributes.solid);
-    assert!(attributes.visible);
-    assert!(attributes.active);
-    assert!(attributes.can_move);
-    assert_eq!(attributes.render_layer, 0);
-    assert!(attributes.animation_controller.is_none());
+    assert_eq!(attributes.gameplay.health, None);
+    assert_eq!(attributes.gameplay.speed, 2.0);
+    assert!(attributes.gameplay.solid);
+    assert!(attributes.rendering.visible);
+    assert!(attributes.behavior.active);
+    assert!(attributes.behavior.can_move);
+    assert_eq!(attributes.rendering.render_layer, 0);
+    assert!(attributes.rendering.animation_controller.is_none());
 }
 
 #[test]
@@ -460,30 +470,30 @@ fn test_factory_method_differences() {
     let decoration = manager.get_entity(decoration_id).unwrap();
 
     // Check health differences
-    assert_eq!(player.attributes.health, Some(100));
-    assert_eq!(npc.attributes.health, Some(50));
-    assert_eq!(item.attributes.health, None);
-    assert_eq!(decoration.attributes.health, None);
+    assert_eq!(player.attributes.gameplay.health, Some(100));
+    assert_eq!(npc.attributes.gameplay.health, Some(50));
+    assert_eq!(item.attributes.gameplay.health, None);
+    assert_eq!(decoration.attributes.gameplay.health, None);
 
     // Check speed differences
-    assert_eq!(player.attributes.speed, 2.0);
-    assert_eq!(npc.attributes.speed, 1.0);
+    assert_eq!(player.attributes.gameplay.speed, 2.0);
+    assert_eq!(npc.attributes.gameplay.speed, 1.0);
 
     // Check movement differences
-    assert!(player.attributes.can_move);
-    assert!(!npc.attributes.can_move);
-    assert!(!item.attributes.can_move);
-    assert!(!decoration.attributes.can_move);
+    assert!(player.attributes.behavior.can_move);
+    assert!(!npc.attributes.behavior.can_move);
+    assert!(!item.attributes.behavior.can_move);
+    assert!(!decoration.attributes.behavior.can_move);
 
     // Check solid differences
-    assert!(player.attributes.solid);
-    assert!(npc.attributes.solid);
-    assert!(!item.attributes.solid);
-    assert!(!decoration.attributes.solid);
+    assert!(player.attributes.gameplay.solid);
+    assert!(npc.attributes.gameplay.solid);
+    assert!(!item.attributes.gameplay.solid);
+    assert!(!decoration.attributes.gameplay.solid);
 
     // Check render layer differences
-    assert_eq!(player.attributes.render_layer, 0);
-    assert_eq!(decoration.attributes.render_layer, -1);
+    assert_eq!(player.attributes.rendering.render_layer, 0);
+    assert_eq!(decoration.attributes.rendering.render_layer, -1);
 }
 
 #[test]

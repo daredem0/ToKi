@@ -34,7 +34,7 @@ impl<'a> AiRuntimeApplier<'a> {
     fn apply_result(&mut self, ai_result: AiUpdateResult) {
         if let Some(animation) = ai_result.new_animation {
             if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
-                if let Some(controller) = &mut entity.attributes.animation_controller {
+                if let Some(controller) = &mut entity.attributes.rendering.animation_controller {
                     if controller.current_clip_state != animation {
                         controller.play(animation);
                     }
@@ -60,10 +60,10 @@ impl<'a> AiRuntimeApplier<'a> {
                             entity_id = new_entity_id,
                             definition_name = ?entity.definition_name,
                             position = ?entity.position,
-                            ai_behavior = ?entity.attributes.ai_config.behavior,
-                            detection_radius = entity.attributes.ai_config.detection_radius,
-                            solid = entity.attributes.solid,
-                            speed = entity.attributes.speed,
+                            ai_behavior = ?entity.attributes.behavior.ai_config.behavior,
+                            detection_radius = entity.attributes.behavior.ai_config.detection_radius,
+                            solid = entity.attributes.gameplay.solid,
+                            speed = entity.attributes.gameplay.speed,
                             "AI spawn: child entity configuration"
                         );
                     }

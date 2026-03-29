@@ -165,7 +165,7 @@ impl EntityPropertyDraft {
             }
         };
 
-        let (health_enabled, health_value) = match entity.attributes.health {
+        let (health_enabled, health_value) = match entity.attributes.gameplay.health {
             Some(value) => (true, value as i64),
             None => (false, 0),
         };
@@ -179,11 +179,13 @@ impl EntityPropertyDraft {
             category: entity.category.clone(),
             static_object_sheet: entity
                 .attributes
+                .rendering
                 .static_object_render
                 .as_ref()
                 .map(|render| render.sheet.clone()),
             static_object_name: entity
                 .attributes
+                .rendering
                 .static_object_render
                 .as_ref()
                 .map(|render| render.object_name.clone()),
@@ -192,27 +194,28 @@ impl EntityPropertyDraft {
             position_y: entity.position.y,
             size_x: entity.size.x as i64,
             size_y: entity.size.y as i64,
-            visible: entity.attributes.visible,
-            has_shadow: entity.attributes.has_shadow,
+            visible: entity.attributes.rendering.visible,
+            has_shadow: entity.attributes.rendering.has_shadow,
             palette_override: entity
                 .attributes
+                .rendering
                 .palette_override
                 .clone()
                 .unwrap_or_default(),
-            active: entity.attributes.active,
-            solid: entity.attributes.solid,
-            interactable: entity.attributes.interactable,
-            interaction_reach: entity.attributes.interaction_reach,
-            can_move: entity.attributes.can_move,
-            ai_config: entity.attributes.ai_config,
-            movement_profile: entity.attributes.movement_profile,
+            active: entity.attributes.behavior.active,
+            solid: entity.attributes.gameplay.solid,
+            interactable: entity.attributes.behavior.interactable,
+            interaction_reach: entity.attributes.behavior.interaction_reach,
+            can_move: entity.attributes.behavior.can_move,
+            ai_config: entity.attributes.behavior.ai_config,
+            movement_profile: entity.attributes.behavior.movement_profile,
             movement_sound_trigger: entity.audio.movement_sound_trigger,
             footstep_trigger_distance: entity.audio.footstep_trigger_distance,
             hearing_radius: entity.audio.hearing_radius,
             movement_sound: entity.audio.movement_sound.clone().unwrap_or_default(),
-            has_inventory: entity.attributes.has_inventory,
-            speed: entity.attributes.speed as f64,
-            render_layer: entity.attributes.render_layer,
+            has_inventory: entity.attributes.behavior.has_inventory,
+            speed: entity.attributes.gameplay.speed as f64,
+            render_layer: entity.attributes.rendering.render_layer,
             persistent_across_saves: entity.persistent_across_saves,
             health_enabled,
             health_value,

@@ -102,6 +102,12 @@ fn player_entity(state: &GameState) -> Option<&toki_core::entity::Entity> {
         .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
 }
 
+fn player_inventory(state: &GameState) -> Option<&toki_core::entity::Inventory> {
+    state.world()
+        .player_id()
+        .and_then(|player_id| state.world().entity_manager().inventory(player_id))
+}
+
 fn scene_with_player(name: &str, position: IVec2) -> Scene {
     scene_with_test_player(name, position)
 }
@@ -248,6 +254,7 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -311,6 +318,7 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -386,6 +394,7 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -414,8 +423,9 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
         .world_mut().entity_manager_mut()
         .get_entity_mut(target_id)
         .expect("target should exist");
-    target.attributes.health = Some(10);
-    target.attributes.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
+    target.attributes.gameplay.health = Some(10);
+    target.attributes.gameplay.stats =
+        toki_core::entity::EntityStats::from_legacy_health(Some(10));
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -455,6 +465,7 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -483,8 +494,9 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
         .world_mut().entity_manager_mut()
         .get_entity_mut(target_id)
         .expect("target should exist");
-    target.attributes.health = Some(10);
-    target.attributes.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
+    target.attributes.gameplay.health = Some(10);
+    target.attributes.gameplay.stats =
+        toki_core::entity::EntityStats::from_legacy_health(Some(10));
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -721,6 +733,7 @@ fn entity_active_condition_checks_target_active_flag() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
+        .behavior
         .active = false;
 
     let inactive = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
@@ -731,6 +744,7 @@ fn entity_active_condition_checks_target_active_flag() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
+        .behavior
         .active = true;
     let active = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
     assert!(active.events.iter().any(|event| matches!(
@@ -953,7 +967,7 @@ fn play_animation_action_overrides_default_animation_for_target() {
     let player = player_entity(&state).expect("player must exist");
     let animation = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_ref()
         .expect("player should have animation controller");
     assert_eq!(animation.current_clip_state, AnimationState::Walk);
@@ -994,7 +1008,7 @@ fn play_animation_uses_priority_order_for_same_target() {
     let player = player_entity(&state).expect("player must exist");
     let animation = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_ref()
         .expect("player should have animation controller");
     assert_eq!(animation.current_clip_state, AnimationState::Walk);
@@ -1835,8 +1849,13 @@ fn dialog_completion_trigger_can_drive_follow_up_rules() {
         &create_test_atlas(),
     );
 
-    let player = player_entity(&state).expect("player should exist");
-    assert_eq!(player.attributes.inventory.item_count("gift"), 1);
+    let _player = player_entity(&state).expect("player should exist");
+    assert_eq!(
+        player_inventory(&state)
+            .expect("player inventory should exist")
+            .item_count("gift"),
+        1
+    );
 }
 
 #[test]
@@ -2079,7 +2098,7 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -2152,7 +2171,7 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -2298,7 +2317,7 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .interactable = true;
+        .behavior.interactable = true;
 
     // Rule fires on interact with NPC
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2354,7 +2373,7 @@ fn on_interact_does_not_fire_when_not_overlapping() {
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .interactable = true;
+        .behavior.interactable = true;
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -2397,7 +2416,7 @@ fn on_interact_does_not_fire_when_entity_is_not_interactable() {
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .interactable = false;
+        .behavior.interactable = false;
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -2440,7 +2459,7 @@ fn on_interact_provides_trigger_context() {
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .interactable = true;
+        .behavior.interactable = true;
 
     // Rule uses TriggerSelf (player) and TriggerOther (NPC)
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2494,7 +2513,7 @@ fn interaction_rules_respect_priority_ordering() {
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .interactable = true;
+        .behavior.interactable = true;
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![
@@ -2555,7 +2574,7 @@ fn on_damaged_fires_when_entity_takes_damage() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -2597,7 +2616,7 @@ fn on_damaged_provides_trigger_context() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
 
     // Rule uses TriggerSelf (victim) and TriggerOther (attacker)
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2650,7 +2669,7 @@ fn on_death_fires_when_entity_dies() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(10);
+        .gameplay.health = Some(10);
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -2692,7 +2711,7 @@ fn on_death_provides_trigger_context() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(10);
+        .gameplay.health = Some(10);
 
     // Rule uses TriggerSelf (victim) and TriggerOther (attacker)
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2745,7 +2764,7 @@ fn on_death_fires_without_attacker() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(10);
+        .gameplay.health = Some(10);
 
     // Rule uses only TriggerSelf (victim) - no attacker requirement
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2798,13 +2817,13 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
     state
         .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
 
     // Rule only fires when player is damaged
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2872,13 +2891,13 @@ fn on_damaged_without_entity_filter_fires_for_all_entities() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
     state
         .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
 
     // Rule fires for ANY damage (no entity filter)
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -2928,13 +2947,13 @@ fn on_damaged_with_specific_entity_id_filter() {
         .get_entity_mut(npc1_id)
         .expect("npc1 should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
     state
         .world_mut().entity_manager_mut()
         .get_entity_mut(npc2_id)
         .expect("npc2 should exist")
         .attributes
-        .health = Some(100);
+        .gameplay.health = Some(100);
 
     // Rule only fires when npc1 is damaged
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -3002,13 +3021,13 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .health = Some(10);
+        .gameplay.health = Some(10);
     state
         .world_mut().entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .health = Some(10);
+        .gameplay.health = Some(10);
 
     // Rule only fires when player dies
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -3076,7 +3095,7 @@ fn on_death_without_entity_filter_fires_for_all_entities() {
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .health = Some(10);
+        .gameplay.health = Some(10);
 
     // Rule fires for ANY death (no entity filter)
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -3129,7 +3148,7 @@ fn health_below_condition_matches_when_entity_health_is_below_threshold() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .stats
+        .gameplay.stats
         .current
         .insert("health".to_string(), 30);
 
@@ -3178,7 +3197,7 @@ fn health_below_condition_does_not_match_when_health_equals_threshold() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .stats
+        .gameplay.stats
         .current
         .insert("health".to_string(), 50);
 
@@ -3261,7 +3280,7 @@ fn health_above_condition_matches_when_entity_health_is_above_threshold() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .stats
+        .gameplay.stats
         .current
         .insert("health".to_string(), 80);
 
@@ -3310,7 +3329,7 @@ fn health_above_condition_does_not_match_when_health_equals_threshold() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .stats
+        .gameplay.stats
         .current
         .insert("health".to_string(), 50);
 
@@ -3356,7 +3375,7 @@ fn health_above_condition_does_not_match_when_health_is_below_threshold() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .stats
+        .gameplay.stats
         .current
         .insert("health".to_string(), 30);
 
@@ -3402,7 +3421,7 @@ fn health_condition_fails_safely_when_entity_has_no_health_stat() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .stats = toki_core::entity::EntityStats::default();
+        .gameplay.stats = toki_core::entity::EntityStats::default();
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![Rule {
@@ -3646,7 +3665,7 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -3887,10 +3906,7 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
     // Give player inventory items
     state
         .world_mut().entity_manager_mut()
-        .get_entity_mut(player_id)
-        .expect("player should exist")
-        .attributes
-        .inventory
+        .ensure_inventory(player_id)
         .add_item("key", 3);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -3936,10 +3952,7 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
     // Give player fewer items than required
     state
         .world_mut().entity_manager_mut()
-        .get_entity_mut(player_id)
-        .expect("player should exist")
-        .attributes
-        .inventory
+        .ensure_inventory(player_id)
         .add_item("key", 1);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4472,7 +4485,7 @@ fn damage_entity_reduces_health_by_specified_amount() {
     // Verify initial health
     let initial_health = state.world().entity_manager()
         .get_entity(target_id)
-        .and_then(|e| e.attributes.health)
+        .and_then(|e| e.attributes.gameplay.health)
         .expect("Target should have health");
     assert_eq!(initial_health, 50);
 
@@ -4496,7 +4509,7 @@ fn damage_entity_reduces_health_by_specified_amount() {
 
     let new_health = state.world().entity_manager()
         .get_entity(target_id)
-        .and_then(|e| e.attributes.health)
+        .and_then(|e| e.attributes.gameplay.health)
         .expect("Target should still exist");
     assert_eq!(new_health, 20, "Health should be reduced by 30");
 }
@@ -4570,7 +4583,7 @@ fn heal_entity_increases_health_by_specified_amount() {
 
     let damaged_health = state.world().entity_manager()
         .get_entity(target_id)
-        .and_then(|e| e.attributes.health)
+        .and_then(|e| e.attributes.gameplay.health)
         .unwrap();
     assert_eq!(damaged_health, 10);
 
@@ -4595,7 +4608,7 @@ fn heal_entity_increases_health_by_specified_amount() {
 
     let healed_health = state.world().entity_manager()
         .get_entity(target_id)
-        .and_then(|e| e.attributes.health)
+        .and_then(|e| e.attributes.gameplay.health)
         .unwrap();
     assert_eq!(healed_health, 35, "Health should increase by 25");
 }
@@ -4625,7 +4638,7 @@ fn heal_entity_does_not_exceed_base_health() {
 
     let health = state.world().entity_manager()
         .get_entity(target_id)
-        .and_then(|e| e.attributes.health)
+        .and_then(|e| e.attributes.gameplay.health)
         .unwrap();
     assert_eq!(health, 50, "Health should not exceed base value");
 }
@@ -4654,11 +4667,11 @@ fn add_inventory_item_adds_to_empty_inventory() {
         &create_test_atlas(),
     );
 
-    let inventory = &state.world().entity_manager()
-        .get_entity(player_id)
-        .unwrap()
-        .attributes
-        .inventory;
+    let inventory = state
+        .world()
+        .entity_manager()
+        .inventory(player_id)
+        .expect("player inventory should exist");
     assert_eq!(inventory.item_count("key_red"), 1);
 }
 
@@ -4694,11 +4707,11 @@ fn add_inventory_item_stacks_with_existing() {
         &create_test_atlas(),
     );
 
-    let inventory = &state.world().entity_manager()
-        .get_entity(player_id)
-        .unwrap()
-        .attributes
-        .inventory;
+    let inventory = state
+        .world()
+        .entity_manager()
+        .inventory(player_id)
+        .expect("player inventory should exist");
     assert_eq!(inventory.item_count("coin"), 20);
 }
 
@@ -4710,10 +4723,7 @@ fn remove_inventory_item_reduces_count() {
     // Add items first
     state
         .world_mut().entity_manager_mut()
-        .get_entity_mut(player_id)
-        .unwrap()
-        .attributes
-        .inventory
+        .ensure_inventory(player_id)
         .add_item("potion", 5);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4735,11 +4745,11 @@ fn remove_inventory_item_reduces_count() {
         &create_test_atlas(),
     );
 
-    let inventory = &state.world().entity_manager()
-        .get_entity(player_id)
-        .unwrap()
-        .attributes
-        .inventory;
+    let inventory = state
+        .world()
+        .entity_manager()
+        .inventory(player_id)
+        .expect("player inventory should exist");
     assert_eq!(inventory.item_count("potion"), 3);
 }
 
@@ -4751,10 +4761,7 @@ fn remove_inventory_item_never_goes_negative() {
     // Add only 2 items
     state
         .world_mut().entity_manager_mut()
-        .get_entity_mut(player_id)
-        .unwrap()
-        .attributes
-        .inventory
+        .ensure_inventory(player_id)
         .add_item("arrow", 2);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4776,11 +4783,11 @@ fn remove_inventory_item_never_goes_negative() {
         &create_test_atlas(),
     );
 
-    let inventory = &state.world().entity_manager()
-        .get_entity(player_id)
-        .unwrap()
-        .attributes
-        .inventory;
+    let inventory = state
+        .world()
+        .entity_manager()
+        .inventory(player_id)
+        .expect("player inventory should exist");
     assert_eq!(
         inventory.item_count("arrow"),
         0,
@@ -4798,7 +4805,7 @@ fn set_entity_active_false_makes_entity_inactive() {
             .get_entity(npc_id)
             .unwrap()
             .attributes
-            .active
+            .behavior.active
     );
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4820,7 +4827,7 @@ fn set_entity_active_false_makes_entity_inactive() {
     );
 
     let entity = state.world().entity_manager().get_entity(npc_id).unwrap();
-    assert!(!entity.attributes.active, "Entity should be inactive");
+    assert!(!entity.attributes.behavior.active, "Entity should be inactive");
 }
 
 #[test]
@@ -4834,7 +4841,7 @@ fn set_entity_active_true_makes_entity_active() {
         .get_entity_mut(npc_id)
         .unwrap()
         .attributes
-        .active = false;
+        .behavior.active = false;
 
     RuleSystem::set_rules(&mut state, RuleSet {
         rules: vec![base_rule(
@@ -4855,7 +4862,7 @@ fn set_entity_active_true_makes_entity_active() {
     );
 
     let entity = state.world().entity_manager().get_entity(npc_id).unwrap();
-    assert!(entity.attributes.active, "Entity should be active");
+    assert!(entity.attributes.behavior.active, "Entity should be active");
 }
 
 #[test]

@@ -16,7 +16,9 @@ impl GameState {
             let Some(entity) = self.world.entity_manager.get_entity_mut(entity_id) else {
                 continue;
             };
-            let Some(animation_controller) = entity.attributes.animation_controller.as_mut() else {
+            let Some(animation_controller) =
+                entity.attributes.rendering.animation_controller.as_mut()
+            else {
                 continue;
             };
 

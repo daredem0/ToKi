@@ -138,6 +138,7 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         description: Some("integration test scene".to_string()),
         maps: vec!["main_map".to_string()],
         entities: Vec::new(),
+        components: Default::default(),
         rules: RuleSet {
             rules: vec![Rule {
                 id: "rule_1".to_string(),

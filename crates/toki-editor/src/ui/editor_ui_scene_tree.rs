@@ -4,7 +4,7 @@ use crate::ui::undo_redo::{EditorCommand, IndexedEntity};
 
 impl EditorUI {
     fn is_scene_item_entity(entity: &toki_core::entity::Entity) -> bool {
-        entity.category == "item" || entity.attributes.pickup.is_some()
+        entity.category == "item"
     }
 
     fn render_scene_entity_group(

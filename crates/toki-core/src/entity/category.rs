@@ -1,4 +1,4 @@
-use super::types::EntityKind;
+use super::model::EntityKind;
 
 pub fn default_category_for_kind(entity_kind: &EntityKind) -> &'static str {
     match entity_kind {

@@ -4,8 +4,8 @@ use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::TileMap;
 use crate::collision::CollisionBox;
 use crate::entity::{
-    AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityId, EntityKind,
-    EntityManager,
+    AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityBehavior, EntityGameplay,
+    EntityId, EntityKind, EntityManager, EntityRendering,
 };
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
@@ -208,7 +208,7 @@ fn ai_context_rejects_movement_into_solid_entity() {
 
     // Add a blocking solid entity
     let mut blocker = create_test_entity(2, IVec2::new(60, 50), AiBehavior::None);
-    blocker.attributes.solid = true;
+    blocker.attributes.gameplay.solid = true;
     entity_manager.add_existing_entity(blocker);
 
     let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
@@ -328,12 +328,21 @@ fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> En
         control_role: ControlRole::None,
         audio: Default::default(),
         attributes: EntityAttributes {
-            ai_config: AiConfig {
-                behavior,
-                detection_radius: 64,
+            gameplay: EntityGameplay {
+                speed: 2.0,
+                ..EntityGameplay::default()
             },
-            animation_controller: Some(controller),
-            speed: 2.0,
+            rendering: EntityRendering {
+                animation_controller: Some(controller),
+                ..EntityRendering::default()
+            },
+            behavior: EntityBehavior {
+                ai_config: AiConfig {
+                    behavior,
+                    detection_radius: 64,
+                },
+                ..EntityBehavior::default()
+            },
             ..EntityAttributes::default()
         },
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
@@ -499,7 +508,7 @@ fn create_test_entity_with_detection_radius(
     detection_radius: u32,
 ) -> Entity {
     let mut entity = create_test_entity(id, position, behavior);
-    entity.attributes.ai_config.detection_radius = detection_radius;
+    entity.attributes.behavior.ai_config.detection_radius = detection_radius;
     entity
 }
 
@@ -977,7 +986,7 @@ fn ai_system_chase_tries_perpendicular_when_blocked() {
     // When it tries to move right (speed=4 -> to x=50, right edge at 66), it would hit the wall
     let mut chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(46, 32), AiBehavior::Chase, 100);
-    chaser.attributes.speed = 4.0; // Move 4 pixels per tick to ensure it tries to enter wall
+    chaser.attributes.gameplay.speed = 4.0; // Move 4 pixels per tick to ensure it tries to enter wall
     entity_manager.add_existing_entity(chaser);
 
     let results = ai_system.update(

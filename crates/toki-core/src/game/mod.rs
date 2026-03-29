@@ -528,7 +528,9 @@ impl GameState {
         let Some(player_entity) = self.world.entity_manager.get_player_mut() else {
             return;
         };
-        let Some(animation_controller) = &mut player_entity.attributes.animation_controller else {
+        let Some(animation_controller) =
+            &mut player_entity.attributes.rendering.animation_controller
+        else {
             return;
         };
         if Self::action_animation_locks_locomotion(animation_controller) {

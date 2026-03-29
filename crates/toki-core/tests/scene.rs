@@ -1,7 +1,8 @@
 use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{
-    AiConfig, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
+    AiConfig, ControlRole, Entity, EntityAttributes, EntityBehavior, EntityGameplay, EntityKind,
+    EntityOptionalComponents, EntityRendering, MovementProfile, PickupDef, StoredEntity,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
@@ -31,28 +32,30 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         control_role: ControlRole::PlayerCharacter,
         audio: toki_core::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes {
-            health: Some(100),
-            stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
-            speed: 2.0,
-            solid: true,
-            visible: true,
-            has_shadow: true,
-            palette_override: None,
-            animation_controller: Some(controller),
-            static_object_render: None,
-            grounding: Default::default(),
-            render_layer: 0,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::PlayerWasd,
-            primary_projectile: None,
-            projectile: None,
-            pickup: None,
-            inventory: toki_core::entity::Inventory::default(),
-            has_inventory: false,
+            gameplay: EntityGameplay {
+                health: Some(100),
+                stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
+                speed: 2.0,
+                solid: true,
+            },
+            rendering: EntityRendering {
+                visible: true,
+                has_shadow: true,
+                palette_override: None,
+                animation_controller: Some(controller),
+                static_object_render: None,
+                grounding: Default::default(),
+                render_layer: 0,
+            },
+            behavior: EntityBehavior {
+                active: true,
+                can_move: true,
+                interactable: false,
+                interaction_reach: 0,
+                ai_config: AiConfig::default(),
+                movement_profile: MovementProfile::PlayerWasd,
+                has_inventory: false,
+            },
         },
         collision_box: None,
         movement_accumulator: glam::Vec2::ZERO,
@@ -437,4 +440,41 @@ fn test_scene_rules_serialization_roundtrip() {
     assert_eq!(deserialized.rules.rules.len(), 1);
     assert_eq!(deserialized.rules.rules[0].id, "scene_rule");
     assert_eq!(deserialized.rules.rules[0].trigger, RuleTrigger::OnStart);
+}
+
+#[test]
+fn test_scene_serialization_preserves_sparse_optional_components() {
+    let mut scene = Scene::new("stored_entities".to_string());
+    let entity = create_test_entity(9, IVec2::new(32, 48));
+    let mut components = EntityOptionalComponents::default();
+    components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 5,
+    });
+    let mut inventory = toki_core::entity::Inventory::default();
+    inventory.add_item("key_red", 1);
+    components.inventory = Some(inventory);
+
+    scene.add_stored_entity(StoredEntity::new(entity, components));
+
+    let json = serde_json::to_string_pretty(&scene).expect("scene json should serialize");
+    let restored: Scene = serde_json::from_str(&json).expect("scene json should deserialize");
+    let restored_components = restored.optional_components(9);
+
+    assert_eq!(
+        restored_components
+            .pickup
+            .as_ref()
+            .expect("pickup should survive scene roundtrip")
+            .count,
+        5
+    );
+    assert_eq!(
+        restored_components
+            .inventory
+            .as_ref()
+            .expect("inventory should survive scene roundtrip")
+            .item_count("key_red"),
+        1
+    );
 }

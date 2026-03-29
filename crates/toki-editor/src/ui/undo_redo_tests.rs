@@ -386,8 +386,8 @@ fn update_entities_command_restores_previous_state_on_undo() {
         .push(before.clone());
 
     let mut after = before.clone();
-    after.attributes.visible = false;
-    after.attributes.render_layer = 9;
+    after.attributes.rendering.visible = false;
+    after.attributes.rendering.render_layer = 9;
 
     let command =
         EditorCommand::update_entities("Main Scene", vec![before.clone()], vec![after.clone()]);
@@ -397,16 +397,16 @@ fn update_entities_command_restores_previous_state_on_undo() {
         .into_iter()
         .find(|entity| entity.id == 42)
         .expect("entity should exist");
-    assert!(!entity.attributes.visible);
-    assert_eq!(entity.attributes.render_layer, 9);
+    assert!(!entity.attributes.rendering.visible);
+    assert_eq!(entity.attributes.rendering.render_layer, 9);
 
     assert!(history.undo(&mut ui_state, None));
     let entity = main_scene_entities(&ui_state)
         .into_iter()
         .find(|entity| entity.id == 42)
         .expect("entity should exist");
-    assert!(entity.attributes.visible);
-    assert_eq!(entity.attributes.render_layer, 0);
+    assert!(entity.attributes.rendering.visible);
+    assert_eq!(entity.attributes.rendering.render_layer, 0);
 }
 
 #[test]

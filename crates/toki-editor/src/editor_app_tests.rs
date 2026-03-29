@@ -1004,7 +1004,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
     let mut stale_scene_entity = soldier_definition
         .create_entity(IVec2::new(24, 48), 15)
         .expect("scene entity should instantiate");
-    stale_scene_entity.attributes.grounding = EntityGrounding::default();
+    stale_scene_entity.attributes.rendering.grounding = EntityGrounding::default();
     stale_scene_entity.collision_box = Some(CollisionBox::solid_box(stale_scene_entity.size));
     scene.entities.push(stale_scene_entity);
 
@@ -1022,7 +1022,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
         .find(|entity| entity.definition_name.as_deref() == Some("soldier"))
         .expect("soldier should exist in preview");
     assert_eq!(
-        soldier.attributes.grounding.footprint,
+        soldier.attributes.rendering.grounding.footprint,
         Some(EntityFootprint::new([4, 12], [8, 4]))
     );
     let collision_box = soldier

@@ -127,10 +127,10 @@ impl InspectorSystem {
         }
 
         MultiEntityCommonState {
-            visible: common_bool(entities, |entity| entity.attributes.visible),
-            active: common_bool(entities, |entity| entity.attributes.active),
+            visible: common_bool(entities, |entity| entity.attributes.rendering.visible),
+            active: common_bool(entities, |entity| entity.attributes.behavior.active),
             collision_enabled: common_bool(entities, |entity| entity.collision_box.is_some()),
-            render_layer: common_i32(entities, |entity| entity.attributes.render_layer),
+            render_layer: common_i32(entities, |entity| entity.attributes.rendering.render_layer),
         }
     }
 
@@ -184,22 +184,22 @@ impl InspectorSystem {
         let mut changed = false;
 
         if let Some(visible) = edit.set_visible {
-            if entity.attributes.visible != visible {
-                entity.attributes.visible = visible;
+            if entity.attributes.rendering.visible != visible {
+                entity.attributes.rendering.visible = visible;
                 changed = true;
             }
         }
 
         if let Some(active) = edit.set_active {
-            if entity.attributes.active != active {
-                entity.attributes.active = active;
+            if entity.attributes.behavior.active != active {
+                entity.attributes.behavior.active = active;
                 changed = true;
             }
         }
 
         if let Some(render_layer) = edit.set_render_layer {
-            if entity.attributes.render_layer != render_layer {
-                entity.attributes.render_layer = render_layer;
+            if entity.attributes.rendering.render_layer != render_layer {
+                entity.attributes.rendering.render_layer = render_layer;
                 changed = true;
             }
         }
