@@ -83,6 +83,7 @@ pub enum UiAction {
     #[serde(alias = "exit_game")]
     ExitRuntime,
     OpenAudioSettings,
+    OpenDisplaySettings,
     OpenGraphicsSettings,
     SaveGame {
         slot: u8,
@@ -99,6 +100,7 @@ pub enum UiAction {
 pub enum UiCommand {
     ExitRuntime,
     OpenAudioSettings,
+    OpenDisplaySettings,
     OpenGraphicsSettings,
     SaveGame { slot: u8 },
     LoadGame { slot: u8 },

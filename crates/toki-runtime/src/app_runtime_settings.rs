@@ -20,6 +20,7 @@ const SATURATION_STEP_PERCENT: i16 = 10;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum RuntimeMenuOverlay {
     Audio { selected_index: usize },
+    Display { selected_index: usize },
     Graphics { selected_index: usize },
 }
 
@@ -31,14 +32,18 @@ impl RuntimeMenuOverlay {
     pub(super) fn graphics() -> Self {
         Self::Graphics { selected_index: 0 }
     }
+
+    pub(super) fn display() -> Self {
+        Self::Display { selected_index: 0 }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct RuntimeOverlayEntry {
-    label: String,
-    value_text: String,
-    slider_percent: Option<u8>,
-    selected: bool,
+pub(super) struct RuntimeOverlayEntry {
+    pub(super) label: String,
+    pub(super) value_text: String,
+    pub(super) slider_percent: Option<u8>,
+    pub(super) selected: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +93,7 @@ impl App {
 
         let should_close = match overlay {
             RuntimeMenuOverlay::Audio { .. } => self.handle_audio_overlay_input(input),
+            RuntimeMenuOverlay::Display { .. } => self.handle_display_overlay_input(input),
             RuntimeMenuOverlay::Graphics { .. } => self.handle_graphics_overlay_input(input),
         };
 
@@ -164,6 +170,9 @@ impl App {
                 let should_close = match self.runtime_overlay.clone() {
                     Some(RuntimeMenuOverlay::Audio { .. }) => {
                         self.handle_audio_overlay_input(MenuInput::Confirm)
+                    }
+                    Some(RuntimeMenuOverlay::Display { .. }) => {
+                        self.handle_display_overlay_input(MenuInput::Confirm)
                     }
                     Some(RuntimeMenuOverlay::Graphics { .. }) => {
                         self.handle_graphics_overlay_input(MenuInput::Confirm)
@@ -664,6 +673,10 @@ impl App {
                 "Audio Settings".to_string(),
                 self.audio_overlay_entries(selected_index),
             ),
+            RuntimeMenuOverlay::Display { selected_index } => (
+                "Display Settings".to_string(),
+                self.display_overlay_entries(selected_index),
+            ),
             RuntimeMenuOverlay::Graphics { selected_index } => (
                 "Graphics Settings".to_string(),
                 self.graphics_overlay_entries(selected_index),
@@ -694,6 +707,7 @@ impl App {
     fn select_runtime_overlay_entry(&mut self, entry_index: usize) {
         match self.runtime_overlay.as_mut() {
             Some(RuntimeMenuOverlay::Audio { selected_index })
+            | Some(RuntimeMenuOverlay::Display { selected_index })
             | Some(RuntimeMenuOverlay::Graphics { selected_index }) => {
                 *selected_index = entry_index;
             }
@@ -705,6 +719,9 @@ impl App {
         match self.runtime_overlay {
             Some(RuntimeMenuOverlay::Audio { .. }) => {
                 self.set_audio_slider_percent(entry_index, percent)
+            }
+            Some(RuntimeMenuOverlay::Display { .. }) => {
+                self.set_display_slider_percent(entry_index, percent)
             }
             Some(RuntimeMenuOverlay::Graphics { .. }) => {
                 self.set_graphics_slider_percent(entry_index, percent)
@@ -783,6 +800,7 @@ impl App {
         self.rendering
             .set_post_process_settings(self.resolved_post_process_settings());
     }
+
 }
 
 fn compose_runtime_settings_ui(
@@ -1148,6 +1166,10 @@ mod tests {
         assert_eq!(
             RuntimeMenuOverlay::graphics(),
             RuntimeMenuOverlay::Graphics { selected_index: 0 }
+        );
+        assert_eq!(
+            RuntimeMenuOverlay::display(),
+            RuntimeMenuOverlay::Display { selected_index: 0 }
         );
     }
 

@@ -10,7 +10,7 @@ use crate::ui::editor_context::{
 };
 use crate::editor_tab_strip::EditorTabStripState;
 use crate::editor_types::PlacementPreviewVisual;
-use crate::project::ProjectTemplateKind;
+use crate::project::{Project, ProjectSettingsDraft, ProjectTemplateKind};
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 use toki_core::palette::{builtin_palettes, Palette4};
@@ -577,6 +577,7 @@ pub struct EditorUI {
 
     // Project management
     pub project: ProjectEditorState,
+    pub project_settings_draft: Option<(PathBuf, ProjectSettingsDraft)>,
 
     pub workspace: WorkspaceUiState,
     active_tab: CenterPanelTab,
@@ -805,6 +806,7 @@ impl EditorUI {
 
             // Project management
             project: ProjectEditorState::default(),
+            project_settings_draft: None,
 
             workspace: WorkspaceUiState::default(),
             active_tab: CenterPanelTab::SceneViewport,
@@ -819,6 +821,25 @@ impl EditorUI {
                 "Mono".to_string(),
             ],
         }
+    }
+
+    pub(crate) fn project_settings_draft_for(
+        &mut self,
+        project: &Project,
+    ) -> &mut ProjectSettingsDraft {
+        let needs_refresh = self
+            .project_settings_draft
+            .as_ref()
+            .is_none_or(|(path, _)| path != &project.path);
+        if needs_refresh {
+            self.project_settings_draft =
+                Some((project.path.clone(), ProjectSettingsDraft::from_project(project)));
+        }
+        &mut self
+            .project_settings_draft
+            .as_mut()
+            .expect("project settings draft should exist")
+            .1
     }
 
     // Scene management methods
