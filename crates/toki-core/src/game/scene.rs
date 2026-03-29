@@ -138,25 +138,33 @@ impl SceneSystem {
             return Err(RestoreError::MissingActiveSceneName);
         }
 
-        for persisted in &save_data.persisted_entities {
-            state
-                .scene
-                .persistent_scene_entities
-                .insert((persisted.scene_name.to_string(), persisted.entity_id));
-            let Some(scene) = state.scene.scene_manager.get_scene_mut(&persisted.scene_name) else {
-                continue;
-            };
+        if !save_data.scene_snapshots.is_empty() {
+            for scene_snapshot in &save_data.scene_snapshots {
+                state.scene.scene_manager.add_scene(scene_snapshot.clone());
+            }
+            state.rebuild_persistent_scene_tracking();
+        } else {
+            for persisted in &save_data.persisted_entities {
+                state
+                    .scene
+                    .persistent_scene_entities
+                    .insert((persisted.scene_name.to_string(), persisted.entity_id));
+                let Some(scene) = state.scene.scene_manager.get_scene_mut(&persisted.scene_name)
+                else {
+                    continue;
+                };
 
-            match &persisted.entity {
-                Some(entity) => {
-                    if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
-                        *existing = entity.clone();
-                    } else {
-                        scene.add_entity(entity.clone());
+                match &persisted.entity {
+                    Some(entity) => {
+                        if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
+                            *existing = entity.clone();
+                        } else {
+                            scene.add_entity(entity.clone());
+                        }
                     }
-                }
-                None => {
-                    scene.remove_entity(persisted.entity_id);
+                    None => {
+                        scene.remove_entity(persisted.entity_id);
+                    }
                 }
             }
         }
@@ -297,6 +305,37 @@ impl GameState {
                 self.scene
                     .persistent_scene_entities
                     .insert((scene.name.clone(), entity.id));
+            }
+        }
+    }
+
+    fn rebuild_persistent_scene_tracking(&mut self) {
+        self.scene.persistent_scene_entities.clear();
+        let scene_names = self
+            .scene
+            .scene_manager
+            .scene_names()
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        for scene_name in scene_names {
+            let entities = self
+                .scene
+                .scene_manager
+                .get_scene(&scene_name)
+                .map(|scene| {
+                    scene
+                        .entities
+                        .iter()
+                        .filter(|entity| entity.persistent_across_saves)
+                        .map(|entity| entity.id)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            for entity_id in entities {
+                self.scene
+                    .persistent_scene_entities
+                    .insert((scene_name.clone(), entity_id));
             }
         }
     }
