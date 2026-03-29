@@ -4,7 +4,7 @@ use toki_core::cache_utils::clone_cached_or_load;
 use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
-use toki_core::math::projection::{calculate_projection, ProjectionParameter};
+use toki_core::math::projection::{screen_space_projection, ProjectionParameter};
 use toki_core::palette::recolor_indexed_image;
 use toki_core::project_runtime::ResolvedPostProcessSettings;
 use toki_core::sprite::SpriteFrame;
@@ -29,6 +29,14 @@ pub struct RenderingSystem {
     loaded_sprite_texture_path: Option<std::path::PathBuf>,
     decoded_sprite_images: BTreeMap<std::path::PathBuf, DecodedImage>,
     recolored_sprite_images: BTreeMap<std::path::PathBuf, DecodedImage>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct LetterboxRect {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
 }
 
 impl Default for RenderingSystem {
@@ -228,7 +236,7 @@ impl RenderingSystem {
 
     /// Calculate current projection matrix
     pub fn calculate_projection(&self) -> glam::Mat4 {
-        calculate_projection(self.projection_params)
+        calculate_letterboxed_projection(self.projection_params)
     }
 
     /// Update GPU projection matrix with view transform
@@ -556,6 +564,41 @@ impl RenderingSystem {
             ShapeRenderer::finalize_ui_shapes(backend.as_mut());
         }
     }
+}
+
+fn compute_letterbox_rect(parameters: ProjectionParameter) -> LetterboxRect {
+    let surface_width = parameters.width.max(1) as f32;
+    let surface_height = parameters.height.max(1) as f32;
+    let desired_width = parameters.desired_width.max(1) as f32;
+    let desired_height = parameters.desired_height.max(1) as f32;
+    let scale = (surface_width / desired_width)
+        .min(surface_height / desired_height)
+        .max(f32::EPSILON);
+    let width = desired_width * scale;
+    let height = desired_height * scale;
+
+    LetterboxRect {
+        x: (surface_width - width) * 0.5,
+        y: (surface_height - height) * 0.5,
+        width,
+        height,
+    }
+}
+
+fn calculate_letterboxed_projection(parameters: ProjectionParameter) -> glam::Mat4 {
+    let rect = compute_letterbox_rect(parameters);
+    let surface = screen_space_projection(
+        parameters.width.max(1) as f32,
+        parameters.height.max(1) as f32,
+    );
+    let translate = glam::Mat4::from_translation(glam::vec3(rect.x, rect.y, 0.0));
+    let scale = glam::Mat4::from_scale(glam::vec3(
+        rect.width / parameters.desired_width.max(1) as f32,
+        rect.height / parameters.desired_height.max(1) as f32,
+        1.0,
+    ));
+
+    surface * translate * scale
 }
 
 fn palette_texture_key(texture_path: &std::path::Path, palette_id: &str) -> std::path::PathBuf {

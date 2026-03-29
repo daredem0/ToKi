@@ -49,18 +49,10 @@ impl SplashPolicy {
 
 impl App {
     pub(super) fn projection_view_size(parameters: ProjectionParameter) -> glam::Vec2 {
-        let aspect = parameters.width as f32 / parameters.height as f32;
-        let desired_aspect = parameters.desired_width as f32 / parameters.desired_height as f32;
-
-        if aspect > desired_aspect {
-            let height = parameters.desired_height as f32;
-            let width = height * aspect;
-            glam::Vec2::new(width, height)
-        } else {
-            let width = parameters.desired_width as f32;
-            let height = width / aspect;
-            glam::Vec2::new(width, height)
-        }
+        glam::Vec2::new(
+            parameters.desired_width.max(1) as f32,
+            parameters.desired_height.max(1) as f32,
+        )
     }
 
     pub(super) fn centered_logo_origin_for_view(
