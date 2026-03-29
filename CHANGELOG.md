@@ -7,6 +7,38 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-03-29
+
+### Added
+- Added advanced Sprite Editor workflows including drag/move selection, floating selection mode, paste preview before placement, rectangle and ellipse tools, per-tile symmetry, dithered painting, and canvas creation from images.
+- Added narrative progression support with flag-driven rules, dialog decision logging controls, and persistent save/load flows across runtime and editor.
+- Added runtime viewport modes for `AspectFit`, `IntegerScale`, and `WindowFill`, plus live display-menu controls and persistent runtime display/audio settings.
+- Added a reusable internal test-fixture layer for newly expanded gameplay, transition, combat, and viewport regression coverage.
+
+### Changed
+- Refactored `GameState` into a stricter aggregate/subsystem model and completed the remaining typed-ID migration across gameplay, scene restore, and transition paths.
+- Refactored editor UI state flow around context-owned `EditorUI` routing and completed the remaining shell/context decomposition.
+- Refactored runtime/entity architecture by splitting `EntityAttributes`, moving optional runtime data into sparse storage, then consolidating that into reusable entity storage and registry layers.
+- Refactored renderer, runtime, core, and editor code to land the planned quick-win and medium-effort decompositions, including render/runtime module splits, `WorldContext`, simulation tick phases, project-settings panel decomposition, and scene-restore extraction.
+- Changed packaging/test organization so publishable crates no longer depend on private fixture crates during `cargo package`.
+- Updated the example project and supporting project/runtime setup to reflect the new display, progression, and persistence behavior.
+
+### Fixed
+- Fixed AI timing so AI movement respects delta timing consistently.
+- Fixed scene/entity save and restore issues, including correct restoration of players in non-main scenes and proper persistence of saved objects/entity state.
+- Fixed viewport rendering so letterboxed scene output is clipped to the resolved viewport rect instead of drawing across the full surface.
+- Fixed runtime UI scaling and placement across splash screen, menus, HUD text, and letterboxed viewport layouts.
+- Fixed runtime settings persistence so machine-local display/audio configuration survives restart.
+- Fixed placeholder-texture handling by replacing the previous empty-path sentinel with an explicit placeholder path.
+- Fixed the changelog release regex and completed workspace formatting/clippy cleanup during the refactor pass.
+- Fixed publish/package preparation so workspace packaging no longer fails on internal test-fixture dependencies.
+
+### Docs
+- Updated the system design notes and related planning documents during the refactor and viewport work.
+
+### Tests
+- Added focused game tick, scene transition, combat resolution, viewport, storage, and runtime settings regression tests to lock in the new architecture and behavior.
+
 ## [0.2.2] - 2026-03-24
 
 ### Added
