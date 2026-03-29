@@ -570,8 +570,14 @@ impl SpritePaintInteraction {
     /// Draw a rectangle on the canvas using `ShapeParams`.
     /// Outline mode draws 4 edges using `draw_line`. Filled mode paints all interior pixels.
     pub fn draw_rectangle(canvas: &mut SpriteCanvas, params: &ShapeParams) -> bool {
-        let min = IVec2::new(params.start.x.min(params.end.x), params.start.y.min(params.end.y));
-        let max = IVec2::new(params.start.x.max(params.end.x), params.start.y.max(params.end.y));
+        let min = IVec2::new(
+            params.start.x.min(params.end.x),
+            params.start.y.min(params.end.y),
+        );
+        let max = IVec2::new(
+            params.start.x.max(params.end.x),
+            params.start.y.max(params.end.y),
+        );
         if params.filled {
             return Self::draw_rectangle_filled(canvas, min, max, params.color, params.brush_size);
         }
@@ -606,7 +612,13 @@ impl SpritePaintInteraction {
     ) -> bool {
         let mut changed = false;
         for y in min.y..=max.y {
-            changed |= Self::draw_line(canvas, IVec2::new(min.x, y), IVec2::new(max.x, y), color, brush_size);
+            changed |= Self::draw_line(
+                canvas,
+                IVec2::new(min.x, y),
+                IVec2::new(max.x, y),
+                color,
+                brush_size,
+            );
         }
         changed
     }
@@ -614,8 +626,14 @@ impl SpritePaintInteraction {
     /// Draw an ellipse on the canvas using `ShapeParams`.
     /// Outline mode draws boundary pixels. Filled mode fills interior with horizontal spans.
     pub fn draw_ellipse(canvas: &mut SpriteCanvas, params: &ShapeParams) -> bool {
-        let min = IVec2::new(params.start.x.min(params.end.x), params.start.y.min(params.end.y));
-        let max = IVec2::new(params.start.x.max(params.end.x), params.start.y.max(params.end.y));
+        let min = IVec2::new(
+            params.start.x.min(params.end.x),
+            params.start.y.min(params.end.y),
+        );
+        let max = IVec2::new(
+            params.start.x.max(params.end.x),
+            params.start.y.max(params.end.y),
+        );
         let cx = (min.x + max.x) / 2;
         let cy = (min.y + max.y) / 2;
         let rx = (max.x - min.x) / 2;
@@ -625,10 +643,22 @@ impl SpritePaintInteraction {
             return Self::paint_brush(canvas, IVec2::new(cx, cy), params.color, params.brush_size);
         }
         if rx == 0 {
-            return Self::draw_line(canvas, IVec2::new(cx, min.y), IVec2::new(cx, max.y), params.color, params.brush_size);
+            return Self::draw_line(
+                canvas,
+                IVec2::new(cx, min.y),
+                IVec2::new(cx, max.y),
+                params.color,
+                params.brush_size,
+            );
         }
         if ry == 0 {
-            return Self::draw_line(canvas, IVec2::new(min.x, cy), IVec2::new(max.x, cy), params.color, params.brush_size);
+            return Self::draw_line(
+                canvas,
+                IVec2::new(min.x, cy),
+                IVec2::new(max.x, cy),
+                params.color,
+                params.brush_size,
+            );
         }
 
         if params.filled {
@@ -647,9 +677,10 @@ impl SpritePaintInteraction {
         brush_size: u32,
         symmetry: &SymmetryConfig,
     ) -> bool {
-        let positions = symmetry.bounds.mirror_positions(
-            center_pos, symmetry.horizontal, symmetry.vertical,
-        );
+        let positions =
+            symmetry
+                .bounds
+                .mirror_positions(center_pos, symmetry.horizontal, symmetry.vertical);
         let mut changed = false;
         for pos in positions {
             changed |= Self::paint_brush(canvas, pos, color, brush_size);
@@ -664,9 +695,10 @@ impl SpritePaintInteraction {
         brush_size: u32,
         symmetry: &SymmetryConfig,
     ) -> bool {
-        let positions = symmetry.bounds.mirror_positions(
-            center_pos, symmetry.horizontal, symmetry.vertical,
-        );
+        let positions =
+            symmetry
+                .bounds
+                .mirror_positions(center_pos, symmetry.horizontal, symmetry.vertical);
         let mut changed = false;
         for pos in positions {
             changed |= Self::erase_brush(canvas, pos, brush_size);
@@ -680,12 +712,14 @@ impl SpritePaintInteraction {
         params: &ShapeParams,
         symmetry: &SymmetryConfig,
     ) -> bool {
-        let starts = symmetry.bounds.mirror_positions(
-            params.start, symmetry.horizontal, symmetry.vertical,
-        );
-        let ends = symmetry.bounds.mirror_positions(
-            params.end, symmetry.horizontal, symmetry.vertical,
-        );
+        let starts =
+            symmetry
+                .bounds
+                .mirror_positions(params.start, symmetry.horizontal, symmetry.vertical);
+        let ends =
+            symmetry
+                .bounds
+                .mirror_positions(params.end, symmetry.horizontal, symmetry.vertical);
         let mut changed = false;
         for (s, e) in starts.iter().zip(ends.iter()) {
             changed |= Self::draw_line(canvas, *s, *e, params.color, params.brush_size);
@@ -699,17 +733,22 @@ impl SpritePaintInteraction {
         params: &ShapeParams,
         symmetry: &SymmetryConfig,
     ) -> bool {
-        let starts = symmetry.bounds.mirror_positions(
-            params.start, symmetry.horizontal, symmetry.vertical,
-        );
-        let ends = symmetry.bounds.mirror_positions(
-            params.end, symmetry.horizontal, symmetry.vertical,
-        );
+        let starts =
+            symmetry
+                .bounds
+                .mirror_positions(params.start, symmetry.horizontal, symmetry.vertical);
+        let ends =
+            symmetry
+                .bounds
+                .mirror_positions(params.end, symmetry.horizontal, symmetry.vertical);
         let mut changed = false;
         for (s, e) in starts.iter().zip(ends.iter()) {
             let mirrored = ShapeParams {
-                start: *s, end: *e, color: params.color,
-                brush_size: params.brush_size, filled: params.filled,
+                start: *s,
+                end: *e,
+                color: params.color,
+                brush_size: params.brush_size,
+                filled: params.filled,
             };
             changed |= Self::draw_rectangle(canvas, &mirrored);
         }
@@ -722,17 +761,22 @@ impl SpritePaintInteraction {
         params: &ShapeParams,
         symmetry: &SymmetryConfig,
     ) -> bool {
-        let starts = symmetry.bounds.mirror_positions(
-            params.start, symmetry.horizontal, symmetry.vertical,
-        );
-        let ends = symmetry.bounds.mirror_positions(
-            params.end, symmetry.horizontal, symmetry.vertical,
-        );
+        let starts =
+            symmetry
+                .bounds
+                .mirror_positions(params.start, symmetry.horizontal, symmetry.vertical);
+        let ends =
+            symmetry
+                .bounds
+                .mirror_positions(params.end, symmetry.horizontal, symmetry.vertical);
         let mut changed = false;
         for (s, e) in starts.iter().zip(ends.iter()) {
             let mirrored = ShapeParams {
-                start: *s, end: *e, color: params.color,
-                brush_size: params.brush_size, filled: params.filled,
+                start: *s,
+                end: *e,
+                color: params.color,
+                brush_size: params.brush_size,
+                filled: params.filled,
             };
             changed |= Self::draw_ellipse(canvas, &mirrored);
         }
@@ -771,9 +815,10 @@ impl SpritePaintInteraction {
         pattern: DitherPattern,
         symmetry: &SymmetryConfig,
     ) -> bool {
-        let positions = symmetry.bounds.mirror_positions(
-            center_pos, symmetry.horizontal, symmetry.vertical,
-        );
+        let positions =
+            symmetry
+                .bounds
+                .mirror_positions(center_pos, symmetry.horizontal, symmetry.vertical);
         let mut changed = false;
         for pos in positions {
             changed |= Self::paint_brush_dithered(canvas, pos, color, brush_size, pattern);
@@ -903,7 +948,11 @@ fn ellipse_horizontal_spans(rx: i32, ry: i32) -> Vec<(i32, i32)> {
             max_x_for_y[ay] = max_x_for_y[ay].max(point.x.abs());
         }
     }
-    max_x_for_y.into_iter().enumerate().map(|(dy, x)| (dy as i32, x)).collect()
+    max_x_for_y
+        .into_iter()
+        .enumerate()
+        .map(|(dy, x)| (dy as i32, x))
+        .collect()
 }
 
 /// Check if a pixel should be painted for the given dither pattern.

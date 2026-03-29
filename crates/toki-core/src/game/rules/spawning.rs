@@ -15,7 +15,9 @@ impl GameState {
         position: glam::IVec2,
     ) -> EntityId {
         match entity_type {
-            RuleSpawnEntityType::PlayerLikeNpc => SceneSystem::spawn_player_like_npc(self, position),
+            RuleSpawnEntityType::PlayerLikeNpc => {
+                SceneSystem::spawn_player_like_npc(self, position)
+            }
             RuleSpawnEntityType::Npc => self.spawn_basic_entity(EntityKind::Npc, position, true),
             RuleSpawnEntityType::Item => self.spawn_basic_entity(EntityKind::Item, position, false),
             RuleSpawnEntityType::Decoration => {
@@ -31,17 +33,14 @@ impl GameState {
         position: glam::IVec2,
         can_move: bool,
     ) -> EntityId {
-        self.world.entity_manager.spawn_entity(
-            kind,
-            position,
-            glam::UVec2::new(16, 16),
-            {
+        self.world
+            .entity_manager
+            .spawn_entity(kind, position, glam::UVec2::new(16, 16), {
                 let mut attributes = EntityAttributes::default();
                 attributes.gameplay.solid = false;
                 attributes.behavior.can_move = can_move;
                 attributes
-            },
-        )
+            })
     }
 
     fn spawn_trigger_entity(&mut self, position: glam::IVec2) -> EntityId {

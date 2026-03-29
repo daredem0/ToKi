@@ -19,13 +19,13 @@
 
 use std::collections::{HashMap, HashSet};
 
+use self::engine::RuleEngine;
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
 use crate::flags::FlagValue;
 use crate::ids::{DialogId, SceneId};
 use crate::project_runtime::SceneTransitionEffect;
 use crate::rules::{RuleSet, RuleSpawnEntityType};
-use self::engine::RuleEngine;
 
 // Re-export submodules
 pub mod events;
@@ -74,10 +74,14 @@ impl RuleSystem {
         command_buffer: &mut Vec<RuleCommand>,
     ) {
         if !state.runtime.rules.started {
-            state.collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnStart, command_buffer);
+            state.collect_rule_commands_for_trigger(
+                crate::rules::RuleTrigger::OnStart,
+                command_buffer,
+            );
             state.runtime.rules.started = true;
         }
-        state.collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnUpdate, command_buffer);
+        state
+            .collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnUpdate, command_buffer);
         state.collect_rule_commands_for_key_triggers(command_buffer);
     }
 
@@ -109,21 +113,21 @@ impl RuleSystem {
         dialog_id: impl Into<crate::DialogId>,
         outcome_id: impl Into<String>,
     ) {
-        state.runtime.rules.frame_dialog_completions.push(DialogCompletionEvent {
-            dialog_id: dialog_id.into(),
-            outcome_id: outcome_id.into(),
-        });
+        state
+            .runtime
+            .rules
+            .frame_dialog_completions
+            .push(DialogCompletionEvent {
+                dialog_id: dialog_id.into(),
+                outcome_id: outcome_id.into(),
+            });
     }
 
     pub fn rule_velocity(state: &GameState, entity_id: EntityId) -> Option<glam::IVec2> {
         state.runtime.rules.velocities.get(&entity_id).copied()
     }
 
-    pub fn set_rule_velocity(
-        state: &mut GameState,
-        entity_id: EntityId,
-        velocity: glam::IVec2,
-    ) {
+    pub fn set_rule_velocity(state: &mut GameState, entity_id: EntityId, velocity: glam::IVec2) {
         state.runtime.rules.velocities.insert(entity_id, velocity);
     }
 }

@@ -480,10 +480,7 @@ enum SelectionTransform {
 
 impl SelectionTransform {
     fn requires_square(self) -> bool {
-        matches!(
-            self,
-            Self::RotateClockwise | Self::RotateCounterClockwise
-        )
+        matches!(self, Self::RotateClockwise | Self::RotateCounterClockwise)
     }
 }
 
@@ -518,7 +515,8 @@ fn transform_selected_pixels(
             let Some(color) = canvas.get_pixel(src_x, src_y) else {
                 continue;
             };
-            let (dst_x, dst_y) = transform_relative_position(x, y, bounds.width, bounds.height, transform);
+            let (dst_x, dst_y) =
+                transform_relative_position(x, y, bounds.width, bounds.height, transform);
             transformed.set_pixel(dst_x, dst_y, color);
         }
     }
@@ -543,7 +541,8 @@ fn transform_selection_mask(
                 continue;
             }
 
-            let (dst_x, dst_y) = transform_relative_position(x, y, bounds.width, bounds.height, transform);
+            let (dst_x, dst_y) =
+                transform_relative_position(x, y, bounds.width, bounds.height, transform);
             transformed.select_pixel(bounds.x + dst_x, bounds.y + dst_y);
         }
     }

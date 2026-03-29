@@ -132,13 +132,7 @@ fn update_chunk_cache_uses_visible_world_size_when_zoomed_out() {
 fn apply_runtime_viewport_updates_camera_viewport_size() {
     let mut manager = sample_camera_manager();
 
-    assert!(manager.apply_runtime_viewport(
-        glam::UVec2::new(64, 48),
-        glam::UVec2::new(256, 256)
-    ));
+    assert!(manager.apply_runtime_viewport(glam::UVec2::new(64, 48), glam::UVec2::new(256, 256)));
     assert_eq!(manager.viewport_size(), glam::UVec2::new(64, 48));
-    assert!(!manager.apply_runtime_viewport(
-        glam::UVec2::new(64, 48),
-        glam::UVec2::new(256, 256)
-    ));
+    assert!(!manager.apply_runtime_viewport(glam::UVec2::new(64, 48), glam::UVec2::new(256, 256)));
 }

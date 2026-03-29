@@ -55,12 +55,20 @@ impl GpuState {
     ) -> Result<(), crate::RenderError> {
         match config.kind {
             TexturePipelineKind::Tilemap => {
-                self.tilemap_pipeline =
-                    TilemapPipeline::new(&self.device, &self.queue, self.config.format, config.source)?;
+                self.tilemap_pipeline = TilemapPipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    config.source,
+                )?;
             }
             TexturePipelineKind::Sprite => {
-                self.sprite_pipeline =
-                    SpritePipeline::new(&self.device, &self.queue, self.config.format, config.source)?;
+                self.sprite_pipeline = SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    config.source,
+                )?;
                 self.sprite_pipelines_by_texture.clear();
             }
         }

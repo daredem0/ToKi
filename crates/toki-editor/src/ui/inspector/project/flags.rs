@@ -46,4 +46,3 @@ pub(super) fn render_flags_section(
     });
     changed
 }
-

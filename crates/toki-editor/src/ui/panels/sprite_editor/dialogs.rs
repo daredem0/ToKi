@@ -33,11 +33,18 @@ pub fn render_dialogs(
 }
 
 fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let source_image = crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image.clone();
-    let source_image_size = crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image_size;
+    let source_image = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .new_canvas_source_image
+        .clone();
+    let source_image_size =
+        crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image_size;
     let source_image_validation = source_image_size.map(|size| {
-        let sprite_w = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_width.max(1);
-        let sprite_h = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_height.max(1);
+        let sprite_w = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .new_sprite_width
+            .max(1);
+        let sprite_h = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .new_sprite_height
+            .max(1);
         if size.x % sprite_w == 0 && size.y % sprite_h == 0 {
             Ok((size.x / sprite_w, size.y / sprite_h))
         } else {
@@ -64,17 +71,22 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 ui.label("Sprite Width:");
                 ui.add(
-                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_width)
-                        .range(1..=512)
-                        .speed(1),
+                    egui::DragValue::new(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_width,
+                    )
+                    .range(1..=512)
+                    .speed(1),
                 );
             });
             ui.horizontal(|ui| {
                 ui.label("Sprite Height:");
                 ui.add(
-                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_height)
-                        .range(1..=512)
-                        .speed(1),
+                    egui::DragValue::new(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .new_sprite_height,
+                    )
+                    .range(1..=512)
+                    .speed(1),
                 );
             });
 
@@ -123,25 +135,35 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     ui.horizontal(|ui| {
                         ui.label("Columns:");
                         ui.add(
-                            egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_cols)
-                                .range(1..=64)
-                                .speed(1),
+                            egui::DragValue::new(
+                                &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .new_sheet_cols,
+                            )
+                            .range(1..=64)
+                            .speed(1),
                         );
                     });
                     ui.horizontal(|ui| {
                         ui.label("Rows:");
                         ui.add(
-                            egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_rows)
-                                .range(1..=64)
-                                .speed(1),
+                            egui::DragValue::new(
+                                &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .new_sheet_rows,
+                            )
+                            .range(1..=64)
+                            .speed(1),
                         );
                     });
 
                     // Show calculated canvas size
                     let cols = crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_cols;
                     let rows = crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_rows;
-                    let canvas_w = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_width * cols;
-                    let canvas_h = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_height * rows;
+                    let canvas_w = crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .new_sprite_width
+                        * cols;
+                    let canvas_h = crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .new_sprite_height
+                        * rows;
                     ui.label(format!(
                         "Canvas: {}x{} ({} cells)",
                         canvas_w,
@@ -153,7 +175,10 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
             ui.separator();
 
-            if let Some(error) = crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error.as_ref() {
+            if let Some(error) = crate::ui::editor_context::sprite_state_mut(ui_state)
+                .new_canvas_error
+                .as_ref()
+            {
                 ui.colored_label(egui::Color32::RED, error);
                 ui.separator();
             }
@@ -174,31 +199,46 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 }
 
 fn submit_new_canvas(ui_state: &mut EditorUI) {
-    let sprite_w = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_width.max(1);
-    let sprite_h = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_height.max(1);
+    let sprite_w = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .new_sprite_width
+        .max(1);
+    let sprite_h = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .new_sprite_height
+        .max(1);
     crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error = None;
 
-    if let Some(path) = crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image.clone() {
+    if let Some(path) = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .new_canvas_source_image
+        .clone()
+    {
         match ui_state
             .sprite_editor_context_mut()
             .sprite
             .import_external_image_as_sheet(&path, sprite_w, sprite_h)
         {
             Ok(()) => {
-                crate::ui::editor_context::sprite_state_mut(ui_state).show_new_canvas_dialog = false;
-                crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image = None;
-                crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image_size = None;
+                crate::ui::editor_context::sprite_state_mut(ui_state).show_new_canvas_dialog =
+                    false;
+                crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image =
+                    None;
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .new_canvas_source_image_size = None;
             }
             Err(error) => {
-                crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error = Some(error);
+                crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error =
+                    Some(error);
             }
         }
         return;
     }
 
     if crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_sheet {
-        let cols = crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_cols.max(1);
-        let rows = crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_rows.max(1);
+        let cols = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .new_sheet_cols
+            .max(1);
+        let rows = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .new_sheet_rows
+            .max(1);
         let canvas_w = sprite_w * cols;
         let canvas_h = sprite_h * rows;
         ui_state
@@ -207,7 +247,9 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
             .new_sheet(canvas_w, canvas_h, sprite_w, sprite_h);
     } else {
         crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas(sprite_w, sprite_h);
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().show_cell_grid = false;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .show_cell_grid = false;
     }
     crate::ui::editor_context::sprite_state_mut(ui_state).show_new_canvas_dialog = false;
     crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image = None;
@@ -234,7 +276,11 @@ fn render_save_dialog(
 
             ui.horizontal(|ui| {
                 ui.label("Asset Name:");
-                ui.text_edit_singleline(&mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().save_asset_name);
+                ui.text_edit_singleline(
+                    &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .active_mut()
+                        .save_asset_name,
+                );
             });
 
             ui.separator();
@@ -242,12 +288,16 @@ fn render_save_dialog(
             ui.horizontal(|ui| {
                 ui.label("Save as:");
                 ui.selectable_value(
-                    &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().save_asset_kind,
+                    &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .active_mut()
+                        .save_asset_kind,
                     SpriteAssetKind::ObjectSheet,
                     "Object Sheet",
                 );
                 ui.selectable_value(
-                    &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().save_asset_kind,
+                    &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .active_mut()
+                        .save_asset_kind,
                     SpriteAssetKind::TileAtlas,
                     "Tile Atlas",
                 );
@@ -255,7 +305,9 @@ fn render_save_dialog(
 
             ui.add_space(4.0);
             if crate::ui::editor_context::sprite_state_mut(ui_state).is_sheet() {
-                if let Some((cols, rows)) = crate::ui::editor_context::sprite_state_mut(ui_state).sheet_cell_count() {
+                if let Some((cols, rows)) =
+                    crate::ui::editor_context::sprite_state_mut(ui_state).sheet_cell_count()
+                {
                     ui.label(format!(
                         "Will create {}x{} grid ({} items)",
                         cols,
@@ -273,7 +325,9 @@ fn render_save_dialog(
 
             ui.horizontal(|ui| {
                 if ui.button("Save").clicked() {
-                    if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).save_as_asset(sprites_dir) {
+                    if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .save_as_asset(sprites_dir)
+                    {
                         tracing::error!("Failed to save sprite: {}", e);
                     }
                 }
@@ -314,7 +368,8 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
             let discovered_assets = crate::ui::editor_context::sprite_state(ui_state)
                 .discovered_assets
                 .clone();
-            let selected_asset_index = crate::ui::editor_context::sprite_state(ui_state).selected_asset_index;
+            let selected_asset_index =
+                crate::ui::editor_context::sprite_state(ui_state).selected_asset_index;
             egui::ScrollArea::vertical()
                 .max_height(200.0)
                 .show(ui, |ui| {
@@ -327,15 +382,21 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
                         let label = format!("{} [{}]", asset.name, kind_label);
                         if ui.selectable_label(is_selected, label).clicked() {
-                            crate::ui::editor_context::sprite_state_mut(ui_state).selected_asset_index = Some(i);
+                            crate::ui::editor_context::sprite_state_mut(ui_state)
+                                .selected_asset_index = Some(i);
                         }
                     }
                 });
 
             ui.separator();
 
-            if let Some(idx) = crate::ui::editor_context::sprite_state(ui_state).selected_asset_index {
-                if let Some(asset) = crate::ui::editor_context::sprite_state(ui_state).discovered_assets.get(idx) {
+            if let Some(idx) =
+                crate::ui::editor_context::sprite_state(ui_state).selected_asset_index
+            {
+                if let Some(asset) = crate::ui::editor_context::sprite_state(ui_state)
+                    .discovered_assets
+                    .get(idx)
+                {
                     ui.label(format!("Selected: {}", asset.name));
                     ui.label(format!("Path: {}", asset.png_path.display()));
                 }
@@ -351,13 +412,22 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     .add_enabled(can_load, egui::Button::new("Load"))
                     .clicked()
                 {
-                    if let Some(idx) = crate::ui::editor_context::sprite_state(ui_state).selected_asset_index {
-                        let asset = crate::ui::editor_context::sprite_state(ui_state).discovered_assets[idx].clone();
-                        if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).load_sprite_asset(&asset) {
+                    if let Some(idx) =
+                        crate::ui::editor_context::sprite_state(ui_state).selected_asset_index
+                    {
+                        let asset = crate::ui::editor_context::sprite_state(ui_state)
+                            .discovered_assets[idx]
+                            .clone();
+                        if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .load_sprite_asset(&asset)
+                        {
                             tracing::error!("Failed to load sprite: {}", e);
                         } else {
                             let available_palettes = ui_state.project.available_palettes.clone();
-                            ui_state.sprite_editor_context_mut().sprite.sync_palette_selection(&available_palettes);
+                            ui_state
+                                .sprite_editor_context_mut()
+                                .sprite
+                                .sync_palette_selection(&available_palettes);
                         }
                     }
                 }
@@ -365,10 +435,17 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     .add_enabled(can_load, egui::Button::new("Rename"))
                     .clicked()
                 {
-                    if let Some(idx) = crate::ui::editor_context::sprite_state(ui_state).selected_asset_index {
-                        if let Some(asset) = crate::ui::editor_context::sprite_state(ui_state).discovered_assets.get(idx) {
-                            crate::ui::editor_context::sprite_state_mut(ui_state).rename_new_name = asset.name.clone();
-                            crate::ui::editor_context::sprite_state_mut(ui_state).show_rename_dialog = true;
+                    if let Some(idx) =
+                        crate::ui::editor_context::sprite_state(ui_state).selected_asset_index
+                    {
+                        if let Some(asset) = crate::ui::editor_context::sprite_state(ui_state)
+                            .discovered_assets
+                            .get(idx)
+                        {
+                            crate::ui::editor_context::sprite_state_mut(ui_state).rename_new_name =
+                                asset.name.clone();
+                            crate::ui::editor_context::sprite_state_mut(ui_state)
+                                .show_rename_dialog = true;
                         }
                     }
                 }
@@ -376,10 +453,17 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     .add_enabled(can_load, egui::Button::new("Delete"))
                     .clicked()
                 {
-                    if let Some(idx) = crate::ui::editor_context::sprite_state(ui_state).selected_asset_index {
-                        if let Some(asset) = crate::ui::editor_context::sprite_state(ui_state).discovered_assets.get(idx) {
-                            crate::ui::editor_context::sprite_state_mut(ui_state).delete_asset_name = asset.name.clone();
-                            crate::ui::editor_context::sprite_state_mut(ui_state).show_delete_confirm = true;
+                    if let Some(idx) =
+                        crate::ui::editor_context::sprite_state(ui_state).selected_asset_index
+                    {
+                        if let Some(asset) = crate::ui::editor_context::sprite_state(ui_state)
+                            .discovered_assets
+                            .get(idx)
+                        {
+                            crate::ui::editor_context::sprite_state_mut(ui_state)
+                                .delete_asset_name = asset.name.clone();
+                            crate::ui::editor_context::sprite_state_mut(ui_state)
+                                .show_delete_confirm = true;
                         }
                     }
                 }
@@ -449,20 +533,27 @@ fn render_merge_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
             ui.separator();
 
-            let count = crate::ui::editor_context::sprite_state_mut(ui_state).merge_selected_indices.len();
+            let count = crate::ui::editor_context::sprite_state_mut(ui_state)
+                .merge_selected_indices
+                .len();
             ui.label(format!("Selected: {} sprites", count));
 
             ui.horizontal(|ui| {
                 ui.label("Columns:");
                 ui.add(
-                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).merge_target_cols)
-                        .range(1..=16)
-                        .speed(1),
+                    egui::DragValue::new(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .merge_target_cols,
+                    )
+                    .range(1..=16)
+                    .speed(1),
                 );
             });
 
             if count > 0 {
-                let cols = crate::ui::editor_context::sprite_state_mut(ui_state).merge_target_cols.max(1);
+                let cols = crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .merge_target_cols
+                    .max(1);
                 let rows = (count as u32).div_ceil(cols);
                 ui.label(format!("Result: {}x{} grid ({} cells)", cols, rows, count));
             }
@@ -475,7 +566,9 @@ fn render_merge_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     .add_enabled(can_merge, egui::Button::new("Merge"))
                     .clicked()
                 {
-                    if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).merge_sprites_into_sheet() {
+                    if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .merge_sprites_into_sheet()
+                    {
                         tracing::error!("Failed to merge sprites: {}", e);
                     }
                 }
@@ -491,15 +584,25 @@ fn render_merge_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 }
 
 fn render_resize_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let cell_w = crate::ui::editor_context::sprite_state_mut(ui_state).active().cell_size.x.max(1);
-    let cell_h = crate::ui::editor_context::sprite_state_mut(ui_state).active().cell_size.y.max(1);
+    let cell_w = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .cell_size
+        .x
+        .max(1);
+    let cell_h = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .cell_size
+        .y
+        .max(1);
 
     egui::Window::new("Resize Canvas")
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
-            if let Some((w, h)) = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_dimensions() {
+            if let Some((w, h)) =
+                crate::ui::editor_context::sprite_state_mut(ui_state).canvas_dimensions()
+            {
                 let tiles_x = w.div_ceil(cell_w);
                 let tiles_y = h.div_ceil(cell_h);
                 ui.label(format!(
@@ -513,22 +616,28 @@ fn render_resize_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 ui.label("Tiles X:");
                 ui.add(
-                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_x)
-                        .range(1..=128)
-                        .speed(1),
+                    egui::DragValue::new(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_x,
+                    )
+                    .range(1..=128)
+                    .speed(1),
                 );
             });
             ui.horizontal(|ui| {
                 ui.label("Tiles Y:");
                 ui.add(
-                    egui::DragValue::new(&mut crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_y)
-                        .range(1..=128)
-                        .speed(1),
+                    egui::DragValue::new(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_y,
+                    )
+                    .range(1..=128)
+                    .speed(1),
                 );
             });
 
-            let new_w = crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_x * cell_w;
-            let new_h = crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_y * cell_h;
+            let new_w =
+                crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_x * cell_w;
+            let new_h =
+                crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_y * cell_h;
             ui.label(format!("Result: {}x{} px", new_w, new_h));
 
             ui.separator();
@@ -538,9 +647,12 @@ fn render_resize_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                 .spacing([2.0, 2.0])
                 .show(ui, |ui| {
                     for (i, anchor) in ResizeAnchor::all().iter().enumerate() {
-                        let is_selected = crate::ui::editor_context::sprite_state_mut(ui_state).resize_anchor == *anchor;
+                        let is_selected = crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .resize_anchor
+                            == *anchor;
                         if ui.selectable_label(is_selected, anchor.label()).clicked() {
-                            crate::ui::editor_context::sprite_state_mut(ui_state).resize_anchor = *anchor;
+                            crate::ui::editor_context::sprite_state_mut(ui_state).resize_anchor =
+                                *anchor;
                         }
                         if (i + 1) % 3 == 0 {
                             ui.end_row();
@@ -552,14 +664,20 @@ fn render_resize_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 if ui.button("Resize").clicked() {
-                    let w = crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_x * cell_w;
-                    let h = crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_y * cell_h;
-                    let anchor = crate::ui::editor_context::sprite_state_mut(ui_state).resize_anchor;
-                    crate::ui::editor_context::sprite_state_mut(ui_state).resize_canvas(w, h, anchor);
-                    crate::ui::editor_context::sprite_state_mut(ui_state).show_resize_dialog = false;
+                    let w = crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_x
+                        * cell_w;
+                    let h = crate::ui::editor_context::sprite_state_mut(ui_state).resize_tiles_y
+                        * cell_h;
+                    let anchor =
+                        crate::ui::editor_context::sprite_state_mut(ui_state).resize_anchor;
+                    crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .resize_canvas(w, h, anchor);
+                    crate::ui::editor_context::sprite_state_mut(ui_state).show_resize_dialog =
+                        false;
                 }
                 if ui.button("Cancel").clicked() {
-                    crate::ui::editor_context::sprite_state_mut(ui_state).show_resize_dialog = false;
+                    crate::ui::editor_context::sprite_state_mut(ui_state).show_resize_dialog =
+                        false;
                 }
             });
         });
@@ -574,7 +692,11 @@ fn render_rename_dialog(
         .sprite_editor_context()
         .sprite
         .selected_asset_index
-        .and_then(|idx| crate::ui::editor_context::sprite_state(ui_state).discovered_assets.get(idx))
+        .and_then(|idx| {
+            crate::ui::editor_context::sprite_state(ui_state)
+                .discovered_assets
+                .get(idx)
+        })
         .map(|a| a.name.clone());
 
     let Some(old_name) = old_name else {
@@ -591,13 +713,17 @@ fn render_rename_dialog(
 
             ui.horizontal(|ui| {
                 ui.label("New name:");
-                ui.text_edit_singleline(&mut crate::ui::editor_context::sprite_state_mut(ui_state).rename_new_name);
+                ui.text_edit_singleline(
+                    &mut crate::ui::editor_context::sprite_state_mut(ui_state).rename_new_name,
+                );
             });
 
             ui.add_space(8.0);
 
             ui.horizontal(|ui| {
-                let new_name = crate::ui::editor_context::sprite_state_mut(ui_state).rename_new_name.clone();
+                let new_name = crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .rename_new_name
+                    .clone();
                 let can_rename = !new_name.is_empty() && new_name != old_name;
 
                 if ui
@@ -607,10 +733,12 @@ fn render_rename_dialog(
                     if let Some(dir) = sprites_dir {
                         match SpriteEditorState::rename_asset(dir, &old_name, &new_name) {
                             Ok(()) => {
-                                crate::ui::editor_context::sprite_state_mut(ui_state).discovered_assets =
-                                    SpriteEditorState::scan_sprite_assets(dir);
-                                crate::ui::editor_context::sprite_state_mut(ui_state).selected_asset_index = None;
-                                crate::ui::editor_context::sprite_state_mut(ui_state).show_rename_dialog = false;
+                                crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .discovered_assets = SpriteEditorState::scan_sprite_assets(dir);
+                                crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .selected_asset_index = None;
+                                crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .show_rename_dialog = false;
                             }
                             Err(e) => {
                                 tracing::error!("Failed to rename asset: {}", e);
@@ -619,7 +747,8 @@ fn render_rename_dialog(
                     }
                 }
                 if ui.button("Cancel").clicked() {
-                    crate::ui::editor_context::sprite_state_mut(ui_state).show_rename_dialog = false;
+                    crate::ui::editor_context::sprite_state_mut(ui_state).show_rename_dialog =
+                        false;
                 }
             });
         });
@@ -650,10 +779,12 @@ fn render_delete_confirm_dialog(
                     if let Some(dir) = sprites_dir {
                         match SpriteEditorState::delete_asset(dir, &name) {
                             Ok(()) => {
-                                crate::ui::editor_context::sprite_state_mut(ui_state).discovered_assets =
-                                    SpriteEditorState::scan_sprite_assets(dir);
-                                crate::ui::editor_context::sprite_state_mut(ui_state).selected_asset_index = None;
-                                crate::ui::editor_context::sprite_state_mut(ui_state).show_delete_confirm = false;
+                                crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .discovered_assets = SpriteEditorState::scan_sprite_assets(dir);
+                                crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .selected_asset_index = None;
+                                crate::ui::editor_context::sprite_state_mut(ui_state)
+                                    .show_delete_confirm = false;
                             }
                             Err(e) => {
                                 tracing::error!("Failed to delete asset: {}", e);
@@ -662,7 +793,8 @@ fn render_delete_confirm_dialog(
                     }
                 }
                 if ui.button("Cancel").clicked() {
-                    crate::ui::editor_context::sprite_state_mut(ui_state).show_delete_confirm = false;
+                    crate::ui::editor_context::sprite_state_mut(ui_state).show_delete_confirm =
+                        false;
                 }
             });
         });

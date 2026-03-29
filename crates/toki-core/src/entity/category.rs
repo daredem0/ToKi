@@ -32,15 +32,24 @@ mod tests {
         assert_eq!(default_category_for_kind(&EntityKind::Player), "human");
         assert_eq!(default_category_for_kind(&EntityKind::Npc), "creature");
         assert_eq!(default_category_for_kind(&EntityKind::Item), "item");
-        assert_eq!(default_category_for_kind(&EntityKind::Decoration), "decoration");
+        assert_eq!(
+            default_category_for_kind(&EntityKind::Decoration),
+            "decoration"
+        );
         assert_eq!(default_category_for_kind(&EntityKind::Trigger), "trigger");
-        assert_eq!(default_category_for_kind(&EntityKind::Projectile), "projectile");
+        assert_eq!(
+            default_category_for_kind(&EntityKind::Projectile),
+            "projectile"
+        );
     }
 
     #[test]
     fn category_string_mapping_supports_legacy_aliases() {
         assert_eq!(runtime_entity_kind_for_category("item"), EntityKind::Item);
-        assert_eq!(runtime_entity_kind_for_category("triggers"), EntityKind::Trigger);
+        assert_eq!(
+            runtime_entity_kind_for_category("triggers"),
+            EntityKind::Trigger
+        );
         assert_eq!(
             runtime_entity_kind_for_category("projectiles"),
             EntityKind::Projectile
@@ -49,6 +58,9 @@ mod tests {
             runtime_entity_kind_for_category("building"),
             EntityKind::Decoration
         );
-        assert_eq!(runtime_entity_kind_for_category("creature"), EntityKind::Npc);
+        assert_eq!(
+            runtime_entity_kind_for_category("creature"),
+            EntityKind::Npc
+        );
     }
 }

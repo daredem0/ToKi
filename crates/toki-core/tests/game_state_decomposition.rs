@@ -2,15 +2,13 @@ use glam::IVec2;
 use std::collections::HashMap;
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::entity::{
-    AttributesDef, AudioDef, CollisionDef, EntityDefinition, OptionalEntityComponents,
-    MovementProfile, MovementSoundTrigger, RenderingDef, StoredEntity,
+    AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile, MovementSoundTrigger,
+    OptionalEntityComponents, RenderingDef, StoredEntity,
 };
-use toki_core::game::{
-    GameSimulation, InputSystem, RenderQueryService, RuleSystem, SceneSystem,
-};
+use toki_core::game::{GameSimulation, InputSystem, RenderQueryService, RuleSystem, SceneSystem};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
-use toki_core::{scene::Scene, DEFAULT_TIMESTEP_MS, GameState, InputKey};
+use toki_core::{scene::Scene, GameState, InputKey, DEFAULT_TIMESTEP_MS};
 use toki_test_fixtures::{test_atlas, test_tilemap};
 
 fn player_definition(name: &str) -> EntityDefinition {
@@ -176,7 +174,12 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         state
             .world()
             .player_id()
-            .and_then(|player_id| state.world().entity_manager().storage().components().inventory(player_id))
+            .and_then(|player_id| state
+                .world()
+                .entity_manager()
+                .storage()
+                .components()
+                .inventory(player_id))
             .expect("player inventory should exist")
             .item_count("potion"),
         2
@@ -206,14 +209,20 @@ fn render_query_service_matches_legacy_render_query_outputs() {
         service.sprite_render_requests(),
         legacy_like_service.sprite_render_requests()
     );
-    assert_eq!(service.player_position(), legacy_like_service.player_position());
+    assert_eq!(
+        service.player_position(),
+        legacy_like_service.player_position()
+    );
     let service_frame = service.current_sprite_frame(&atlas, texture_size);
     let legacy_frame = legacy_like_service.current_sprite_frame(&atlas, texture_size);
     assert_eq!(service_frame.u0, legacy_frame.u0);
     assert_eq!(service_frame.v0, legacy_frame.v0);
     assert_eq!(service_frame.u1, legacy_frame.u1);
     assert_eq!(service_frame.v1, legacy_frame.v1);
-    assert_eq!(service.entity_sprite_flip_x(player_id), legacy_like_service.entity_sprite_flip_x(player_id));
+    assert_eq!(
+        service.entity_sprite_flip_x(player_id),
+        legacy_like_service.entity_sprite_flip_x(player_id)
+    );
 }
 
 #[test]
@@ -292,5 +301,8 @@ fn rule_system_dialog_completion_path_uses_subsystem_api() {
     let world_bounds = glam::UVec2::new(64, 64);
     let _ = GameSimulation::tick_fixed(&mut state, world_bounds, &test_tilemap(), &test_atlas());
 
-    assert_eq!(state.flag("accepted"), Some(&toki_core::FlagValue::Bool(true)));
+    assert_eq!(
+        state.flag("accepted"),
+        Some(&toki_core::FlagValue::Bool(true))
+    );
 }

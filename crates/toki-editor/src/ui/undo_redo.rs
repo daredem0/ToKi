@@ -651,7 +651,9 @@ fn apply_scene_rules_graph_snapshot(
                 .insert(scene_name.to_string(), graph);
         }
         None => {
-            crate::ui::editor_context::graph_state_mut(ui_state).rule_graphs_by_scene.remove(scene_name);
+            crate::ui::editor_context::graph_state_mut(ui_state)
+                .rule_graphs_by_scene
+                .remove(scene_name);
         }
     }
 
@@ -664,7 +666,9 @@ fn apply_scene_rules_graph_snapshot(
                 .insert(scene_name.to_string(), layout);
         }
         None => {
-            crate::ui::editor_context::graph_state_mut(ui_state).layouts_by_scene.remove(scene_name);
+            crate::ui::editor_context::graph_state_mut(ui_state)
+                .layouts_by_scene
+                .remove(scene_name);
         }
     }
     crate::ui::editor_context::graph_state_mut(ui_state).layout_dirty = true;

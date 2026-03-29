@@ -123,9 +123,7 @@ impl SceneTransitionController {
                 elapsed_ms,
                 duration_ms,
                 ..
-            } => {
-                1.0 - (*elapsed_ms as f32 / *duration_ms as f32).clamp(0.0, 1.0)
-            }
+            } => 1.0 - (*elapsed_ms as f32 / *duration_ms as f32).clamp(0.0, 1.0),
         }
     }
 

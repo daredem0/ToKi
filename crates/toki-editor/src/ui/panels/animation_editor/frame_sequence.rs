@@ -13,13 +13,23 @@ pub fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         return;
     };
 
-    if clip_idx >= crate::ui::editor_context::animation_state(ui_state).authoring.clips.len() {
+    if clip_idx
+        >= crate::ui::editor_context::animation_state(ui_state)
+            .authoring
+            .clips
+            .len()
+    {
         return;
     };
 
     // Clip settings - get values first to avoid borrow issues
-    let current_duration = crate::ui::editor_context::animation_state(ui_state).authoring.clips[clip_idx].default_duration_ms;
-    let current_loop_mode = crate::ui::editor_context::animation_state(ui_state).authoring.clips[clip_idx]
+    let current_duration = crate::ui::editor_context::animation_state(ui_state)
+        .authoring
+        .clips[clip_idx]
+        .default_duration_ms;
+    let current_loop_mode = crate::ui::editor_context::animation_state(ui_state)
+        .authoring
+        .clips[clip_idx]
         .loop_mode
         .clone();
 
@@ -35,8 +45,13 @@ pub fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         )
         .changed()
     {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.clips[clip_idx].default_duration_ms = duration;
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .clips[clip_idx]
+            .default_duration_ms = duration;
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .dirty = true;
     }
 
     ui.horizontal(|ui| {
@@ -59,8 +74,13 @@ pub fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         });
 
     if loop_mode_changed {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.clips[clip_idx].loop_mode = loop_mode;
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .clips[clip_idx]
+            .loop_mode = loop_mode;
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .dirty = true;
     }
 
     ui.separator();
@@ -133,27 +153,55 @@ pub fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     // Apply deferred actions
     if let Some(idx) = select_frame {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index = Some(idx);
-        crate::ui::editor_context::animation_state_mut(ui_state).preview.go_to_frame(idx, frame_count);
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .selected_frame_index = Some(idx);
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .preview
+            .go_to_frame(idx, frame_count);
     }
 
     if let Some(idx) = move_up {
-        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).authoring.clips.get_mut(clip_idx) {
+        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .clips
+            .get_mut(clip_idx)
+        {
             clip.move_frame(idx, idx - 1);
-            if crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index == Some(idx) {
-                crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index = Some(idx - 1);
+            if crate::ui::editor_context::animation_state_mut(ui_state)
+                .authoring
+                .selected_frame_index
+                == Some(idx)
+            {
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .authoring
+                    .selected_frame_index = Some(idx - 1);
             }
-            crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .authoring
+                .dirty = true;
         }
     }
 
     if let Some(idx) = move_down {
-        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).authoring.clips.get_mut(clip_idx) {
+        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .clips
+            .get_mut(clip_idx)
+        {
             clip.move_frame(idx, idx + 1);
-            if crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index == Some(idx) {
-                crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index = Some(idx + 1);
+            if crate::ui::editor_context::animation_state_mut(ui_state)
+                .authoring
+                .selected_frame_index
+                == Some(idx)
+            {
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .authoring
+                    .selected_frame_index = Some(idx + 1);
             }
-            crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .authoring
+                .dirty = true;
         }
     }
 
@@ -161,22 +209,34 @@ pub fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         let selected_frame_index = crate::ui::editor_context::animation_state(ui_state)
             .authoring
             .selected_frame_index;
-        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).authoring.clips.get_mut(clip_idx) {
+        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .clips
+            .get_mut(clip_idx)
+        {
             clip.remove_frame(idx);
             if clip.frames.is_empty() {
-                crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index = None;
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .authoring
+                    .selected_frame_index = None;
             } else if let Some(sel) = selected_frame_index {
                 if sel >= clip.frames.len() {
-                    crate::ui::editor_context::animation_state_mut(ui_state).authoring.selected_frame_index = Some(clip.frames.len() - 1);
+                    crate::ui::editor_context::animation_state_mut(ui_state)
+                        .authoring
+                        .selected_frame_index = Some(clip.frames.len() - 1);
                 }
             }
-            crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .authoring
+                .dirty = true;
         }
     }
 
     // Keyboard shortcuts
     let ctx = ui.ctx();
     if ctx.input(|i| i.key_pressed(egui::Key::Delete)) {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.remove_selected_frame();
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .remove_selected_frame();
     }
 }

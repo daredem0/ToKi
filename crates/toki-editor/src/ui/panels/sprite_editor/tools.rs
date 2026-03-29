@@ -17,12 +17,16 @@ pub fn handle_tool_interaction(
     rect: egui::Rect,
     ctx: &egui::Context,
 ) {
-    let Some(canvas_pos) = crate::ui::editor_context::sprite_state_mut(ui_state).active().cursor_canvas_pos else {
+    let Some(canvas_pos) = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .cursor_canvas_pos
+    else {
         return;
     };
 
-    if should_intercept_canvas_input(crate::ui::editor_context::sprite_state_mut(ui_state).has_floating())
-        && handle_floating_canvas_interaction(ui_state, response, ctx)
+    if should_intercept_canvas_input(
+        crate::ui::editor_context::sprite_state_mut(ui_state).has_floating(),
+    ) && handle_floating_canvas_interaction(ui_state, response, ctx)
     {
         return;
     }
@@ -39,8 +43,12 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::MagicErase => handle_magic_erase_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::AddOutline => handle_add_outline_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::AddShadow => handle_add_shadow_tool(ui_state, response, canvas_pos),
-        SpriteEditorTool::Rectangle => handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Rectangle),
-        SpriteEditorTool::Ellipse => handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Ellipse),
+        SpriteEditorTool::Rectangle => {
+            handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Rectangle)
+        }
+        SpriteEditorTool::Ellipse => {
+            handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Ellipse)
+        }
     }
 }
 
@@ -50,12 +58,18 @@ fn should_intercept_canvas_input(has_floating: bool) -> bool {
 
 fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     // Click to select cell in sheet mode
-    if response.clicked() && crate::ui::editor_context::sprite_state_mut(ui_state).is_sheet() && canvas_pos.x >= 0 && canvas_pos.y >= 0 {
+    if response.clicked()
+        && crate::ui::editor_context::sprite_state_mut(ui_state).is_sheet()
+        && canvas_pos.x >= 0
+        && canvas_pos.y >= 0
+    {
         let cell = ui_state
             .sprite_editor_context_mut()
             .sprite
             .cell_at_position(canvas_pos.x as u32, canvas_pos.y as u32);
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selected_cell = cell;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .selected_cell = cell;
     }
 
     // Primary drag for panning
@@ -84,9 +98,16 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
         let brush_size = crate::ui::editor_context::sprite_state_mut(ui_state).brush_size;
         let pattern = crate::ui::editor_context::sprite_state_mut(ui_state).dither_pattern;
         let sym = symmetry_config(ui_state);
-        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
-            if SpritePaintInteraction::paint_brush_dithered_symmetric(canvas, canvas_pos, color, brush_size, pattern, &sym) {
-                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas
+        {
+            if SpritePaintInteraction::paint_brush_dithered_symmetric(
+                canvas, canvas_pos, color, brush_size, pattern, &sym,
+            ) {
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
         }
@@ -105,9 +126,14 @@ fn handle_eraser_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas
     if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
         let brush_size = crate::ui::editor_context::sprite_state_mut(ui_state).brush_size;
         let sym = symmetry_config(ui_state);
-        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
+        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas
+        {
             if SpritePaintInteraction::erase_brush_symmetric(canvas, canvas_pos, brush_size, &sym) {
-                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
         }
@@ -126,9 +152,14 @@ fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
             crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color,
             selected_palette(ui_state),
         );
-        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
+        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas
+        {
             if SpritePaintInteraction::flood_fill(canvas, canvas_pos, color) {
-                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
         }
@@ -142,13 +173,19 @@ fn handle_eyedropper_tool(
     canvas_pos: glam::IVec2,
 ) {
     if response.clicked() {
-        if let Some(canvas) = &crate::ui::editor_context::sprite_state_mut(ui_state).active().canvas {
+        if let Some(canvas) = &crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .canvas
+        {
             if let Some(color) = SpritePaintInteraction::pick_color(canvas, canvas_pos) {
-                if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode == ColorMode::PaletteIndexed {
+                if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode
+                    == ColorMode::PaletteIndexed
+                {
                     if let Some(slot) =
                         indexed_slot_for_authored_color(color, selected_palette(ui_state))
                     {
-                        crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = canonical_indexed_color(slot);
+                        crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color =
+                            canonical_indexed_color(slot);
                     }
                 } else {
                     crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = color;
@@ -177,7 +214,9 @@ fn handle_shape_tool(
     kind: ShapeKind,
 ) {
     if response.drag_started_by(egui::PointerButton::Primary) {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().line_start_pos = Some(canvas_pos);
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .line_start_pos = Some(canvas_pos);
         start_paint_stroke(ui_state);
     }
 
@@ -189,41 +228,56 @@ fn handle_shape_tool(
     if response.drag_stopped_by(egui::PointerButton::Primary) {
         // Restore and draw final shape
         preview_shape(ui_state, canvas_pos, kind);
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().line_start_pos = None;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .line_start_pos = None;
         finish_paint_stroke(ui_state);
     }
 }
 
 fn preview_shape(ui_state: &mut EditorUI, canvas_pos: glam::IVec2, kind: ShapeKind) {
-    let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state).active().line_start_pos else {
+    let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .line_start_pos
+    else {
         return;
     };
 
     // Restore canvas to pre-stroke state before redrawing
-    if let Some(before) = &crate::ui::editor_context::sprite_state_mut(ui_state).active().canvas_before_stroke {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas = Some(before.clone());
+    if let Some(before) = &crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .canvas_before_stroke
+    {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas = Some(before.clone());
     }
 
     let params = build_shape_params(ui_state, start, canvas_pos);
     let sym = symmetry_config(ui_state);
-    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
         let changed = match kind {
             ShapeKind::Line => SpritePaintInteraction::draw_line_symmetric(canvas, &params, &sym),
-            ShapeKind::Rectangle => SpritePaintInteraction::draw_rectangle_symmetric(canvas, &params, &sym),
-            ShapeKind::Ellipse => SpritePaintInteraction::draw_ellipse_symmetric(canvas, &params, &sym),
+            ShapeKind::Rectangle => {
+                SpritePaintInteraction::draw_rectangle_symmetric(canvas, &params, &sym)
+            }
+            ShapeKind::Ellipse => {
+                SpritePaintInteraction::draw_ellipse_symmetric(canvas, &params, &sym)
+            }
         };
         if changed {
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
             invalidate_canvas_texture(ui_state);
         }
     }
 }
 
-fn build_shape_params(
-    ui_state: &EditorUI,
-    start: glam::IVec2,
-    end: glam::IVec2,
-) -> ShapeParams {
+fn build_shape_params(ui_state: &EditorUI, start: glam::IVec2, end: glam::IVec2) -> ShapeParams {
     ShapeParams {
         start,
         end,
@@ -267,12 +321,16 @@ fn handle_floating_canvas_interaction(
             return true;
         }
         let delta = response.drag_delta();
-        let zoom = crate::ui::editor_context::sprite_state_mut(ui_state).active().viewport.zoom;
+        let zoom = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .viewport
+            .zoom;
         // Convert screen-space drag delta to canvas-space pixel delta
         let dx = (delta.x / zoom).round() as i32;
         let dy = (delta.y / zoom).round() as i32;
         if dx != 0 || dy != 0 {
-            crate::ui::editor_context::sprite_state_mut(ui_state).nudge_floating(glam::IVec2::new(dx, dy));
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .nudge_floating(glam::IVec2::new(dx, dy));
         }
         return true;
     }
@@ -316,29 +374,45 @@ fn handle_selection_drag(
             return;
         }
 
-        let existing_selection = crate::ui::editor_context::sprite_state_mut(ui_state).active().selection.clone();
+        let existing_selection = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .selection
+            .clone();
         let active = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut();
         active.selection_start_pos = Some(canvas_pos);
         active.selection_drag_base = existing_selection;
     }
 
     if response.dragged_by(egui::PointerButton::Primary) {
-        if let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state).active().selection_start_pos {
+        if let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .selection_start_pos
+        {
             apply_drag_selection(ui_state, start, canvas_pos, selection_mode);
         }
     }
 
     let primary_released = ctx.input(|input| input.pointer.primary_released());
     if primary_released {
-        if let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection_start_pos.take() {
+        if let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .selection_start_pos
+            .take()
+        {
             apply_drag_selection(ui_state, start, canvas_pos, selection_mode);
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection_drag_base = None;
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .selection_drag_base = None;
         }
     }
 
     if response.clicked_by(egui::PointerButton::Secondary) {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection = None;
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection_drag_base = None;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .selection = None;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .selection_drag_base = None;
     }
 }
 
@@ -347,8 +421,8 @@ fn is_click_inside_selection(ui_state: &EditorUI, pos: glam::IVec2) -> bool {
         return false;
     }
     ui_state
-            .sprite_editor_context()
-            .sprite
+        .sprite_editor_context()
+        .sprite
         .active()
         .selection
         .as_ref()
@@ -361,17 +435,26 @@ fn handle_magic_wand_tool(
     canvas_pos: glam::IVec2,
 ) {
     if response.clicked() && canvas_pos.x >= 0 && canvas_pos.y >= 0 {
-        if let Some(canvas) = &crate::ui::editor_context::sprite_state_mut(ui_state).active().canvas {
+        if let Some(canvas) = &crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .canvas
+        {
             let x = canvas_pos.x as u32;
             let y = canvas_pos.y as u32;
             let selection_mode = current_selection_mode(&response.ctx);
 
             if let Some(mask) = canvas.find_connected_selection_mask(x, y) {
-                let base = crate::ui::editor_context::sprite_state_mut(ui_state).active().selection.clone();
-                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection =
-                    merge_selection_masks(base.as_ref(), &mask, selection_mode);
+                let base = crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active()
+                    .selection
+                    .clone();
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .selection = merge_selection_masks(base.as_ref(), &mask, selection_mode);
             } else if selection_mode == SelectionModifyMode::Replace {
-                crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection = None;
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .selection = None;
             } else {
                 // Keep the existing selection on transparent clicks when adding/subtracting.
             }
@@ -380,7 +463,9 @@ fn handle_magic_wand_tool(
 
     // Clear selection with right-click
     if response.clicked_by(egui::PointerButton::Secondary) {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection = None;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .selection = None;
     }
 }
 
@@ -398,9 +483,14 @@ fn handle_magic_erase_tool(
     };
 
     start_paint_stroke(ui_state);
-    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
         if SpritePaintInteraction::erase_connected_color_in_bounds(canvas, canvas_pos, bounds) {
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
             invalidate_canvas_texture(ui_state);
         }
     }
@@ -426,10 +516,15 @@ fn handle_add_outline_tool(
         crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color,
         selected_palette(ui_state),
     );
-    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
         if SpritePaintInteraction::add_outline_in_bounds(canvas, canvas_pos, outline_color, bounds)
         {
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
             invalidate_canvas_texture(ui_state);
         }
     }
@@ -455,14 +550,19 @@ fn handle_add_shadow_tool(
         crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color,
         selected_palette(ui_state),
     );
-    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas {
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
         if SpritePaintInteraction::add_ground_shadow_in_bounds(
             canvas,
             canvas_pos,
             shadow_color,
             bounds,
         ) {
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().dirty = true;
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
             invalidate_canvas_texture(ui_state);
         }
     }
@@ -482,7 +582,8 @@ fn clicked_tile_bounds(
 
     if crate::ui::editor_context::sprite_state(ui_state).is_sheet() {
         let cell_idx = crate::ui::editor_context::sprite_state(ui_state).cell_at_position(x, y)?;
-        let (start_x, start_y, end_x, end_y) = crate::ui::editor_context::sprite_state(ui_state).cell_bounds(cell_idx)?;
+        let (start_x, start_y, end_x, end_y) =
+            crate::ui::editor_context::sprite_state(ui_state).cell_bounds(cell_idx)?;
         return Some((
             glam::UVec2::new(start_x, start_y),
             glam::UVec2::new(end_x, end_y),
@@ -518,13 +619,20 @@ fn apply_drag_selection(
     end: glam::IVec2,
     mode: SelectionModifyMode,
 ) {
-    let Some((canvas_width, canvas_height)) = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_dimensions() else {
+    let Some((canvas_width, canvas_height)) =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_dimensions()
+    else {
         return;
     };
     let selection_rect = create_selection(start, end);
     let drag_mask = selection_mask_from_rect(canvas_width, canvas_height, selection_rect);
-    let base = crate::ui::editor_context::sprite_state_mut(ui_state).active().selection_drag_base.clone();
-    crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection = merge_selection_masks(base.as_ref(), &drag_mask, mode);
+    let base = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .selection_drag_base
+        .clone();
+    crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .selection = merge_selection_masks(base.as_ref(), &drag_mask, mode);
 }
 
 fn selection_mask_from_rect(width: u32, height: u32, rect: SpriteSelection) -> SelectionMask {
@@ -562,16 +670,35 @@ fn create_selection(start: glam::IVec2, end: glam::IVec2) -> SpriteSelection {
 }
 
 fn start_paint_stroke(ui_state: &mut EditorUI) {
-    if !crate::ui::editor_context::sprite_state_mut(ui_state).active().is_painting {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().is_painting = true;
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas_before_stroke = crate::ui::editor_context::sprite_state_mut(ui_state).active().canvas.clone();
+    if !crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .is_painting
+    {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .is_painting = true;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas_before_stroke = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .canvas
+            .clone();
     }
 }
 
 fn finish_paint_stroke(ui_state: &mut EditorUI) {
-    if crate::ui::editor_context::sprite_state_mut(ui_state).active().is_painting {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().is_painting = false;
-        if let Some(before) = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas_before_stroke.take() {
+    if crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .is_painting
+    {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .is_painting = false;
+        if let Some(before) = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas_before_stroke
+            .take()
+        {
             crate::ui::editor_context::sprite_state_mut(ui_state).push_undo_state(before);
         }
         let foreground_color = crate::ui::editor_context::sprite_state(ui_state).foreground_color;
@@ -584,8 +711,8 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
 
 fn selected_palette(ui_state: &EditorUI) -> Option<Palette4> {
     ui_state
-            .sprite_editor_context()
-            .sprite
+        .sprite_editor_context()
+        .sprite
         .selected_palette_id
         .as_ref()
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
@@ -617,11 +744,20 @@ fn symmetry_config(ui_state: &EditorUI) -> SymmetryConfig {
 
 fn compute_symmetry_bounds(ui_state: &EditorUI) -> (UVec2, UVec2) {
     // In sheet mode with per-tile enabled, mirror within the tile under the cursor
-    if crate::ui::editor_context::sprite_state(ui_state).symmetry_per_tile && crate::ui::editor_context::sprite_state(ui_state).is_sheet() {
-        if let Some(pos) = crate::ui::editor_context::sprite_state(ui_state).active().cursor_canvas_pos {
+    if crate::ui::editor_context::sprite_state(ui_state).symmetry_per_tile
+        && crate::ui::editor_context::sprite_state(ui_state).is_sheet()
+    {
+        if let Some(pos) = crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .cursor_canvas_pos
+        {
             if pos.x >= 0 && pos.y >= 0 {
-                if let Some(cell_idx) = crate::ui::editor_context::sprite_state(ui_state).cell_at_position(pos.x as u32, pos.y as u32) {
-                    if let Some((sx, sy, ex, ey)) = crate::ui::editor_context::sprite_state(ui_state).cell_bounds(cell_idx) {
+                if let Some(cell_idx) = crate::ui::editor_context::sprite_state(ui_state)
+                    .cell_at_position(pos.x as u32, pos.y as u32)
+                {
+                    if let Some((sx, sy, ex, ey)) =
+                        crate::ui::editor_context::sprite_state(ui_state).cell_bounds(cell_idx)
+                    {
                         return (UVec2::new(sx, sy), UVec2::new(ex - sx, ey - sy));
                     }
                 }
@@ -629,7 +765,9 @@ fn compute_symmetry_bounds(ui_state: &EditorUI) -> (UVec2, UVec2) {
         }
     }
     // Otherwise mirror within the full canvas
-    let (w, h) = crate::ui::editor_context::sprite_state(ui_state).canvas_dimensions().unwrap_or((1, 1));
+    let (w, h) = crate::ui::editor_context::sprite_state(ui_state)
+        .canvas_dimensions()
+        .unwrap_or((1, 1));
     (UVec2::ZERO, UVec2::new(w, h))
 }
 
@@ -660,10 +798,15 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
 
     // Brush size
     if ui.input(|i| i.key_pressed(egui::Key::OpenBracket)) {
-        crate::ui::editor_context::sprite_state_mut(ui_state).brush_size = crate::ui::editor_context::sprite_state_mut(ui_state).brush_size.saturating_sub(1).max(1);
+        crate::ui::editor_context::sprite_state_mut(ui_state).brush_size =
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .brush_size
+                .saturating_sub(1)
+                .max(1);
     }
     if ui.input(|i| i.key_pressed(egui::Key::CloseBracket)) {
-        crate::ui::editor_context::sprite_state_mut(ui_state).brush_size = (crate::ui::editor_context::sprite_state_mut(ui_state).brush_size + 1).min(32);
+        crate::ui::editor_context::sprite_state_mut(ui_state).brush_size =
+            (crate::ui::editor_context::sprite_state_mut(ui_state).brush_size + 1).min(32);
     }
 }
 

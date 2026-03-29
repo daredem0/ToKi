@@ -45,8 +45,8 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
     );
 
     ui_state
-            .animation_editor_context_mut()
-            .animation
+        .animation_editor_context_mut()
+        .animation
         .load_entity(entity_name, file_path, authoring);
 
     // Store atlas metadata for canvas rendering
@@ -59,12 +59,16 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
         atlas_default_palette,
     )) = atlas_info
     {
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_cell_size = Some((cell_size.x, cell_size.y));
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_path = Some(png_path);
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_cell_size =
+            Some((cell_size.x, cell_size.y));
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_path =
+            Some(png_path);
         crate::ui::editor_context::animation_state_mut(ui_state).atlas_color_mode = color_mode;
         crate::ui::editor_context::animation_state_mut(ui_state).atlas_palette_id = palette_id;
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_entity_palette_override = entity_palette_override;
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_default_palette = atlas_default_palette;
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_entity_palette_override =
+            entity_palette_override;
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_default_palette =
+            atlas_default_palette;
     }
 
     tracing::info!("Loaded entity for animation editing: {}", entity_name);
@@ -145,7 +149,10 @@ fn load_atlas_tile_lookup(
 }
 
 pub fn save_current_entity(ui_state: &mut EditorUI) {
-    let Some(file_path) = crate::ui::editor_context::animation_state_mut(ui_state).entity_file_path.clone() else {
+    let Some(file_path) = crate::ui::editor_context::animation_state_mut(ui_state)
+        .entity_file_path
+        .clone()
+    else {
         tracing::error!("No entity file path set");
         return;
     };
@@ -167,7 +174,9 @@ pub fn save_current_entity(ui_state: &mut EditorUI) {
     };
 
     // Update animations from authoring state
-    definition.animations = crate::ui::editor_context::animation_state_mut(ui_state).authoring.to_animations_def();
+    definition.animations = crate::ui::editor_context::animation_state_mut(ui_state)
+        .authoring
+        .to_animations_def();
 
     // Update atlas metadata with tile names for all frame positions
     if let Some(project_path) = file_path.parent().and_then(|p| p.parent()) {
@@ -185,7 +194,9 @@ pub fn save_current_entity(ui_state: &mut EditorUI) {
         return;
     }
 
-    crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = false;
+    crate::ui::editor_context::animation_state_mut(ui_state)
+        .authoring
+        .dirty = false;
     tracing::info!("Saved animation changes to {:?}", file_path);
 }
 

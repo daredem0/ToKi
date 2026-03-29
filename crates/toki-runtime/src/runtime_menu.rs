@@ -1,8 +1,8 @@
+use toki_core::game::RuleSystem;
 use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuAppearance,
     MenuDialogLayout, MenuInput, MenuLayout,
 };
-use toki_core::game::RuleSystem;
 use toki_core::ui::UiCommand;
 use toki_core::DialogStartRequest;
 
@@ -34,10 +34,14 @@ impl App {
             ((scaled.footer_spacing_px as f32 * scale).round().max(2.0)) as u16;
         scaled.border_thickness_px =
             ((scaled.border_thickness_px as f32 * scale).round().max(1.0)) as u16;
-        scaled.dialog_speaker_text.font_size_px =
-            ((scaled.dialog_speaker_text.font_size_px as f32 * scale).round().max(3.0)) as u16;
-        scaled.dialog_body_text.font_size_px =
-            ((scaled.dialog_body_text.font_size_px as f32 * scale).round().max(3.0)) as u16;
+        scaled.dialog_speaker_text.font_size_px = ((scaled.dialog_speaker_text.font_size_px as f32
+            * scale)
+            .round()
+            .max(3.0)) as u16;
+        scaled.dialog_body_text.font_size_px = ((scaled.dialog_body_text.font_size_px as f32
+            * scale)
+            .round()
+            .max(3.0)) as u16;
         scaled
     }
 
@@ -113,8 +117,8 @@ impl App {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return false;
             };
-            let appearance =
-                self.scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
+            let appearance = self
+                .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
                 let result = self
@@ -147,7 +151,8 @@ impl App {
         let Some(menu_view) = self.menu_system.current_view(&inventory) else {
             return false;
         };
-        let appearance = self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+        let appearance =
+            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
         if let Some(entry_index) = menu_entry_at_position(&layout, position) {
             if self
@@ -177,8 +182,8 @@ impl App {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return false;
             };
-            let appearance =
-                self.scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
+            let appearance = self
+                .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
                 self.dialog_system.select_entry(entry_index);
@@ -206,7 +211,8 @@ impl App {
         let Some(menu_view) = self.menu_system.current_view(&inventory) else {
             return false;
         };
-        let appearance = self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+        let appearance =
+            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
         menu_entry_at_position(&layout, position).is_some_and(|entry_index| {
             self.menu_system
@@ -276,11 +282,12 @@ impl App {
                 return;
             };
             let viewport = self.runtime_menu_viewport();
-            let appearance =
-                self.scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
+            let appearance = self
+                .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
-            self.rendering.render_viewport_ui_composition(&dialog_composition);
+            self.rendering
+                .render_viewport_ui_composition(&dialog_composition);
             return;
         }
 
@@ -294,7 +301,8 @@ impl App {
         };
 
         let viewport = self.runtime_menu_viewport();
-        let appearance = self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+        let appearance =
+            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
 
         if self.render_runtime_settings_overlay(&appearance, viewport) {
             return;
@@ -312,7 +320,8 @@ impl App {
         if let Some(dialog_view) = dialog_view {
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
-            self.rendering.render_viewport_ui_composition(&dialog_composition);
+            self.rendering
+                .render_viewport_ui_composition(&dialog_composition);
         }
     }
 
@@ -491,7 +500,10 @@ mod tests {
             UiCommand::OpenDisplaySettings,
         );
 
-        assert_eq!(runtime_overlay, Some(super::super::RuntimeMenuOverlay::display()));
+        assert_eq!(
+            runtime_overlay,
+            Some(super::super::RuntimeMenuOverlay::display())
+        );
     }
 
     #[test]

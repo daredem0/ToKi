@@ -185,8 +185,10 @@ impl GameState {
             );
             false
         } else {
-            if let Some((entity, entity_audio)) =
-                self.world.entity_manager.get_entity_with_audio_mut(entity_id)
+            if let Some((entity, entity_audio)) = self
+                .world
+                .entity_manager
+                .get_entity_with_audio_mut(entity_id)
             {
                 entity.position = new_position;
                 entity_audio.last_collision_state = false;
@@ -460,7 +462,8 @@ impl GameState {
         let initial_positions = controlled_entity_ids
             .iter()
             .filter_map(|&entity_id| {
-                self.world.entity_manager
+                self.world
+                    .entity_manager
                     .get_entity(entity_id)
                     .map(|entity| (entity_id, entity.position))
             })
@@ -566,7 +569,8 @@ impl GameState {
                 continue;
             }
 
-            let Some(current_entity) = self.world.entity_manager.get_entity(entity_id).cloned() else {
+            let Some(current_entity) = self.world.entity_manager.get_entity(entity_id).cloned()
+            else {
                 continue;
             };
 
@@ -595,8 +599,10 @@ impl GameState {
                 continue;
             }
 
-            if let Some((entity, entity_audio)) =
-                self.world.entity_manager.get_entity_with_audio_mut(entity_id)
+            if let Some((entity, entity_audio)) = self
+                .world
+                .entity_manager
+                .get_entity_with_audio_mut(entity_id)
             {
                 entity.position = candidate_position;
                 entity_audio.last_collision_state = false;

@@ -466,7 +466,6 @@ impl GpuState {
         self.world_underlay_pipeline.update_camera(&self.queue, mvp);
         self.debug_pipeline.update_camera(&self.queue, mvp);
     }
-
 }
 
 impl crate::RenderBackend for GpuState {

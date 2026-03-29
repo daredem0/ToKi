@@ -163,12 +163,14 @@ fn set_logging_for_node_updates_owning_rule_chain() {
 
     assert_eq!(graph.logging_for_node(node_id), Some(true));
     let roundtrip = graph.to_rule_set().expect("graph should stay valid");
-    assert!(roundtrip
-        .rules
-        .iter()
-        .find(|rule| rule.id == "rule_music")
-        .expect("rule should remain present")
-        .log_enabled);
+    assert!(
+        roundtrip
+            .rules
+            .iter()
+            .find(|rule| rule.id == "rule_music")
+            .expect("rule should remain present")
+            .log_enabled
+    );
 }
 
 #[test]
@@ -386,7 +388,7 @@ fn from_rule_set_merges_shared_action_nodes_for_multiple_triggers() {
                 enabled: true,
                 priority: 0,
                 once: false,
-        log_enabled: false,
+                log_enabled: false,
                 trigger: RuleTrigger::OnStart,
                 conditions: Vec::new(),
                 actions: vec![shared_action.clone()],
@@ -396,7 +398,7 @@ fn from_rule_set_merges_shared_action_nodes_for_multiple_triggers() {
                 enabled: true,
                 priority: 0,
                 once: false,
-        log_enabled: false,
+                log_enabled: false,
                 trigger: RuleTrigger::OnUpdate,
                 conditions: Vec::new(),
                 actions: vec![shared_action.clone()],
@@ -445,7 +447,7 @@ fn from_rule_set_merges_shared_condition_and_action_suffixes() {
                 enabled: true,
                 priority: 0,
                 once: false,
-        log_enabled: false,
+                log_enabled: false,
                 trigger: RuleTrigger::OnStart,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![shared_action.clone()],
@@ -455,7 +457,7 @@ fn from_rule_set_merges_shared_condition_and_action_suffixes() {
                 enabled: true,
                 priority: 0,
                 once: false,
-        log_enabled: false,
+                log_enabled: false,
                 trigger: RuleTrigger::OnUpdate,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![shared_action.clone()],

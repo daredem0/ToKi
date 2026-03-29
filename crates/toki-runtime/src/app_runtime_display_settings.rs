@@ -154,9 +154,11 @@ impl App {
         let Some((selected_key, _)) = entries.get(selected_index) else {
             return;
         };
-        let Some(next_viewport) =
-            adjusted_display_viewport(self.launch_options.display.viewport, *selected_key, direction)
-        else {
+        let Some(next_viewport) = adjusted_display_viewport(
+            self.launch_options.display.viewport,
+            *selected_key,
+            direction,
+        ) else {
             return;
         };
         self.launch_options.display.viewport = next_viewport;
@@ -169,9 +171,11 @@ impl App {
         let Some((selected_key, _)) = entries.get(entry_index) else {
             return;
         };
-        let Some(next_viewport) =
-            slider_adjusted_display_viewport(self.launch_options.display.viewport, *selected_key, percent)
-        else {
+        let Some(next_viewport) = slider_adjusted_display_viewport(
+            self.launch_options.display.viewport,
+            *selected_key,
+            percent,
+        ) else {
             return;
         };
         self.launch_options.display.viewport = next_viewport;
@@ -186,21 +190,21 @@ fn adjusted_display_viewport(
     direction: i32,
 ) -> Option<RuntimeViewportMode> {
     match (key, viewport) {
-        (DisplaySettingKey::ViewportMode, viewport) => Some(cycle_viewport_mode(viewport, direction)),
-        (
-            DisplaySettingKey::AspectFitPercent,
-            RuntimeViewportMode::AspectFit { fit_percent },
-        ) => Some(RuntimeViewportMode::AspectFit {
-            fit_percent: ((fit_percent as i32)
-                + DISPLAY_SETTING_STEP_PERCENT as i32 * direction)
-                .clamp(1, 100) as u16,
-        }),
-        (
-            DisplaySettingKey::IntegerScaleFactor,
-            RuntimeViewportMode::IntegerScale { factor },
-        ) => Some(RuntimeViewportMode::IntegerScale {
-            factor: cycle_integer_scale_factor(factor, direction),
-        }),
+        (DisplaySettingKey::ViewportMode, viewport) => {
+            Some(cycle_viewport_mode(viewport, direction))
+        }
+        (DisplaySettingKey::AspectFitPercent, RuntimeViewportMode::AspectFit { fit_percent }) => {
+            Some(RuntimeViewportMode::AspectFit {
+                fit_percent: ((fit_percent as i32)
+                    + DISPLAY_SETTING_STEP_PERCENT as i32 * direction)
+                    .clamp(1, 100) as u16,
+            })
+        }
+        (DisplaySettingKey::IntegerScaleFactor, RuntimeViewportMode::IntegerScale { factor }) => {
+            Some(RuntimeViewportMode::IntegerScale {
+                factor: cycle_integer_scale_factor(factor, direction),
+            })
+        }
         (
             DisplaySettingKey::WindowFillZoomPercent,
             RuntimeViewportMode::WindowFill { zoom_percent },
@@ -218,18 +222,16 @@ fn slider_adjusted_display_viewport(
     percent: u8,
 ) -> Option<RuntimeViewportMode> {
     match (key, viewport) {
-        (
-            DisplaySettingKey::AspectFitPercent,
-            RuntimeViewportMode::AspectFit { .. },
-        ) => Some(RuntimeViewportMode::AspectFit {
-            fit_percent: percent.max(1) as u16,
-        }),
-        (
-            DisplaySettingKey::WindowFillZoomPercent,
-            RuntimeViewportMode::WindowFill { .. },
-        ) => Some(RuntimeViewportMode::WindowFill {
-            zoom_percent: slider_to_window_fill_zoom(percent),
-        }),
+        (DisplaySettingKey::AspectFitPercent, RuntimeViewportMode::AspectFit { .. }) => {
+            Some(RuntimeViewportMode::AspectFit {
+                fit_percent: percent.max(1) as u16,
+            })
+        }
+        (DisplaySettingKey::WindowFillZoomPercent, RuntimeViewportMode::WindowFill { .. }) => {
+            Some(RuntimeViewportMode::WindowFill {
+                zoom_percent: slider_to_window_fill_zoom(percent),
+            })
+        }
         _ => None,
     }
 }
@@ -376,20 +378,18 @@ mod tests {
             ),
             Some(RuntimeViewportMode::AspectFit { fit_percent: 95 })
         );
-        assert!(
-            matches!(
-                adjusted_display_viewport(
-                    RuntimeViewportMode::IntegerScale {
-                        factor: IntegerScaleFactor::Auto,
-                    },
-                    DisplaySettingKey::IntegerScaleFactor,
-                    1,
-                ),
-                Some(RuntimeViewportMode::IntegerScale {
-                    factor: IntegerScaleFactor::Fixed(1),
-                })
-            )
-        );
+        assert!(matches!(
+            adjusted_display_viewport(
+                RuntimeViewportMode::IntegerScale {
+                    factor: IntegerScaleFactor::Auto,
+                },
+                DisplaySettingKey::IntegerScaleFactor,
+                1,
+            ),
+            Some(RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(1),
+            })
+        ));
         assert_eq!(
             adjusted_display_viewport(
                 RuntimeViewportMode::WindowFill { zoom_percent: 100 },

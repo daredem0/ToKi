@@ -22,7 +22,11 @@ impl PlacementInteraction {
         rect: egui::Rect,
         config: Option<&EditorConfig>,
     ) {
-        if let Some(drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_move_drag.as_ref() {
+        if let Some(drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .scene_anchor_move_drag
+            .as_ref()
+        {
             if let Some(hover_pos) = response.hover_pos() {
                 let display_rect = viewport.display_rect_in(rect);
                 let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, display_rect);
@@ -32,12 +36,20 @@ impl PlacementInteraction {
                     viewport.tilemap(),
                     config,
                 );
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = Some(world_pos);
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = Some(true);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_position = Some(world_pos);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_valid = Some(true);
                 viewport.mark_dirty();
             } else {
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = None;
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_position = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_valid = None;
                 viewport.mark_dirty();
             }
             return;
@@ -62,15 +74,23 @@ impl PlacementInteraction {
                     viewport.tilemap(),
                     config,
                 );
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = Some(world_pos);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_position = Some(world_pos);
 
                 let is_valid =
                     Self::check_placement_validity(ui_state, viewport, world_pos, config);
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = Some(is_valid);
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_valid = Some(is_valid);
                 viewport.mark_dirty();
             } else {
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_position = None;
-                crate::ui::editor_context::scene_viewport_context_mut(ui_state).placement.preview_valid = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_position = None;
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .preview_valid = None;
                 viewport.mark_dirty();
             }
         }
@@ -93,7 +113,11 @@ impl PlacementInteraction {
             config,
         )
         .world_origin;
-        if let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_definition().map(str::to_string) {
+        if let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .entity_definition()
+            .map(str::to_string)
+        {
             tracing::info!(
                 "Placing entity '{}' at world coordinates ({}, {}) [converted from screen ({}, {})]",
                 entity_def_name,
@@ -111,7 +135,11 @@ impl PlacementInteraction {
             return;
         }
 
-        if let Some(anchor_draft) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_draft().cloned() {
+        if let Some(anchor_draft) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .scene_anchor_draft()
+            .cloned()
+        {
             tracing::info!(
                 "Placing scene anchor '{}' ({:?}) at world coordinates ({}, {})",
                 anchor_draft.suggested_id,
@@ -333,10 +361,17 @@ impl PlacementInteraction {
         world_pos: glam::Vec2,
         config: Option<&EditorConfig>,
     ) -> bool {
-        if crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_draft().is_some() {
+        if crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .scene_anchor_draft()
+            .is_some()
+        {
             return true;
         }
-        let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_definition() else {
+        let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .entity_definition()
+        else {
             return false;
         };
 

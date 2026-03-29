@@ -1,6 +1,6 @@
 use super::{
-    AudioEvent, CombatSystem, DEFAULT_TIMESTEP_MS, GameSimulation, GameState, GameUpdateResult,
-    InteractionSystem, MovementSystem, RuleSystem, UpdateContext, WorldContext,
+    AudioEvent, CombatSystem, GameSimulation, GameState, GameUpdateResult, InteractionSystem,
+    MovementSystem, RuleSystem, UpdateContext, WorldContext, DEFAULT_TIMESTEP_MS,
 };
 
 struct TickPhaseState {
@@ -86,7 +86,11 @@ impl GameSimulation {
         )
     }
 
-    fn begin_tick(state: &mut GameState, time_scale: f32, world: WorldContext<'_>) -> TickPhaseState {
+    fn begin_tick(
+        state: &mut GameState,
+        time_scale: f32,
+        world: WorldContext<'_>,
+    ) -> TickPhaseState {
         let mut phases = TickPhaseState::new(state, time_scale);
         let mut rule_commands = Vec::new();
         RuleSystem::begin_frame(state);
@@ -117,7 +121,9 @@ impl GameSimulation {
             .world
             .player_id
             .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
-            .map(|entity| state.held_keys_for_profile(GameState::effective_movement_profile(entity)))
+            .map(|entity| {
+                state.held_keys_for_profile(GameState::effective_movement_profile(entity))
+            })
             .map(|keys| GameState::movement_delta_from_keys(&keys))
             .unwrap_or(glam::IVec2::ZERO);
 
@@ -173,7 +179,9 @@ impl GameSimulation {
         if phases.pending_persistence.is_none() {
             phases.pending_persistence = reactive_persistence;
         }
-        phases.pending_rule_animations.append(&mut reactive_animations);
+        phases
+            .pending_rule_animations
+            .append(&mut reactive_animations);
     }
 
     fn finalize_tick(

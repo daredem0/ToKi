@@ -323,7 +323,10 @@ fn selection_mask_tracks_pixels_and_bounding_rect() {
 
     assert!(selection.is_selected(5, 2));
     assert!(selection.is_selected(3, 6));
-    assert_eq!(selection.bounding_rect(), Some(SpriteSelection::new(3, 2, 3, 5)));
+    assert_eq!(
+        selection.bounding_rect(),
+        Some(SpriteSelection::new(3, 2, 3, 5))
+    );
 }
 
 #[test]
@@ -2008,14 +2011,8 @@ fn lift_selection_stores_canvas_before_lift() {
 
     let floating = state.active().floating.as_ref().unwrap();
     // canvas_before_lift should have the original red pixels
-    assert_eq!(
-        floating.canvas_before_lift.get_pixel(2, 2),
-        Some(red)
-    );
-    assert_eq!(
-        floating.canvas_before_lift.get_pixel(3, 3),
-        Some(red)
-    );
+    assert_eq!(floating.canvas_before_lift.get_pixel(2, 2), Some(red));
+    assert_eq!(floating.canvas_before_lift.get_pixel(3, 3), Some(red));
 }
 
 #[test]

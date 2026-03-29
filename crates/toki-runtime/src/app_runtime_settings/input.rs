@@ -58,7 +58,8 @@ impl App {
         match input {
             MenuInput::Left => self.adjust_graphics_setting(selected_index, -1),
             MenuInput::Right | MenuInput::Confirm => {
-                let selected_key = self.graphics_entries_with_keys(selected_index)[selected_index].0;
+                let selected_key =
+                    self.graphics_entries_with_keys(selected_index)[selected_index].0;
                 if selected_key == GraphicsSettingKey::Back && matches!(input, MenuInput::Confirm) {
                     return true;
                 }

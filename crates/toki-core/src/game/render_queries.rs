@@ -344,7 +344,11 @@ impl<'a> RenderQueryService<'a> {
         requests
     }
 
-    pub fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
+    pub fn current_sprite_frame(
+        &self,
+        atlas: &AtlasMeta,
+        texture_size: glam::UVec2,
+    ) -> SpriteFrame {
         if let Some(player_id) = self.player_id {
             if let Some(frame) = self.entity_sprite_frame(player_id, atlas, texture_size) {
                 return frame;
@@ -561,18 +565,21 @@ mod tests {
                 ..entity_attributes()
             },
         );
-        entity_manager.storage_mut().components_mut().set_projectile(
-            projectile_id,
-            Some(ProjectileState {
-                sheet: "objects".to_string(),
-                object_name: "bullet".to_string(),
-                size: [8, 8],
-                velocity: [1, 0],
-                remaining_ticks: 10,
-                damage: 1,
-                owner_id: None,
-            }),
-        );
+        entity_manager
+            .storage_mut()
+            .components_mut()
+            .set_projectile(
+                projectile_id,
+                Some(ProjectileState {
+                    sheet: "objects".to_string(),
+                    object_name: "bullet".to_string(),
+                    size: [8, 8],
+                    velocity: [1, 0],
+                    remaining_ticks: 10,
+                    damage: 1,
+                    owner_id: None,
+                }),
+            );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
         let shadows = facade.entity_ground_shadows();

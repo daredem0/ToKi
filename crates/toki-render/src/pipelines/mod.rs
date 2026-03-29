@@ -1,6 +1,6 @@
 mod common;
-mod dynamic_buffer;
 pub mod debug;
+mod dynamic_buffer;
 pub mod post_process;
 pub mod sprite;
 pub mod tilemap;

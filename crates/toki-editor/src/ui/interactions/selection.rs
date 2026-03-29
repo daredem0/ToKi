@@ -178,11 +178,11 @@ impl SelectionInteraction {
                 .scene_viewport_context_mut()
                 .placement
                 .begin_entity_move_drag(EntityMoveDragState {
-                scene_name: active_scene_name,
-                entity,
-                dragged_entities,
-                grab_offset,
-            });
+                    scene_name: active_scene_name,
+                    entity,
+                    dragged_entities,
+                    grab_offset,
+                });
             viewport.suppress_entity_rendering_many(
                 ui_state
                     .scene_viewport_context()
@@ -223,10 +223,10 @@ impl SelectionInteraction {
             .scene_viewport_context_mut()
             .placement
             .begin_scene_anchor_move_drag(SceneAnchorMoveDragState {
-            scene_name,
-            anchor,
-            grab_offset,
-        });
+                scene_name,
+                anchor,
+                grab_offset,
+            });
     }
 
     pub fn handle_marquee_drag_start(ui_state: &mut EditorUI, drag_start_pos: egui::Pos2) {
@@ -274,8 +274,17 @@ impl SelectionInteraction {
         rect: egui::Rect,
         config: Option<&EditorConfig>,
     ) {
-        let Some(drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_move_drag.clone() else {
-            if let Some(anchor_drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_move_drag.clone() {
+        let Some(drag_state) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .entity_move_drag
+            .clone()
+        else {
+            if let Some(anchor_drag_state) =
+                crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .scene_anchor_move_drag
+                    .clone()
+            {
                 Self::handle_scene_anchor_drag_release(
                     ui_state,
                     viewport,

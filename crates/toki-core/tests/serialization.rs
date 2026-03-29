@@ -30,18 +30,21 @@ fn create_test_entity_manager() -> EntityManager {
         audio.movement_sound = Some("sfx_step".to_string());
         audio.collision_sound = Some("sfx_hit2".to_string());
     }
-    manager.storage_mut().components_mut().set_primary_projectile(
-        player_id,
-        Some(PrimaryProjectileDef {
-            sheet: "effects".to_string(),
-            object_name: "fireball".to_string(),
-            size: [8, 8],
-            speed: 6,
-            damage: 4,
-            lifetime_ticks: 12,
-            spawn_offset: [1, -2],
-        }),
-    );
+    manager
+        .storage_mut()
+        .components_mut()
+        .set_primary_projectile(
+            player_id,
+            Some(PrimaryProjectileDef {
+                sheet: "effects".to_string(),
+                object_name: "fireball".to_string(),
+                size: [8, 8],
+                speed: 6,
+                damage: 4,
+                lifetime_ticks: 12,
+                spawn_offset: [1, -2],
+            }),
+        );
     manager
         .storage_mut()
         .components_mut()
@@ -104,7 +107,8 @@ fn player_position(state: &GameState) -> IVec2 {
 }
 
 fn player_entity(state: &GameState) -> Option<&Entity> {
-    state.world()
+    state
+        .world()
         .player_id()
         .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
 }
@@ -173,7 +177,11 @@ fn test_entity_minimal_fields() {
     assert_eq!(entity.entity_kind, deserialized.entity_kind);
     assert_eq!(deserialized.definition_name, None);
     assert!(deserialized.collision_box.is_none());
-    assert!(deserialized.attributes.rendering.animation_controller.is_none());
+    assert!(deserialized
+        .attributes
+        .rendering
+        .animation_controller
+        .is_none());
     assert_eq!(deserialized.attributes.gameplay.health, None);
 }
 
@@ -189,10 +197,17 @@ fn save_data_capture_persists_only_persistent_scene_entities() {
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "main").expect("scene should load");
 
-    if let Some(entity) = game_state.world_mut().entity_manager_mut().get_entity_mut(2) {
+    if let Some(entity) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(2)
+    {
         entity.position = IVec2::new(99, 88);
     }
-    game_state.world_mut().entity_manager_mut().despawn_entity(3);
+    game_state
+        .world_mut()
+        .entity_manager_mut()
+        .despawn_entity(3);
     SceneSystem::sync_persistent_entities_to_active_scene(&mut game_state);
 
     let save = SaveData::capture(&game_state, 1).expect("save should capture");
@@ -218,7 +233,10 @@ fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
     scene.add_entity(persistent_npc(2, IVec2::new(10, 10)));
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "main").expect("scene should load");
-    game_state.world_mut().entity_manager_mut().despawn_entity(2);
+    game_state
+        .world_mut()
+        .entity_manager_mut()
+        .despawn_entity(2);
     SceneSystem::sync_persistent_entities_to_active_scene(&mut game_state);
 
     let save = SaveData::capture(&game_state, 1).expect("save should capture");
@@ -233,11 +251,9 @@ fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
     toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save)
         .expect("save should restore");
 
-    assert!(
-        SceneSystem::active_scene(&restored)
-            .and_then(|scene| scene.get_entity(2))
-            .is_none()
-    );
+    assert!(SceneSystem::active_scene(&restored)
+        .and_then(|scene| scene.get_entity(2))
+        .is_none());
 }
 
 #[test]
@@ -273,7 +289,10 @@ fn restore_from_save_data_preserves_saved_player_in_scene_without_player_entry()
     SceneSystem::transition(&mut state, "side", "door")
         .expect("side scene should load through transition");
 
-    let player_id = state.world().player_id().expect("player should exist after transition");
+    let player_id = state
+        .world()
+        .player_id()
+        .expect("player should exist after transition");
     state
         .world_mut()
         .entity_manager_mut()
@@ -414,7 +433,8 @@ fn test_entity_manager_roundtrip() {
 
     // Verify audio components were preserved
     let audio_component = deserialized
-        .storage().audio_component(original_player_id)
+        .storage()
+        .audio_component(original_player_id)
         .expect("player audio component should exist");
     assert_eq!(audio_component.footstep_trigger_distance, 32.0);
     assert_eq!(audio_component.movement_sound.as_deref(), Some("sfx_step"));
@@ -429,7 +449,9 @@ fn test_entity_manager_roundtrip() {
     assert_eq!(primary_projectile.spawn_offset, [1, -2]);
 
     let inventory = deserialized
-        .storage().components().inventory(original_player_id)
+        .storage()
+        .components()
+        .inventory(original_player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("coin"), 3);
 
@@ -611,7 +633,10 @@ fn restore_from_save_data_rehydrates_existing_project_state() {
     let mut restored = create_save_test_state();
     toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save_data).unwrap();
 
-    assert_eq!(restored.scene().scene_manager().active_scene_name(), Some("main"));
+    assert_eq!(
+        restored.scene().scene_manager().active_scene_name(),
+        Some("main")
+    );
     assert_eq!(player_position(&restored), IVec2::new(80, 96));
     assert_eq!(
         restored.flag("chapter"),
@@ -760,7 +785,10 @@ fn test_stored_entity_deserializes_legacy_flat_optional_component_shape() {
 
     assert_eq!(stored.entity.id, 7);
     assert_eq!(stored.entity.attributes.gameplay.health, Some(9));
-    assert_eq!(stored.entity.attributes.current_stat(HEALTH_STAT_ID), Some(9));
+    assert_eq!(
+        stored.entity.attributes.current_stat(HEALTH_STAT_ID),
+        Some(9)
+    );
     assert!(stored.entity.attributes.behavior.has_inventory);
     assert_eq!(
         stored

@@ -148,10 +148,10 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_runtime_settings_snapshot, load_runtime_settings_snapshot, runtime_settings_file_path,
-        save_runtime_settings_snapshot, RuntimeSettingsSnapshot,
+        apply_runtime_settings_snapshot, load_runtime_settings_snapshot,
+        runtime_settings_file_path, save_runtime_settings_snapshot, RuntimeSettingsSnapshot,
     };
-    use crate::app::{App, RuntimeLaunchOptions, RuntimeDisplayOptions};
+    use crate::app::{App, RuntimeDisplayOptions, RuntimeLaunchOptions};
     use toki_core::project_runtime::{IntegerScaleFactor, RuntimeViewportMode};
 
     #[test]
@@ -186,11 +186,9 @@ mod tests {
     #[test]
     fn missing_runtime_settings_snapshot_is_treated_as_optional() {
         let temp = tempfile::tempdir().expect("temp dir");
-        assert!(
-            load_runtime_settings_snapshot(temp.path())
-                .expect("load optional snapshot")
-                .is_none()
-        );
+        assert!(load_runtime_settings_snapshot(temp.path())
+            .expect("load optional snapshot")
+            .is_none());
     }
 
     #[test]

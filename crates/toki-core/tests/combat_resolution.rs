@@ -31,9 +31,7 @@ fn create_test_sprite() -> SpriteInstance {
     SpriteInstance::new(IVec2::new(50, 60), animation, sprite_sheet)
 }
 
-fn sprite_render_requests(
-    state: &GameState,
-) -> Vec<toki_core::sprite_render::SpriteRenderRequest> {
+fn sprite_render_requests(state: &GameState) -> Vec<toki_core::sprite_render::SpriteRenderRequest> {
     RenderQueryService::new(
         state.world().entity_manager(),
         state.world().player_id(),

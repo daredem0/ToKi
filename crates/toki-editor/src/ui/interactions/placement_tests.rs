@@ -257,7 +257,10 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
     assert_eq!(scene.entities().len(), 1);
     assert_eq!(scene.entities()[0].position, IVec2::new(32, 48));
     assert_eq!(scene.entities()[0].category, "creature");
-    assert_eq!(scene.entities()[0].definition_name.as_deref(), Some("sample"));
+    assert_eq!(
+        scene.entities()[0].definition_name.as_deref(),
+        Some("sample")
+    );
     assert!(ui_state.scene_content_changed);
     assert!(ui_state.can_undo());
     // Placement mode exits at a higher level after successful click.
@@ -370,9 +373,9 @@ fn scene_anchor_placement_adds_anchor_and_selects_it() {
         .scene_viewport_context_mut()
         .placement
         .enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
-        kind: SceneAnchorKind::SpawnPoint,
-        suggested_id: "spawn_point_1".to_string(),
-    });
+            kind: SceneAnchorKind::SpawnPoint,
+            suggested_id: "spawn_point_1".to_string(),
+        });
 
     let placed = PlacementInteraction::try_place_scene_anchor(
         &mut ui_state,

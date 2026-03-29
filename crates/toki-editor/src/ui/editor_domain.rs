@@ -1,11 +1,11 @@
 use strum::EnumIter;
 use toki_core::animation::AnimationState;
 use toki_core::entity::EntityKind;
-use toki_core::FlagValue;
 use toki_core::rules::{
     InteractionMode, RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
 };
+use toki_core::FlagValue;
 
 pub fn animation_state_label(state: AnimationState) -> &'static str {
     match state {

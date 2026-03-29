@@ -99,12 +99,7 @@ fn render_stats(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
 
 fn render_behavior(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
     let is_static_item =
-        entity.category == "item"
-            && entity
-                .attributes
-                .rendering
-                .static_object_render
-                .is_some();
+        entity.category == "item" && entity.attributes.rendering.static_object_render.is_some();
 
     if let Some(static_render) = &entity.attributes.rendering.static_object_render {
         ui.horizontal(|ui| {
@@ -119,7 +114,9 @@ fn render_behavior(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
     if !is_static_item {
         ui.horizontal(|ui| {
             ui.label("AI:");
-            ui.label(ai_behavior_label(entity.attributes.behavior.ai_config.behavior));
+            ui.label(ai_behavior_label(
+                entity.attributes.behavior.ai_config.behavior,
+            ));
             if ai_behavior_needs_detection_radius(entity.attributes.behavior.ai_config.behavior) {
                 ui.label(format!(
                     "(radius: {})",

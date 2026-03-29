@@ -14,7 +14,10 @@ impl PanelSystem {
         if crate::ui::editor_context::map_state(ui_state).tool != MapEditorTool::Brush {
             return;
         }
-        let Some(selected_tile) = crate::ui::editor_context::map_state(ui_state).selected_tile.clone() else {
+        let Some(selected_tile) = crate::ui::editor_context::map_state(ui_state)
+            .selected_tile
+            .clone()
+        else {
             return;
         };
         let Some(pointer_pos) = ui.input(|input| input.pointer.hover_pos()) else {
@@ -92,10 +95,16 @@ impl PanelSystem {
         if crate::ui::editor_context::map_state(ui_state).tool != MapEditorTool::PlaceObject {
             return;
         }
-        let Some(object_sheet_name) = crate::ui::editor_context::map_state(ui_state).selected_object_sheet.clone() else {
+        let Some(object_sheet_name) = crate::ui::editor_context::map_state(ui_state)
+            .selected_object_sheet
+            .clone()
+        else {
             return;
         };
-        let Some(object_name) = crate::ui::editor_context::map_state(ui_state).selected_object_name.clone() else {
+        let Some(object_name) = crate::ui::editor_context::map_state(ui_state)
+            .selected_object_name
+            .clone()
+        else {
             return;
         };
         let Some(pointer_pos) = ui.input(|input| input.pointer.hover_pos()) else {
@@ -190,10 +199,17 @@ impl PanelSystem {
         ctx: &egui::Context,
         texture_path: &std::path::Path,
     ) -> Option<egui::TextureHandle> {
-        if crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path.as_deref() == Some(texture_path)
-            && crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture.is_some()
+        if crate::ui::editor_context::map_state_mut(ui_state)
+            .brush_preview_image_path
+            .as_deref()
+            == Some(texture_path)
+            && crate::ui::editor_context::map_state_mut(ui_state)
+                .brush_preview_texture
+                .is_some()
         {
-            return crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture.clone();
+            return crate::ui::editor_context::map_state_mut(ui_state)
+                .brush_preview_texture
+                .clone();
         }
 
         let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
@@ -203,8 +219,10 @@ impl PanelSystem {
         );
         let key = format!("map_editor_preview:{}", texture_path.display());
         let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
-        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path = Some(texture_path.to_path_buf());
-        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture = Some(texture.clone());
+        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path =
+            Some(texture_path.to_path_buf());
+        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture =
+            Some(texture.clone());
         Some(texture)
     }
 
@@ -273,10 +291,17 @@ impl PanelSystem {
         ctx: &egui::Context,
         texture_path: &std::path::Path,
     ) -> Option<egui::TextureHandle> {
-        if crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path.as_deref() == Some(texture_path)
-            && crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture.is_some()
+        if crate::ui::editor_context::map_state_mut(ui_state)
+            .brush_preview_image_path
+            .as_deref()
+            == Some(texture_path)
+            && crate::ui::editor_context::map_state_mut(ui_state)
+                .brush_preview_texture
+                .is_some()
         {
-            return crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture.clone();
+            return crate::ui::editor_context::map_state_mut(ui_state)
+                .brush_preview_texture
+                .clone();
         }
 
         let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
@@ -286,8 +311,10 @@ impl PanelSystem {
         );
         let key = format!("map_editor_brush_preview:{}", texture_path.display());
         let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
-        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path = Some(texture_path.to_path_buf());
-        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture = Some(texture.clone());
+        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path =
+            Some(texture_path.to_path_buf());
+        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture =
+            Some(texture.clone());
         Some(texture)
     }
 }

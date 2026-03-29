@@ -20,7 +20,9 @@ impl InspectorSystem {
         }
 
         // Entity info
-        if let Some(summary) = crate::ui::editor_context::entity_editor_state(ui_state).selected_entity_summary() {
+        if let Some(summary) =
+            crate::ui::editor_context::entity_editor_state(ui_state).selected_entity_summary()
+        {
             ui.label(format!("Name: {}", summary.name));
             ui.label(format!("Display: {}", summary.display_name));
             ui.label(format!("Category: {}", summary.category));
@@ -46,18 +48,29 @@ impl InspectorSystem {
         ui.label("Browser Statistics:");
         ui.label(format!(
             "Total entities: {}",
-            crate::ui::editor_context::entity_editor_state(ui_state).entities.len()
+            crate::ui::editor_context::entity_editor_state(ui_state)
+                .entities
+                .len()
         ));
 
-        let filtered_count = crate::ui::editor_context::entity_editor_state(ui_state).filtered_entities().len();
-        if crate::ui::editor_context::entity_editor_state(ui_state).filter.is_active() {
+        let filtered_count = crate::ui::editor_context::entity_editor_state(ui_state)
+            .filtered_entities()
+            .len();
+        if crate::ui::editor_context::entity_editor_state(ui_state)
+            .filter
+            .is_active()
+        {
             ui.label(format!("Filtered: {}", filtered_count));
         }
 
-        let category_count = crate::ui::editor_context::entity_editor_state(ui_state).all_categories().len();
+        let category_count = crate::ui::editor_context::entity_editor_state(ui_state)
+            .all_categories()
+            .len();
         ui.label(format!("Categories: {}", category_count));
 
-        let tag_count = crate::ui::editor_context::entity_editor_state(ui_state).all_tags().len();
+        let tag_count = crate::ui::editor_context::entity_editor_state(ui_state)
+            .all_tags()
+            .len();
         ui.label(format!("Unique tags: {}", tag_count));
 
         // Help

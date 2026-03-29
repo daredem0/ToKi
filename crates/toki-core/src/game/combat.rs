@@ -14,10 +14,7 @@ impl CombatSystem {
         state.process_profile_actions();
     }
 
-    pub(crate) fn update_projectiles(
-        state: &mut GameState,
-        world: WorldContext<'_>,
-    ) {
+    pub(crate) fn update_projectiles(state: &mut GameState, world: WorldContext<'_>) {
         state.update_projectiles(world.tilemap, world.atlas);
     }
 }
@@ -158,17 +155,17 @@ impl GameState {
             .storage_mut()
             .components_mut()
             .set_projectile(
-            projectile_id,
-            Some(crate::entity::ProjectileState {
-                sheet: spec.sheet,
-                object_name: spec.object_name,
-                size: spec.size,
-                velocity: [velocity.x, velocity.y],
-                remaining_ticks: spec.lifetime_ticks,
-                damage: spec.damage.max(0),
-                owner_id: Some(attacker_id),
-            }),
-        );
+                projectile_id,
+                Some(crate::entity::ProjectileState {
+                    sheet: spec.sheet,
+                    object_name: spec.object_name,
+                    size: spec.size,
+                    velocity: [velocity.x, velocity.y],
+                    remaining_ticks: spec.lifetime_ticks,
+                    damage: spec.damage.max(0),
+                    owner_id: Some(attacker_id),
+                }),
+            );
         if let Some(projectile) = self.world.entity_manager.get_entity_mut(projectile_id) {
             projectile.category = "projectile".to_string();
             projectile.collision_box = Some(CollisionBox::solid_box(size));
@@ -297,7 +294,8 @@ impl GameState {
                 continue;
             }
 
-            if let Some(projectile_entity) = self.world.entity_manager.get_entity_mut(projectile_id) {
+            if let Some(projectile_entity) = self.world.entity_manager.get_entity_mut(projectile_id)
+            {
                 projectile_entity.position = new_position;
                 if let Some(projectile) = self
                     .world
@@ -399,7 +397,9 @@ impl GameState {
         );
 
         self.spawn_primary_projectile(entity_id, facing);
-        self.runtime.effects.pending_stat_changes
+        self.runtime
+            .effects
+            .pending_stat_changes
             .extend(self.collect_primary_action_stat_changes(entity_id, facing));
         true
     }

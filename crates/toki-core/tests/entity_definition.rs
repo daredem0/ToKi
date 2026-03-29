@@ -219,7 +219,10 @@ fn test_entity_definition_create_npc_entity() {
     // Check attributes specific to NPC
     assert!(!entity.attributes.behavior.can_move);
     assert!(!entity.attributes.behavior.has_inventory);
-    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::Wander);
+    assert_eq!(
+        entity.attributes.behavior.ai_config.behavior,
+        AiBehavior::Wander
+    );
     assert_eq!(
         entity.attributes.behavior.movement_profile,
         MovementProfile::LegacyDefault
@@ -285,7 +288,10 @@ fn test_entity_definition_missing_ai_fields_defaults_to_none() {
     let entity = entity_def
         .create_entity(IVec2::ZERO, 1)
         .expect("entity should still instantiate");
-    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::None);
+    assert_eq!(
+        entity.attributes.behavior.ai_config.behavior,
+        AiBehavior::None
+    );
     assert_eq!(
         entity.attributes.behavior.movement_profile,
         MovementProfile::LegacyDefault
@@ -944,7 +950,12 @@ fn test_entity_definition_copies_authored_pickup() {
         .expect("static object render should be copied");
     assert_eq!(static_render.sheet, "items");
     assert_eq!(static_render.object_name, "coin");
-    assert!(bundle.entity.attributes.rendering.animation_controller.is_none());
+    assert!(bundle
+        .entity
+        .attributes
+        .rendering
+        .animation_controller
+        .is_none());
 }
 
 #[test]
@@ -1594,7 +1605,10 @@ fn test_entity_definition_with_ai_config() {
         .create_entity(IVec2::ZERO, 1)
         .expect("entity should instantiate");
 
-    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::Chase);
+    assert_eq!(
+        entity.attributes.behavior.ai_config.behavior,
+        AiBehavior::Chase
+    );
     assert_eq!(entity.attributes.behavior.ai_config.detection_radius, 100);
 }
 
@@ -1659,7 +1673,10 @@ fn test_legacy_ai_behavior_backward_compatibility() {
         .create_entity(IVec2::ZERO, 1)
         .expect("legacy entity should instantiate");
 
-    assert_eq!(entity.attributes.behavior.ai_config.behavior, AiBehavior::Wander);
+    assert_eq!(
+        entity.attributes.behavior.ai_config.behavior,
+        AiBehavior::Wander
+    );
 }
 
 #[test]
@@ -1719,7 +1736,11 @@ fn entity_definition_defaults_grounding_to_bottom_center_and_collision_footprint
         .expect("entity should build");
 
     assert_eq!(
-        entity.attributes.rendering.grounding.resolved_origin(entity.size),
+        entity
+            .attributes
+            .rendering
+            .grounding
+            .resolved_origin(entity.size),
         IVec2::new(16, 47)
     );
     assert_eq!(entity.resolved_footprint().offset, [8, 40]);

@@ -79,12 +79,9 @@ impl ProjectSettingsDraft {
                 IntegerScaleFactor::Auto,
                 100,
             ),
-            RuntimeViewportMode::IntegerScale { factor } => (
-                ProjectViewportModeDraft::IntegerScale,
-                100,
-                factor,
-                100,
-            ),
+            RuntimeViewportMode::IntegerScale { factor } => {
+                (ProjectViewportModeDraft::IntegerScale, 100, factor, 100)
+            }
             RuntimeViewportMode::WindowFill { zoom_percent } => (
                 ProjectViewportModeDraft::WindowFill,
                 100,
@@ -202,7 +199,10 @@ pub fn validate_project_settings_draft(
             }]
         }
         ProjectViewportModeDraft::IntegerScale
-            if matches!(draft.viewport_integer_scale_factor, IntegerScaleFactor::Fixed(0)) =>
+            if matches!(
+                draft.viewport_integer_scale_factor,
+                IntegerScaleFactor::Fixed(0)
+            ) =>
         {
             vec![ProjectSettingsValidationIssue {
                 message: "Integer Scale factor must be Auto or a positive factor.".to_string(),
@@ -380,11 +380,18 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
         project.metadata.runtime.flags.declarations = draft.flag_declarations.clone();
         changed = true;
     }
-    if project.metadata.runtime.scene_transitions.default_duration_ms
+    if project
+        .metadata
+        .runtime
+        .scene_transitions
+        .default_duration_ms
         != draft.transition_default_duration_ms
     {
-        project.metadata.runtime.scene_transitions.default_duration_ms =
-            draft.transition_default_duration_ms.max(1);
+        project
+            .metadata
+            .runtime
+            .scene_transitions
+            .default_duration_ms = draft.transition_default_duration_ms.max(1);
         changed = true;
     }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
@@ -583,9 +590,16 @@ mod tests {
                 .vignette_strength_percent,
             72
         );
-        assert_eq!(project.metadata.runtime.flags.declarations, draft.flag_declarations);
         assert_eq!(
-            project.metadata.runtime.scene_transitions.default_duration_ms,
+            project.metadata.runtime.flags.declarations,
+            draft.flag_declarations
+        );
+        assert_eq!(
+            project
+                .metadata
+                .runtime
+                .scene_transitions
+                .default_duration_ms,
             420
         );
         assert_eq!(
@@ -657,7 +671,10 @@ mod tests {
                 factor: IntegerScaleFactor::Fixed(4),
             }
         );
-        assert_eq!(reloaded_draft.runtime_viewport_mode(), reloaded.metadata.runtime.display.viewport);
+        assert_eq!(
+            reloaded_draft.runtime_viewport_mode(),
+            reloaded.metadata.runtime.display.viewport
+        );
     }
 
     #[test]

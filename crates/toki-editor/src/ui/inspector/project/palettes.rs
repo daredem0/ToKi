@@ -103,8 +103,7 @@ pub(super) fn render_palettes_section(
         if let Some(remove_palette_id) = remove_palette_id {
             match remove_project_palette_file(project, &remove_palette_id) {
                 Ok(()) => {
-                    if draft.indexed_palette_override.as_deref()
-                        == Some(remove_palette_id.as_str())
+                    if draft.indexed_palette_override.as_deref() == Some(remove_palette_id.as_str())
                     {
                         draft.indexed_palette_override = None;
                         outcome.changed = true;

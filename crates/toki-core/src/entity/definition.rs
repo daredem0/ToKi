@@ -9,8 +9,8 @@ use super::model::{
     EntityRendering, EntityStats, MovementProfile, MovementSoundTrigger, StaticObjectRenderDef,
     HEALTH_STAT_ID,
 };
-use super::storage::{EntitySpawnBundle, OptionalEntityComponents};
 use super::runtime_entity_kind_for_category;
+use super::storage::{EntitySpawnBundle, OptionalEntityComponents};
 use super::{Inventory, PickupDef, PrimaryProjectileDef};
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
@@ -264,7 +264,9 @@ impl EntityDefinition {
         Ok(self.create_spawn_bundle(position, entity_id)?.entity)
     }
 
-    fn build_animation_controller(&self) -> Result<Option<AnimationController>, EntityDefinitionError> {
+    fn build_animation_controller(
+        &self,
+    ) -> Result<Option<AnimationController>, EntityDefinitionError> {
         if self.animations.clips.is_empty() {
             return Ok(None);
         }

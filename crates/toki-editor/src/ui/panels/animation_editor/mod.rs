@@ -74,7 +74,11 @@ fn sync_with_selection(ui_state: &mut EditorUI, project_path: Option<&Path>) {
     };
 
     // Check if we already have this entity loaded
-    if crate::ui::editor_context::animation_state_mut(ui_state).active_entity.as_ref() == Some(&entity_name) {
+    if crate::ui::editor_context::animation_state_mut(ui_state)
+        .active_entity
+        .as_ref()
+        == Some(&entity_name)
+    {
         return;
     }
 
@@ -125,7 +129,8 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
 
     // Get panel widths from state
     let clip_list_width = crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width;
-    let frame_sequence_width = crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width;
+    let frame_sequence_width =
+        crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width;
     let separator_width = 8.0; // Width of draggable separator
     let center_width =
         (available_width - clip_list_width - frame_sequence_width - separator_width * 2.0)
@@ -144,9 +149,10 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         // Draggable separator between clip list and center
         let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
-            crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width = (crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width
-                + sep_response.drag_delta().x)
-                .clamp(120.0, available_width * 0.4);
+            crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width =
+                (crate::ui::editor_context::animation_state_mut(ui_state).clip_list_width
+                    + sep_response.drag_delta().x)
+                    .clamp(120.0, available_width * 0.4);
         }
 
         // Center panel: Atlas grid and preview
@@ -162,9 +168,10 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
             // Dragging right makes frame panel smaller
-            crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width = (crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width
-                - sep_response.drag_delta().x)
-                .clamp(150.0, available_width * 0.4);
+            crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width =
+                (crate::ui::editor_context::animation_state_mut(ui_state).frame_sequence_width
+                    - sep_response.drag_delta().x)
+                    .clamp(150.0, available_width * 0.4);
         }
 
         // Right panel: Frame sequence
@@ -198,9 +205,10 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
     // Draggable separator between preview and atlas
     let sep_response = render_horizontal_separator(ui, available_width);
     if sep_response.dragged() {
-        crate::ui::editor_context::animation_state_mut(ui_state).preview_height = (crate::ui::editor_context::animation_state_mut(ui_state).preview_height
-            + sep_response.drag_delta().y)
-            .clamp(100.0, available_height - 150.0);
+        crate::ui::editor_context::animation_state_mut(ui_state).preview_height =
+            (crate::ui::editor_context::animation_state_mut(ui_state).preview_height
+                + sep_response.drag_delta().y)
+                .clamp(100.0, available_height - 150.0);
     }
 
     // Atlas grid (for selecting frames)

@@ -302,11 +302,10 @@ impl EditorUI {
                                         ui.label("No runtime entities");
                                     } else {
                                         for entity_id in &entity_ids {
-                                            if let Some(entity) =
-                                                game_state
-                                                    .world()
-                                                    .entity_manager()
-                                                    .get_entity(*entity_id)
+                                            if let Some(entity) = game_state
+                                                .world()
+                                                .entity_manager()
+                                                .get_entity(*entity_id)
                                             {
                                                 let is_selected = matches!(
                                                     &self.selection,

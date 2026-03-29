@@ -88,6 +88,9 @@ mod tests {
         flags.set("quest", FlagValue::String("done".to_string()));
 
         assert!(!flags.increment("quest", 3));
-        assert_eq!(flags.get("quest"), Some(&FlagValue::String("done".to_string())));
+        assert_eq!(
+            flags.get("quest"),
+            Some(&FlagValue::String("done".to_string()))
+        );
     }
 }

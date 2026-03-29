@@ -130,7 +130,7 @@ impl InspectorSystem {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
@@ -551,8 +551,7 @@ impl InspectorSystem {
                             issues.push(RuleValidationIssue {
                                 rule_index,
                                 action_index: Some(action_index),
-                                message: "Flag actions require a non-empty flag name"
-                                    .to_string(),
+                                message: "Flag actions require a non-empty flag name".to_string(),
                             });
                         } else if !declared_flag_ids.is_empty()
                             && !declared_flag_ids.contains(flag.trim())
@@ -688,7 +687,11 @@ impl InspectorSystem {
                 ui.label("Fade Duration:");
                 let mut value = *override_duration_ms as i64;
                 if ui
-                    .add(egui::DragValue::new(&mut value).speed(1.0).range(1..=60_000))
+                    .add(
+                        egui::DragValue::new(&mut value)
+                            .speed(1.0)
+                            .range(1..=60_000),
+                    )
                     .changed()
                 {
                     *override_duration_ms = value.max(1) as u32;

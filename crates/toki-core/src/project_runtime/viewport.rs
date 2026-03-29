@@ -36,7 +36,9 @@ impl RuntimeViewportMode {
     pub fn zoom_percent(self) -> u16 {
         match self {
             Self::WindowFill { zoom_percent } => zoom_percent.max(1),
-            Self::AspectFit { .. } | Self::IntegerScale { .. } => default_window_fill_zoom_percent(),
+            Self::AspectFit { .. } | Self::IntegerScale { .. } => {
+                default_window_fill_zoom_percent()
+            }
         }
     }
 }

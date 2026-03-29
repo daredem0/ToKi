@@ -40,7 +40,8 @@ impl PanelSystem {
             return;
         };
 
-        let mut connect_from = crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node;
+        let mut connect_from =
+            crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node;
         let mut connect_to = crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node;
         let (mut graph_zoom, mut graph_pan) =
             crate::ui::editor_ui::graph_view_for_scene(ui_state, &active_scene_name);
@@ -64,9 +65,10 @@ impl PanelSystem {
                 &active_scene_name,
                 &scene_rules,
             );
-            let mut graph = crate::ui::editor_ui::rule_graph_for_scene(ui_state, &active_scene_name)
-                .cloned()
-                .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
+            let mut graph =
+                crate::ui::editor_ui::rule_graph_for_scene(ui_state, &active_scene_name)
+                    .cloned()
+                    .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
             let mut pending_command: Option<GraphCommand> = None;
 
             let node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
@@ -74,9 +76,11 @@ impl PanelSystem {
                 let Some(node_key) = graph.stable_node_key(node_id) else {
                     continue;
                 };
-                let Some(position) =
-                    crate::ui::editor_ui::graph_layout_position(ui_state, &active_scene_name, &node_key)
-                else {
+                let Some(position) = crate::ui::editor_ui::graph_layout_position(
+                    ui_state,
+                    &active_scene_name,
+                    &node_key,
+                ) else {
                     continue;
                 };
                 let _ = graph.set_node_position(node_id, position);
@@ -499,7 +503,9 @@ impl PanelSystem {
                                         {
                                             ui.label("Dialog:");
                                             let mut dialog_id_value = dialog_id.to_string();
-                                            if ui.text_edit_singleline(&mut dialog_id_value).changed()
+                                            if ui
+                                                .text_edit_singleline(&mut dialog_id_value)
+                                                .changed()
                                             {
                                                 *dialog_id = dialog_id_value.into();
                                             }

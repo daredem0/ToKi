@@ -47,26 +47,31 @@ impl ResourceManager {
         let assets_dir = project_dir.join("assets");
         let terrain_path = assets_dir.join("terrain.json");
         let creature_path = assets_dir.join("creatures.json");
-        let tilemap_path = assets_dir.join("maps").join("new_town_map_64x64_crossings.json");
+        let tilemap_path = assets_dir
+            .join("maps")
+            .join("new_town_map_64x64_crossings.json");
 
-        let terrain_atlas =
-            AtlasMeta::load_from_file(&terrain_path).map_err(|source| ResourceError::AtlasLoad {
+        let terrain_atlas = AtlasMeta::load_from_file(&terrain_path).map_err(|source| {
+            ResourceError::AtlasLoad {
                 path: terrain_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
 
-        let creature_atlas =
-            AtlasMeta::load_from_file(&creature_path).map_err(|source| ResourceError::AtlasLoad {
+        let creature_atlas = AtlasMeta::load_from_file(&creature_path).map_err(|source| {
+            ResourceError::AtlasLoad {
                 path: creature_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
 
         // Default to the main map used by runtime
-        let tilemap =
-            TileMap::load_from_file(&tilemap_path).map_err(|source| ResourceError::TilemapLoad {
+        let tilemap = TileMap::load_from_file(&tilemap_path).map_err(|source| {
+            ResourceError::TilemapLoad {
                 path: tilemap_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
 
         // Validate the tilemap
         tilemap
@@ -86,28 +91,25 @@ impl ResourceManager {
         creature_atlas_path: &Path,
         tilemap_path: &Path,
     ) -> Result<Self, ResourceError> {
-        let terrain_atlas =
-            AtlasMeta::load_from_file(terrain_atlas_path).map_err(|source| {
-                ResourceError::AtlasLoad {
-                    path: terrain_atlas_path.display().to_string(),
-                    source,
-                }
-            })?;
-
-        let creature_atlas =
-            AtlasMeta::load_from_file(creature_atlas_path).map_err(|source| {
-                ResourceError::AtlasLoad {
-                    path: creature_atlas_path.display().to_string(),
-                    source,
-                }
-            })?;
-
-        let tilemap = TileMap::load_from_file(tilemap_path).map_err(|source| {
-            ResourceError::TilemapLoad {
-                path: tilemap_path.display().to_string(),
+        let terrain_atlas = AtlasMeta::load_from_file(terrain_atlas_path).map_err(|source| {
+            ResourceError::AtlasLoad {
+                path: terrain_atlas_path.display().to_string(),
                 source,
             }
         })?;
+
+        let creature_atlas = AtlasMeta::load_from_file(creature_atlas_path).map_err(|source| {
+            ResourceError::AtlasLoad {
+                path: creature_atlas_path.display().to_string(),
+                source,
+            }
+        })?;
+
+        let tilemap =
+            TileMap::load_from_file(tilemap_path).map_err(|source| ResourceError::TilemapLoad {
+                path: tilemap_path.display().to_string(),
+                source,
+            })?;
 
         // Validate the tilemap
         tilemap

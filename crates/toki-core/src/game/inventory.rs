@@ -36,7 +36,8 @@ impl GameState {
             .active_entities()
             .into_iter()
             .filter(|&entity_id| {
-                self.world.entity_manager
+                self.world
+                    .entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| entity.attributes.behavior.has_inventory)
             })
@@ -50,7 +51,8 @@ impl GameState {
             .components()
             .pickup_ids()
             .filter(|&entity_id| {
-                self.world.entity_manager
+                self.world
+                    .entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| entity.attributes.behavior.active)
             })

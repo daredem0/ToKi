@@ -1,6 +1,6 @@
 use toki_core::math::projection::screen_space_projection;
-use toki_core::text::TextItem;
 use toki_core::project_runtime::RuntimeViewportMode;
+use toki_core::text::TextItem;
 use toki_core::ui::{UiComposition, UiRect};
 
 use super::layout::{compute_layout_for_mode, ViewportLayout};
@@ -58,10 +58,7 @@ impl ViewportPresentation {
             return None;
         }
 
-        Some(glam::Vec2::new(
-            position.x - rect.x,
-            position.y - rect.y,
-        ))
+        Some(glam::Vec2::new(position.x - rect.x, position.y - rect.y))
     }
 
     pub fn offset_surface_rect(&self, rect: UiRect) -> UiRect {

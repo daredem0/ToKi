@@ -31,8 +31,13 @@ fn sync_collision_from_grounding(edit: &mut crate::ui::editor_ui::EntityEditStat
 }
 
 pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let available_atlases = crate::ui::editor_context::entity_editor_state_mut(ui_state).available_atlases.clone();
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let available_atlases = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .available_atlases
+        .clone();
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -174,7 +179,10 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 pub fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 

@@ -128,7 +128,10 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.size, new_size);
 
         changed |= set_if_changed(&mut entity.attributes.rendering.visible, draft.visible);
-        changed |= set_if_changed(&mut entity.attributes.rendering.has_shadow, draft.has_shadow);
+        changed |= set_if_changed(
+            &mut entity.attributes.rendering.has_shadow,
+            draft.has_shadow,
+        );
         let runtime_palette_override = {
             let trimmed = draft.palette_override.trim();
             if trimmed.is_empty() {

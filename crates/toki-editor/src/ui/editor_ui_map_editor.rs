@@ -79,7 +79,12 @@ impl MapEditorHistory {
         let Some(command) = self.history.take_undo() else {
             return false;
         };
-        if apply_map_editor_tilemap_snapshot(map_state, &command.map_name, command.is_draft, &command.before) {
+        if apply_map_editor_tilemap_snapshot(
+            map_state,
+            &command.map_name,
+            command.is_draft,
+            &command.before,
+        ) {
             self.history.restore_redo(command);
             true
         } else {
@@ -92,7 +97,12 @@ impl MapEditorHistory {
         let Some(command) = self.history.take_redo() else {
             return false;
         };
-        if apply_map_editor_tilemap_snapshot(map_state, &command.map_name, command.is_draft, &command.after) {
+        if apply_map_editor_tilemap_snapshot(
+            map_state,
+            &command.map_name,
+            command.is_draft,
+            &command.after,
+        ) {
             self.history.restore_undo(command);
             true
         } else {
@@ -176,7 +186,11 @@ pub(crate) fn sync_map_editor_selection(ui_state: &mut EditorUI, available_map_n
     let mut sorted_names = available_map_names.to_vec();
     sorted_names.sort();
     let next_map = sorted_names[0].clone();
-    if crate::ui::editor_context::map_state_mut(ui_state).active_map.as_ref() != Some(&next_map) {
+    if crate::ui::editor_context::map_state_mut(ui_state)
+        .active_map
+        .as_ref()
+        != Some(&next_map)
+    {
         crate::ui::editor_context::map_state_mut(ui_state).active_map = Some(next_map.clone());
         crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = Some(next_map);
     }
@@ -233,7 +247,9 @@ pub(crate) fn set_map_editor_draft(ui_state: &mut EditorUI, draft: MapEditorDraf
     crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = None;
     crate::ui::editor_context::map_state_mut(ui_state).draft = Some(draft);
     crate::ui::editor_context::map_state_mut(ui_state).dirty = true;
-    crate::ui::editor_context::map_state_mut(ui_state).history.clear();
+    crate::ui::editor_context::map_state_mut(ui_state)
+        .history
+        .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
     crate::ui::editor_context::map_state_mut(ui_state).selected_object_info = None;
@@ -253,12 +269,16 @@ pub(crate) fn map_editor_selected_label(ui_state: &EditorUI) -> String {
 }
 
 pub(crate) fn has_unsaved_map_editor_draft(ui_state: &EditorUI) -> bool {
-    crate::ui::editor_context::map_state(ui_state).draft.is_some()
+    crate::ui::editor_context::map_state(ui_state)
+        .draft
+        .is_some()
 }
 
 pub(crate) fn has_unsaved_map_editor_changes(ui_state: &EditorUI) -> bool {
     crate::ui::editor_context::map_state(ui_state).dirty
-        || crate::ui::editor_context::map_state(ui_state).draft.is_some()
+        || crate::ui::editor_context::map_state(ui_state)
+            .draft
+            .is_some()
 }
 
 pub(crate) fn sync_map_editor_brush_selection(ui_state: &mut EditorUI, tile_names: &[String]) {
@@ -280,7 +300,8 @@ pub(crate) fn sync_map_editor_brush_selection(ui_state: &mut EditorUI, tile_name
 
     let mut sorted_names = tile_names.to_vec();
     sorted_names.sort();
-    crate::ui::editor_context::map_state_mut(ui_state).selected_tile = Some(sorted_names[0].clone());
+    crate::ui::editor_context::map_state_mut(ui_state).selected_tile =
+        Some(sorted_names[0].clone());
 }
 
 pub(crate) fn sync_map_editor_object_sheet_selection(
@@ -309,10 +330,7 @@ pub(crate) fn sync_map_editor_object_sheet_selection(
         Some(sorted_names[0].clone());
 }
 
-pub(crate) fn sync_map_editor_object_selection(
-    ui_state: &mut EditorUI,
-    object_names: &[String],
-) {
+pub(crate) fn sync_map_editor_object_selection(ui_state: &mut EditorUI, object_names: &[String]) {
     if object_names.is_empty() {
         crate::ui::editor_context::map_state_mut(ui_state).selected_object_name = None;
         return;
@@ -354,7 +372,9 @@ pub(crate) fn finalize_saved_map_editor_draft(ui_state: &mut EditorUI, saved_nam
     crate::ui::editor_context::map_state_mut(ui_state).active_map = Some(saved_name.clone());
     crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = Some(saved_name);
     crate::ui::editor_context::map_state_mut(ui_state).save_requested = false;
-    crate::ui::editor_context::map_state_mut(ui_state).history.clear();
+    crate::ui::editor_context::map_state_mut(ui_state)
+        .history
+        .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
 }
@@ -365,7 +385,9 @@ pub(crate) fn finalize_saved_existing_map(ui_state: &mut EditorUI) {
 }
 
 pub(crate) fn clear_map_editor_history(ui_state: &mut EditorUI) {
-    crate::ui::editor_context::map_state_mut(ui_state).history.clear();
+    crate::ui::editor_context::map_state_mut(ui_state)
+        .history
+        .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
 }
@@ -375,8 +397,8 @@ pub(crate) fn select_map_editor_object(
     index: usize,
     object: &MapObjectInstance,
 ) {
-    crate::ui::editor_context::map_state_mut(ui_state).selected_object_info = Some(
-        MapEditorObjectInfo {
+    crate::ui::editor_context::map_state_mut(ui_state).selected_object_info =
+        Some(MapEditorObjectInfo {
             index,
             sheet: object.sheet.clone(),
             object_name: object.object_name.clone(),
@@ -385,8 +407,7 @@ pub(crate) fn select_map_editor_object(
             grounding: object.grounding.clone(),
             visible: object.visible,
             solid: object.solid,
-        },
-    );
+        });
     crate::ui::editor_context::map_state_mut(ui_state).selected_tile_info = None;
 }
 
@@ -432,7 +453,9 @@ pub(crate) fn begin_map_object_move_drag(
 }
 
 pub(crate) fn is_map_object_move_drag_active(ui_state: &EditorUI) -> bool {
-    crate::ui::editor_context::map_state(ui_state).object_move_drag.is_some()
+    crate::ui::editor_context::map_state(ui_state)
+        .object_move_drag
+        .is_some()
 }
 
 pub(crate) fn finish_map_object_move_drag(ui_state: &mut EditorUI) {
@@ -446,14 +469,13 @@ pub(crate) fn queue_map_editor_object_property_edit(
     visible: bool,
     solid: bool,
 ) {
-    crate::ui::editor_context::map_state_mut(ui_state).object_edit_requested = Some(
-        MapEditorObjectPropertyEditRequest {
+    crate::ui::editor_context::map_state_mut(ui_state).object_edit_requested =
+        Some(MapEditorObjectPropertyEditRequest {
             object_index,
             grounding: grounding.clone(),
             visible,
             solid,
-        },
-    );
+        });
     if let Some(selected) = crate::ui::editor_context::map_state_mut(ui_state)
         .selected_object_info
         .as_mut()
@@ -500,7 +522,9 @@ pub(crate) fn finish_map_editor_edit(ui_state: &mut EditorUI, after: &TileMap) -
         .active_map
         .clone()
         .unwrap_or_else(|| "map".to_string());
-    let is_draft = crate::ui::editor_context::map_state_mut(ui_state).draft.is_some();
+    let is_draft = crate::ui::editor_context::map_state_mut(ui_state)
+        .draft
+        .is_some();
     crate::ui::editor_context::map_state_mut(ui_state)
         .history
         .push(MapEditorEditCommand {

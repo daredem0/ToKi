@@ -60,13 +60,22 @@ impl RuleEngine<'_> {
                     if rule.log_enabled {
                         info!(rule_id = %rule.id, trigger = ?rule.trigger, "Rule trigger passed");
                     }
-                    let conditions_result =
-                        self.rule_conditions_match(&rule.id, rule.log_enabled, &rule.conditions, context);
+                    let conditions_result = self.rule_conditions_match(
+                        &rule.id,
+                        rule.log_enabled,
+                        &rule.conditions,
+                        context,
+                    );
                     log_rule(rule, conditions_result);
                     if !conditions_result {
                         None
                     } else {
-                        Some((rule.actions.clone(), rule.id.clone(), rule.once, rule.log_enabled))
+                        Some((
+                            rule.actions.clone(),
+                            rule.id.clone(),
+                            rule.once,
+                            rule.log_enabled,
+                        ))
                     }
                 }
             }) else {

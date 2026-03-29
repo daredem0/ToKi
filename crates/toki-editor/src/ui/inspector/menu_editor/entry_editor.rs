@@ -441,7 +441,13 @@ mod tests {
 
     #[test]
     fn display_settings_action_has_stable_kind_and_label() {
-        assert_eq!(InspectorSystem::ui_action_to_kind(&UiAction::OpenDisplaySettings), 6);
-        assert_eq!(InspectorSystem::ui_action_kind_label(6), "Open Display Settings");
+        assert_eq!(
+            InspectorSystem::ui_action_to_kind(&UiAction::OpenDisplaySettings),
+            6
+        );
+        assert_eq!(
+            InspectorSystem::ui_action_kind_label(6),
+            "Open Display Settings"
+        );
     }
 }

@@ -52,11 +52,11 @@ impl GameState {
                 if entity_id == player_id {
                     return false;
                 }
-                self.world.entity_manager
+                self.world
+                    .entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| {
-                        entity.attributes.behavior.interactable
-                            && entity.attributes.behavior.active
+                        entity.attributes.behavior.interactable && entity.attributes.behavior.active
                     })
             })
             .collect::<Vec<_>>();
@@ -83,11 +83,14 @@ impl GameState {
             );
 
             if let Some(spatial) = spatial {
-                self.runtime.rules.frame_interactions.push(InteractionEvent {
-                    interactor: player_id,
-                    interactable: interactable_id,
-                    spatial,
-                });
+                self.runtime
+                    .rules
+                    .frame_interactions
+                    .push(InteractionEvent {
+                        interactor: player_id,
+                        interactable: interactable_id,
+                        spatial,
+                    });
 
                 tracing::debug!(
                     "Player {} interacting with entity {} (spatial: {:?})",

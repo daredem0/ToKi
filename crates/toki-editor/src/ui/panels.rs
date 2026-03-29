@@ -1,3 +1,4 @@
+use super::editor_context::EditorContextHost;
 use super::editor_domain::{
     animation_state_label, animation_state_options,
     default_rule_action as shared_default_rule_action,
@@ -12,7 +13,6 @@ use super::editor_domain::{
     RuleActionEditorKind as GraphActionKind, RuleConditionEditorKind as GraphConditionKind,
     RuleTriggerEditorKind as GraphTriggerKind,
 };
-use super::editor_context::EditorContextHost;
 use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
 use super::interactions::{
     CameraInteraction, MapObjectInteraction, MapPaintInteraction, PlacementInteraction,
@@ -264,7 +264,11 @@ impl PanelSystem {
     }
 
     fn paint_marquee_selection_overlay(ui: &egui::Ui, ui_state: &super::EditorUI) {
-        let Some(marquee) = crate::ui::editor_context::scene_viewport_context(ui_state).placement.marquee_selection.as_ref() else {
+        let Some(marquee) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .marquee_selection
+            .as_ref()
+        else {
             return;
         };
 

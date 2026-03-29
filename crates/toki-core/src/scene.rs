@@ -180,19 +180,24 @@ impl Scene {
 
     /// Add an entity to the scene
     pub fn add_entity(&mut self, entity: Entity) -> EntityId {
-        self.add_stored_entity(StoredEntity::new(entity, OptionalEntityComponents::default()))
+        self.add_stored_entity(StoredEntity::new(
+            entity,
+            OptionalEntityComponents::default(),
+        ))
     }
 
     pub fn add_stored_entity(&mut self, stored: StoredEntity) -> EntityId {
         let id = stored.entity.id;
-        self.components.apply_optional_components(id, stored.components);
+        self.components
+            .apply_optional_components(id, stored.components);
         self.entities.push(stored.entity);
         id
     }
 
     pub fn insert_stored_entity(&mut self, index: usize, stored: StoredEntity) -> EntityId {
         let id = stored.entity.id;
-        self.components.apply_optional_components(id, stored.components);
+        self.components
+            .apply_optional_components(id, stored.components);
         let insert_index = index.min(self.entities.len());
         self.entities.insert(insert_index, stored.entity);
         id

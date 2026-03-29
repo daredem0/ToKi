@@ -381,8 +381,7 @@ fn window_fill_projection_uses_full_window_without_letterbox() {
 
     let projection = rendering.calculate_projection();
     let top_left = project_to_screen(projection, 320.0, 144.0, glam::Vec2::ZERO);
-    let bottom_right =
-        project_to_screen(projection, 320.0, 144.0, glam::Vec2::new(320.0, 144.0));
+    let bottom_right = project_to_screen(projection, 320.0, 144.0, glam::Vec2::new(320.0, 144.0));
 
     assert!((top_left.x - 0.0).abs() < 0.01);
     assert!((top_left.y - 0.0).abs() < 0.01);

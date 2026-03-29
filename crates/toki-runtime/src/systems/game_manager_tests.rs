@@ -113,7 +113,8 @@ fn wrapper_methods_expose_core_entity_state() {
     let player_id = SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(10, 12));
     let mut manager = GameManager::new(game_state);
 
-    let npc_id = SceneSystem::spawn_player_like_npc(&mut manager.game_state, glam::IVec2::new(20, 12));
+    let npc_id =
+        SceneSystem::spawn_player_like_npc(&mut manager.game_state, glam::IVec2::new(20, 12));
     let renderable = render_queries(&manager).sprite_render_requests();
     let entities_for_camera = manager.entities_for_camera();
 
@@ -231,7 +232,10 @@ fn debug_collision_wrappers_return_tiles_and_boxes_when_enabled() {
     let queries = render_queries(&manager);
     assert!(!queries.entity_collision_boxes().is_empty());
     assert_eq!(queries.solid_tile_positions(&tilemap, &atlas), vec![(0, 0)]);
-    assert_eq!(queries.trigger_tile_positions(&tilemap, &atlas), vec![(1, 0)]);
+    assert_eq!(
+        queries.trigger_tile_positions(&tilemap, &atlas),
+        vec![(1, 0)]
+    );
 }
 
 #[test]
@@ -243,8 +247,12 @@ fn player_wasd_profile_ignores_arrow_keys_for_movement() {
     let tilemap = walkable_tilemap();
 
     manager.handle_keyboard_input(KeyCode::ArrowRight, true);
-    let result =
-        GameSimulation::tick_fixed(&mut manager.game_state, glam::UVec2::new(128, 128), &tilemap, &atlas);
+    let result = GameSimulation::tick_fixed(
+        &mut manager.game_state,
+        glam::UVec2::new(128, 128),
+        &tilemap,
+        &atlas,
+    );
     manager.handle_keyboard_input(KeyCode::ArrowRight, false);
 
     assert!(!result.player_moved);
@@ -269,8 +277,12 @@ fn player_wasd_profile_moves_from_wasd_keys() {
     let tilemap = walkable_tilemap();
 
     manager.handle_keyboard_input(KeyCode::KeyD, true);
-    let result =
-        GameSimulation::tick_fixed(&mut manager.game_state, glam::UVec2::new(128, 128), &tilemap, &atlas);
+    let result = GameSimulation::tick_fixed(
+        &mut manager.game_state,
+        glam::UVec2::new(128, 128),
+        &tilemap,
+        &atlas,
+    );
     manager.handle_keyboard_input(KeyCode::KeyD, false);
 
     assert!(result.player_moved);
@@ -326,7 +338,12 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
     let tilemap = walkable_tilemap();
 
     manager.handle_keyboard_input(KeyCode::Space, true);
-    GameSimulation::tick_fixed(&mut manager.game_state, glam::UVec2::new(128, 128), &tilemap, &atlas);
+    GameSimulation::tick_fixed(
+        &mut manager.game_state,
+        glam::UVec2::new(128, 128),
+        &tilemap,
+        &atlas,
+    );
     manager.handle_keyboard_input(KeyCode::Space, false);
 
     let current_state = manager

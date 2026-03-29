@@ -204,9 +204,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
                     .debug_collision_rendering(),
             )
             .player_position();
-            self.camera_system
-                .camera_mut()
-                .center_on(player_position);
+            self.camera_system.camera_mut().center_on(player_position);
             toki_core::camera::CameraMode::FollowEntity(player_id)
         } else {
             toki_core::camera::CameraMode::FreeScroll

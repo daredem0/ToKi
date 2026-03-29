@@ -451,11 +451,7 @@ impl InspectorSystem {
             }
             RuleAction::SetFlag { flag, value } => {
                 changed |= Self::render_flag_name_editor(ui, flag);
-                changed |= Self::render_flag_value_editor(
-                    ui,
-                    format!("{id_salt}_set_flag"),
-                    value,
-                );
+                changed |= Self::render_flag_value_editor(ui, format!("{id_salt}_set_flag"), value);
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 changed |= Self::render_flag_name_editor(ui, flag);

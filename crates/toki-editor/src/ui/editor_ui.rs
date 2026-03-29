@@ -3,16 +3,16 @@ use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
-use crate::ui::editor_context::{
-    default_active_context, default_parked_contexts, null_context, AnimationEditorContext,
-    DialogEditorContext, EditorContext, EditorContextHost, EntityEditorContext,
-    RuleGraphContext, SceneViewportContext, SpriteEditorContext,
-};
 use crate::editor_tab_strip::EditorTabStripState;
 use crate::editor_types::PlacementPreviewVisual;
-use crate::project::{Project, ProjectSettingsDraft, ProjectTemplateKind};
 use crate::project::SceneGraphLayout;
+use crate::project::{Project, ProjectSettingsDraft, ProjectTemplateKind};
 use crate::scene::SceneViewport;
+use crate::ui::editor_context::{
+    default_active_context, default_parked_contexts, null_context, AnimationEditorContext,
+    DialogEditorContext, EditorContext, EditorContextHost, EntityEditorContext, RuleGraphContext,
+    SceneViewportContext, SpriteEditorContext,
+};
 use toki_core::palette::{builtin_palettes, Palette4};
 
 #[path = "editor_ui_animation_authoring.rs"]
@@ -45,12 +45,11 @@ pub(crate) use editor_ui_entity_editor::{
     create_default_definition, EntityCategory, EntityEditState, EntitySummary,
 };
 pub(crate) use editor_ui_graph::{
-    clear_graph_layout_dirty, execute_scene_rules_graph_command,
-    export_graph_layouts_for_project, export_rule_graph_drafts_for_project,
-    graph_layout_position, graph_view_for_scene, is_graph_layout_dirty,
-    load_graph_layouts_from_project, load_rule_graph_drafts_from_project, rule_graph_for_scene,
-    set_graph_view_for_scene, set_rule_graph_for_scene, sync_rule_graph_with_rule_set,
-    SceneRulesGraphCommandData,
+    clear_graph_layout_dirty, execute_scene_rules_graph_command, export_graph_layouts_for_project,
+    export_rule_graph_drafts_for_project, graph_layout_position, graph_view_for_scene,
+    is_graph_layout_dirty, load_graph_layouts_from_project, load_rule_graph_drafts_from_project,
+    rule_graph_for_scene, set_graph_view_for_scene, set_rule_graph_for_scene,
+    sync_rule_graph_with_rule_set, SceneRulesGraphCommandData,
 };
 pub(crate) use editor_ui_map_editor::{
     begin_map_editor_edit, begin_map_object_move_drag, begin_new_map_dialog,
@@ -60,21 +59,21 @@ pub(crate) use editor_ui_map_editor::{
     has_unsaved_map_editor_changes, has_unsaved_map_editor_draft, is_map_object_move_drag_active,
     map_editor_selected_label, mark_map_editor_dirty, pick_map_editor_tile,
     queue_map_editor_object_property_edit, select_map_editor_object, set_map_editor_draft,
-    sync_map_editor_brush_selection, sync_map_editor_object_selection,
+    submit_new_map_request, sync_map_editor_brush_selection, sync_map_editor_object_selection,
     sync_map_editor_object_sheet_selection, sync_map_editor_selection,
     sync_selected_map_editor_object_from_tilemap, take_map_editor_object_property_edit_request,
-    take_pending_map_editor_tilemap_sync, submit_new_map_request, MapEditorDraft,
-    MapEditorHistory, MapEditorObjectInfo, MapEditorObjectPropertyEditRequest,
-    MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState, NewMapRequest,
+    take_pending_map_editor_tilemap_sync, MapEditorDraft, MapEditorHistory, MapEditorObjectInfo,
+    MapEditorObjectPropertyEditRequest, MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState,
+    NewMapRequest,
 };
 pub(crate) use editor_ui_menu_editor::{
     select_menu_dialog, select_menu_entry, select_menu_screen, selected_menu_dialog_id,
     selected_menu_screen_id, sync_menu_editor_selection,
 };
 pub(crate) use editor_ui_sprite_editor::{
-    begin_new_sprite_canvas_dialog, cancel_new_sprite_canvas_dialog,
-    CanvasSide, DualCanvasLayout, PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind,
-    SpriteCanvas, SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
+    begin_new_sprite_canvas_dialog, cancel_new_sprite_canvas_dialog, CanvasSide, DualCanvasLayout,
+    PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
+    SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -728,7 +727,9 @@ impl EditorUI {
     #[cfg(test)]
     #[cfg(test)]
     pub(crate) fn rule_graph_context(&self) -> &RuleGraphContext {
-        if self.active_tab == CenterPanelTab::SceneGraph || self.active_tab == CenterPanelTab::SceneRules {
+        if self.active_tab == CenterPanelTab::SceneGraph
+            || self.active_tab == CenterPanelTab::SceneRules
+        {
             self.context::<RuleGraphContext>(self.active_tab)
                 .expect("rule graph context should always exist")
         } else if let Some(context) = self.context::<RuleGraphContext>(CenterPanelTab::SceneGraph) {
@@ -740,10 +741,15 @@ impl EditorUI {
     }
 
     pub(crate) fn rule_graph_context_mut(&mut self) -> &mut RuleGraphContext {
-        if self.active_tab == CenterPanelTab::SceneGraph || self.active_tab == CenterPanelTab::SceneRules {
+        if self.active_tab == CenterPanelTab::SceneGraph
+            || self.active_tab == CenterPanelTab::SceneRules
+        {
             self.context_mut::<RuleGraphContext>(self.active_tab)
                 .expect("rule graph context should always exist")
-        } else if self.context::<RuleGraphContext>(CenterPanelTab::SceneGraph).is_some() {
+        } else if self
+            .context::<RuleGraphContext>(CenterPanelTab::SceneGraph)
+            .is_some()
+        {
             self.context_mut::<RuleGraphContext>(CenterPanelTab::SceneGraph)
                 .expect("rule graph context should always exist")
         } else {
@@ -834,8 +840,10 @@ impl EditorUI {
             .as_ref()
             .is_none_or(|(path, _)| path != &project.path);
         if needs_refresh {
-            self.project_settings_draft =
-                Some((project.path.clone(), ProjectSettingsDraft::from_project(project)));
+            self.project_settings_draft = Some((
+                project.path.clone(),
+                ProjectSettingsDraft::from_project(project),
+            ));
         }
         &mut self
             .project_settings_draft

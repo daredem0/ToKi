@@ -5,11 +5,7 @@ use toki_core::entity::{
     EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, RenderingDef,
 };
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
-use toki_core::{
-    animation::AnimationState,
-    game::SceneSystem,
-    GameState,
-};
+use toki_core::{animation::AnimationState, game::SceneSystem, GameState};
 
 fn player_definition(name: &str) -> EntityDefinition {
     EntityDefinition {

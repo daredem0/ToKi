@@ -277,7 +277,11 @@ pub(crate) fn render_menu_editor(
                 let entry_rect = translated_rect(&entry.rect, origin);
                 let id = ui.id().with(("menu_entry", &screen.id, item_index));
                 if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
-                    crate::ui::editor_ui::select_menu_entry(ui_state, screen.id.clone(), item_index);
+                    crate::ui::editor_ui::select_menu_entry(
+                        ui_state,
+                        screen.id.clone(),
+                        item_index,
+                    );
                 }
             }
         }

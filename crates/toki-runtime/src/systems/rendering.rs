@@ -273,7 +273,8 @@ impl RenderingSystem {
     }
 
     pub fn logical_to_surface_position(&self, position: glam::Vec2) -> glam::Vec2 {
-        self.viewport_presentation().logical_to_surface_position(position)
+        self.viewport_presentation()
+            .logical_to_surface_position(position)
     }
 
     pub fn surface_to_viewport_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
@@ -292,7 +293,11 @@ impl RenderingSystem {
     }
 
     fn scene_clip_rect(&self) -> Option<SceneClipRect> {
-        let rect = self.effective_runtime_viewport().presentation.layout.viewport_rect;
+        let rect = self
+            .effective_runtime_viewport()
+            .presentation
+            .layout
+            .viewport_rect;
         Some(SceneClipRect {
             x: rect.x.round().max(0.0) as u32,
             y: rect.y.round().max(0.0) as u32,

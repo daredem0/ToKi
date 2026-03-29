@@ -152,7 +152,10 @@ impl InspectorSystem {
                 changed |= Self::render_flag_name_editor(ui, flag);
                 changed |= Self::render_flag_value_editor(
                     ui,
-                    format!("graph_node_condition_flag_equals_{}_{}", scene_name, node_key),
+                    format!(
+                        "graph_node_condition_flag_equals_{}_{}",
+                        scene_name, node_key
+                    ),
                     value,
                 );
             }

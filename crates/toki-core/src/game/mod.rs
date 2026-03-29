@@ -35,19 +35,19 @@ mod world_context;
 mod rules_tests;
 
 // Re-export event types for external use
+pub use combat::CombatSystem;
+pub use input::InputSystem;
+pub use interaction::InteractionSystem;
+pub use movement::MovementSystem;
 pub use render_queries::GroundShadow;
 pub use render_queries::RenderQueryService;
-pub use movement::MovementSystem;
-pub use combat::CombatSystem;
-pub use interaction::InteractionSystem;
+pub use rules::RuleSystem;
 pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,
 };
-pub use rules::RuleSystem;
 pub use scene::RestoreError;
 pub use scene::SceneSystem;
-pub use input::InputSystem;
 pub(crate) use world_context::WorldContext;
 
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
@@ -139,7 +139,8 @@ impl WorldState {
     }
 
     pub fn insert_entity_definition(&mut self, definition: EntityDefinition) {
-        self.entity_definitions.insert(definition.name.clone(), definition);
+        self.entity_definitions
+            .insert(definition.name.clone(), definition);
     }
 }
 

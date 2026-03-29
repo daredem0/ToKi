@@ -20,15 +20,15 @@ mod viewport;
 // Re-export all public types
 pub use canvas::SpriteCanvas;
 pub use dual_canvas::{CanvasSide, CanvasState, DualCanvasLayout};
-pub use history::{SpriteEditCommand, SpriteEditorHistory};
 pub use floating::{FloatingOrigin, FloatingSelection};
+pub use history::{SpriteEditCommand, SpriteEditorHistory};
 #[cfg(test)]
 pub use selection::{clear_masked_pixels, extract_masked_selection};
 pub use selection::{SelectionMask, SpriteSelection};
 pub use state::SpriteEditorState;
 pub use types::{
     canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot,
-    preview_indexed_color, DitherPattern, DiscoveredSpriteAsset, PixelColor, ResizeAnchor,
+    preview_indexed_color, DiscoveredSpriteAsset, DitherPattern, PixelColor, ResizeAnchor,
     SpriteAssetKind, SpriteEditorTool,
 };
 pub use viewport::SpriteCanvasViewport;

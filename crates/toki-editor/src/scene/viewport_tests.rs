@@ -4,8 +4,8 @@ use super::{
 };
 use crate::project::assets::ProjectAssets;
 use std::collections::HashMap;
-use toki_core::graphics::image::save_image_rgba8;
 use toki_core::game::RenderQueryService;
+use toki_core::graphics::image::save_image_rgba8;
 use toki_core::palette::resolve_palette;
 use toki_core::sprite_render::{
     SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteSortKey, SpriteVisualRef,

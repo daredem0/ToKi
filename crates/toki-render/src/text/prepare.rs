@@ -26,8 +26,12 @@ impl GlyphonTextRenderer {
             surface_width as f32,
             surface_height as f32,
         );
-        let text_areas =
-            build_text_areas(&self.cached_buffers, &prepared.entries, surface_width, surface_height);
+        let text_areas = build_text_areas(
+            &self.cached_buffers,
+            &prepared.entries,
+            surface_width,
+            surface_height,
+        );
 
         self.renderer
             .prepare(
@@ -100,7 +104,8 @@ impl GlyphonTextRenderer {
     }
 
     fn prune_unused_buffers(&mut self, used_keys: &std::collections::HashSet<TextBufferKey>) {
-        self.cached_buffers.retain(|entry| used_keys.contains(&entry.key));
+        self.cached_buffers
+            .retain(|entry| used_keys.contains(&entry.key));
     }
 
     fn upsert_buffer(

@@ -88,7 +88,9 @@ impl SceneManager {
     }
 
     pub fn scene_entries(&self) -> impl Iterator<Item = (&str, &Scene)> {
-        self.scenes.iter().map(|(name, scene)| (name.as_str(), scene))
+        self.scenes
+            .iter()
+            .map(|(name, scene)| (name.as_str(), scene))
     }
 
     /// Check if a scene exists

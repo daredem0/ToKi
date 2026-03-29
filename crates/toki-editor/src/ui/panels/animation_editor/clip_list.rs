@@ -36,14 +36,14 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         .authoring
         .clips
         .iter()
-                .enumerate()
-                .map(|(idx, clip)| {
-                    let animation_state = crate::ui::editor_context::animation_state(ui_state);
-                    let is_selected = animation_state.authoring.selected_clip_index == Some(idx);
-                    let is_default = clip.state == animation_state.authoring.default_state;
-                    (
-                        idx,
-                        clip.state.clone(),
+        .enumerate()
+        .map(|(idx, clip)| {
+            let animation_state = crate::ui::editor_context::animation_state(ui_state);
+            let is_selected = animation_state.authoring.selected_clip_index == Some(idx);
+            let is_default = clip.state == animation_state.authoring.default_state;
+            (
+                idx,
+                clip.state.clone(),
                 clip.frames.len(),
                 is_selected,
                 is_default,
@@ -80,12 +80,18 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     // Apply deferred actions
     if let Some(idx) = select_index {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.select_clip(idx);
-        crate::ui::editor_context::animation_state_mut(ui_state).preview.stop();
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .select_clip(idx);
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .preview
+            .stop();
     }
 
     if let Some(idx) = delete_index {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.delete_clip(idx);
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .delete_clip(idx);
     }
 
     // Draggable separator between clip list and default state
@@ -93,7 +99,9 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     if sep_response.dragged() {
         let delta_ratio = sep_response.drag_delta().y / content_height;
         crate::ui::editor_context::animation_state_mut(ui_state).clip_list_ratio =
-            (crate::ui::editor_context::animation_state_mut(ui_state).clip_list_ratio + delta_ratio).clamp(0.2, 0.9);
+            (crate::ui::editor_context::animation_state_mut(ui_state).clip_list_ratio
+                + delta_ratio)
+                .clamp(0.2, 0.9);
     }
 
     // Default state selector
@@ -128,8 +136,12 @@ pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                                 .selectable_value(&mut default_state, state.clone(), state)
                                 .changed()
                             {
-                                crate::ui::editor_context::animation_state_mut(ui_state).authoring.default_state = default_state.clone();
-                                crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+                                crate::ui::editor_context::animation_state_mut(ui_state)
+                                    .authoring
+                                    .default_state = default_state.clone();
+                                crate::ui::editor_context::animation_state_mut(ui_state)
+                                    .authoring
+                                    .dirty = true;
                             }
                         }
                     });

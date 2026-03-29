@@ -149,7 +149,7 @@ fn restore_graph_layout_preserves_existing_nodes_after_add_chain() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -215,7 +215,7 @@ fn enforce_graph_border_gap_moves_pan_when_left_or_top_nodes_touch_border() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -249,7 +249,7 @@ fn collect_graph_validation_issues_reports_non_linear_chain_error() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -292,7 +292,7 @@ fn collect_graph_validation_issues_warns_for_detached_action_nodes() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -333,7 +333,7 @@ fn auto_layout_uses_edge_direction_and_positions_all_nodes() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -388,7 +388,7 @@ fn auto_layout_prevents_node_overlap() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {

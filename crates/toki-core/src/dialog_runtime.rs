@@ -581,7 +581,9 @@ fn cycle_binary_selection(active: &mut ActiveDialogState, allow_cancel: bool, di
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dialog::{DialogBranch, DialogChoice, DialogCondition, DialogNode, DialogNodeKind, DialogTree};
+    use crate::dialog::{
+        DialogBranch, DialogChoice, DialogCondition, DialogNode, DialogNodeKind, DialogTree,
+    };
     use crate::flags::FlagValue;
     use crate::menu::MenuInput;
     use crate::GameState;
@@ -621,7 +623,11 @@ mod tests {
         let game_state = GameState::new_empty();
         let mut controller = DialogController::new(vec![simple_dialog()]);
         controller
-            .start_dialog(&game_state, &"intro".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"intro".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
 
         let first = controller.current_view().expect("view");
@@ -700,7 +706,11 @@ mod tests {
         };
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, &"choices".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"choices".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
         controller.handle_input(MenuInput::Down, &game_state);
         assert_eq!(
@@ -726,7 +736,11 @@ mod tests {
         let game_state = GameState::new_empty();
         let mut controller = DialogController::new(vec![simple_dialog()]);
         controller
-            .start_dialog(&game_state, &"intro".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"intro".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
 
         controller.handle_input(MenuInput::Right, &game_state);
@@ -749,7 +763,11 @@ mod tests {
         dialog.gate_gameplay = false;
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, &"intro".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"intro".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
 
         assert!(!controller.active_dialog_gates_gameplay());
@@ -803,7 +821,11 @@ mod tests {
 
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, &"flag_branch".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"flag_branch".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
 
         let view = controller.current_view().expect("view");
@@ -848,7 +870,11 @@ mod tests {
 
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, &"line_skip".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"line_skip".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
 
         assert_eq!(controller.current_view().expect("view").body, "visible");
@@ -878,7 +904,11 @@ mod tests {
 
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, &"end_skip".into(), DialogRuntimeContext::default())
+            .start_dialog(
+                &game_state,
+                &"end_skip".into(),
+                DialogRuntimeContext::default(),
+            )
             .expect("dialog should start");
 
         assert!(!controller.is_open());
@@ -905,8 +935,11 @@ mod tests {
         };
 
         let mut controller = DialogController::new(vec![invalid]);
-        let result =
-            controller.start_dialog(&game_state, &"broken".into(), DialogRuntimeContext::default());
+        let result = controller.start_dialog(
+            &game_state,
+            &"broken".into(),
+            DialogRuntimeContext::default(),
+        );
 
         match result {
             Err(DialogStartError::InvalidDialog(report)) => {
