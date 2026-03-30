@@ -1,5 +1,6 @@
 use super::*;
 use toki_core::animation::AnimationState;
+use toki_core::rules::{RuleIntSource, RuleVec2IntSource};
 
 struct RuleActionEditorContext<'a> {
     scene_name: &'a str,
@@ -451,20 +452,59 @@ impl InspectorSystem {
             }
             RuleAction::SetFlag { flag, value } => {
                 changed |= Self::render_flag_name_editor(ui, flag);
-                changed |= Self::render_flag_value_editor(ui, format!("{id_salt}_set_flag"), value);
+                changed |= Self::render_rule_flag_value_source_editor(
+                    ui,
+                    format!("{id_salt}_set_flag"),
+                    value,
+                );
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 changed |= Self::render_flag_name_editor(ui, flag);
-                ui.horizontal(|ui| {
-                    ui.label("Amount:");
-                    changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
-                });
+                changed |= Self::render_rule_int_source_editor(
+                    ui,
+                    format!("{id_salt}_increment_flag"),
+                    "Amount:",
+                    amount,
+                );
             }
             RuleAction::ClearFlag { flag } => {
                 changed |= Self::render_flag_name_editor(ui, flag);
             }
             RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
                 changed |= Self::render_save_slot_editor(ui, slot);
+            }
+            RuleAction::ShowUi { ui_id } | RuleAction::HideUi { ui_id } => {
+                ui.horizontal(|ui| {
+                    ui.label("UI Id:");
+                    let mut ui_id_value = ui_id.to_string();
+                    if ui.text_edit_singleline(&mut ui_id_value).changed() {
+                        *ui_id = ui_id_value.into();
+                        changed = true;
+                    }
+                });
+            }
+            RuleAction::UpdateUiBinding {
+                ui_id,
+                binding_key,
+                value,
+            } => {
+                ui.horizontal(|ui| {
+                    ui.label("UI Id:");
+                    let mut ui_id_value = ui_id.to_string();
+                    if ui.text_edit_singleline(&mut ui_id_value).changed() {
+                        *ui_id = ui_id_value.into();
+                        changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Binding Key:");
+                    changed |= ui.text_edit_singleline(binding_key).changed();
+                });
+                changed |= Self::render_rule_flag_value_source_editor(
+                    ui,
+                    format!("{id_salt}_ui_binding_value"),
+                    value,
+                );
             }
         }
 
@@ -596,7 +636,7 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         ctx: &RuleActionEditorContext<'_>,
         target: &mut RuleTarget,
-        velocity: &mut [i32; 2],
+        velocity: &mut RuleVec2IntSource,
     ) -> bool {
         let mut changed = Self::render_rule_target_editor(
             ui,
@@ -605,15 +645,12 @@ impl InspectorSystem {
             ctx.action_index,
             target,
         );
-        ui.horizontal(|ui| {
-            ui.label("Velocity:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
-                .changed();
-            changed |= ui
-                .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
-                .changed();
-        });
+        changed |= Self::render_rule_vec2_source_editor(
+            ui,
+            ("rule_set_velocity", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            "Velocity:",
+            velocity,
+        );
         changed
     }
 
@@ -621,7 +658,7 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         id_salt: &str,
         entity_type: &mut RuleSpawnEntityType,
-        position: &mut [i32; 2],
+        position: &mut RuleVec2IntSource,
     ) -> bool {
         let mut changed = false;
         ui.horizontal(|ui| {
@@ -640,15 +677,7 @@ impl InspectorSystem {
                     }
                 });
         });
-        ui.horizontal(|ui| {
-            ui.label("Position:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                .changed();
-            changed |= ui
-                .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                .changed();
-        });
+        changed |= Self::render_rule_vec2_source_editor(ui, (id_salt, "spawn"), "Position:", position);
         changed
     }
 
@@ -708,7 +737,7 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         ctx: &RuleActionEditorContext<'_>,
         target: &mut RuleTarget,
-        amount: &mut i32,
+        amount: &mut RuleIntSource,
     ) -> bool {
         let mut changed = Self::render_rule_target_editor(
             ui,
@@ -717,12 +746,12 @@ impl InspectorSystem {
             ctx.action_index,
             target,
         );
-        ui.horizontal(|ui| {
-            ui.label("Amount:");
-            changed |= ui
-                .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
-                .changed();
-        });
+        changed |= Self::render_rule_int_source_editor(
+            ui,
+            ("rule_amount", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            "Amount:",
+            amount,
+        );
         changed
     }
 
@@ -776,8 +805,8 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         ctx: &RuleActionEditorContext<'_>,
         target: &mut RuleTarget,
-        tile_x: &mut u32,
-        tile_y: &mut u32,
+        tile_x: &mut RuleIntSource,
+        tile_y: &mut RuleIntSource,
     ) -> bool {
         let mut changed = Self::render_rule_target_editor(
             ui,
@@ -786,28 +815,18 @@ impl InspectorSystem {
             ctx.action_index,
             target,
         );
-        ui.horizontal(|ui| {
-            ui.label("Tile X:");
-            let mut x_val = *tile_x as i32;
-            if ui
-                .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
-                .changed()
-            {
-                *tile_x = x_val.max(0) as u32;
-                changed = true;
-            }
-        });
-        ui.horizontal(|ui| {
-            ui.label("Tile Y:");
-            let mut y_val = *tile_y as i32;
-            if ui
-                .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
-                .changed()
-            {
-                *tile_y = y_val.max(0) as u32;
-                changed = true;
-            }
-        });
+        changed |= Self::render_rule_int_source_editor(
+            ui,
+            ("rule_teleport_x", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            "Tile X:",
+            tile_x,
+        );
+        changed |= Self::render_rule_int_source_editor(
+            ui,
+            ("rule_teleport_y", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            "Tile Y:",
+            tile_y,
+        );
         changed
     }
 
@@ -847,6 +866,12 @@ impl InspectorSystem {
 
         match condition {
             RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => {}
+            RuleCondition::Expression { expression } => {
+                ui.horizontal(|ui| {
+                    ui.label("Expression:");
+                    changed |= ui.text_edit_singleline(expression).changed();
+                });
+            }
             RuleCondition::TargetExists { target } => {
                 changed |= Self::render_rule_condition_target_editor(
                     ui,

@@ -69,7 +69,7 @@ fn sample_rules() -> RuleSet {
                     },
                     RuleAction::Spawn {
                         entity_type: toki_core::rules::RuleSpawnEntityType::Item,
-                        position: [10, 20],
+                        position: toki_core::rules::RuleVec2IntSource::Literal([10, 20]),
                     },
                 ],
             },

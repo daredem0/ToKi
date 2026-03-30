@@ -282,6 +282,14 @@ impl RenderingSystem {
             .surface_to_viewport_local_position(position)
     }
 
+    pub fn surface_to_logical_viewport_position(
+        &self,
+        position: glam::Vec2,
+    ) -> Option<glam::Vec2> {
+        self.viewport_presentation()
+            .surface_to_logical_viewport_position(position)
+    }
+
     /// Update GPU projection matrix with view transform
     pub fn update_projection(&mut self, view_matrix: glam::Mat4) {
         let projection = self.calculate_projection();
@@ -585,6 +593,13 @@ impl RenderingSystem {
         let transformed = self
             .viewport_presentation()
             .offset_surface_ui_composition(composition);
+        self.render_ui_composition(&transformed);
+    }
+
+    pub fn render_logical_viewport_ui_composition(&mut self, composition: &UiComposition) {
+        let transformed = self
+            .viewport_presentation()
+            .transform_logical_ui_composition(composition);
         self.render_ui_composition(&transformed);
     }
 

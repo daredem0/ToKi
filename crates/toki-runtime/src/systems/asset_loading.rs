@@ -7,7 +7,9 @@ use toki_core::project_assets::{
     load_dialog_from_path as load_dialog_from_project_path,
     load_entity_definition_from_path as load_entity_definition_from_project_path,
     load_scene_from_path as load_scene_from_project_path,
+    load_ui_layout_from_path as load_ui_layout_from_project_path,
 };
+use toki_core::ui_layout::UiLayoutAsset;
 use toki_core::AssetCache;
 use toki_core::Scene;
 use toki_render::RenderError;
@@ -91,6 +93,7 @@ pub struct DecodedProjectCache {
     object_sheets: AssetCache<PathBuf, ObjectSheetMeta>,
     entity_definitions: AssetCache<PathBuf, EntityDefinition>,
     dialogs: AssetCache<PathBuf, DialogTree>,
+    ui_layouts: AssetCache<PathBuf, UiLayoutAsset>,
 }
 
 impl DecodedProjectCache {
@@ -168,6 +171,22 @@ impl DecodedProjectCache {
                 }
             })
         })
+    }
+
+    pub fn load_ui_layout_from_path(
+        &mut self,
+        layout_path: &Path,
+    ) -> Result<UiLayoutAsset, toki_core::CoreError> {
+        self.ui_layouts
+            .get_or_load(layout_path.to_path_buf(), |path| {
+                load_ui_layout_from_project_path(path).map_err(|error| match error {
+                    toki_core::project_assets::ProjectAssetError::Io(error) => error.into(),
+                    toki_core::project_assets::ProjectAssetError::Core(error) => error,
+                    toki_core::project_assets::ProjectAssetError::Validation(error) => {
+                        toki_core::CoreError::FileLoad(path.to_path_buf(), error)
+                    }
+                })
+            })
     }
 }
 

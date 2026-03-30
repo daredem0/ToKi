@@ -3,7 +3,9 @@ use crate::rule_graph_ui::{
     rule_graph_action_summary, rule_graph_condition_summary, rule_graph_trigger_summary,
     RuleGraphSummaryStyle,
 };
-use toki_core::rules::InteractionMode;
+use toki_core::rules::{
+    InteractionMode, RuleFlagValueSource, RuleIntSource, RuleVec2IntSource,
+};
 use toki_core::FlagValue;
 
 impl PanelSystem {
@@ -59,7 +61,7 @@ impl PanelSystem {
         match kind {
             GraphActionKind::DamageEntity => RuleAction::DamageEntity {
                 target: RuleTarget::TriggerOther,
-                amount: 10,
+                amount: RuleIntSource::Literal(10),
             },
             GraphActionKind::SetEntityActive => RuleAction::SetEntityActive {
                 target: RuleTarget::TriggerOther,
@@ -76,6 +78,7 @@ impl PanelSystem {
     ) -> bool {
         match condition {
             RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => false,
+            RuleCondition::Expression { expression } => ui.text_edit_singleline(expression).changed(),
             RuleCondition::TargetExists { target } => {
                 Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"))
             }
@@ -211,12 +214,12 @@ impl PanelSystem {
             RuleAction::SetVelocity { target, velocity } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::vel_target"));
-                changed |= ui
-                    .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
-                    .changed();
-                changed |= ui
-                    .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
-                    .changed();
+                changed |= Self::edit_rule_vec2_source(
+                    ui,
+                    &format!("{id_prefix}::velocity"),
+                    "Velocity:",
+                    velocity,
+                );
                 changed
             }
             RuleAction::Spawn {
@@ -255,12 +258,12 @@ impl PanelSystem {
                                 .changed();
                         }
                     });
-                changed |= ui
-                    .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                    .changed();
-                changed |= ui
-                    .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                    .changed();
+                changed |= Self::edit_rule_vec2_source(
+                    ui,
+                    &format!("{id_prefix}::position"),
+                    "Position:",
+                    position,
+                );
                 changed
             }
             RuleAction::DestroySelf { target } => {
@@ -311,13 +314,23 @@ impl PanelSystem {
             RuleAction::DamageEntity { target, amount } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::damage_target"));
-                changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                changed |= Self::edit_rule_int_source(
+                    ui,
+                    &format!("{id_prefix}::damage_amount"),
+                    "Amount:",
+                    amount,
+                );
                 changed
             }
             RuleAction::HealEntity { target, amount } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::heal_target"));
-                changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                changed |= Self::edit_rule_int_source(
+                    ui,
+                    &format!("{id_prefix}::heal_amount"),
+                    "Amount:",
+                    amount,
+                );
                 changed
             }
             RuleAction::AddInventoryItem {
@@ -355,46 +368,64 @@ impl PanelSystem {
             } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::teleport_target"));
-                ui.horizontal(|ui| {
-                    ui.label("Tile X:");
-                    let mut x_val = *tile_x as i32;
-                    if ui
-                        .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
-                        .changed()
-                    {
-                        *tile_x = x_val.max(0) as u32;
-                        changed = true;
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Tile Y:");
-                    let mut y_val = *tile_y as i32;
-                    if ui
-                        .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
-                        .changed()
-                    {
-                        *tile_y = y_val.max(0) as u32;
-                        changed = true;
-                    }
-                });
+                changed |=
+                    Self::edit_rule_int_source(ui, &format!("{id_prefix}::tile_x"), "Tile X:", tile_x);
+                changed |=
+                    Self::edit_rule_int_source(ui, &format!("{id_prefix}::tile_y"), "Tile Y:", tile_y);
                 changed
             }
             RuleAction::SetFlag { flag, value } => {
                 let mut changed = Self::edit_flag_name(ui, flag);
-                changed |= Self::edit_flag_value(ui, &format!("{id_prefix}::flag_value"), value);
+                changed |=
+                    Self::edit_rule_flag_value_source(ui, &format!("{id_prefix}::flag_value"), value);
                 changed
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 let mut changed = Self::edit_flag_name(ui, flag);
-                ui.horizontal(|ui| {
-                    ui.label("Amount:");
-                    changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
-                });
+                changed |=
+                    Self::edit_rule_int_source(ui, &format!("{id_prefix}::increment"), "Amount:", amount);
                 changed
             }
             RuleAction::ClearFlag { flag } => Self::edit_flag_name(ui, flag),
             RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
                 Self::edit_save_slot(ui, slot)
+            }
+            RuleAction::ShowUi { ui_id } | RuleAction::HideUi { ui_id } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("UI Id:");
+                    let mut ui_id_value = ui_id.to_string();
+                    if ui.text_edit_singleline(&mut ui_id_value).changed() {
+                        *ui_id = ui_id_value.into();
+                        changed = true;
+                    }
+                });
+                changed
+            }
+            RuleAction::UpdateUiBinding {
+                ui_id,
+                binding_key,
+                value,
+            } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("UI Id:");
+                    let mut ui_id_value = ui_id.to_string();
+                    if ui.text_edit_singleline(&mut ui_id_value).changed() {
+                        *ui_id = ui_id_value.into();
+                        changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Binding Key:");
+                    changed |= ui.text_edit_singleline(binding_key).changed();
+                });
+                changed |= Self::edit_rule_flag_value_source(
+                    ui,
+                    &format!("{id_prefix}::ui_binding_value"),
+                    value,
+                );
+                changed
             }
         }
     }
@@ -467,6 +498,147 @@ impl PanelSystem {
                 ui.horizontal(|ui| {
                     ui.label("Value:");
                     changed |= ui.text_edit_singleline(value).changed();
+                });
+            }
+        }
+        changed
+    }
+
+    fn edit_rule_int_source(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        label: &str,
+        value: &mut RuleIntSource,
+    ) -> bool {
+        let mut changed = false;
+        let is_expression = matches!(value, RuleIntSource::Expression { .. });
+        let mut selected_expression = is_expression;
+        ui.horizontal(|ui| {
+            ui.label(label);
+            egui::ComboBox::from_id_salt((id_salt, "mode"))
+                .selected_text(if is_expression { "Expr" } else { "Literal" })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_expression, false, "Literal")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_expression, true, "Expression")
+                        .changed();
+                });
+        });
+        if selected_expression != is_expression {
+            if selected_expression {
+                value.set_expression(value.as_literal().unwrap_or_default().to_string());
+            } else {
+                value.set_literal(value.as_literal().unwrap_or_default());
+            }
+        }
+        match value {
+            RuleIntSource::Literal(literal) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui
+                        .add(egui::DragValue::new(literal).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleIntSource::Expression { expr } => {
+                ui.horizontal(|ui| {
+                    ui.label("Expr:");
+                    changed |= ui.text_edit_singleline(expr).changed();
+                });
+            }
+        }
+        changed
+    }
+
+    fn edit_rule_vec2_source(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        label: &str,
+        value: &mut RuleVec2IntSource,
+    ) -> bool {
+        let mut changed = false;
+        let is_expression = matches!(value, RuleVec2IntSource::Expression { .. });
+        let mut selected_expression = is_expression;
+        ui.horizontal(|ui| {
+            ui.label(label);
+            egui::ComboBox::from_id_salt((id_salt, "mode"))
+                .selected_text(if is_expression { "Per Axis" } else { "Literal" })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_expression, false, "Literal")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_expression, true, "Per Axis")
+                        .changed();
+                });
+        });
+        if selected_expression != is_expression {
+            if selected_expression {
+                let [x, y] = value.as_literal().unwrap_or([0, 0]);
+                value.set_expression(RuleIntSource::Literal(x), RuleIntSource::Literal(y));
+            } else {
+                value.set_literal(value.as_literal().unwrap_or([0, 0]));
+            }
+        }
+        match value {
+            RuleVec2IntSource::Literal(literal) => {
+                ui.horizontal(|ui| {
+                    ui.label("X:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut literal[0]).speed(1.0))
+                        .changed();
+                    ui.label("Y:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut literal[1]).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleVec2IntSource::Expression { x, y } => {
+                changed |= Self::edit_rule_int_source(ui, &format!("{id_salt}::x"), "X:", x);
+                changed |= Self::edit_rule_int_source(ui, &format!("{id_salt}::y"), "Y:", y);
+            }
+        }
+        changed
+    }
+
+    fn edit_rule_flag_value_source(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        value: &mut RuleFlagValueSource,
+    ) -> bool {
+        let mut changed = false;
+        let is_expression = matches!(value, RuleFlagValueSource::Expression { .. });
+        let mut selected_expression = is_expression;
+        ui.horizontal(|ui| {
+            ui.label("Value Source:");
+            egui::ComboBox::from_id_salt((id_salt, "source_mode"))
+                .selected_text(if is_expression { "Expression" } else { "Literal" })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_expression, false, "Literal")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_expression, true, "Expression")
+                        .changed();
+                });
+        });
+        if selected_expression != is_expression {
+            if selected_expression {
+                value.set_expression(String::new());
+            } else {
+                value.set_literal(FlagValue::Bool(false));
+            }
+        }
+        match value {
+            RuleFlagValueSource::Literal(literal) => {
+                changed |= Self::edit_flag_value(ui, &format!("{id_salt}::literal"), literal);
+            }
+            RuleFlagValueSource::Expression { expr } => {
+                ui.horizontal(|ui| {
+                    ui.label("Expr:");
+                    changed |= ui.text_edit_singleline(expr).changed();
                 });
             }
         }

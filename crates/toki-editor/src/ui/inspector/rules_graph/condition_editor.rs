@@ -53,6 +53,12 @@ impl InspectorSystem {
 
         match condition {
             RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => {}
+            RuleCondition::Expression { expression } => {
+                ui.horizontal(|ui| {
+                    ui.label("Expression:");
+                    changed |= ui.text_edit_singleline(expression).changed();
+                });
+            }
             RuleCondition::TargetExists { target } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,

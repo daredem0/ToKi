@@ -1,6 +1,6 @@
 use super::editor_ui::{
     AnimationEditorState, DialogEditorState, GraphEditorState, MapEditorState, PlacementState,
-    ViewportCursorState,
+    UiEditorState, ViewportCursorState,
 };
 use super::editor_ui::{CenterPanelTab, EditorUI};
 use crate::config::EditorConfig;
@@ -99,6 +99,11 @@ pub(crate) struct DialogEditorContext {
 }
 
 #[derive(Default)]
+pub(crate) struct UiEditorContext {
+    pub ui: UiEditorState,
+}
+
+#[derive(Default)]
 pub(crate) struct SpriteEditorContext {
     pub sprite: SpriteEditorState,
 }
@@ -184,6 +189,18 @@ impl SpriteEditorContext {
     }
 }
 
+impl UiEditorContext {
+    pub(crate) fn state(ui: &EditorUI) -> &Self {
+        ui.context::<Self>(CenterPanelTab::UiEditor)
+            .expect("ui editor context should always exist")
+    }
+
+    pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
+        ui.context_mut::<Self>(CenterPanelTab::UiEditor)
+            .expect("ui editor context should always exist")
+    }
+}
+
 impl AnimationEditorContext {
     pub(crate) fn state(ui: &EditorUI) -> &Self {
         ui.context::<Self>(CenterPanelTab::AnimationEditor)
@@ -242,6 +259,14 @@ pub(crate) fn dialog_state_mut(ui: &mut EditorUI) -> &mut DialogEditorState {
 
 pub(crate) fn sprite_state(ui: &EditorUI) -> &SpriteEditorState {
     &SpriteEditorContext::state(ui).sprite
+}
+
+pub(crate) fn ui_editor_state(ui: &EditorUI) -> &UiEditorContext {
+    UiEditorContext::state(ui)
+}
+
+pub(crate) fn ui_editor_state_mut(ui: &mut EditorUI) -> &mut UiEditorContext {
+    UiEditorContext::state_mut(ui)
 }
 
 pub(crate) fn sprite_state_mut(ui: &mut EditorUI) -> &mut SpriteEditorState {
@@ -480,6 +505,48 @@ impl EditorContext for DialogEditorContext {
     }
 }
 
+impl EditorContext for UiEditorContext {
+    fn render_center_panel(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        _egui_ctx: &egui::Context,
+        host: &mut EditorContextHost<'_>,
+    ) {
+        crate::ui::panels::ui_editor::render_ui_editor(
+            ui,
+            shell,
+            host.project_assets.as_deref_mut(),
+            host.project.as_deref_mut(),
+        );
+    }
+
+    fn render_inspector(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        _egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        InspectorSystem::render_ui_editor_inspector(
+            shell,
+            ui,
+            host.project.as_deref_mut(),
+            host.project_assets.as_deref_mut(),
+        );
+        true
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
 impl EditorContext for SpriteEditorContext {
     fn render_center_panel(
         &mut self,
@@ -620,6 +687,7 @@ pub(crate) fn default_active_context(tab: CenterPanelTab) -> Box<dyn EditorConte
         CenterPanelTab::MapEditor => Box::new(MapEditorContext::default()),
         CenterPanelTab::MenuEditor => Box::new(MenuEditorContext),
         CenterPanelTab::DialogEditor => Box::new(DialogEditorContext::default()),
+        CenterPanelTab::UiEditor => Box::new(UiEditorContext::default()),
         CenterPanelTab::SpriteEditor => Box::new(SpriteEditorContext::default()),
         CenterPanelTab::AnimationEditor => Box::new(AnimationEditorContext::default()),
         CenterPanelTab::EntityEditor => Box::new(EntityEditorContext::default()),
@@ -636,6 +704,7 @@ pub(crate) fn default_parked_contexts(
         CenterPanelTab::MapEditor,
         CenterPanelTab::MenuEditor,
         CenterPanelTab::DialogEditor,
+        CenterPanelTab::UiEditor,
         CenterPanelTab::SpriteEditor,
         CenterPanelTab::AnimationEditor,
         CenterPanelTab::EntityEditor,

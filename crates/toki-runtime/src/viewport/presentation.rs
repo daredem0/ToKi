@@ -61,6 +61,14 @@ impl ViewportPresentation {
         Some(glam::Vec2::new(position.x - rect.x, position.y - rect.y))
     }
 
+    pub fn surface_to_logical_viewport_position(
+        &self,
+        position: glam::Vec2,
+    ) -> Option<glam::Vec2> {
+        self.surface_to_viewport_local_position(position)
+            .map(|surface_local| surface_local / self.layout.resolved_scale.max(f32::EPSILON))
+    }
+
     pub fn offset_surface_rect(&self, rect: UiRect) -> UiRect {
         let origin = self.surface_viewport_origin();
         UiRect {
@@ -78,6 +86,12 @@ impl ViewportPresentation {
         transformed
     }
 
+    pub fn transform_logical_text_item(&self, item: &TextItem) -> TextItem {
+        let mut transformed = item.clone();
+        transformed.position = self.logical_to_surface_position(item.position);
+        transformed
+    }
+
     pub fn offset_surface_ui_composition(&self, composition: &UiComposition) -> UiComposition {
         let mut transformed = composition.clone();
         let origin = self.surface_viewport_origin();
@@ -88,6 +102,28 @@ impl ViewportPresentation {
             }
         }
         transformed
+    }
+
+    pub fn transform_logical_ui_composition(&self, composition: &UiComposition) -> UiComposition {
+        let mut transformed = composition.clone();
+        for block in &mut transformed.blocks {
+            block.rect = self.transform_logical_rect(block.rect);
+            block.border_thickness *= self.layout.resolved_scale;
+            if let Some(text) = block.text.as_mut() {
+                text.position = self.logical_to_surface_position(text.position);
+            }
+        }
+        transformed
+    }
+
+    fn transform_logical_rect(&self, rect: UiRect) -> UiRect {
+        let position = self.logical_to_surface_position(glam::vec2(rect.x, rect.y));
+        UiRect {
+            x: position.x,
+            y: position.y,
+            width: rect.width * self.layout.resolved_scale,
+            height: rect.height * self.layout.resolved_scale,
+        }
     }
 }
 
@@ -214,6 +250,62 @@ mod tests {
         assert!((block.border_thickness - 1.0).abs() < 0.01);
         let text = block.text.as_ref().expect("text should exist");
         assert_eq!(text.position, glam::Vec2::new(100.0, 32.0));
+        assert!((text.style.size_px - 8.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn logical_text_and_ui_are_scaled_and_offset_into_the_presented_viewport() {
+        let presentation = resolve_viewport_presentation(
+            glam::UVec2::new(800, 600),
+            glam::UVec2::new(160, 144),
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Auto,
+            },
+        );
+
+        let text = TextItem::new_screen(
+            "HUD",
+            glam::Vec2::new(8.0, 8.0),
+            TextStyle {
+                size_px: 10.0,
+                ..TextStyle::default()
+            },
+        );
+        let transformed_text = presentation.transform_logical_text_item(&text);
+        assert_eq!(transformed_text.position, glam::Vec2::new(112.0, 44.0));
+        assert!((transformed_text.style.size_px - 10.0).abs() < 0.01);
+
+        let mut composition = UiComposition::default();
+        composition.push(UiBlock {
+            rect: UiRect {
+                x: 10.0,
+                y: 12.0,
+                width: 20.0,
+                height: 8.0,
+            },
+            fill_color: Some([0.0, 0.0, 0.0, 1.0]),
+            border_color: Some([1.0, 1.0, 1.0, 1.0]),
+            border_thickness: 1.0,
+            text: Some(UiTextBlock {
+                content: "Hello".to_string(),
+                position: glam::Vec2::new(20.0, 20.0),
+                anchor: TextAnchor::TopCenter,
+                style: TextStyle {
+                    size_px: 8.0,
+                    ..TextStyle::default()
+                },
+                layer: 1,
+            }),
+        });
+        let transformed = presentation.transform_logical_ui_composition(&composition);
+        let block = &transformed.blocks[0];
+        assert_eq!(block.rect.x, 120.0);
+        assert_eq!(block.rect.y, 60.0);
+        assert_eq!(block.rect.width, 80.0);
+        assert_eq!(block.rect.height, 32.0);
+        assert!((block.border_thickness - 4.0).abs() < 0.01);
+        let text = block.text.as_ref().expect("text should exist");
+        assert_eq!(text.position, glam::Vec2::new(160.0, 92.0));
         assert!((text.style.size_px - 8.0).abs() < 0.01);
     }
 

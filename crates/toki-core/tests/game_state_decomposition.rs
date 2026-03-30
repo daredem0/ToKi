@@ -288,7 +288,9 @@ fn rule_system_dialog_completion_path_uses_subsystem_api() {
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::SetFlag {
                     flag: "accepted".to_string(),
-                    value: toki_core::FlagValue::Bool(true),
+                    value: toki_core::rules::RuleFlagValueSource::Literal(
+                        toki_core::FlagValue::Bool(true),
+                    ),
                 }],
                 priority: 0,
                 enabled: true,

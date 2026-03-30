@@ -361,6 +361,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
 
     let resolved = App::resolve_post_splash_sprite_texture_path(&options, None);
@@ -399,6 +400,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_pat
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
 
     let resolved = App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
@@ -467,9 +469,10 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
 
-    let (resources, game_state, _dialogs, pack_mount, asset_load_plan, _) =
+    let (resources, game_state, _dialogs, _ui_layouts, pack_mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
     assert!(pack_mount.is_some(), "pack mount should be retained");
@@ -580,9 +583,10 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
 
-    let (_resources, game_state, _dialogs, _pack_mount, asset_load_plan, _) =
+    let (_resources, game_state, _dialogs, _ui_layouts, _pack_mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
     assert_eq!(
@@ -688,9 +692,10 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
 
-    let (_resources, game_state, _dialogs, _mount, asset_load_plan, _) =
+    let (_resources, game_state, _dialogs, _ui_layouts, _mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
     assert_eq!(
@@ -840,8 +845,9 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
-    let (resources, mut game_state, _dialogs, _mount, _asset_load_plan, _) =
+    let (resources, mut game_state, _dialogs, _ui_layouts, _mount, _asset_load_plan, _) =
         App::build_startup_state(&launch_options);
     let mut transition =
         super::app_transition::SceneTransitionController::new(launch_options.transition.clone());
@@ -939,6 +945,7 @@ fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing(
         flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
+        ui: Default::default(),
     };
 
     let error = App::build_startup_state_from_pack(&launch_options, &pack_path)

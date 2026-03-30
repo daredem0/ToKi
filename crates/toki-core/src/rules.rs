@@ -3,9 +3,11 @@ use strum::EnumIter;
 
 use crate::animation::AnimationState;
 use crate::entity::{EntityId, EntityKind};
+use crate::expression::{Expression, ExpressionError};
 use crate::flags::FlagValue;
-use crate::ids::{DialogId, SceneId};
+use crate::ids::{DialogId, SceneId, UiLayoutId};
 use crate::project_runtime::SceneTransitionEffect;
+use crate::value_path::ValuePathContext;
 
 /// Context provided by triggers that involve entity interactions.
 ///
@@ -199,6 +201,9 @@ pub enum RuleKey {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleCondition {
     Always,
+    Expression {
+        expression: String,
+    },
     TargetExists {
         target: RuleTarget,
     },
@@ -259,6 +264,226 @@ pub enum RuleCondition {
         flag: String,
         value: i32,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RuleIntSource {
+    Literal(i32),
+    Expression { expr: String },
+}
+
+impl RuleIntSource {
+    pub fn literal(value: i32) -> Self {
+        Self::Literal(value)
+    }
+
+    pub fn resolve(&self, context: ValuePathContext<'_, '_>) -> Result<i32, ExpressionError> {
+        match self {
+            Self::Literal(value) => Ok(*value),
+            Self::Expression { expr } => match Expression::parse(expr)?.evaluate(context)? {
+                crate::value_path::ResolvedValue::Int(value) => Ok(value),
+                value => Err(ExpressionError::Evaluation {
+                    span: crate::expression::TextSpan { start: 0, end: 0 },
+                    message: format!("expected int expression result, got {:?}", value),
+                }),
+            },
+        }
+    }
+
+    pub fn as_literal(&self) -> Option<i32> {
+        match self {
+            Self::Literal(value) => Some(*value),
+            Self::Expression { .. } => None,
+        }
+    }
+
+    pub fn expression(&self) -> Option<&str> {
+        match self {
+            Self::Literal(_) => None,
+            Self::Expression { expr } => Some(expr.as_str()),
+        }
+    }
+
+    pub fn set_literal(&mut self, value: i32) {
+        *self = Self::Literal(value);
+    }
+
+    pub fn set_expression(&mut self, expr: impl Into<String>) {
+        *self = Self::Expression { expr: expr.into() };
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RuleBoolSource {
+    Literal(bool),
+    Expression { expr: String },
+}
+
+impl RuleBoolSource {
+    pub fn resolve(&self, context: ValuePathContext<'_, '_>) -> Result<bool, ExpressionError> {
+        match self {
+            Self::Literal(value) => Ok(*value),
+            Self::Expression { expr } => match Expression::parse(expr)?.evaluate(context)? {
+                crate::value_path::ResolvedValue::Bool(value) => Ok(value),
+                value => Err(ExpressionError::Evaluation {
+                    span: crate::expression::TextSpan { start: 0, end: 0 },
+                    message: format!("expected bool expression result, got {:?}", value),
+                }),
+            },
+        }
+    }
+
+    pub fn as_literal(&self) -> Option<bool> {
+        match self {
+            Self::Literal(value) => Some(*value),
+            Self::Expression { .. } => None,
+        }
+    }
+
+    pub fn expression(&self) -> Option<&str> {
+        match self {
+            Self::Literal(_) => None,
+            Self::Expression { expr } => Some(expr.as_str()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RuleFlagValueSource {
+    Literal(FlagValue),
+    Expression { expr: String },
+}
+
+impl RuleFlagValueSource {
+    pub fn resolve(
+        &self,
+        context: ValuePathContext<'_, '_>,
+    ) -> Result<FlagValue, ExpressionError> {
+        match self {
+            Self::Literal(value) => Ok(value.clone()),
+            Self::Expression { expr } => Ok(Expression::parse(expr)?
+                .evaluate(context)?
+                .into_flag_value()),
+        }
+    }
+
+    pub fn as_literal(&self) -> Option<&FlagValue> {
+        match self {
+            Self::Literal(value) => Some(value),
+            Self::Expression { .. } => None,
+        }
+    }
+
+    pub fn expression(&self) -> Option<&str> {
+        match self {
+            Self::Literal(_) => None,
+            Self::Expression { expr } => Some(expr.as_str()),
+        }
+    }
+
+    pub fn set_literal(&mut self, value: FlagValue) {
+        *self = Self::Literal(value);
+    }
+
+    pub fn set_expression(&mut self, expr: impl Into<String>) {
+        *self = Self::Expression { expr: expr.into() };
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RuleVec2IntSource {
+    Literal([i32; 2]),
+    Expression {
+        x: RuleIntSource,
+        y: RuleIntSource,
+    },
+}
+
+impl RuleVec2IntSource {
+    pub fn literal(value: [i32; 2]) -> Self {
+        Self::Literal(value)
+    }
+
+    pub fn resolve(
+        &self,
+        context: ValuePathContext<'_, '_>,
+    ) -> Result<[i32; 2], ExpressionError> {
+        match self {
+            Self::Literal(value) => Ok(*value),
+            Self::Expression { x, y } => Ok([x.resolve(context)?, y.resolve(context)?]),
+        }
+    }
+
+    pub fn as_literal(&self) -> Option<[i32; 2]> {
+        match self {
+            Self::Literal(value) => Some(*value),
+            Self::Expression { .. } => None,
+        }
+    }
+
+    pub fn expression_components(&self) -> Option<(&RuleIntSource, &RuleIntSource)> {
+        match self {
+            Self::Literal(_) => None,
+            Self::Expression { x, y } => Some((x, y)),
+        }
+    }
+
+    pub fn expression_components_mut(
+        &mut self,
+    ) -> Option<(&mut RuleIntSource, &mut RuleIntSource)> {
+        match self {
+            Self::Literal(_) => None,
+            Self::Expression { x, y } => Some((x, y)),
+        }
+    }
+
+    pub fn set_literal(&mut self, value: [i32; 2]) {
+        *self = Self::Literal(value);
+    }
+
+    pub fn set_expression(&mut self, x: RuleIntSource, y: RuleIntSource) {
+        *self = Self::Expression { x, y };
+    }
+}
+
+impl std::fmt::Display for RuleIntSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Literal(value) => write!(f, "{value}"),
+            Self::Expression { expr } => write!(f, "={expr}"),
+        }
+    }
+}
+
+impl std::fmt::Display for RuleBoolSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Literal(value) => write!(f, "{value}"),
+            Self::Expression { expr } => write!(f, "={expr}"),
+        }
+    }
+}
+
+impl std::fmt::Display for RuleFlagValueSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Literal(value) => write!(f, "{value:?}"),
+            Self::Expression { expr } => write!(f, "={expr}"),
+        }
+    }
+}
+
+impl std::fmt::Display for RuleVec2IntSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Literal([x, y]) => write!(f, "[{x}, {y}]"),
+            Self::Expression { x, y } => write!(f, "[{x}, {y}]"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
@@ -333,11 +558,11 @@ pub enum RuleAction {
     },
     SetVelocity {
         target: RuleTarget,
-        velocity: [i32; 2],
+        velocity: RuleVec2IntSource,
     },
     Spawn {
         entity_type: RuleSpawnEntityType,
-        position: [i32; 2],
+        position: RuleVec2IntSource,
     },
     DestroySelf {
         target: RuleTarget,
@@ -354,17 +579,28 @@ pub enum RuleAction {
     StartDialog {
         dialog_id: DialogId,
     },
+    ShowUi {
+        ui_id: UiLayoutId,
+    },
+    HideUi {
+        ui_id: UiLayoutId,
+    },
+    UpdateUiBinding {
+        ui_id: UiLayoutId,
+        binding_key: String,
+        value: RuleFlagValueSource,
+    },
     /// Damages the target entity by the specified amount.
     /// Does not reduce health below zero. Death is handled by the game state.
     DamageEntity {
         target: RuleTarget,
-        amount: i32,
+        amount: RuleIntSource,
     },
     /// Heals the target entity by the specified amount.
     /// Does not exceed the entity's maximum health.
     HealEntity {
         target: RuleTarget,
-        amount: i32,
+        amount: RuleIntSource,
     },
     /// Adds the specified item to the target entity's inventory.
     /// If the item already exists, increases the count.
@@ -391,17 +627,17 @@ pub enum RuleAction {
     TeleportEntity {
         target: RuleTarget,
         /// The tile x-coordinate (in tile units, not pixels).
-        tile_x: u32,
+        tile_x: RuleIntSource,
         /// The tile y-coordinate (in tile units, not pixels).
-        tile_y: u32,
+        tile_y: RuleIntSource,
     },
     SetFlag {
         flag: String,
-        value: FlagValue,
+        value: RuleFlagValueSource,
     },
     IncrementFlag {
         flag: String,
-        amount: i32,
+        amount: RuleIntSource,
     },
     ClearFlag {
         flag: String,

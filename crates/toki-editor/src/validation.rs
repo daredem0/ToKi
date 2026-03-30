@@ -67,6 +67,14 @@ impl AssetValidator {
             }
         }
 
+        // Validate authored UI layouts
+        for (layout_name, layout_asset) in &project_assets.ui_layouts {
+            total_files += 1;
+            if self.validate_and_log_file(&layout_asset.path, "ui_layout", layout_name) {
+                valid_files += 1;
+            }
+        }
+
         tracing::info!(
             "✅ Project validation complete: {}/{} files valid",
             valid_files,

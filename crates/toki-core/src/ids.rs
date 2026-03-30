@@ -88,3 +88,5 @@ macro_rules! string_id {
 string_id!(SceneId);
 string_id!(DialogId);
 string_id!(EntityDefName);
+string_id!(UiLayoutId);
+string_id!(UiWidgetId);

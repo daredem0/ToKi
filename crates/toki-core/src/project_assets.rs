@@ -6,6 +6,7 @@ use crate::io::text::{
 };
 use crate::palette::{load_palette_asset_from_path, Palette4};
 use crate::scene::Scene;
+use crate::ui_layout::UiLayoutAsset;
 use crate::CoreError;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -99,6 +100,10 @@ pub fn dialog_file_path(project_path: &Path, dialog_name: &str) -> PathBuf {
     project_path
         .join("dialogs")
         .join(format!("{dialog_name}.json"))
+}
+
+pub fn ui_layout_file_path(project_path: &Path, layout_name: &str) -> PathBuf {
+    project_path.join("ui").join(format!("{layout_name}.json"))
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -201,6 +206,10 @@ pub fn discover_project_dialog_paths(
     find_json_files(&project_path.join("dialogs"))
 }
 
+pub fn discover_project_ui_paths(project_path: &Path) -> Result<Vec<PathBuf>, ProjectAssetError> {
+    find_json_files(&project_path.join("ui"))
+}
+
 pub fn load_scene_from_path(path: &Path) -> Result<Scene, ProjectAssetError> {
     let json = read_text_file_with_limit(
         path,
@@ -234,11 +243,35 @@ pub fn load_dialog_from_path(path: &Path) -> Result<DialogTree, ProjectAssetErro
     Ok(serde_json::from_str::<DialogTree>(&json).map_err(CoreError::from)?)
 }
 
+pub fn load_ui_layout_from_path(path: &Path) -> Result<UiLayoutAsset, ProjectAssetError> {
+    let json = read_text_file_with_limit(
+        path,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            too_large_io_error(path, size_bytes, max_bytes, "ui layout file")
+        },
+    )?;
+    Ok(serde_json::from_str::<UiLayoutAsset>(&json).map_err(CoreError::from)?)
+}
+
 pub fn save_dialog_to_path(path: &Path, dialog: &DialogTree) -> Result<(), ProjectAssetError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     let json = serde_json::to_string_pretty(dialog).map_err(CoreError::from)?;
+    fs::write(path, json)?;
+    Ok(())
+}
+
+pub fn save_ui_layout_to_path(
+    path: &Path,
+    layout: &UiLayoutAsset,
+) -> Result<(), ProjectAssetError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let json = serde_json::to_string_pretty(layout).map_err(CoreError::from)?;
     fs::write(path, json)?;
     Ok(())
 }

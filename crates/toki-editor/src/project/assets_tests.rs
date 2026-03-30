@@ -2,6 +2,7 @@ use super::{ProjectAssets, ProjectAudioAssetKind};
 use std::fs;
 use tempfile::tempdir;
 use toki_core::palette::{save_palette_asset_to_path, Palette4};
+use toki_core::ui_layout::{UiLayoutAsset, UiWidgetNode};
 
 #[test]
 fn scan_assets_discovers_atlases_and_object_sheets_separately() {
@@ -165,4 +166,35 @@ fn scan_assets_discovers_palette_files() {
     assets.scan_assets().expect("asset scan should succeed");
 
     assert!(assets.palettes.contains_key("swamp"));
+}
+
+#[test]
+fn ui_layout_assets_scan_save_and_load() {
+    let temp_dir = tempdir().expect("temp dir should be created");
+    let ui_dir = temp_dir.path().join("ui");
+    fs::create_dir_all(&ui_dir).expect("ui dir should be created");
+
+    let layout = UiLayoutAsset {
+        id: "hud".into(),
+        title: "HUD".to_string(),
+        startup_visible: true,
+        z_order: 10,
+        root: UiWidgetNode::default(),
+    };
+
+    let mut assets = ProjectAssets::new(temp_dir.path().to_path_buf());
+    assets
+        .save_ui_layout(&layout)
+        .expect("ui layout save should succeed");
+    assets.scan_assets().expect("asset scan should succeed");
+
+    assert!(assets.ui_layouts.contains_key("hud"));
+    assert_eq!(assets.get_ui_layout_names(), vec!["hud".to_string()]);
+
+    let loaded = assets
+        .load_ui_layout("hud")
+        .expect("ui layout load should succeed")
+        .expect("ui layout should exist");
+    assert_eq!(loaded.id, layout.id);
+    assert_eq!(loaded.title, "HUD");
 }

@@ -10,8 +10,9 @@ use toki_core::dialog_runtime::DialogController;
 use toki_core::game::SceneSystem;
 use toki_core::menu::{MenuAppearance, MenuController, MenuSettings};
 use toki_core::project_runtime::{
-    RuntimeFlagSettings, RuntimePostProcessSettings, RuntimeViewportMode,
+    RuntimeFlagSettings, RuntimePostProcessSettings, RuntimeUiSettings, RuntimeViewportMode,
 };
+use toki_core::ui_layout::UiController;
 use toki_core::TimingSystem;
 use toki_render::RenderError;
 
@@ -171,6 +172,7 @@ pub struct RuntimeLaunchOptions {
     pub flags: RuntimeFlagSettings,
     pub menu: MenuSettings,
     pub dialog_appearance: MenuAppearance,
+    pub ui: RuntimeUiSettings,
 }
 
 #[derive(Debug)]
@@ -190,6 +192,7 @@ struct App {
     launch_options: RuntimeLaunchOptions,
     menu_system: MenuController,
     dialog_system: DialogController,
+    ui_controller: UiController,
     splash_policy: SplashPolicy,
     splash_config: ResolvedSplashConfig,
     splash_active: bool,
@@ -320,7 +323,15 @@ impl App {
         Self::apply_persisted_runtime_settings_from_disk(&mut launch_options);
         let splash_policy = SplashPolicy::Community;
         let splash_config = splash_policy.resolve(&launch_options.splash);
-        let (resources, game_state, dialogs, pack_mount, asset_load_plan, decoded_project_cache) =
+        let (
+            resources,
+            game_state,
+            dialogs,
+            ui_layouts,
+            pack_mount,
+            asset_load_plan,
+            decoded_project_cache,
+        ) =
             Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
         let camera_system = Self::build_camera_system(&launch_options, &game_system);
@@ -328,6 +339,7 @@ impl App {
             Self::build_audio_system(&launch_options, pack_mount.as_ref(), &asset_load_plan);
         let menu_system = MenuController::new(launch_options.menu.clone());
         let dialog_system = DialogController::new(dialogs);
+        let ui_controller = UiController::new(ui_layouts);
         let mut scene_transition =
             SceneTransitionController::new(launch_options.transition.clone());
         Self::prime_initial_scene_music(
@@ -359,6 +371,7 @@ impl App {
             launch_options,
             menu_system,
             dialog_system,
+            ui_controller,
             splash_policy,
             splash_config,
             splash_active: true,

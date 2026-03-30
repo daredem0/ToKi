@@ -36,6 +36,7 @@ mod menu_editor;
 mod project;
 mod rules;
 mod sprite_editor;
+mod ui_editor;
 
 pub use domain_inspectors::*;
 

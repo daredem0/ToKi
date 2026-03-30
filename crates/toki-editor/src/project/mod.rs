@@ -7,7 +7,9 @@ pub mod templates;
 
 pub use assets::ProjectAssets;
 pub use manager::ProjectManager;
-pub use project_data::{DialogGraphLayout, Project, ProjectMetadata, SceneGraphLayout};
+pub use project_data::{
+    DialogGraphLayout, Project, ProjectMetadata, SceneGraphLayout, UiEditorLayoutState,
+};
 pub use settings::{
     apply_project_settings_draft, validate_project_settings_draft, ProjectSettingsDraft,
     ProjectViewportModeDraft,

@@ -15,10 +15,11 @@ pub mod errors;
 pub(crate) mod io;
 pub use errors::CoreError;
 pub mod ids;
-pub use ids::{DialogId, EntityDefName, SceneId};
+pub use ids::{DialogId, EntityDefName, SceneId, UiLayoutId, UiWidgetId};
 pub mod cache_utils;
 pub mod dialog;
 pub mod dialog_runtime;
+pub mod expression;
 pub mod flags;
 pub mod pack;
 pub mod palette;
@@ -33,8 +34,14 @@ pub mod sprite;
 pub mod sprite_render;
 pub mod text;
 pub mod ui;
+pub mod ui_layout;
+pub use ui_layout::{
+    UiBinding, UiCollectionBinding, UiController, UiLayoutAsset, UiLayoutEngine, UiRequest,
+    UiTheme, UiWidgetNode,
+};
 
 pub mod animation;
+pub mod value_path;
 pub mod assets {
     pub mod atlas;
     pub mod object_sheet;

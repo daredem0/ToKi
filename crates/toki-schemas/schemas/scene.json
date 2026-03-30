@@ -306,6 +306,24 @@
               },
               {
                 "type": "object",
+                "required": ["Expression"],
+                "additionalProperties": false,
+                "properties": {
+                  "Expression": {
+                    "type": "object",
+                    "required": ["expression"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
                 "required": ["TargetExists"],
                 "additionalProperties": false,
                 "properties": {
@@ -599,12 +617,7 @@
                   "$ref": "#/definitions/ruleTarget"
                 },
                 "velocity": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  },
-                  "minItems": 2,
-                  "maxItems": 2
+                  "$ref": "#/definitions/ruleVec2IntSource"
                 }
               }
             }
@@ -625,12 +638,7 @@
                   "enum": ["PlayerLikeNpc", "Npc", "Item", "Decoration", "Trigger"]
                 },
                 "position": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  },
-                  "minItems": 2,
-                  "maxItems": 2
+                  "$ref": "#/definitions/ruleVec2IntSource"
                 }
               }
             }
@@ -689,8 +697,7 @@
                   "$ref": "#/definitions/ruleTarget"
                 },
                 "amount": {
-                  "type": "integer",
-                  "minimum": 0
+                  "$ref": "#/definitions/ruleIntSource"
                 }
               }
             }
@@ -710,8 +717,7 @@
                   "$ref": "#/definitions/ruleTarget"
                 },
                 "amount": {
-                  "type": "integer",
-                  "minimum": 0
+                  "$ref": "#/definitions/ruleIntSource"
                 }
               }
             }
@@ -801,16 +807,127 @@
                   "$ref": "#/definitions/ruleTarget"
                 },
                 "tile_x": {
-                  "type": "integer",
-                  "minimum": 0,
+                  "$ref": "#/definitions/ruleIntSource",
                   "description": "Tile x-coordinate (in tile units, not pixels)"
                 },
                 "tile_y": {
-                  "type": "integer",
-                  "minimum": 0,
+                  "$ref": "#/definitions/ruleIntSource",
                   "description": "Tile y-coordinate (in tile units, not pixels)"
                 }
               }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["SetFlag"],
+          "additionalProperties": false,
+          "properties": {
+            "SetFlag": {
+              "type": "object",
+              "required": ["flag", "value"],
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "$ref": "#/definitions/ruleFlagValueSource"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["IncrementFlag"],
+          "additionalProperties": false,
+          "properties": {
+            "IncrementFlag": {
+              "type": "object",
+              "required": ["flag", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "amount": {
+                  "$ref": "#/definitions/ruleIntSource"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ruleIntSource": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "object",
+          "required": ["expr"],
+          "additionalProperties": false,
+          "properties": {
+            "expr": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "ruleVec2IntSource": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "object",
+          "required": ["x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "$ref": "#/definitions/ruleIntSource"
+            },
+            "y": {
+              "$ref": "#/definitions/ruleIntSource"
+            }
+          }
+        }
+      ]
+    },
+    "ruleFlagValueSource": {
+      "oneOf": [
+        {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "required": ["expr"],
+          "additionalProperties": false,
+          "properties": {
+            "expr": {
+              "type": "string",
+              "minLength": 1
             }
           }
         }

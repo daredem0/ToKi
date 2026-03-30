@@ -2,6 +2,7 @@ use crate::entity::{Entity, EntityId, EntityManager};
 use crate::flags::GameFlags;
 use crate::game::{InputKey, RuleRuntimeState};
 use crate::rules::{RuleSet, RuleTarget, TriggerContext};
+use crate::value_path::ValuePathContext;
 
 pub(super) struct RuleEngineContext<'a> {
     pub(super) entity_manager: &'a EntityManager,
@@ -56,6 +57,18 @@ impl<'a> RuleEngine<'a> {
     ) -> Option<&Entity> {
         self.resolve_rule_target(target, context)
             .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+    }
+
+    pub(super) fn value_path_context<'b>(
+        &self,
+        context: &'b TriggerContext,
+    ) -> ValuePathContext<'a, 'b> {
+        ValuePathContext {
+            entity_manager: self.entity_manager,
+            game_flags: self.game_flags,
+            player_id: self.player_id,
+            trigger_context: context,
+        }
     }
 }
 

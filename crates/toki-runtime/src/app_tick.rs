@@ -135,6 +135,9 @@ impl App {
                 }
             }
         }
+        for request in game_result.ui_requests.drain(..) {
+            self.ui_controller.apply_request(request);
+        }
 
         {
             let mut coordinator = self.create_scene_runtime_coordinator();
@@ -187,6 +190,7 @@ impl App {
                 &self.performance,
             )
             .render_world_frame();
+            self.render_authored_ui();
             self.render_runtime_menu_overlay();
             render_scene_transition_overlay(&mut self.rendering, &self.scene_transition);
             self.rendering.finalize_ui_shapes();

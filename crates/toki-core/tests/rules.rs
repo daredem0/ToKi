@@ -12,8 +12,9 @@ use toki_core::game::{
     SceneSystem,
 };
 use toki_core::rules::{
-    InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
-    RuleSpawnEntityType, RuleTarget, RuleTrigger,
+    InteractionMode, Rule, RuleAction, RuleCondition, RuleFlagValueSource, RuleIntSource,
+    RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType, RuleTarget, RuleTrigger,
+    RuleVec2IntSource,
 };
 use toki_core::{
     entity::EntityKind,
@@ -266,6 +267,131 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
         )),
         "sustained blocked input should not retrigger OnCollision every frame"
     );
+}
+
+#[test]
+fn expression_condition_can_gate_rule_execution() {
+    let mut state = GameState::new_empty();
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+    state.set_flag("coins", FlagValue::Int(7));
+
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "expr_condition".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Expression {
+                    expression: "flags.coins > 5 && player.health == 100".to_string(),
+                }],
+                actions: vec![RuleAction::SetFlag {
+                    flag: "expr_condition_hit".to_string(),
+                    value: RuleFlagValueSource::Literal(FlagValue::Bool(true)),
+                }],
+            }],
+        },
+    );
+
+    let _ = GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(
+        state.flag("expr_condition_hit"),
+        Some(&FlagValue::Bool(true))
+    );
+}
+
+#[test]
+fn expression_damage_amount_resolves_against_flags() {
+    let mut state = GameState::new_empty();
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+    state.set_flag("bonus_damage", FlagValue::Int(4));
+
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "expr_damage".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::DamageEntity {
+                    target: RuleTarget::Player,
+                    amount: RuleIntSource::Expression {
+                        expr: "flags.bonus_damage + 3".to_string(),
+                    },
+                }],
+            }],
+        },
+    );
+
+    let _ = GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let player = state
+        .world()
+        .entity_manager()
+        .get_entity(player_id)
+        .expect("player should exist after damage");
+    assert_eq!(
+        player
+            .attributes
+            .gameplay
+            .stats
+            .current(toki_core::entity::HEALTH_STAT_ID),
+        Some(93)
+    );
+}
+
+#[test]
+fn expression_set_flag_value_can_read_player_state() {
+    let mut state = GameState::new_empty();
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "expr_set_flag".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::SetFlag {
+                    flag: "player_is_active".to_string(),
+                    value: RuleFlagValueSource::Expression {
+                        expr: "player.active".to_string(),
+                    },
+                }],
+            }],
+        },
+    );
+
+    let _ = GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(state.flag("player_is_active"), Some(&FlagValue::Bool(true)));
 }
 
 #[test]
@@ -885,7 +1011,7 @@ fn increment_flag_action_updates_integer_flags() {
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::IncrementFlag {
                     flag: "coins".to_string(),
-                    amount: 3,
+                    amount: RuleIntSource::Literal(3),
                 }],
             }],
         },
@@ -1161,7 +1287,7 @@ fn spawn_action_creates_entity_at_requested_position() {
                 0,
                 vec![RuleAction::Spawn {
                     entity_type: RuleSpawnEntityType::Npc,
-                    position: [42, 84],
+                    position: RuleVec2IntSource::Literal([42, 84]),
                 }],
             )],
         },
@@ -1201,7 +1327,7 @@ fn spawn_actions_follow_rule_priority_order() {
                     1,
                     vec![RuleAction::Spawn {
                         entity_type: RuleSpawnEntityType::Npc,
-                        position: [100, 100],
+                        position: RuleVec2IntSource::Literal([100, 100]),
                     }],
                 ),
                 base_rule(
@@ -1210,7 +1336,7 @@ fn spawn_actions_follow_rule_priority_order() {
                     10,
                     vec![RuleAction::Spawn {
                         entity_type: RuleSpawnEntityType::Npc,
-                        position: [10, 10],
+                        position: RuleVec2IntSource::Literal([10, 10]),
                     }],
                 ),
             ],
@@ -1297,7 +1423,7 @@ fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
                     0,
                     vec![RuleAction::SetVelocity {
                         target: RuleTarget::Entity(npc_id),
-                        velocity: [5, 0],
+                        velocity: RuleVec2IntSource::Literal([5, 0]),
                     }],
                 ),
             ],
@@ -1531,7 +1657,7 @@ fn set_velocity_action_moves_player_without_input() {
                 0,
                 vec![RuleAction::SetVelocity {
                     target: RuleTarget::Player,
-                    velocity: [2, 0],
+                    velocity: RuleVec2IntSource::Literal([2, 0]),
                 }],
             )],
         },
@@ -1566,7 +1692,7 @@ fn higher_priority_velocity_command_wins_for_same_target() {
                     100,
                     vec![RuleAction::SetVelocity {
                         target: RuleTarget::Player,
-                        velocity: [4, 0],
+                        velocity: RuleVec2IntSource::Literal([4, 0]),
                     }],
                 ),
                 base_rule(
@@ -1575,7 +1701,7 @@ fn higher_priority_velocity_command_wins_for_same_target() {
                     1,
                     vec![RuleAction::SetVelocity {
                         target: RuleTarget::Player,
-                        velocity: [1, 0],
+                        velocity: RuleVec2IntSource::Literal([1, 0]),
                     }],
                 ),
             ],
@@ -1608,7 +1734,7 @@ fn same_priority_velocity_uses_id_tiebreaker() {
                     5,
                     vec![RuleAction::SetVelocity {
                         target: RuleTarget::Player,
-                        velocity: [3, 0],
+                        velocity: RuleVec2IntSource::Literal([3, 0]),
                     }],
                 ),
                 base_rule(
@@ -1617,7 +1743,7 @@ fn same_priority_velocity_uses_id_tiebreaker() {
                     5,
                     vec![RuleAction::SetVelocity {
                         target: RuleTarget::Player,
-                        velocity: [6, 0],
+                        velocity: RuleVec2IntSource::Literal([6, 0]),
                     }],
                 ),
             ],
@@ -1661,7 +1787,7 @@ fn deterministic_execution_matches_across_identical_states() {
                         10,
                         vec![RuleAction::SetVelocity {
                             target: RuleTarget::Player,
-                            velocity: [2, 1],
+                            velocity: RuleVec2IntSource::Literal([2, 1]),
                         }],
                     ),
                     base_rule(
@@ -1723,7 +1849,7 @@ fn rules_serialize_roundtrip() {
                 },
                 RuleAction::SetVelocity {
                     target: RuleTarget::Player,
-                    velocity: [1, -1],
+                    velocity: RuleVec2IntSource::Literal([1, -1]),
                 },
                 RuleAction::PlayAnimation {
                     target: RuleTarget::Player,
@@ -1740,7 +1866,7 @@ fn rules_serialize_roundtrip() {
                 },
                 RuleAction::Spawn {
                     entity_type: RuleSpawnEntityType::Npc,
-                    position: [5, 6],
+                    position: RuleVec2IntSource::Literal([5, 6]),
                 },
                 RuleAction::DestroySelf {
                     target: RuleTarget::Player,
@@ -2100,7 +2226,7 @@ fn on_start_set_velocity_initializes_persistent_movement() {
                 0,
                 vec![RuleAction::SetVelocity {
                     target: RuleTarget::Player,
-                    velocity: [3, 0],
+                    velocity: RuleVec2IntSource::Literal([3, 0]),
                 }],
             )],
         },
@@ -4764,7 +4890,7 @@ fn on_tile_enter_provides_trigger_self_context() {
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::SetVelocity {
                     target: RuleTarget::TriggerSelf,
-                    velocity: [0, 5],
+                    velocity: RuleVec2IntSource::Literal([0, 5]),
                 }],
             }],
         },
@@ -4822,7 +4948,7 @@ fn on_tile_exit_provides_trigger_self_context() {
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::SetVelocity {
                     target: RuleTarget::TriggerSelf,
-                    velocity: [10, 0],
+                    velocity: RuleVec2IntSource::Literal([10, 0]),
                 }],
             }],
         },
@@ -4979,7 +5105,7 @@ fn damage_entity_reduces_health_by_specified_amount() {
                 0,
                 vec![RuleAction::DamageEntity {
                     target: RuleTarget::Entity(target_id),
-                    amount: 30,
+                    amount: RuleIntSource::Literal(30),
                 }],
             )],
         },
@@ -5016,7 +5142,7 @@ fn damage_entity_triggers_death_when_health_reaches_zero() {
                     10,
                     vec![RuleAction::DamageEntity {
                         target: RuleTarget::Entity(target_id),
-                        amount: 150, // More than initial health
+                        amount: RuleIntSource::Literal(150), // More than initial health
                     }],
                 ),
                 base_rule(
@@ -5068,7 +5194,7 @@ fn heal_entity_increases_health_by_specified_amount() {
                 0,
                 vec![RuleAction::DamageEntity {
                     target: RuleTarget::Entity(target_id),
-                    amount: 40,
+                    amount: RuleIntSource::Literal(40),
                 }],
             )],
         },
@@ -5098,7 +5224,7 @@ fn heal_entity_increases_health_by_specified_amount() {
                 0,
                 vec![RuleAction::HealEntity {
                     target: RuleTarget::Entity(target_id),
-                    amount: 25,
+                    amount: RuleIntSource::Literal(25),
                 }],
             )],
         },
@@ -5134,7 +5260,7 @@ fn heal_entity_does_not_exceed_base_health() {
                 0,
                 vec![RuleAction::HealEntity {
                     target: RuleTarget::Entity(target_id),
-                    amount: 100, // Would exceed base health of 50
+                    amount: RuleIntSource::Literal(100), // Would exceed base health of 50
                 }],
             )],
         },
@@ -5447,8 +5573,8 @@ fn teleport_entity_moves_to_specified_position() {
                 0,
                 vec![RuleAction::TeleportEntity {
                     target: RuleTarget::Entity(npc_id),
-                    tile_x: 5,
-                    tile_y: 6,
+                    tile_x: RuleIntSource::Literal(5),
+                    tile_y: RuleIntSource::Literal(6),
                 }],
             )],
         },
@@ -5486,8 +5612,8 @@ fn teleport_entity_works_with_trigger_self() {
                 0,
                 vec![RuleAction::TeleportEntity {
                     target: RuleTarget::TriggerSelf,
-                    tile_x: 6,
-                    tile_y: 6,
+                    tile_x: RuleIntSource::Literal(6),
+                    tile_y: RuleIntSource::Literal(6),
                 }],
             )],
         },

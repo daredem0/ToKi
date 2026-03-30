@@ -11,7 +11,7 @@ use toki_core::entity::{
     EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, MovementProfile,
     MovementSoundTrigger, PickupDef, PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
 };
-use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
+use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger, RuleVec2IntSource};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
     entity::{AiBehavior, AiConfig},
@@ -3338,7 +3338,7 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
                 conditions: vec![],
                 actions: vec![RuleAction::SetVelocity {
                     target: RuleTarget::Entity(mover_id),
-                    velocity: [1, 0],
+                    velocity: RuleVec2IntSource::Literal([1, 0]),
                 }],
             }],
         },

@@ -23,7 +23,7 @@ use self::engine::{RuleEngine, RuleEngineContext};
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
 use crate::flags::FlagValue;
-use crate::ids::{DialogId, SceneId};
+use crate::ids::{DialogId, SceneId, UiLayoutId};
 use crate::project_runtime::SceneTransitionEffect;
 use crate::rules::{RuleSet, RuleSpawnEntityType};
 
@@ -54,6 +54,7 @@ pub(super) struct AppliedRuleCommandResult {
     pub(super) pending_animations: Vec<(EntityId, AnimationState)>,
     pub(super) pending_scene_switch: Option<PendingSceneSwitch>,
     pub(super) pending_persistence: Option<crate::events::PersistenceRequest>,
+    pub(super) pending_ui_requests: Vec<crate::ui_layout::UiRequest>,
 }
 
 pub struct RuleSystem;
@@ -187,6 +188,17 @@ pub(super) enum RuleCommand {
     StartDialog {
         dialog_id: DialogId,
         context: crate::dialog::DialogRuntimeContext,
+    },
+    ShowUi {
+        ui_id: UiLayoutId,
+    },
+    HideUi {
+        ui_id: UiLayoutId,
+    },
+    UpdateUiBinding {
+        ui_id: UiLayoutId,
+        binding_key: String,
+        value: FlagValue,
     },
     DamageEntity {
         entity_id: EntityId,

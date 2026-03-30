@@ -408,6 +408,9 @@ fn action_kind_label(action: &RuleAction) -> &'static str {
         RuleAction::ClearFlag { .. } => "ClearFlag",
         RuleAction::SaveGame { .. } => "SaveGame",
         RuleAction::LoadGame { .. } => "LoadGame",
+        RuleAction::ShowUi { .. } => "ShowUi",
+        RuleAction::HideUi { .. } => "HideUi",
+        RuleAction::UpdateUiBinding { .. } => "UpdateUiBinding",
     }
 }
 

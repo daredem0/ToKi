@@ -11,7 +11,7 @@ use crate::scene::SceneViewport;
 use crate::ui::editor_context::{
     default_active_context, default_parked_contexts, null_context, AnimationEditorContext,
     DialogEditorContext, EditorContext, EditorContextHost, EntityEditorContext, RuleGraphContext,
-    SceneViewportContext, SpriteEditorContext,
+    SceneViewportContext, SpriteEditorContext, UiEditorContext,
 };
 use toki_core::palette::{builtin_palettes, Palette4};
 
@@ -33,6 +33,8 @@ mod editor_ui_hierarchy_panel;
 mod editor_ui_map_editor;
 #[path = "editor_ui_menu_editor.rs"]
 mod editor_ui_menu_editor;
+#[path = "editor_ui_ui_editor.rs"]
+mod editor_ui_ui_editor;
 #[path = "editor_ui_scene_tree.rs"]
 mod editor_ui_scene_tree;
 #[path = "editor_ui_sprite_editor.rs"]
@@ -73,6 +75,10 @@ pub(crate) use editor_ui_map_editor::{
 pub(crate) use editor_ui_menu_editor::{
     select_menu_dialog, select_menu_entry, select_menu_screen, selected_menu_dialog_id,
     selected_menu_screen_id, sync_menu_editor_selection,
+};
+pub(crate) use editor_ui_ui_editor::{
+    clear_ui_layout_view_dirty, export_ui_layout_views_for_project, is_ui_layout_view_dirty,
+    load_ui_layout_views_from_project, sync_ui_layout_registry, UiEditorState,
 };
 pub(crate) use editor_ui_sprite_editor::{
     begin_new_sprite_canvas_dialog, cancel_new_sprite_canvas_dialog, CanvasSide, DualCanvasLayout,
@@ -121,6 +127,7 @@ pub(crate) enum CenterPanelTab {
     MapEditor,
     MenuEditor,
     DialogEditor,
+    UiEditor,
     SpriteEditor,
     AnimationEditor,
     EntityEditor,
@@ -770,6 +777,16 @@ impl EditorUI {
     pub(crate) fn dialog_editor_context_mut(&mut self) -> &mut DialogEditorContext {
         self.context_mut::<DialogEditorContext>(CenterPanelTab::DialogEditor)
             .expect("dialog editor context should always exist")
+    }
+
+    pub(crate) fn ui_editor_context(&self) -> &UiEditorContext {
+        self.context::<UiEditorContext>(CenterPanelTab::UiEditor)
+            .expect("ui editor context should always exist")
+    }
+
+    pub(crate) fn ui_editor_context_mut(&mut self) -> &mut UiEditorContext {
+        self.context_mut::<UiEditorContext>(CenterPanelTab::UiEditor)
+            .expect("ui editor context should always exist")
     }
 
     pub(crate) fn sprite_editor_context(&self) -> &SpriteEditorContext {

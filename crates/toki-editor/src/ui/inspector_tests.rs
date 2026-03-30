@@ -14,8 +14,8 @@ use toki_core::entity::{
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
-    RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
+    RuleSpawnEntityType, RuleTarget, RuleTrigger, RuleVec2IntSource,
 };
 use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 use toki_core::Scene;
@@ -860,14 +860,14 @@ fn add_remove_and_switch_action_types() {
         rule.actions[3],
         RuleAction::SetVelocity {
             target: RuleTarget::Player,
-            velocity: [0, 0]
+            velocity: RuleVec2IntSource::Literal([0, 0])
         }
     ));
     assert!(matches!(
         rule.actions[4],
         RuleAction::Spawn {
             entity_type: RuleSpawnEntityType::Npc,
-            position: [0, 0]
+            position: RuleVec2IntSource::Literal([0, 0])
         }
     ));
     assert!(matches!(
@@ -890,7 +890,7 @@ fn add_remove_and_switch_action_types() {
         rule.actions[0],
         RuleAction::SetVelocity {
             target: RuleTarget::Player,
-            velocity: [0, 0]
+            velocity: RuleVec2IntSource::Literal([0, 0])
         }
     ));
     InspectorSystem::switch_action_kind(&mut rule.actions[0], RuleActionKind::PlaySound);
@@ -972,7 +972,7 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
         },
         RuleAction::SetVelocity {
             target: RuleTarget::Entity(0),
-            velocity: [1, 0],
+            velocity: RuleVec2IntSource::Literal([1, 0]),
         },
         RuleAction::DestroySelf {
             target: RuleTarget::Entity(0),
@@ -1061,7 +1061,9 @@ fn validate_rule_set_for_scene_warns_for_undeclared_flags() {
             }],
             actions: vec![RuleAction::SetFlag {
                 flag: "missing_flag".to_string(),
-                value: toki_core::FlagValue::Bool(true),
+                value: toki_core::rules::RuleFlagValueSource::Literal(
+                    toki_core::FlagValue::Bool(true),
+                ),
             }],
         }],
     };

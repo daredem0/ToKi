@@ -1,5 +1,6 @@
 use crate::menu::{MenuAppearance, MenuSettings};
 use crate::palette::{resolve_palette, Palette4};
+use crate::ui_layout::UiTheme;
 use crate::FlagValue;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -73,9 +74,17 @@ pub struct RuntimeSettings {
     #[serde(default)]
     pub dialog_appearance: MenuAppearance,
     #[serde(default)]
+    pub ui: RuntimeUiSettings,
+    #[serde(default)]
     pub flags: RuntimeFlagSettings,
     #[serde(default)]
     pub scene_transitions: RuntimeSceneTransitionSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct RuntimeUiSettings {
+    #[serde(default)]
+    pub theme: UiTheme,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]

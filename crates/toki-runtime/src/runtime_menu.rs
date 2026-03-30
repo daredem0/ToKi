@@ -4,11 +4,123 @@ use toki_core::menu::{
     MenuDialogLayout, MenuInput, MenuLayout,
 };
 use toki_core::ui::UiCommand;
+use toki_core::ui_layout::UiBindingContext;
 use toki_core::DialogStartRequest;
 
 use super::App;
 
+const EMPTY_TRIGGER_CONTEXT: toki_core::rules::TriggerContext = toki_core::rules::TriggerContext {
+    trigger_self: None,
+    trigger_other: None,
+};
+
 impl App {
+    fn authored_ui_binding_context<'a>(
+        &'a self,
+        binding_overrides: &'a std::collections::HashMap<String, toki_core::FlagValue>,
+    ) -> UiBindingContext<'a, 'static, 'a> {
+        UiBindingContext {
+            value_paths: toki_core::value_path::ValuePathContext {
+                entity_manager: self.game_system.game_state.world().entity_manager(),
+                game_flags: self.game_system.game_state.game_flags(),
+                player_id: self.game_system.game_state.world().player_id(),
+                trigger_context: &EMPTY_TRIGGER_CONTEXT,
+            },
+            binding_overrides,
+            declared_flags: &self.launch_options.flags.declarations,
+        }
+    }
+
+    pub(super) fn render_authored_ui(&mut self) {
+        let viewport = self.authored_ui_viewport();
+        let surfaces = self.ui_controller.render_visible_surfaces(
+            &self.launch_options.ui.theme,
+            viewport,
+            self.authored_ui_binding_context(&std::collections::HashMap::new()),
+        );
+        for surface in surfaces {
+            self.rendering
+                .render_logical_viewport_ui_composition(&surface.output.composition);
+        }
+    }
+
+    pub(super) fn handle_authored_ui_pointer_click(&mut self, position: glam::Vec2) -> bool {
+        let viewport = self.authored_ui_viewport();
+        let Some(position) = self.authored_ui_position(position) else {
+            return false;
+        };
+        let theme = self.launch_options.ui.theme.clone();
+        let declared_flags = self.launch_options.flags.declarations.clone();
+        let empty_overrides = std::collections::HashMap::new();
+        let game_state = &self.game_system.game_state;
+        let handled = self.ui_controller.handle_pointer_click(
+            &theme,
+            viewport,
+            position,
+            UiBindingContext {
+                value_paths: toki_core::value_path::ValuePathContext {
+                    entity_manager: game_state.world().entity_manager(),
+                    game_flags: game_state.game_flags(),
+                    player_id: game_state.world().player_id(),
+                    trigger_context: &EMPTY_TRIGGER_CONTEXT,
+                },
+                binding_overrides: &empty_overrides,
+                declared_flags: &declared_flags,
+            },
+        );
+        self.pending_ui_events
+            .extend(self.ui_controller.take_emitted_events());
+        handled
+    }
+
+    pub(super) fn focus_next_authored_ui_widget(&mut self) -> bool {
+        let theme = self.launch_options.ui.theme.clone();
+        let declared_flags = self.launch_options.flags.declarations.clone();
+        let empty_overrides = std::collections::HashMap::new();
+        let game_state = &self.game_system.game_state;
+        let handled = self.ui_controller.focus_next(
+            &theme,
+            self.authored_ui_viewport(),
+            UiBindingContext {
+                value_paths: toki_core::value_path::ValuePathContext {
+                    entity_manager: game_state.world().entity_manager(),
+                    game_flags: game_state.game_flags(),
+                    player_id: game_state.world().player_id(),
+                    trigger_context: &EMPTY_TRIGGER_CONTEXT,
+                },
+                binding_overrides: &empty_overrides,
+                declared_flags: &declared_flags,
+            },
+        );
+        self.pending_ui_events
+            .extend(self.ui_controller.take_emitted_events());
+        handled
+    }
+
+    pub(super) fn activate_focused_authored_ui_widget(&mut self) -> bool {
+        let theme = self.launch_options.ui.theme.clone();
+        let declared_flags = self.launch_options.flags.declarations.clone();
+        let empty_overrides = std::collections::HashMap::new();
+        let game_state = &self.game_system.game_state;
+        let handled = self.ui_controller.activate_focused(
+            &theme,
+            self.authored_ui_viewport(),
+            UiBindingContext {
+                value_paths: toki_core::value_path::ValuePathContext {
+                    entity_manager: game_state.world().entity_manager(),
+                    game_flags: game_state.game_flags(),
+                    player_id: game_state.world().player_id(),
+                    trigger_context: &EMPTY_TRIGGER_CONTEXT,
+                },
+                binding_overrides: &empty_overrides,
+                declared_flags: &declared_flags,
+            },
+        );
+        self.pending_ui_events
+            .extend(self.ui_controller.take_emitted_events());
+        handled
+    }
+
     pub(super) fn runtime_ui_scale_factor(&self) -> f32 {
         if self.rendering.has_gpu() {
             self.rendering
@@ -57,6 +169,23 @@ impl App {
     fn runtime_menu_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
         if self.rendering.has_gpu() {
             self.rendering.surface_to_viewport_position(position)
+        } else {
+            Some(position)
+        }
+    }
+
+    fn authored_ui_viewport(&self) -> glam::Vec2 {
+        if self.rendering.has_gpu() {
+            self.rendering.viewport_logical_size()
+        } else {
+            let size = self.camera_system.viewport_size();
+            glam::Vec2::new(size.x as f32, size.y as f32)
+        }
+    }
+
+    fn authored_ui_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
+        if self.rendering.has_gpu() {
+            self.rendering.surface_to_logical_viewport_position(position)
         } else {
             Some(position)
         }
@@ -131,7 +260,7 @@ impl App {
         }
 
         if self.runtime_overlay.is_some() || !self.menu_system.is_open() {
-            return false;
+            return self.handle_authored_ui_pointer_click(position);
         }
 
         if let Some(dialog_view) = self.menu_system.current_dialog_view() {

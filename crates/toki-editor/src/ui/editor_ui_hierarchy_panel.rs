@@ -1,6 +1,8 @@
 use super::EditorUI;
 use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
-use crate::ui::{editor_ui::sync_dialog_registry, editor_ui::CenterPanelTab};
+use crate::ui::{
+    editor_ui::{sync_dialog_registry, sync_ui_layout_registry, CenterPanelTab},
+};
 impl EditorUI {
     pub fn render_hierarchy_and_maps_combined_panel(
         &mut self,
@@ -40,7 +42,9 @@ impl EditorUI {
 
                         if let Some(project_assets) = project_assets {
                             sync_dialog_registry(self, project_assets);
+                            sync_ui_layout_registry(self, project_assets);
                             self.render_dialog_assets_section(ui, project_assets);
+                            self.render_ui_assets_section(ui, project_assets);
                         }
 
                         self.render_entity_palette_section(ui, config);
@@ -90,6 +94,52 @@ impl EditorUI {
                             Err(error) => {
                                 self.dialog_editor_context_mut().dialog.status_message =
                                     Some(format!("Failed to load dialog '{dialog_id}': {error}"));
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
+    fn render_ui_assets_section(
+        &mut self,
+        ui: &mut egui::Ui,
+        project_assets: &mut crate::project::ProjectAssets,
+    ) {
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new("UI")
+            .id_salt("asset_palette_ui_section")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.separator();
+                if ui.button("+ New UI Layout").clicked() {
+                    let existing = project_assets.get_ui_layout_names();
+                    self.ui_editor_context_mut().ui =
+                        crate::ui::editor_ui::UiEditorState::new_layout(&existing);
+                    self.workspace.center_panel_tab = CenterPanelTab::UiEditor;
+                }
+
+                if let Some(status) = &self.ui_editor_context().ui.status_message {
+                    ui.small(status);
+                }
+
+                for layout_id in project_assets.get_ui_layout_names() {
+                    let selected = self.ui_editor_context().ui.selected_layout_id.as_deref()
+                        == Some(layout_id.as_str());
+                    if ui.selectable_label(selected, &layout_id).clicked() {
+                        match project_assets.load_ui_layout(&layout_id) {
+                            Ok(Some(layout)) => {
+                                self.ui_editor_context_mut().ui.load_layout(layout);
+                                self.workspace.center_panel_tab = CenterPanelTab::UiEditor;
+                            }
+                            Ok(None) => {
+                                self.ui_editor_context_mut().ui.status_message =
+                                    Some(format!("UI layout '{layout_id}' no longer exists"));
+                            }
+                            Err(error) => {
+                                self.ui_editor_context_mut().ui.status_message = Some(format!(
+                                    "Failed to load UI layout '{layout_id}': {error}"
+                                ));
                             }
                         }
                     }

@@ -144,6 +144,20 @@ impl App {
                         {
                             self.handle_menu_input(MenuInput::Confirm);
                         }
+                        KeyCode::Tab if !self.is_dialog_open() && !self.is_menu_open() => {
+                            if self.focus_next_authored_ui_widget() {
+                                return;
+                            }
+                            self.game_system.handle_keyboard_input(keycode, true);
+                        }
+                        KeyCode::Enter | KeyCode::Space
+                            if !self.is_dialog_open() && !self.is_menu_open() =>
+                        {
+                            if self.activate_focused_authored_ui_widget() {
+                                return;
+                            }
+                            self.game_system.handle_keyboard_input(keycode, true);
+                        }
                         _ => {
                             if !self.is_dialog_open() && !self.is_menu_open() {
                                 self.game_system.handle_keyboard_input(keycode, true);

@@ -86,6 +86,9 @@ pub struct ProjectEditorMetadata {
     /// Persisted dialog graph layout settings for each dialog asset
     #[serde(default)]
     pub dialog_graph_layouts: HashMap<String, DialogGraphLayout>,
+    /// Persisted authored UI editor view settings for each UI layout asset
+    #[serde(default)]
+    pub ui_layout_views: HashMap<String, UiEditorLayoutState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,6 +117,16 @@ pub struct DialogGraphLayout {
     pub pan: [f32; 2],
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UiEditorLayoutState {
+    #[serde(default = "default_graph_zoom")]
+    pub zoom: f32,
+    #[serde(default = "default_graph_pan")]
+    pub pan: [f32; 2],
+    #[serde(default)]
+    pub selected_widget_id: Option<String>,
+}
+
 impl Default for SceneGraphLayout {
     fn default() -> Self {
         Self {
@@ -130,6 +143,16 @@ impl Default for DialogGraphLayout {
             node_positions: HashMap::new(),
             zoom: default_graph_zoom(),
             pan: default_graph_pan(),
+        }
+    }
+}
+
+impl Default for UiEditorLayoutState {
+    fn default() -> Self {
+        Self {
+            zoom: default_graph_zoom(),
+            pan: default_graph_pan(),
+            selected_widget_id: None,
         }
     }
 }

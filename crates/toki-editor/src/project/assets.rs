@@ -6,10 +6,14 @@ use toki_core::dialog::DialogTree;
 use toki_core::palette::{load_palette_asset_from_path, Palette4};
 use toki_core::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
-    discover_project_dialog_paths, load_dialog_from_path as load_dialog_from_project_path,
+    discover_project_dialog_paths, discover_project_ui_paths,
+    load_dialog_from_path as load_dialog_from_project_path,
     load_entity_definition_from_path as load_entity_definition_from_project_path,
-    load_scene_from_path as load_scene_from_project_path, SpriteMetadataFileKind,
+    load_scene_from_path as load_scene_from_project_path,
+    load_ui_layout_from_path as load_ui_layout_from_project_path,
+    save_ui_layout_to_path as save_ui_layout_to_project_path, SpriteMetadataFileKind,
 };
+use toki_core::ui_layout::UiLayoutAsset;
 use toki_core::{entity::EntityDefinition, Scene};
 
 /// Asset discovery and management for project
@@ -29,6 +33,8 @@ pub struct ProjectAssets {
     pub entities: HashMap<String, EntityAsset>,
     /// Discovered dialog trees
     pub dialogs: HashMap<String, DialogAsset>,
+    /// Discovered UI layouts
+    pub ui_layouts: HashMap<String, UiAsset>,
     /// Discovered project palette assets
     pub palettes: BTreeMap<String, PaletteAsset>,
 }
@@ -85,6 +91,12 @@ pub struct DialogAsset {
 }
 
 #[derive(Debug, Clone)]
+pub struct UiAsset {
+    pub path: PathBuf,
+    pub layout: Option<UiLayoutAsset>,
+}
+
+#[derive(Debug, Clone)]
 pub struct PaletteAsset {
     pub path: PathBuf,
     pub palette: Option<Palette4>,
@@ -101,6 +113,7 @@ impl ProjectAssets {
             object_sheets: HashMap::new(),
             entities: HashMap::new(),
             dialogs: HashMap::new(),
+            ui_layouts: HashMap::new(),
             palettes: BTreeMap::new(),
         }
     }
@@ -112,16 +125,18 @@ impl ProjectAssets {
         self.scan_sprite_atlases()?;
         self.scan_entities()?;
         self.scan_dialogs()?;
+        self.scan_ui_layouts()?;
         self.scan_palettes()?;
 
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities, {} dialogs, {} palettes",
+            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities, {} dialogs, {} ui layouts, {} palettes",
             self.scenes.len(),
             self.tilemaps.len(),
             self.sprite_atlases.len(),
             self.object_sheets.len(),
             self.entities.len(),
             self.dialogs.len(),
+            self.ui_layouts.len(),
             self.palettes.len()
         );
 
@@ -359,6 +374,17 @@ impl ProjectAssets {
         Ok(())
     }
 
+    fn scan_ui_layouts(&mut self) -> Result<()> {
+        self.ui_layouts.clear();
+        for path in discover_project_ui_paths(&self.project_path)? {
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                self.ui_layouts
+                    .insert(stem.to_string(), UiAsset { path, layout: None });
+            }
+        }
+        Ok(())
+    }
+
     /// Load a scene by name
     pub fn load_scene(&mut self, scene_name: &str) -> Result<Option<Scene>> {
         if let Some(scene_asset) = self.scenes.get_mut(scene_name) {
@@ -526,6 +552,47 @@ impl ProjectAssets {
 
     pub fn get_dialog_names(&self) -> Vec<String> {
         let mut names = self.dialogs.keys().cloned().collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    pub fn load_ui_layout(&mut self, layout_id: &str) -> Result<Option<UiLayoutAsset>> {
+        if let Some(ui_asset) = self.ui_layouts.get_mut(layout_id) {
+            if ui_asset.layout.is_none() {
+                let layout =
+                    load_ui_layout_from_project_path(&ui_asset.path).map_err(|error| {
+                        anyhow::anyhow!("Failed to load ui layout '{}': {}", layout_id, error)
+                    })?;
+                ui_asset.layout = Some(layout.clone());
+                Ok(Some(layout))
+            } else {
+                Ok(ui_asset.layout.clone())
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn save_ui_layout(&mut self, layout: &UiLayoutAsset) -> Result<()> {
+        let path = self
+            .project_path
+            .join("ui")
+            .join(format!("{}.json", layout.id));
+        save_ui_layout_to_project_path(&path, layout).map_err(|error| {
+            anyhow::anyhow!("Failed to save ui layout '{}': {}", layout.id, error)
+        })?;
+        self.ui_layouts.insert(
+            layout.id.to_string(),
+            UiAsset {
+                path,
+                layout: Some(layout.clone()),
+            },
+        );
+        Ok(())
+    }
+
+    pub fn get_ui_layout_names(&self) -> Vec<String> {
+        let mut names = self.ui_layouts.keys().cloned().collect::<Vec<_>>();
         names.sort();
         names
     }

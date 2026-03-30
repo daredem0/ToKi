@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use crate::dialog::DialogRuntimeContext;
 use crate::ids::{DialogId, SceneId};
 use crate::project_runtime::SceneTransitionEffect;
+use crate::ui_layout::UiRequest;
 
 /// Trait that all game events must implement
 pub trait GameEvent: std::fmt::Debug + Clone + Send + Sync {}
@@ -98,6 +99,8 @@ pub struct GameUpdateResult<T: GameEvent> {
     pub dialog_start_request: Option<DialogStartRequest>,
     /// Optional deferred save/load request to be applied by the runtime layer.
     pub persistence_request: Option<PersistenceRequest>,
+    /// Deferred UI visibility and binding requests for the runtime UI controller.
+    pub ui_requests: Vec<UiRequest>,
 }
 
 impl<T: GameEvent> GameUpdateResult<T> {
@@ -109,6 +112,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
             scene_switch_request: None,
             dialog_start_request: None,
             persistence_request: None,
+            ui_requests: Vec::new(),
         }
     }
 
@@ -120,6 +124,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
             scene_switch_request: None,
             dialog_start_request: None,
             persistence_request: None,
+            ui_requests: Vec::new(),
         }
     }
 
@@ -165,5 +170,30 @@ impl<T: GameEvent> GameUpdateResult<T> {
 
     pub fn request_load_slot(&mut self, slot: u8) {
         self.persistence_request = Some(PersistenceRequest::LoadSlot { slot });
+    }
+
+    pub fn request_show_ui(&mut self, ui_id: impl Into<crate::UiLayoutId>) {
+        self.ui_requests.push(UiRequest::ShowUi {
+            ui_id: ui_id.into(),
+        });
+    }
+
+    pub fn request_hide_ui(&mut self, ui_id: impl Into<crate::UiLayoutId>) {
+        self.ui_requests.push(UiRequest::HideUi {
+            ui_id: ui_id.into(),
+        });
+    }
+
+    pub fn request_ui_binding(
+        &mut self,
+        ui_id: impl Into<crate::UiLayoutId>,
+        binding_key: impl Into<String>,
+        value: crate::FlagValue,
+    ) {
+        self.ui_requests.push(UiRequest::UpdateUiBinding {
+            ui_id: ui_id.into(),
+            binding_key: binding_key.into(),
+            value,
+        });
     }
 }

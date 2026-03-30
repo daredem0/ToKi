@@ -14,6 +14,7 @@ use crate::ui::editor_domain::{
     rule_trigger_kind as shared_rule_trigger_kind,
     rule_trigger_kind_label as shared_rule_trigger_kind_label,
 };
+use toki_core::rules::{RuleFlagValueSource, RuleIntSource, RuleVec2IntSource};
 
 impl InspectorSystem {
     pub(in super::super) fn render_flag_name_editor(ui: &mut egui::Ui, flag: &mut String) -> bool {
@@ -94,6 +95,207 @@ impl InspectorSystem {
         }
 
         changed
+    }
+
+    pub(in super::super) fn render_rule_int_source_editor(
+        ui: &mut egui::Ui,
+        id_salt: impl std::hash::Hash,
+        label: &str,
+        value: &mut RuleIntSource,
+    ) -> bool {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum IntSourceMode {
+            Literal,
+            Expression,
+        }
+
+        let mut changed = false;
+        let current_mode = match value {
+            RuleIntSource::Literal(_) => IntSourceMode::Literal,
+            RuleIntSource::Expression { .. } => IntSourceMode::Expression,
+        };
+        let mut selected_mode = current_mode;
+        ui.horizontal(|ui| {
+            ui.label(label);
+            egui::ComboBox::from_id_salt((&id_salt, "mode"))
+                .selected_text(match current_mode {
+                    IntSourceMode::Literal => "Literal",
+                    IntSourceMode::Expression => "Expr",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_mode, IntSourceMode::Literal, "Literal")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_mode,
+                            IntSourceMode::Expression,
+                            "Expression",
+                        )
+                        .changed();
+                });
+        });
+
+        if selected_mode != current_mode {
+            match selected_mode {
+                IntSourceMode::Literal => value.set_literal(value.as_literal().unwrap_or_default()),
+                IntSourceMode::Expression => {
+                    value.set_expression(value.as_literal().unwrap_or_default().to_string())
+                }
+            }
+        }
+
+        match value {
+            RuleIntSource::Literal(literal) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui
+                        .add(egui::DragValue::new(literal).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleIntSource::Expression { expr } => {
+                ui.horizontal(|ui| {
+                    ui.label("Expr:");
+                    changed |= ui.text_edit_singleline(expr).changed();
+                });
+            }
+        }
+
+        changed
+    }
+
+    pub(in super::super) fn render_rule_vec2_source_editor(
+        ui: &mut egui::Ui,
+        id_salt: impl std::hash::Hash,
+        label: &str,
+        value: &mut RuleVec2IntSource,
+    ) -> bool {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum VecSourceMode {
+            Literal,
+            Components,
+        }
+
+        let mut changed = false;
+        let current_mode = match value {
+            RuleVec2IntSource::Literal(_) => VecSourceMode::Literal,
+            RuleVec2IntSource::Expression { .. } => VecSourceMode::Components,
+        };
+        let mut selected_mode = current_mode;
+        ui.horizontal(|ui| {
+            ui.label(label);
+            egui::ComboBox::from_id_salt((&id_salt, "mode"))
+                .selected_text(match current_mode {
+                    VecSourceMode::Literal => "Literal",
+                    VecSourceMode::Components => "Per Axis",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_mode, VecSourceMode::Literal, "Literal")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_mode, VecSourceMode::Components, "Per Axis")
+                        .changed();
+                });
+        });
+
+        if selected_mode != current_mode {
+            match selected_mode {
+                VecSourceMode::Literal => value.set_literal(value.as_literal().unwrap_or([0, 0])),
+                VecSourceMode::Components => {
+                    let [x, y] = value.as_literal().unwrap_or([0, 0]);
+                    value.set_expression(RuleIntSource::Literal(x), RuleIntSource::Literal(y));
+                }
+            }
+        }
+
+        match value {
+            RuleVec2IntSource::Literal(literal) => {
+                ui.horizontal(|ui| {
+                    ui.label("X:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut literal[0]).speed(1.0))
+                        .changed();
+                    ui.label("Y:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut literal[1]).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleVec2IntSource::Expression { x, y } => {
+                changed |= Self::render_rule_int_source_editor(ui, (&id_salt, "x"), "X:", x);
+                changed |= Self::render_rule_int_source_editor(ui, (&id_salt, "y"), "Y:", y);
+            }
+        }
+
+        changed
+    }
+
+    pub(in super::super) fn render_rule_flag_value_source_editor(
+        ui: &mut egui::Ui,
+        id_salt: impl std::hash::Hash,
+        value: &mut RuleFlagValueSource,
+    ) -> bool {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum FlagSourceMode {
+            Literal,
+            Expression,
+        }
+
+        let mut changed = false;
+        let current_mode = match value {
+            RuleFlagValueSource::Literal(_) => FlagSourceMode::Literal,
+            RuleFlagValueSource::Expression { .. } => FlagSourceMode::Expression,
+        };
+        let mut selected_mode = current_mode;
+        ui.horizontal(|ui| {
+            ui.label("Value Source:");
+                egui::ComboBox::from_id_salt((&id_salt, "mode"))
+                .selected_text(match current_mode {
+                    FlagSourceMode::Literal => "Literal",
+                    FlagSourceMode::Expression => "Expression",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_mode, FlagSourceMode::Literal, "Literal")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_mode,
+                            FlagSourceMode::Expression,
+                            "Expression",
+                        )
+                        .changed();
+                });
+        });
+
+        if selected_mode != current_mode {
+            match selected_mode {
+                FlagSourceMode::Literal => value.set_literal(FlagValue::Bool(false)),
+                FlagSourceMode::Expression => value.set_expression(String::new()),
+            }
+        }
+
+        match value {
+            RuleFlagValueSource::Literal(literal) => {
+                changed |= Self::render_flag_value_editor(ui, (&id_salt, "literal"), literal);
+            }
+            RuleFlagValueSource::Expression { expr } => {
+                ui.horizontal(|ui| {
+                    ui.label("Expr:");
+                    changed |= ui.text_edit_singleline(expr).changed();
+                });
+            }
+        }
+
+        changed
+    }
+
+    fn validate_expression_string(expression: &str) -> Option<String> {
+        toki_core::expression::Expression::parse(expression)
+            .err()
+            .map(|error| error.to_string())
     }
 
     pub(in super::super) fn render_save_slot_editor(ui: &mut egui::Ui, slot: &mut u8) -> bool {
@@ -319,6 +521,30 @@ impl InspectorSystem {
                     | RuleCondition::TriggerOtherIsPlayer
                     | RuleCondition::TriggerOtherIsKind { .. }
                     | RuleCondition::TriggerOtherHasTag { .. } => {}
+                    RuleCondition::Expression { expression } => {
+                        if expression.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: None,
+                                message: format!(
+                                    "Condition {} expression must not be empty",
+                                    condition_index + 1
+                                ),
+                            });
+                        } else if let Some(message) =
+                            Self::validate_expression_string(expression)
+                        {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: None,
+                                message: format!(
+                                    "Condition {} has invalid expression: {}",
+                                    condition_index + 1,
+                                    message
+                                ),
+                            });
+                        }
+                    }
                     RuleCondition::TargetExists { target }
                     | RuleCondition::EntityActive { target, .. }
                     | RuleCondition::HealthBelow { target, .. }
@@ -389,7 +615,7 @@ impl InspectorSystem {
                         }
                     }
                     RuleAction::PlayAnimation { .. } => {}
-                    RuleAction::SetVelocity { target, .. } => {
+                    RuleAction::SetVelocity { target, velocity } => {
                         if let RuleTarget::Entity(entity_id) = target {
                             if *entity_id == 0 {
                                 issues.push(RuleValidationIssue {
@@ -400,8 +626,47 @@ impl InspectorSystem {
                                 });
                             }
                         }
+                        if let RuleVec2IntSource::Expression { x, y } = velocity {
+                            for (axis_label, source) in
+                                [("x", x as &RuleIntSource), ("y", y as &RuleIntSource)]
+                            {
+                                if let Some(expression) = source.expression() {
+                                    if let Some(message) =
+                                        Self::validate_expression_string(expression)
+                                    {
+                                        issues.push(RuleValidationIssue {
+                                            rule_index,
+                                            action_index: Some(action_index),
+                                            message: format!(
+                                                "SetVelocity {} has invalid expression: {}",
+                                                axis_label, message
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        }
                     }
-                    RuleAction::Spawn { .. } => {}
+                    RuleAction::Spawn { position, .. } => {
+                        if let RuleVec2IntSource::Expression { x, y } = position {
+                            for source in [x as &RuleIntSource, y as &RuleIntSource] {
+                                if let Some(expression) = source.expression() {
+                                    if let Some(message) =
+                                        Self::validate_expression_string(expression)
+                                    {
+                                        issues.push(RuleValidationIssue {
+                                            rule_index,
+                                            action_index: Some(action_index),
+                                            message: format!(
+                                                "Spawn position has invalid expression: {}",
+                                                message
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
                     RuleAction::DestroySelf { target } => {
                         if let RuleTarget::Entity(entity_id) = target {
                             if *entity_id == 0 {
@@ -491,21 +756,129 @@ impl InspectorSystem {
                         }
                     }
                     RuleAction::DamageEntity { amount, .. } => {
-                        if *amount <= 0 {
-                            issues.push(RuleValidationIssue {
-                                rule_index,
-                                action_index: Some(action_index),
-                                message: "DamageEntity amount must be positive".to_string(),
-                            });
+                        if let Some(value) = amount.as_literal() {
+                            if value <= 0 {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: "DamageEntity amount must be positive".to_string(),
+                                });
+                            }
+                        } else if let Some(expression) = amount.expression() {
+                            if let Some(message) = Self::validate_expression_string(expression) {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "DamageEntity amount has invalid expression: {}",
+                                        message
+                                    ),
+                                });
+                            }
                         }
                     }
                     RuleAction::HealEntity { amount, .. } => {
-                        if *amount <= 0 {
+                        if let Some(value) = amount.as_literal() {
+                            if value <= 0 {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: "HealEntity amount must be positive".to_string(),
+                                });
+                            }
+                        } else if let Some(expression) = amount.expression() {
+                            if let Some(message) = Self::validate_expression_string(expression) {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "HealEntity amount has invalid expression: {}",
+                                        message
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                    RuleAction::SetFlag { flag, value } => {
+                        if flag.trim().is_empty() {
                             issues.push(RuleValidationIssue {
                                 rule_index,
                                 action_index: Some(action_index),
-                                message: "HealEntity amount must be positive".to_string(),
+                                message: "Flag actions require a non-empty flag name".to_string(),
                             });
+                        } else if !declared_flag_ids.is_empty()
+                            && !declared_flag_ids.contains(flag.trim())
+                        {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: format!(
+                                    "Flag action references undeclared flag '{}'",
+                                    flag.trim()
+                                ),
+                            });
+                        }
+                        if let Some(expression) = value.expression() {
+                            if let Some(message) = Self::validate_expression_string(expression) {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "SetFlag value has invalid expression: {}",
+                                        message
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                    RuleAction::IncrementFlag { flag, amount } => {
+                        if flag.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "Flag actions require a non-empty flag name".to_string(),
+                            });
+                        } else if !declared_flag_ids.is_empty()
+                            && !declared_flag_ids.contains(flag.trim())
+                        {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: format!(
+                                    "Flag action references undeclared flag '{}'",
+                                    flag.trim()
+                                ),
+                            });
+                        }
+                        if let Some(expression) = amount.expression() {
+                            if let Some(message) = Self::validate_expression_string(expression) {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "IncrementFlag amount has invalid expression: {}",
+                                        message
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                    RuleAction::TeleportEntity { tile_x, tile_y, .. } => {
+                        for (axis_label, source) in [("tile_x", tile_x), ("tile_y", tile_y)] {
+                            if let Some(expression) = source.expression() {
+                                if let Some(message) =
+                                    Self::validate_expression_string(expression)
+                                {
+                                    issues.push(RuleValidationIssue {
+                                        rule_index,
+                                        action_index: Some(action_index),
+                                        message: format!(
+                                            "TeleportEntity {} has invalid expression: {}",
+                                            axis_label, message
+                                        ),
+                                    });
+                                }
+                            }
                         }
                     }
                     RuleAction::AddInventoryItem { item_id, count, .. } => {
@@ -543,10 +916,7 @@ impl InspectorSystem {
                         }
                     }
                     RuleAction::SetEntityActive { .. } => {}
-                    RuleAction::TeleportEntity { .. } => {}
-                    RuleAction::SetFlag { flag, .. }
-                    | RuleAction::IncrementFlag { flag, .. }
-                    | RuleAction::ClearFlag { flag } => {
+                    RuleAction::ClearFlag { flag } => {
                         if flag.trim().is_empty() {
                             issues.push(RuleValidationIssue {
                                 rule_index,
@@ -573,6 +943,48 @@ impl InspectorSystem {
                                 action_index: Some(action_index),
                                 message: "Save/load slot must be between 1 and 3".to_string(),
                             });
+                        }
+                    }
+                    RuleAction::ShowUi { ui_id } | RuleAction::HideUi { ui_id } => {
+                        if ui_id.as_str().trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "UI actions require a non-empty UI id".to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::UpdateUiBinding {
+                        ui_id,
+                        binding_key,
+                        value,
+                    } => {
+                        if ui_id.as_str().trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "UI actions require a non-empty UI id".to_string(),
+                            });
+                        }
+                        if binding_key.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "UpdateUiBinding requires a non-empty binding key"
+                                    .to_string(),
+                            });
+                        }
+                        if let Some(expression) = value.expression() {
+                            if let Some(message) = Self::validate_expression_string(expression) {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "UpdateUiBinding value has invalid expression: {}",
+                                        message
+                                    ),
+                                });
+                            }
                         }
                     }
                 }

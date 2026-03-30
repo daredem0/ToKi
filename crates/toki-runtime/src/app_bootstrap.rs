@@ -7,11 +7,13 @@ use toki_core::game::SceneSystem;
 use toki_core::project_assets::{
     discover_project_dialog_paths, discover_project_entity_definition_paths,
     discover_project_scene_paths, first_existing_path, resolve_project_scene_path,
+    discover_project_ui_paths,
 };
 use toki_core::project_content::{
     build_game_state_from_project_content as shared_build_game_state_from_project_content,
     build_game_state_from_scene as shared_build_game_state_from_scene,
 };
+use toki_core::ui_layout::UiLayoutAsset;
 use toki_core::{GameState, Scene};
 use toki_render::RenderError;
 
@@ -52,12 +54,14 @@ struct PreloadedProjectContent {
     scenes: Vec<Scene>,
     entity_definitions: Vec<EntityDefinition>,
     dialogs: Vec<DialogTree>,
+    ui_layouts: Vec<UiLayoutAsset>,
 }
 
 struct StartupBundle {
     resources: ResourceManager,
     game_state: GameState,
     dialogs: Vec<DialogTree>,
+    ui_layouts: Vec<UiLayoutAsset>,
     pack_mount: Option<tempfile::TempDir>,
     asset_load_plan: RuntimeAssetLoadPlan,
     decoded_project_cache: DecodedProjectCache,
@@ -67,6 +71,7 @@ type StartupStateParts = (
     ResourceManager,
     GameState,
     Vec<DialogTree>,
+    Vec<UiLayoutAsset>,
     Option<tempfile::TempDir>,
     RuntimeAssetLoadPlan,
     DecodedProjectCache,
@@ -78,6 +83,7 @@ impl StartupBundle {
             self.resources,
             self.game_state,
             self.dialogs,
+            self.ui_layouts,
             self.pack_mount,
             self.asset_load_plan,
             self.decoded_project_cache,
@@ -153,6 +159,7 @@ impl<'a> StartupCoordinator<'a> {
                 resources,
                 game_state: App::fallback_game_state(),
                 dialogs: Vec::new(),
+                ui_layouts: Vec::new(),
                 pack_mount: None,
                 asset_load_plan: RuntimeAssetLoadPlan {
                     scene_name: self.launch_options.scene_name.clone(),
@@ -228,6 +235,7 @@ impl<'a> StartupCoordinator<'a> {
             resources,
             game_state,
             dialogs: preloaded.dialogs,
+            ui_layouts: preloaded.ui_layouts,
             pack_mount: startup_root.pack_mount,
             asset_load_plan,
             decoded_project_cache: std::mem::take(decoded_project_cache),
@@ -260,11 +268,18 @@ impl<'a> StartupCoordinator<'a> {
             "dialogs",
             App::load_project_dialogs_with_cache(project_path, decoded_project_cache),
         )?;
+        let ui_layouts = Self::load_with_policy(
+            error_policy,
+            project_path,
+            "ui layouts",
+            App::load_project_ui_layouts_with_cache(project_path, decoded_project_cache),
+        )?;
 
         Ok(PreloadedProjectContent {
             scenes,
             entity_definitions,
             dialogs,
+            ui_layouts,
         })
     }
 
@@ -397,6 +412,28 @@ impl App {
         }
         dialogs.sort_by(|left, right| left.id.cmp(&right.id));
         Ok(dialogs)
+    }
+
+    pub(super) fn load_project_ui_layouts_with_cache(
+        project_path: &Path,
+        decoded_project_cache: &mut DecodedProjectCache,
+    ) -> anyhow::Result<Vec<UiLayoutAsset>> {
+        let ui_paths = discover_project_ui_paths(project_path).with_context(|| {
+            format!(
+                "failed to discover ui layouts under '{}'",
+                project_path.display()
+            )
+        })?;
+        let mut layouts = Vec::new();
+        for path in ui_paths {
+            layouts.push(
+                decoded_project_cache
+                    .load_ui_layout_from_path(&path)
+                    .map_err(anyhow::Error::msg)?,
+            );
+        }
+        layouts.sort_by(|left, right| left.id.cmp(&right.id));
+        Ok(layouts)
     }
 
     #[cfg_attr(not(test), allow(dead_code))]

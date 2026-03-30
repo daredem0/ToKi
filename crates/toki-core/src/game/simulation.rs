@@ -9,6 +9,7 @@ struct TickPhaseState {
     pending_rule_animations: Vec<(crate::entity::EntityId, crate::animation::AnimationState)>,
     pending_scene_switch: Option<super::rules::PendingSceneSwitch>,
     pending_persistence: Option<crate::events::PersistenceRequest>,
+    pending_ui_requests: Vec<crate::ui_layout::UiRequest>,
     initial_player_position: glam::IVec2,
 }
 
@@ -36,6 +37,7 @@ impl TickPhaseState {
             pending_rule_animations: Vec::new(),
             pending_scene_switch: None,
             pending_persistence: None,
+            pending_ui_requests: Vec::new(),
             initial_player_position,
         }
     }
@@ -103,6 +105,7 @@ impl GameSimulation {
         phases.pending_rule_animations = command_result.pending_animations;
         phases.pending_scene_switch = command_result.pending_scene_switch;
         phases.pending_persistence = command_result.pending_persistence;
+        phases.pending_ui_requests = command_result.pending_ui_requests;
         phases
     }
 
@@ -182,6 +185,9 @@ impl GameSimulation {
         phases
             .pending_rule_animations
             .append(&mut command_result.pending_animations);
+        phases
+            .pending_ui_requests
+            .append(&mut command_result.pending_ui_requests);
     }
 
     fn finalize_tick(
@@ -221,6 +227,10 @@ impl GameSimulation {
             }
             None => {}
         }
+        phases
+            .result
+            .ui_requests
+            .append(&mut phases.pending_ui_requests);
 
         std::mem::replace(&mut phases.result, GameUpdateResult::new())
     }

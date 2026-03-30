@@ -47,6 +47,7 @@ mod scene_graph_layout;
 mod scene_graph_validation;
 mod scene_viewport;
 pub(crate) mod sprite_editor;
+pub(crate) mod ui_editor;
 
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
@@ -95,7 +96,7 @@ enum GraphCommand {
 }
 
 impl PanelSystem {
-    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 9] {
+    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 10] {
         [
             EditorTabSpec {
                 value: CenterPanelTab::SceneViewport,
@@ -120,6 +121,10 @@ impl PanelSystem {
             EditorTabSpec {
                 value: CenterPanelTab::DialogEditor,
                 label: "Dialog Editor",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::UiEditor,
+                label: "UI Editor",
             },
             EditorTabSpec {
                 value: CenterPanelTab::SpriteEditor,

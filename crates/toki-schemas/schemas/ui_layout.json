@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToKi UI Layout",
+  "type": "object",
+  "required": ["id", "root"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "startup_visible": {
+      "type": "boolean"
+    },
+    "z_order": {
+      "type": "integer"
+    },
+    "root": {
+      "$ref": "#/$defs/widgetNode"
+    }
+  },
+  "$defs": {
+    "rgba": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "left": { "type": "integer", "minimum": 0 },
+        "top": { "type": "integer", "minimum": 0 },
+        "right": { "type": "integer", "minimum": 0 },
+        "bottom": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "layoutSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "type": "string",
+          "enum": [
+            "top_left",
+            "top_right",
+            "bottom_left",
+            "bottom_right",
+            "center",
+            "stretch"
+          ]
+        },
+        "offset": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        },
+        "size": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        },
+        "margin": {
+          "$ref": "#/$defs/spacing"
+        },
+        "padding": {
+          "$ref": "#/$defs/spacing"
+        }
+      }
+    },
+    "widgetStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fill_color": { "$ref": "#/$defs/rgba" },
+        "border_color": { "$ref": "#/$defs/rgba" },
+        "text_color": { "$ref": "#/$defs/rgba" },
+        "accent_color": { "$ref": "#/$defs/rgba" },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "font_family": { "type": ["string", "null"] },
+            "font_size_px": { "type": ["integer", "null"], "minimum": 1 },
+            "weight": {
+              "type": ["string", "null"],
+              "enum": ["Normal", "Bold", null]
+            },
+            "slant": {
+              "type": ["string", "null"],
+              "enum": ["Normal", "Italic", null]
+            },
+            "anchor": {
+              "type": ["string", "null"],
+              "enum": [
+                "TopLeft",
+                "TopCenter",
+                "TopRight",
+                "CenterLeft",
+                "Center",
+                "CenterRight",
+                "BottomLeft",
+                "BottomCenter",
+                "BottomRight",
+                null
+              ]
+            }
+          }
+        }
+      }
+    },
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "path"],
+          "properties": {
+            "kind": { "const": "value_path" },
+            "path": { "type": "string", "minLength": 1 },
+            "key": { "type": ["string", "null"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "expression"],
+          "properties": {
+            "kind": { "const": "expression" },
+            "expression": { "type": "string", "minLength": 1 },
+            "key": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "textSegment": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text"],
+          "properties": {
+            "kind": { "const": "literal" },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "binding"],
+          "properties": {
+            "kind": { "const": "binding" },
+            "binding": { "$ref": "#/$defs/binding" }
+          }
+        }
+      ]
+    },
+    "textTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/textSegment" }
+        }
+      }
+    },
+    "progressBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "current", "max"],
+          "properties": {
+            "mode": { "const": "current_max" },
+            "current": { "$ref": "#/$defs/binding" },
+            "max": { "$ref": "#/$defs/binding" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "percent"],
+          "properties": {
+            "mode": { "const": "percent" },
+            "percent": { "$ref": "#/$defs/binding" }
+          }
+        }
+      ]
+    },
+    "collectionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["player_inventory", "declared_flags"]
+        }
+      }
+    },
+    "collectionRowSegment": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text"],
+          "properties": {
+            "kind": { "const": "literal" },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["item_id", "item_count", "item_value"]
+            }
+          }
+        }
+      ]
+    },
+    "collectionRowTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/collectionRowSegment" }
+        }
+      }
+    },
+    "widgetKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "content"],
+          "properties": {
+            "kind": { "const": "label" },
+            "content": { "$ref": "#/$defs/textTemplate" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "image_id"],
+          "properties": {
+            "kind": { "const": "image" },
+            "image_id": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "progress_bar" },
+            "value": { "$ref": "#/$defs/progressBinding" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "columns", "spacing"],
+          "properties": {
+            "kind": { "const": "grid_container" },
+            "columns": { "type": "integer", "minimum": 1 },
+            "spacing": { "$ref": "#/$defs/spacing" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "collection", "row_height", "row_spacing", "row_template"],
+          "properties": {
+            "kind": { "const": "scroll_list" },
+            "collection": { "$ref": "#/$defs/collectionBinding" },
+            "row_height": { "type": "integer", "minimum": 1 },
+            "row_spacing": { "type": "integer", "minimum": 0 },
+            "row_template": { "$ref": "#/$defs/collectionRowTemplate" }
+          }
+        }
+      ]
+    },
+    "widgetNode": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "layout": { "$ref": "#/$defs/layoutSpec" },
+        "style": { "$ref": "#/$defs/widgetStyle" },
+        "event_id": { "type": ["string", "null"] },
+        "focusable": { "type": "boolean" },
+        "visible_if": { "type": ["string", "null"] },
+        "enabled_if": { "type": ["string", "null"] },
+        "kind": { "$ref": "#/$defs/widgetKind" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/widgetNode" }
+        }
+      }
+    }
+  }
+}

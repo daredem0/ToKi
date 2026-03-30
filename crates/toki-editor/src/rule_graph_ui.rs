@@ -154,6 +154,7 @@ pub fn rule_graph_condition_summary(
 ) -> String {
     match condition {
         RuleCondition::Always => "Always".to_string(),
+        RuleCondition::Expression { expression } => format!("Expr({expression})"),
         RuleCondition::TargetExists { target } => {
             format!("TargetExists({})", rule_graph_target_summary(*target))
         }
@@ -256,16 +257,14 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
         }
         RuleAction::SetVelocity { target, velocity } => match style {
             RuleGraphSummaryStyle::Compact => format!(
-                "SetVelocity({}, {}, {})",
+                "SetVelocity({}, {})",
                 rule_graph_target_summary(*target),
-                velocity[0],
-                velocity[1]
+                velocity
             ),
             RuleGraphSummaryStyle::Detailed => format!(
-                "SetVelocity({}, [{}, {}])",
+                "SetVelocity({}, {})",
                 rule_graph_target_summary(*target),
-                velocity[0],
-                velocity[1]
+                velocity
             ),
         },
         RuleAction::Spawn {
@@ -273,13 +272,10 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             position,
         } => match style {
             RuleGraphSummaryStyle::Compact => {
-                format!("Spawn({:?}, {}, {})", entity_type, position[0], position[1])
+                format!("Spawn({:?}, {})", entity_type, position)
             }
             RuleGraphSummaryStyle::Detailed => {
-                format!(
-                    "Spawn({:?}, [{}, {}])",
-                    entity_type, position[0], position[1]
-                )
+                format!("Spawn({:?}, {})", entity_type, position)
             }
         },
         RuleAction::DestroySelf { target } => {
@@ -378,15 +374,20 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             tile_x,
             tile_y
         ),
-        RuleAction::SetFlag { flag, value } => {
-            format!("SetFlag({}, {})", flag, flag_value_summary(value))
-        }
+        RuleAction::SetFlag { flag, value } => format!("SetFlag({}, {})", flag, value),
         RuleAction::IncrementFlag { flag, amount } => {
             format!("IncrementFlag({}, {})", flag, amount)
         }
         RuleAction::ClearFlag { flag } => format!("ClearFlag({flag})"),
         RuleAction::SaveGame { slot } => format!("SaveGame(slot {})", slot),
         RuleAction::LoadGame { slot } => format!("LoadGame(slot {})", slot),
+        RuleAction::ShowUi { ui_id } => format!("ShowUi({ui_id})"),
+        RuleAction::HideUi { ui_id } => format!("HideUi({ui_id})"),
+        RuleAction::UpdateUiBinding {
+            ui_id,
+            binding_key,
+            value,
+        } => format!("UpdateUiBinding({ui_id}, {binding_key}, {value})"),
     }
 }
 

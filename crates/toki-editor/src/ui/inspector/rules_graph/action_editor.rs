@@ -1,6 +1,7 @@
 //! Action node editing UI.
 
 use super::*;
+use toki_core::rules::{RuleIntSource, RuleVec2IntSource};
 
 pub(in super::super) struct RuleGraphActionEditorContext<'a> {
     pub scene_name: &'a str,
@@ -171,7 +172,7 @@ impl InspectorSystem {
             } => Self::render_teleport_params(ui, scene_name, node_key, target, tile_x, tile_y),
             RuleAction::SetFlag { flag, value } => {
                 let mut changed = Self::render_flag_name_editor(ui, flag);
-                changed |= Self::render_flag_value_editor(
+                changed |= Self::render_rule_flag_value_source_editor(
                     ui,
                     format!("graph_node_set_flag_{}_{}", scene_name, node_key),
                     value,
@@ -180,15 +181,54 @@ impl InspectorSystem {
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 let mut changed = Self::render_flag_name_editor(ui, flag);
-                ui.horizontal(|ui| {
-                    ui.label("Amount:");
-                    changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
-                });
+                changed |= Self::render_rule_int_source_editor(
+                    ui,
+                    format!("graph_node_inc_flag_{}_{}", scene_name, node_key),
+                    "Amount:",
+                    amount,
+                );
                 changed
             }
             RuleAction::ClearFlag { flag } => Self::render_flag_name_editor(ui, flag),
             RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
                 Self::render_save_slot_editor(ui, slot)
+            }
+            RuleAction::ShowUi { ui_id } | RuleAction::HideUi { ui_id } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("UI Id:");
+                    let mut ui_id_value = ui_id.to_string();
+                    if ui.text_edit_singleline(&mut ui_id_value).changed() {
+                        *ui_id = ui_id_value.into();
+                        changed = true;
+                    }
+                });
+                changed
+            }
+            RuleAction::UpdateUiBinding {
+                ui_id,
+                binding_key,
+                value,
+            } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("UI Id:");
+                    let mut ui_id_value = ui_id.to_string();
+                    if ui.text_edit_singleline(&mut ui_id_value).changed() {
+                        *ui_id = ui_id_value.into();
+                        changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Binding Key:");
+                    changed |= ui.text_edit_singleline(binding_key).changed();
+                });
+                changed |= Self::render_rule_flag_value_source_editor(
+                    ui,
+                    format!("graph_node_ui_binding_{}_{}", scene_name, node_key),
+                    value,
+                );
+                changed
             }
         }
     }
@@ -288,22 +328,19 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         target: &mut toki_core::rules::RuleTarget,
-        velocity: &mut [i32; 2],
+        velocity: &mut RuleVec2IntSource,
     ) -> bool {
         let mut changed = Self::render_rule_target_editor_with_salt(
             ui,
             &format!("graph_node_velocity_target_{}_{}", scene_name, node_key),
             target,
         );
-        ui.horizontal(|ui| {
-            ui.label("Velocity:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
-                .changed();
-            changed |= ui
-                .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
-                .changed();
-        });
+        changed |= Self::render_rule_vec2_source_editor(
+            ui,
+            ("graph_velocity", scene_name, node_key),
+            "Velocity:",
+            velocity,
+        );
         changed
     }
 
@@ -312,7 +349,7 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         entity_type: &mut RuleSpawnEntityType,
-        position: &mut [i32; 2],
+        position: &mut RuleVec2IntSource,
     ) -> bool {
         let mut changed = false;
         ui.horizontal(|ui| {
@@ -334,15 +371,12 @@ impl InspectorSystem {
                 }
             });
         });
-        ui.horizontal(|ui| {
-            ui.label("Position:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                .changed();
-            changed |= ui
-                .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                .changed();
-        });
+        changed |= Self::render_rule_vec2_source_editor(
+            ui,
+            ("graph_spawn", scene_name, node_key),
+            "Position:",
+            position,
+        );
         changed
     }
 
@@ -351,7 +385,7 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         target: &mut toki_core::rules::RuleTarget,
-        amount: &mut i32,
+        amount: &mut RuleIntSource,
         prefix: &str,
     ) -> bool {
         let mut changed = Self::render_rule_target_editor_with_salt(
@@ -359,12 +393,12 @@ impl InspectorSystem {
             &format!("graph_node_{}_target_{}_{}", prefix, scene_name, node_key),
             target,
         );
-        ui.horizontal(|ui| {
-            ui.label("Amount:");
-            changed |= ui
-                .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
-                .changed();
-        });
+        changed |= Self::render_rule_int_source_editor(
+            ui,
+            ("graph_amount", scene_name, node_key, prefix),
+            "Amount:",
+            amount,
+        );
         changed
     }
 
@@ -418,36 +452,26 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         target: &mut toki_core::rules::RuleTarget,
-        tile_x: &mut u32,
-        tile_y: &mut u32,
+        tile_x: &mut RuleIntSource,
+        tile_y: &mut RuleIntSource,
     ) -> bool {
         let mut changed = Self::render_rule_target_editor_with_salt(
             ui,
             &format!("graph_node_teleport_target_{}_{}", scene_name, node_key),
             target,
         );
-        ui.horizontal(|ui| {
-            ui.label("Tile X:");
-            let mut x_val = *tile_x as i32;
-            if ui
-                .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
-                .changed()
-            {
-                *tile_x = x_val.max(0) as u32;
-                changed = true;
-            }
-        });
-        ui.horizontal(|ui| {
-            ui.label("Tile Y:");
-            let mut y_val = *tile_y as i32;
-            if ui
-                .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
-                .changed()
-            {
-                *tile_y = y_val.max(0) as u32;
-                changed = true;
-            }
-        });
+        changed |= Self::render_rule_int_source_editor(
+            ui,
+            ("graph_tile_x", scene_name, node_key),
+            "Tile X:",
+            tile_x,
+        );
+        changed |= Self::render_rule_int_source_editor(
+            ui,
+            ("graph_tile_y", scene_name, node_key),
+            "Tile Y:",
+            tile_y,
+        );
         changed
     }
 }

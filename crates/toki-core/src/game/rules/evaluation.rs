@@ -33,6 +33,29 @@ impl RuleEngine<'_> {
     ) -> bool {
         match condition {
             RuleCondition::Always => true,
+            RuleCondition::Expression { expression } => match crate::expression::Expression::parse(
+                expression,
+            )
+            .and_then(|expr| expr.evaluate(self.value_path_context(context)))
+            {
+                Ok(crate::value_path::ResolvedValue::Bool(value)) => value,
+                Ok(other) => {
+                    tracing::warn!(
+                        condition = %expression,
+                        result = ?other,
+                        "Rule condition expression did not resolve to bool"
+                    );
+                    false
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        condition = %expression,
+                        error = %error,
+                        "Failed to evaluate rule condition expression"
+                    );
+                    false
+                }
+            },
             RuleCondition::TargetExists { target } => {
                 self.resolve_entity(*target, context).is_some()
             }

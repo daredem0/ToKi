@@ -27,6 +27,7 @@ impl GameState {
         let mut pending_scene_switch = None;
         let mut pending_dialog_start = None;
         let mut pending_persistence = None;
+        let mut pending_ui_requests = Vec::new();
 
         for command in &commands {
             match command {
@@ -41,12 +42,16 @@ impl GameState {
                 ),
                 RuleCommand::SwitchScene { .. }
                 | RuleCommand::StartDialog { .. }
+                | RuleCommand::ShowUi { .. }
+                | RuleCommand::HideUi { .. }
+                | RuleCommand::UpdateUiBinding { .. }
                 | RuleCommand::SaveGame { .. }
                 | RuleCommand::LoadGame { .. } => self.apply_scene_dialog_or_persistence_command(
                     command,
                     &mut pending_scene_switch,
                     &mut pending_dialog_start,
                     &mut pending_persistence,
+                    &mut pending_ui_requests,
                 ),
                 RuleCommand::Spawn { .. }
                 | RuleCommand::DestroySelf { .. }
@@ -79,6 +84,7 @@ impl GameState {
             pending_animations,
             pending_scene_switch,
             pending_persistence,
+            pending_ui_requests,
         }
     }
 
@@ -127,6 +133,7 @@ impl GameState {
         pending_scene_switch: &mut Option<PendingSceneSwitch>,
         pending_dialog_start: &mut Option<PendingDialogStart>,
         pending_persistence: &mut Option<PersistenceRequest>,
+        pending_ui_requests: &mut Vec<crate::ui_layout::UiRequest>,
     ) {
         match command {
             RuleCommand::SwitchScene {
@@ -150,6 +157,27 @@ impl GameState {
                         context: *context,
                     });
                 }
+            }
+            RuleCommand::ShowUi { ui_id } => {
+                pending_ui_requests.push(crate::ui_layout::UiRequest::ShowUi {
+                    ui_id: ui_id.clone(),
+                });
+            }
+            RuleCommand::HideUi { ui_id } => {
+                pending_ui_requests.push(crate::ui_layout::UiRequest::HideUi {
+                    ui_id: ui_id.clone(),
+                });
+            }
+            RuleCommand::UpdateUiBinding {
+                ui_id,
+                binding_key,
+                value,
+            } => {
+                pending_ui_requests.push(crate::ui_layout::UiRequest::UpdateUiBinding {
+                    ui_id: ui_id.clone(),
+                    binding_key: binding_key.clone(),
+                    value: value.clone(),
+                });
             }
             RuleCommand::SaveGame { slot } => {
                 if pending_persistence.is_none() {

@@ -464,6 +464,7 @@ impl ApplicationHandler for EditorApp {
                         | CenterPanelTab::SceneRules
                         | CenterPanelTab::MenuEditor
                         | CenterPanelTab::DialogEditor
+                        | CenterPanelTab::UiEditor
                         | CenterPanelTab::SpriteEditor
                         | CenterPanelTab::AnimationEditor
                         | CenterPanelTab::EntityEditor => None,
@@ -854,6 +855,7 @@ impl EditorApp {
             | CenterPanelTab::SceneRules
             | CenterPanelTab::MenuEditor
             | CenterPanelTab::DialogEditor
+            | CenterPanelTab::UiEditor
             | CenterPanelTab::SpriteEditor
             | CenterPanelTab::AnimationEditor
             | CenterPanelTab::EntityEditor => {}

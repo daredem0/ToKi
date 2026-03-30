@@ -42,6 +42,9 @@ impl RuleEngine<'_> {
             }
             RuleAction::SwitchScene { .. }
             | RuleAction::StartDialog { .. }
+            | RuleAction::ShowUi { .. }
+            | RuleAction::HideUi { .. }
+            | RuleAction::UpdateUiBinding { .. }
             | RuleAction::SaveGame { .. }
             | RuleAction::LoadGame { .. } => {
                 self.buffer_scene_dialog_or_persistence_action(action, context, command_buffer);
@@ -124,6 +127,37 @@ impl RuleEngine<'_> {
                     });
                 }
             }
+            RuleAction::ShowUi { ui_id } => {
+                if !ui_id.as_str().trim().is_empty() {
+                    command_buffer.push(RuleCommand::ShowUi { ui_id: ui_id.clone() });
+                }
+            }
+            RuleAction::HideUi { ui_id } => {
+                if !ui_id.as_str().trim().is_empty() {
+                    command_buffer.push(RuleCommand::HideUi { ui_id: ui_id.clone() });
+                }
+            }
+            RuleAction::UpdateUiBinding {
+                ui_id,
+                binding_key,
+                value,
+            } => {
+                let binding_key = binding_key.trim();
+                if !ui_id.as_str().trim().is_empty() && !binding_key.is_empty() {
+                    match value.resolve(self.value_path_context(context)) {
+                        Ok(value) => command_buffer.push(RuleCommand::UpdateUiBinding {
+                            ui_id: ui_id.clone(),
+                            binding_key: binding_key.to_string(),
+                            value,
+                        }),
+                        Err(error) => tracing::warn!(
+                            error = %error,
+                            action = ?action,
+                            "Failed to resolve ui binding expression"
+                        ),
+                    }
+                }
+            }
             RuleAction::SaveGame { slot } => {
                 command_buffer.push(RuleCommand::SaveGame { slot: *slot });
             }
@@ -145,10 +179,17 @@ impl RuleEngine<'_> {
                 entity_type,
                 position,
             } => {
-                command_buffer.push(RuleCommand::Spawn {
-                    entity_type: *entity_type,
-                    position: glam::IVec2::new(position[0], position[1]),
-                });
+                match position.resolve(self.value_path_context(context)) {
+                    Ok(position) => command_buffer.push(RuleCommand::Spawn {
+                        entity_type: *entity_type,
+                        position: glam::IVec2::new(position[0], position[1]),
+                    }),
+                    Err(error) => tracing::warn!(
+                        error = %error,
+                        action = ?action,
+                        "Failed to resolve spawn position expression"
+                    ),
+                }
             }
             RuleAction::DestroySelf { target } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
@@ -156,20 +197,34 @@ impl RuleEngine<'_> {
                 });
             }
             RuleAction::DamageEntity { target, amount } => {
-                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::DamageEntity {
-                        entity_id,
-                        amount: *amount,
-                    }
-                });
+                match amount.resolve(self.value_path_context(context)) {
+                    Ok(amount) => self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                        RuleCommand::DamageEntity {
+                            entity_id,
+                            amount,
+                        }
+                    }),
+                    Err(error) => tracing::warn!(
+                        error = %error,
+                        action = ?action,
+                        "Failed to resolve damage amount expression"
+                    ),
+                }
             }
             RuleAction::HealEntity { target, amount } => {
-                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::HealEntity {
-                        entity_id,
-                        amount: *amount,
-                    }
-                });
+                match amount.resolve(self.value_path_context(context)) {
+                    Ok(amount) => self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                        RuleCommand::HealEntity {
+                            entity_id,
+                            amount,
+                        }
+                    }),
+                    Err(error) => tracing::warn!(
+                        error = %error,
+                        action = ?action,
+                        "Failed to resolve heal amount expression"
+                    ),
+                }
             }
             RuleAction::SetEntityActive { target, active } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
@@ -184,13 +239,28 @@ impl RuleEngine<'_> {
                 tile_x,
                 tile_y,
             } => {
-                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::TeleportEntity {
-                        entity_id,
-                        tile_x: *tile_x,
-                        tile_y: *tile_y,
+                let resolved_x = tile_x.resolve(self.value_path_context(context));
+                let resolved_y = tile_y.resolve(self.value_path_context(context));
+                match (resolved_x, resolved_y) {
+                    (Ok(tile_x), Ok(tile_y)) if tile_x >= 0 && tile_y >= 0 => {
+                        self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                            RuleCommand::TeleportEntity {
+                                entity_id,
+                                tile_x: tile_x as u32,
+                                tile_y: tile_y as u32,
+                            }
+                        });
                     }
-                });
+                    (Ok(_), Ok(_)) => tracing::warn!(
+                        action = ?action,
+                        "Teleport expressions resolved to negative tile coordinates"
+                    ),
+                    (Err(error), _) | (_, Err(error)) => tracing::warn!(
+                        error = %error,
+                        action = ?action,
+                        "Failed to resolve teleport expression"
+                    ),
+                }
             }
             _ => unreachable!("entity mutation helper only handles entity mutation actions"),
         }
@@ -232,19 +302,33 @@ impl RuleEngine<'_> {
             RuleAction::SetFlag { flag, value } => {
                 let flag = flag.trim();
                 if !flag.is_empty() {
-                    command_buffer.push(RuleCommand::SetFlag {
-                        flag: flag.to_string(),
-                        value: value.clone(),
-                    });
+                    match value.resolve(self.value_path_context(context)) {
+                        Ok(value) => command_buffer.push(RuleCommand::SetFlag {
+                            flag: flag.to_string(),
+                            value,
+                        }),
+                        Err(error) => tracing::warn!(
+                            error = %error,
+                            action = ?action,
+                            "Failed to resolve set-flag value expression"
+                        ),
+                    }
                 }
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 let flag = flag.trim();
                 if !flag.is_empty() {
-                    command_buffer.push(RuleCommand::IncrementFlag {
-                        flag: flag.to_string(),
-                        amount: *amount,
-                    });
+                    match amount.resolve(self.value_path_context(context)) {
+                        Ok(amount) => command_buffer.push(RuleCommand::IncrementFlag {
+                            flag: flag.to_string(),
+                            amount,
+                        }),
+                        Err(error) => tracing::warn!(
+                            error = %error,
+                            action = ?action,
+                            "Failed to resolve increment-flag amount expression"
+                        ),
+                    }
                 }
             }
             RuleAction::ClearFlag { flag } => {
@@ -306,15 +390,21 @@ impl RuleEngine<'_> {
     fn buffer_set_velocity(
         &self,
         target: crate::rules::RuleTarget,
-        velocity: &[i32; 2],
+        velocity: &crate::rules::RuleVec2IntSource,
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        self.resolve_and_push(target, context, command_buffer, |entity_id| {
-            RuleCommand::SetVelocity {
-                entity_id,
-                velocity: glam::IVec2::new(velocity[0], velocity[1]),
-            }
-        });
+        match velocity.resolve(self.value_path_context(context)) {
+            Ok(velocity) => self.resolve_and_push(target, context, command_buffer, |entity_id| {
+                RuleCommand::SetVelocity {
+                    entity_id,
+                    velocity: glam::IVec2::new(velocity[0], velocity[1]),
+                }
+            }),
+            Err(error) => tracing::warn!(
+                error = %error,
+                "Failed to resolve set-velocity expression"
+            ),
+        }
     }
 }
