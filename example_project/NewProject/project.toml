@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Scene 2" = "scenes/Scene 2.json"
 main = "scenes/main.json"
 "Main Scene" = "scenes/Main Scene.json"
+"Scene 2" = "scenes/Scene 2.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -241,6 +241,59 @@ font_size_px = 16
 bold = false
 cursive = true
 
+[runtime.ui.theme]
+font_family = "Sans"
+base_font_size_px = 14
+foreground_color = [
+    240,
+    240,
+    240,
+    255,
+]
+background_color = [
+    12,
+    18,
+    28,
+    224,
+]
+accent_color = [
+    100,
+    220,
+    180,
+    255,
+]
+border_color = [
+    255,
+    255,
+    255,
+    255,
+]
+border_thickness_px = 1
+progress_fill_color = [
+    80,
+    220,
+    120,
+    255,
+]
+progress_empty_color = [
+    32,
+    48,
+    56,
+    255,
+]
+selection_color = [
+    255,
+    210,
+    90,
+    255,
+]
+
+[runtime.ui.theme.default_spacing]
+left = 4
+top = 4
+right = 4
+bottom = 4
+
 [[runtime.flags.declarations]]
 id = "coins"
 
@@ -264,6 +317,31 @@ recent_files = []
 
 [editor.camera_settings]
 
+[editor.graph_layouts."Scene 2"]
+zoom = 0.8264462351799011
+pan = [
+    -74.87890625,
+    64.38671875,
+]
+
+[editor.graph_layouts."Scene 2".node_positions]
+"node:4" = [
+    656.8824462890625,
+    177.01071166992188,
+]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:1" = [
+    60.0,
+    50.0,
+]
+
 [editor.graph_layouts."Main Scene"]
 zoom = 0.8088202476501465
 pan = [
@@ -276,25 +354,77 @@ pan = [
     240.34375,
     356.265625,
 ]
-"node:18" = [
-    483.578125,
+"node:14" = [
+    60.0,
+    258.953125,
+]
+"node:19" = [
+    259.625,
+    307.609375,
+]
+"node:17" = [
+    60.0,
     307.609375,
 ]
 "node:7" = [
     244.359375,
     112.984375,
 ]
-"node:19" = [
-    259.625,
-    307.609375,
+"node:12" = [
+    584.375,
+    210.296875,
 ]
-"node:14" = [
+"node:20" = [
     60.0,
+    356.265625,
+]
+"node:2" = [
+    469.625,
+    64.328125,
+]
+"node:1" = [
+    60.0,
+    64.328125,
+]
+"node:15" = [
+    522.25,
     258.953125,
 ]
 "node:11" = [
     60.0,
     210.296875,
+]
+"node:3" = [
+    246.0,
+    64.328125,
+]
+"node:18" = [
+    483.578125,
+    307.609375,
+]
+"node:10" = [
+    318.65625,
+    161.640625,
+]
+"node:4" = [
+    60.0,
+    112.984375,
+]
+"node:8" = [
+    60.0,
+    161.640625,
+]
+"node:13" = [
+    293.71875,
+    210.296875,
+]
+"node:21" = [
+    452.296875,
+    356.265625,
+]
+"node:9" = [
+    615.984375,
+    161.640625,
 ]
 "node:16" = [
     262.625,
@@ -304,86 +434,9 @@ pan = [
     758.296875,
     64.328125,
 ]
-"node:17" = [
-    60.0,
-    307.609375,
-]
-"node:3" = [
-    246.0,
-    64.328125,
-]
-"node:8" = [
-    60.0,
-    161.640625,
-]
-"node:1" = [
-    60.0,
-    64.328125,
-]
-"node:20" = [
-    60.0,
-    356.265625,
-]
-"node:12" = [
-    584.375,
-    210.296875,
-]
-"node:10" = [
-    318.65625,
-    161.640625,
-]
 "node:6" = [
     488.640625,
     112.984375,
-]
-"node:2" = [
-    469.625,
-    64.328125,
-]
-"node:15" = [
-    522.25,
-    258.953125,
-]
-"node:9" = [
-    615.984375,
-    161.640625,
-]
-"node:13" = [
-    293.71875,
-    210.296875,
-]
-"node:4" = [
-    60.0,
-    112.984375,
-]
-"node:21" = [
-    452.296875,
-    356.265625,
-]
-
-[editor.graph_layouts."Scene 2"]
-zoom = 0.8264462351799011
-pan = [
-    -74.87890625,
-    64.38671875,
-]
-
-[editor.graph_layouts."Scene 2".node_positions]
-"node:1" = [
-    60.0,
-    50.0,
-]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:4" = [
-    656.8824462890625,
-    177.01071166992188,
-]
-"node:3" = [
-    430.0,
-    50.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -732,3 +785,32 @@ priority = 0
 once = false
 log_enabled = true
 trigger_node_id = 20
+
+[editor.dialog_graph_layouts.dialog_1]
+zoom = 0.683013379573822
+pan = [
+    60.984375,
+    6.97265625,
+]
+
+[editor.dialog_graph_layouts.dialog_1.node_positions]
+end = [
+    720.0,
+    80.0,
+]
+start = [
+    80.0,
+    80.0,
+]
+line = [
+    400.0,
+    80.0,
+]
+
+[editor.ui_layout_views.ui_1]
+zoom = 2.9242379665374756
+pan = [
+    101.56640625,
+    12.42578125,
+]
+selected_widget_id = "label_1"

@@ -490,7 +490,7 @@ impl UiLayoutEngine {
 
         let enabled = evaluate_widget_gate(widget.enabled_if.as_deref(), *context, true);
         let rect = resolve_widget_rect(&widget.layout, parent_rect);
-        let content_rect = inset_rect(rect, widget.layout.padding);
+        let content_rect = inset_rect_for_content(rect, widget.layout.padding);
         output.widget_frames.push(UiWidgetFrame {
             widget_id: widget.id.clone(),
             rect,
@@ -933,6 +933,15 @@ fn inset_rect(rect: UiRect, spacing: UiSpacing) -> UiRect {
         y,
         width,
         height,
+    }
+}
+
+fn inset_rect_for_content(rect: UiRect, spacing: UiSpacing) -> UiRect {
+    let inset = inset_rect(rect, spacing);
+    if inset.width <= 0.0 || inset.height <= 0.0 {
+        rect
+    } else {
+        inset
     }
 }
 

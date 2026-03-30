@@ -15,6 +15,7 @@ pub enum ValuePathRoot {
 pub enum ValuePathAccessor {
     Flag(String),
     Health,
+    MaxHealth,
     Active,
     Kind,
     Stat(String),
@@ -145,6 +146,14 @@ impl ValuePath {
                         .current(HEALTH_STAT_ID)
                         .map(ResolvedValue::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
+                    ValuePathAccessor::MaxHealth => entity
+                        .attributes
+                        .gameplay
+                        .stats
+                        .base(HEALTH_STAT_ID)
+                        .or_else(|| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
+                        .map(ResolvedValue::Int)
+                        .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
                     ValuePathAccessor::Active => {
                         Ok(ResolvedValue::Bool(entity.attributes.behavior.active))
                     }
@@ -177,6 +186,9 @@ impl std::fmt::Display for ValuePath {
         match (&self.root, &self.accessor) {
             (ValuePathRoot::Flags, ValuePathAccessor::Flag(flag)) => write!(f, "flags.{flag}"),
             (root, ValuePathAccessor::Health) => write!(f, "{}.health", entity_root_label(root)),
+            (root, ValuePathAccessor::MaxHealth) => {
+                write!(f, "{}.max_health", entity_root_label(root))
+            }
             (root, ValuePathAccessor::Active) => write!(f, "{}.active", entity_root_label(root)),
             (root, ValuePathAccessor::Kind) => write!(f, "{}.kind", entity_root_label(root)),
             (root, ValuePathAccessor::Stat(stat)) => {
@@ -195,6 +207,7 @@ impl std::fmt::Display for ValuePath {
 fn parse_entity_accessor(path: &str, segments: &[&str]) -> Result<ValuePathAccessor, ValuePathError> {
     match segments {
         [_, "health"] => Ok(ValuePathAccessor::Health),
+        [_, "max_health"] => Ok(ValuePathAccessor::MaxHealth),
         [_, "active"] => Ok(ValuePathAccessor::Active),
         [_, "kind"] => Ok(ValuePathAccessor::Kind),
         [_, "stats", stat] if !stat.trim().is_empty() => {
@@ -205,7 +218,7 @@ fn parse_entity_accessor(path: &str, segments: &[&str]) -> Result<ValuePathAcces
         }
         _ => Err(ValuePathError::InvalidStructure {
             path: path.to_string(),
-            reason: "entity paths must be '<root>.health', '<root>.active', '<root>.kind', '<root>.stats.<id>', or '<root>.inventory.<item_id>'".to_string(),
+            reason: "entity paths must be '<root>.health', '<root>.max_health', '<root>.active', '<root>.kind', '<root>.stats.<id>', or '<root>.inventory.<item_id>'".to_string(),
         }),
     }
 }
@@ -337,6 +350,45 @@ mod tests {
                 .resolve(context)
                 .expect("health should resolve"),
             ResolvedValue::Int(12)
+        );
+    }
+
+    #[test]
+    fn resolve_max_health_uses_base_health_stat() {
+        let mut state = crate::GameState::new_empty();
+        let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
+        let player = state
+            .world_mut()
+            .entity_manager_mut()
+            .get_entity_mut(player_id)
+            .expect("player should exist");
+        player
+            .attributes
+            .gameplay
+            .stats
+            .base
+            .insert(HEALTH_STAT_ID.to_string(), 25);
+        player
+            .attributes
+            .gameplay
+            .stats
+            .current
+            .insert(HEALTH_STAT_ID.to_string(), 12);
+
+        let flags = GameFlags::default();
+        let context = ValuePathContext {
+            entity_manager: state.world().entity_manager(),
+            game_flags: &flags,
+            player_id: Some(player_id),
+            trigger_context: &TriggerContext::empty(),
+        };
+
+        assert_eq!(
+            ValuePath::parse("player.max_health")
+                .expect("max health path should parse")
+                .resolve(context)
+                .expect("max health should resolve"),
+            ResolvedValue::Int(25)
         );
     }
 }

@@ -132,6 +132,13 @@ fn ui_layout_engine_composes_bindings_progress_and_frames() {
             .iter()
             .any(|hitbox| hitbox.widget_id.as_str() == "coins" && hitbox.event_id.is_some())
     );
+    assert!(
+        output
+            .composition
+            .blocks
+            .iter()
+            .any(|block| block.fill_color.is_some() && block.rect.width > 20.0 && block.rect.height > 2.0)
+    );
 }
 
 #[test]

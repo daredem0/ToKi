@@ -3,6 +3,34 @@ use crate::ui::editor_ui::ProjectRequest;
 use std::process::Command;
 
 impl EditorApp {
+    pub(super) fn persist_dirty_ui_layout_draft(&mut self) -> anyhow::Result<()> {
+        let (dirty, layout) = {
+            let ui_editor = &crate::ui::editor_context::ui_editor_state(&self.core.ui).ui;
+            (ui_editor.dirty, ui_editor.draft.clone())
+        };
+        if !dirty {
+            return Ok(());
+        }
+
+        let Some(layout) = layout else {
+            return Ok(());
+        };
+
+        let project_assets = self
+            .core
+            .project_manager
+            .get_project_assets_mut()
+            .ok_or_else(|| anyhow::anyhow!("No project assets manager available"))?;
+        project_assets.save_ui_layout(&layout)?;
+
+        let ui_editor = &mut crate::ui::editor_context::ui_editor_state_mut(&mut self.core.ui).ui;
+        ui_editor.loaded_layout_id = Some(layout.id.to_string());
+        ui_editor.selected_layout_id = Some(layout.id.to_string());
+        ui_editor.dirty = false;
+        ui_editor.status_message = Some("UI layout autosaved for runtime launch".to_string());
+        Ok(())
+    }
+
     pub(super) fn handle_play_scene_request(&mut self) {
         if !self.core.ui.project.take_request(ProjectRequest::PlayScene) {
             return;
@@ -16,6 +44,19 @@ impl EditorApp {
             tracing::warn!("Cannot play scene: no active scene is selected");
             return;
         };
+
+        if let Err(error) = self.persist_dirty_ui_layout_draft() {
+            tracing::error!(
+                "Cannot play scene '{}': failed to save current UI layout draft: {}",
+                active_scene_name,
+                error
+            );
+            return;
+        }
+
+        if let Some(project) = self.core.project_manager.current_project.as_mut() {
+            crate::editor_services::graph_metadata::copy_ui_into_project(&self.core.ui, project);
+        }
 
         if let Err(error) = self
             .core

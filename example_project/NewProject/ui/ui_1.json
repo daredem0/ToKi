@@ -1,0 +1,174 @@
+{
+  "id": "ui_1",
+  "title": "New UI Layout",
+  "startup_visible": true,
+  "z_order": 0,
+  "root": {
+    "id": "root",
+    "title": "Root",
+    "layout": {
+      "anchor": "stretch",
+      "offset": [
+        0.0,
+        0.0
+      ],
+      "size": [
+        320.0,
+        180.0
+      ],
+      "margin": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      },
+      "padding": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      }
+    },
+    "style": {
+      "fill_color": null,
+      "border_color": null,
+      "text_color": null,
+      "accent_color": null,
+      "typography": {
+        "font_family": null,
+        "font_size_px": null,
+        "weight": null,
+        "slant": null,
+        "anchor": null
+      }
+    },
+    "event_id": null,
+    "focusable": false,
+    "visible_if": null,
+    "enabled_if": null,
+    "kind": {
+      "kind": "grid_container",
+      "columns": 1,
+      "spacing": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      }
+    },
+    "children": [
+      {
+        "id": "label_1",
+        "title": "Title",
+        "layout": {
+          "anchor": "top_left",
+          "offset": [
+            -11.0,
+            -11.0
+          ],
+          "size": [
+            59.0,
+            18.0
+          ],
+          "margin": {
+            "left": 4,
+            "top": 4,
+            "right": 4,
+            "bottom": 4
+          },
+          "padding": {
+            "left": 4,
+            "top": 4,
+            "right": 4,
+            "bottom": 4
+          }
+        },
+        "style": {
+          "fill_color": null,
+          "border_color": null,
+          "text_color": null,
+          "accent_color": null,
+          "typography": {
+            "font_family": "Sans",
+            "font_size_px": 33,
+            "weight": "Bold",
+            "slant": "Italic",
+            "anchor": "CenterLeft"
+          }
+        },
+        "event_id": null,
+        "focusable": false,
+        "visible_if": null,
+        "enabled_if": null,
+        "kind": {
+          "kind": "label",
+          "content": {
+            "segments": [
+              {
+                "kind": "literal",
+                "text": "blaaaa"
+              }
+            ]
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "progress_1",
+        "title": "progress_1",
+        "layout": {
+          "anchor": "top_left",
+          "offset": [
+            80.0,
+            95.0
+          ],
+          "size": [
+            75.0,
+            12.0
+          ],
+          "margin": {
+            "left": 4,
+            "top": 4,
+            "right": 4,
+            "bottom": 4
+          },
+          "padding": {
+            "left": 4,
+            "top": 4,
+            "right": 4,
+            "bottom": 4
+          }
+        },
+        "style": {
+          "fill_color": null,
+          "border_color": null,
+          "text_color": null,
+          "accent_color": null,
+          "typography": {
+            "font_family": null,
+            "font_size_px": null,
+            "weight": null,
+            "slant": null,
+            "anchor": null
+          }
+        },
+        "event_id": null,
+        "focusable": false,
+        "visible_if": null,
+        "enabled_if": null,
+        "kind": {
+          "kind": "progress_bar",
+          "value": {
+            "mode": "percent",
+            "percent": {
+              "kind": "expression",
+              "expression": "50",
+              "key": null
+            }
+          }
+        },
+        "children": []
+      }
+    ]
+  }
+}

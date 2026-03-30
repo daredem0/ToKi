@@ -10,7 +10,10 @@ use toki_core::expression::Expression;
 use toki_core::flags::{FlagValue, GameFlags};
 use toki_core::rules::TriggerContext;
 use toki_core::text::{TextAnchor, TextSlant, TextWeight};
-use toki_core::ui::{UiBlock, UiComposition, UiRect};
+use toki_core::ui::{
+    runtime_ui_text_scale, transform_logical_ui_composition_with_scales,
+    transform_logical_ui_rect, UiBlock, UiComposition, UiRect,
+};
 use toki_core::ui_layout::{
     UiAnchor, UiBinding, UiBindingContext, UiCollectionBinding, UiCollectionRowTemplate,
     UiCollectionTextSegment, UiLayoutAsset, UiLayoutEngine, UiProgressBinding, UiSpacing,
@@ -422,8 +425,9 @@ fn render_ui_layout_canvas(
     paint_ui_composition(
         &painter,
         &preview.composition,
-        origin,
+        glam::vec2(origin.x, origin.y),
         zoom,
+        preview_viewport_size,
         &ui_editor_font_choices(ui_state),
     );
 
@@ -1507,23 +1511,27 @@ fn make_duplicate_id(existing: &BTreeSet<&str>, source_id: &str) -> String {
 fn paint_ui_composition(
     painter: &egui::Painter,
     composition: &UiComposition,
-    origin: Vec2,
+    origin: glam::Vec2,
     scale: f32,
+    logical_viewport_size: glam::Vec2,
     available_fonts: &[String],
 ) {
-    for block in &composition.blocks {
-        paint_ui_block(painter, block, origin, scale, available_fonts);
+    let transformed = transform_logical_ui_composition_with_scales(
+        composition,
+        origin,
+        scale,
+        runtime_ui_text_scale(logical_viewport_size, logical_viewport_size * scale),
+    );
+    for block in &transformed.blocks {
+        paint_ui_block(painter, block, available_fonts);
     }
 }
 
-fn paint_ui_block(
-    painter: &egui::Painter,
-    block: &UiBlock,
-    origin: Vec2,
-    scale: f32,
-    available_fonts: &[String],
-) {
-    let rect = scaled_rect(block.rect, origin, scale);
+fn paint_ui_block(painter: &egui::Painter, block: &UiBlock, available_fonts: &[String]) {
+    let rect = Rect::from_min_size(
+        Pos2::new(block.rect.x, block.rect.y),
+        Vec2::new(block.rect.width, block.rect.height),
+    );
     if let Some(fill) = block.fill_color {
         painter.rect_filled(rect, 0.0, rgba_to_color32(fill));
     }
@@ -1531,22 +1539,19 @@ fn paint_ui_block(
         painter.rect_stroke(
             rect,
             0.0,
-            Stroke::new(block.border_thickness.max(1.0) * scale.max(1.0), rgba_to_color32(border)),
+            Stroke::new(block.border_thickness.max(1.0), rgba_to_color32(border)),
             StrokeKind::Outside,
         );
     }
     if let Some(text) = &block.text {
         let font_family = resolve_preview_font_family(&text.style.font_family, available_fonts);
         let mut format = TextFormat::simple(
-            FontId::new(text.style.size_px * scale, font_family),
+            FontId::new(text.style.size_px, font_family),
             rgba_to_color32(text.style.color),
         );
         format.italics = matches!(text.style.slant, TextSlant::Italic);
         let galley = painter.layout_job(LayoutJob::single_section(text.content.clone(), format));
-        let anchor_position = Pos2::new(
-            origin.x + text.position.x * scale,
-            origin.y + text.position.y * scale,
-        );
+        let anchor_position = Pos2::new(text.position.x, text.position.y);
         let galley_pos = align_galley_top_left(anchor_position, galley.size(), text.anchor);
         painter.galley(galley_pos, galley.clone(), rgba_to_color32(text.style.color));
         if matches!(text.style.weight, TextWeight::Bold) {
@@ -1614,9 +1619,10 @@ fn ui_preview_viewport_size(project: Option<&Project>) -> glam::Vec2 {
 }
 
 fn scaled_rect(rect: UiRect, origin: Vec2, scale: f32) -> Rect {
+    let rect = transform_logical_ui_rect(rect, glam::vec2(origin.x, origin.y), scale);
     Rect::from_min_size(
-        Pos2::new(origin.x + rect.x * scale, origin.y + rect.y * scale),
-        Vec2::new(rect.width * scale, rect.height * scale),
+        Pos2::new(rect.x, rect.y),
+        Vec2::new(rect.width, rect.height),
     )
 }
 

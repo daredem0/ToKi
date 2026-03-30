@@ -224,6 +224,11 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_project_request(&mut self) {
+        if let Err(error) = self.persist_dirty_ui_layout_draft() {
+            tracing::error!("Failed to save UI layout draft before project save: {}", error);
+            return;
+        }
+
         if let Some(project) = self.core.project_manager.current_project.as_mut() {
             graph_metadata::copy_ui_into_project(&self.core.ui, project);
         }

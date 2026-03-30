@@ -1,7 +1,9 @@
 use toki_core::math::projection::screen_space_projection;
 use toki_core::project_runtime::RuntimeViewportMode;
 use toki_core::text::TextItem;
-use toki_core::ui::{UiComposition, UiRect};
+use toki_core::ui::{
+    runtime_ui_text_scale, transform_logical_ui_composition_with_scales, UiComposition, UiRect,
+};
 
 use super::layout::{compute_layout_for_mode, ViewportLayout};
 
@@ -13,16 +15,7 @@ pub struct ViewportPresentation {
 
 impl ViewportPresentation {
     pub fn runtime_ui_scale_factor(&self) -> f32 {
-        let surface_size = self.surface_viewport_size();
-        let reference_size = glam::Vec2::new(
-            self.layout.logical_viewport_size.x as f32 * 7.0,
-            self.layout.logical_viewport_size.y as f32 * 7.0,
-        );
-        let size_ratio = (surface_size.x / reference_size.x)
-            .min(surface_size.y / reference_size.y)
-            .clamp(0.0, 1.0);
-
-        0.06 + 0.94 * size_ratio.powf(1.15)
+        runtime_ui_text_scale(self.logical_viewport_size(), self.surface_viewport_size())
     }
 
     pub fn logical_viewport_size(&self) -> glam::Vec2 {
@@ -89,6 +82,7 @@ impl ViewportPresentation {
     pub fn transform_logical_text_item(&self, item: &TextItem) -> TextItem {
         let mut transformed = item.clone();
         transformed.position = self.logical_to_surface_position(item.position);
+        transformed.style.size_px *= self.runtime_ui_scale_factor();
         transformed
     }
 
@@ -105,25 +99,12 @@ impl ViewportPresentation {
     }
 
     pub fn transform_logical_ui_composition(&self, composition: &UiComposition) -> UiComposition {
-        let mut transformed = composition.clone();
-        for block in &mut transformed.blocks {
-            block.rect = self.transform_logical_rect(block.rect);
-            block.border_thickness *= self.layout.resolved_scale;
-            if let Some(text) = block.text.as_mut() {
-                text.position = self.logical_to_surface_position(text.position);
-            }
-        }
-        transformed
-    }
-
-    fn transform_logical_rect(&self, rect: UiRect) -> UiRect {
-        let position = self.logical_to_surface_position(glam::vec2(rect.x, rect.y));
-        UiRect {
-            x: position.x,
-            y: position.y,
-            width: rect.width * self.layout.resolved_scale,
-            height: rect.height * self.layout.resolved_scale,
-        }
+        transform_logical_ui_composition_with_scales(
+            composition,
+            self.surface_viewport_origin(),
+            self.layout.resolved_scale,
+            self.runtime_ui_scale_factor(),
+        )
     }
 }
 
@@ -273,7 +254,10 @@ mod tests {
         );
         let transformed_text = presentation.transform_logical_text_item(&text);
         assert_eq!(transformed_text.position, glam::Vec2::new(112.0, 44.0));
-        assert!((transformed_text.style.size_px - 10.0).abs() < 0.01);
+        assert!(
+            (transformed_text.style.size_px - 10.0 * presentation.runtime_ui_scale_factor()).abs()
+                < 0.01
+        );
 
         let mut composition = UiComposition::default();
         composition.push(UiBlock {
@@ -306,7 +290,9 @@ mod tests {
         assert!((block.border_thickness - 4.0).abs() < 0.01);
         let text = block.text.as_ref().expect("text should exist");
         assert_eq!(text.position, glam::Vec2::new(160.0, 92.0));
-        assert!((text.style.size_px - 8.0).abs() < 0.01);
+        assert!(
+            (text.style.size_px - 8.0 * presentation.runtime_ui_scale_factor()).abs() < 0.01
+        );
     }
 
     #[test]
