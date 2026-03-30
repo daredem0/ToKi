@@ -54,44 +54,46 @@ fn ui_layout_engine_composes_bindings_progress_and_frames() {
     flags.set("coins", FlagValue::Int(7));
     let overrides = HashMap::new();
 
-    let mut root = UiWidgetNode::default();
-    root.children = vec![
-        UiWidgetNode {
-            id: "coins".into(),
-            title: "Coins".to_string(),
-            kind: UiWidgetKind::Label {
-                content: UiTextTemplate {
-                    segments: vec![
-                        UiTextSegment::Literal {
-                            text: "Coins: ".to_string(),
-                        },
-                        UiTextSegment::Binding {
-                            binding: UiBinding::ValuePath {
-                                path: "flags.coins".to_string(),
-                                key: None,
+    let root = UiWidgetNode {
+        children: vec![
+            UiWidgetNode {
+                id: "coins".into(),
+                title: "Coins".to_string(),
+                kind: UiWidgetKind::Label {
+                    content: UiTextTemplate {
+                        segments: vec![
+                            UiTextSegment::Literal {
+                                text: "Coins: ".to_string(),
                             },
-                        },
-                    ],
-                },
-            },
-            focusable: true,
-            event_id: Some("coins_clicked".to_string()),
-            ..UiWidgetNode::default()
-        },
-        UiWidgetNode {
-            id: "progress".into(),
-            title: "Progress".to_string(),
-            kind: UiWidgetKind::ProgressBar {
-                value: UiProgressBinding::Percent {
-                    percent: UiBinding::Expression {
-                        expression: "50".to_string(),
-                        key: None,
+                            UiTextSegment::Binding {
+                                binding: UiBinding::ValuePath {
+                                    path: "flags.coins".to_string(),
+                                    key: None,
+                                },
+                            },
+                        ],
                     },
                 },
+                focusable: true,
+                event_id: Some("coins_clicked".to_string()),
+                ..UiWidgetNode::default()
             },
-            ..UiWidgetNode::default()
-        },
-    ];
+            UiWidgetNode {
+                id: "progress".into(),
+                title: "Progress".to_string(),
+                kind: UiWidgetKind::ProgressBar {
+                    value: UiProgressBinding::Percent {
+                        percent: UiBinding::Expression {
+                            expression: "50".to_string(),
+                            key: None,
+                        },
+                    },
+                },
+                ..UiWidgetNode::default()
+            },
+        ],
+        ..UiWidgetNode::default()
+    };
 
     let layout = UiLayoutAsset {
         id: "hud".into(),
@@ -136,24 +138,26 @@ fn ui_controller_handles_visibility_binding_updates_and_click_events() {
     let flags = GameFlags::default();
     let overrides = HashMap::new();
 
-    let mut root = UiWidgetNode::default();
-    root.children = vec![UiWidgetNode {
-        id: "button_like".into(),
-        title: "Button".to_string(),
-        focusable: true,
-        event_id: Some("open_inventory".to_string()),
-        kind: UiWidgetKind::Label {
-            content: UiTextTemplate {
-                segments: vec![UiTextSegment::Binding {
-                    binding: UiBinding::ValuePath {
-                        path: "flags.mode".to_string(),
-                        key: Some("mode".to_string()),
-                    },
-                }],
+    let root = UiWidgetNode {
+        children: vec![UiWidgetNode {
+            id: "button_like".into(),
+            title: "Button".to_string(),
+            focusable: true,
+            event_id: Some("open_inventory".to_string()),
+            kind: UiWidgetKind::Label {
+                content: UiTextTemplate {
+                    segments: vec![UiTextSegment::Binding {
+                        binding: UiBinding::ValuePath {
+                            path: "flags.mode".to_string(),
+                            key: Some("mode".to_string()),
+                        },
+                    }],
+                },
             },
-        },
+            ..UiWidgetNode::default()
+        }],
         ..UiWidgetNode::default()
-    }];
+    };
 
     let layout = UiLayoutAsset {
         id: "hud".into(),
@@ -226,46 +230,48 @@ fn root_level_widgets_keep_independent_positions() {
     let flags = GameFlags::default();
     let overrides = HashMap::new();
 
-    let mut root = UiWidgetNode::default();
-    root.children = vec![
-        UiWidgetNode {
-            id: "label".into(),
-            title: "Label".to_string(),
-            layout: toki_core::ui_layout::UiLayoutSpec {
-                anchor: toki_core::ui_layout::UiAnchor::TopLeft,
-                offset: [0.0, 0.0],
-                size: [80.0, 60.0],
-                ..Default::default()
-            },
-            kind: UiWidgetKind::Label {
-                content: UiTextTemplate {
-                    segments: vec![UiTextSegment::Literal {
-                        text: "Top Left".to_string(),
-                    }],
+    let root = UiWidgetNode {
+        children: vec![
+            UiWidgetNode {
+                id: "label".into(),
+                title: "Label".to_string(),
+                layout: toki_core::ui_layout::UiLayoutSpec {
+                    anchor: toki_core::ui_layout::UiAnchor::TopLeft,
+                    offset: [0.0, 0.0],
+                    size: [80.0, 60.0],
+                    ..Default::default()
                 },
-            },
-            ..UiWidgetNode::default()
-        },
-        UiWidgetNode {
-            id: "progress".into(),
-            title: "Progress".to_string(),
-            layout: toki_core::ui_layout::UiLayoutSpec {
-                anchor: toki_core::ui_layout::UiAnchor::TopRight,
-                offset: [0.0, 0.0],
-                size: [40.0, 12.0],
-                ..Default::default()
-            },
-            kind: UiWidgetKind::ProgressBar {
-                value: UiProgressBinding::Percent {
-                    percent: UiBinding::Expression {
-                        expression: "50".to_string(),
-                        key: None,
+                kind: UiWidgetKind::Label {
+                    content: UiTextTemplate {
+                        segments: vec![UiTextSegment::Literal {
+                            text: "Top Left".to_string(),
+                        }],
                     },
                 },
+                ..UiWidgetNode::default()
             },
-            ..UiWidgetNode::default()
-        },
-    ];
+            UiWidgetNode {
+                id: "progress".into(),
+                title: "Progress".to_string(),
+                layout: toki_core::ui_layout::UiLayoutSpec {
+                    anchor: toki_core::ui_layout::UiAnchor::TopRight,
+                    offset: [0.0, 0.0],
+                    size: [40.0, 12.0],
+                    ..Default::default()
+                },
+                kind: UiWidgetKind::ProgressBar {
+                    value: UiProgressBinding::Percent {
+                        percent: UiBinding::Expression {
+                            expression: "50".to_string(),
+                            key: None,
+                        },
+                    },
+                },
+                ..UiWidgetNode::default()
+            },
+        ],
+        ..UiWidgetNode::default()
+    };
 
     let layout = UiLayoutAsset {
         id: "hud".into(),
@@ -305,29 +311,31 @@ fn label_text_defaults_to_center_and_honors_typography_overrides() {
     let flags = GameFlags::default();
     let overrides = HashMap::new();
 
-    let mut root = UiWidgetNode::default();
-    root.children = vec![UiWidgetNode {
-        id: "headline".into(),
-        title: "Headline".to_string(),
-        style: toki_core::ui_layout::UiWidgetStyle {
-            typography: UiTypography {
-                font_family: Some("Monospace".to_string()),
-                font_size_px: Some(20),
-                weight: Some(TextWeight::Bold),
-                slant: Some(TextSlant::Italic),
-                anchor: Some(TextAnchor::Center),
+    let root = UiWidgetNode {
+        children: vec![UiWidgetNode {
+            id: "headline".into(),
+            title: "Headline".to_string(),
+            style: toki_core::ui_layout::UiWidgetStyle {
+                typography: UiTypography {
+                    font_family: Some("Monospace".to_string()),
+                    font_size_px: Some(20),
+                    weight: Some(TextWeight::Bold),
+                    slant: Some(TextSlant::Italic),
+                    anchor: Some(TextAnchor::Center),
+                },
+                ..Default::default()
             },
-            ..Default::default()
-        },
-        kind: UiWidgetKind::Label {
-            content: UiTextTemplate {
-                segments: vec![UiTextSegment::Literal {
-                    text: "Centered".to_string(),
-                }],
+            kind: UiWidgetKind::Label {
+                content: UiTextTemplate {
+                    segments: vec![UiTextSegment::Literal {
+                        text: "Centered".to_string(),
+                    }],
+                },
             },
-        },
+            ..UiWidgetNode::default()
+        }],
         ..UiWidgetNode::default()
-    }];
+    };
 
     let layout = UiLayoutAsset {
         id: "hud".into(),
