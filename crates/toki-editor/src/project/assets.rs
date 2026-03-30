@@ -559,10 +559,9 @@ impl ProjectAssets {
     pub fn load_ui_layout(&mut self, layout_id: &str) -> Result<Option<UiLayoutAsset>> {
         if let Some(ui_asset) = self.ui_layouts.get_mut(layout_id) {
             if ui_asset.layout.is_none() {
-                let layout =
-                    load_ui_layout_from_project_path(&ui_asset.path).map_err(|error| {
-                        anyhow::anyhow!("Failed to load ui layout '{}': {}", layout_id, error)
-                    })?;
+                let layout = load_ui_layout_from_project_path(&ui_asset.path).map_err(|error| {
+                    anyhow::anyhow!("Failed to load ui layout '{}': {}", layout_id, error)
+                })?;
                 ui_asset.layout = Some(layout.clone());
                 Ok(Some(layout))
             } else {

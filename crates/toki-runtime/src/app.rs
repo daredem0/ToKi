@@ -331,8 +331,7 @@ impl App {
             pack_mount,
             asset_load_plan,
             decoded_project_cache,
-        ) =
-            Self::build_startup_state(&launch_options);
+        ) = Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
         let camera_system = Self::build_camera_system(&launch_options, &game_system);
         let mut audio_system =

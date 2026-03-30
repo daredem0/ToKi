@@ -468,19 +468,18 @@ impl<'a> Lexer<'a> {
 
     fn read_number(&mut self, start: usize, first: char) -> Result<i32, ExpressionError> {
         let mut number = String::from(first);
-        while self
-            .peek_char()
-            .is_some_and(|(_, ch)| ch.is_ascii_digit())
-        {
+        while self.peek_char().is_some_and(|(_, ch)| ch.is_ascii_digit()) {
             number.push(self.next_char().expect("peeked char should exist").1);
         }
-        number.parse::<i32>().map_err(|error| ExpressionError::Parse {
-            span: TextSpan {
-                start,
-                end: self.current_index(),
-            },
-            message: format!("invalid integer literal: {error}"),
-        })
+        number
+            .parse::<i32>()
+            .map_err(|error| ExpressionError::Parse {
+                span: TextSpan {
+                    start,
+                    end: self.current_index(),
+                },
+                message: format!("invalid integer literal: {error}"),
+            })
     }
 
     fn read_ident(&mut self, _start: usize, first: char) -> String {
@@ -756,8 +755,8 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::Expression;
-    use crate::flags::{FlagValue, GameFlags};
     use crate::entity::HEALTH_STAT_ID;
+    use crate::flags::{FlagValue, GameFlags};
     use crate::value_path::{ResolvedValue, ValuePathContext};
     use crate::{game::SceneSystem, rules::TriggerContext, GameState};
     use glam::IVec2;
@@ -778,7 +777,8 @@ mod tests {
         let expr = Expression::parse("1 + 2 * 3").expect("expression should parse");
         let flags = GameFlags::default();
         assert_eq!(
-            expr.evaluate(empty_context(&flags)).expect("expression should evaluate"),
+            expr.evaluate(empty_context(&flags))
+                .expect("expression should evaluate"),
             ResolvedValue::Int(7)
         );
     }
@@ -788,7 +788,8 @@ mod tests {
         let expr = Expression::parse("1 + 2 == 3 && !false").expect("expression should parse");
         let flags = GameFlags::default();
         assert_eq!(
-            expr.evaluate(empty_context(&flags)).expect("expression should evaluate"),
+            expr.evaluate(empty_context(&flags))
+                .expect("expression should evaluate"),
             ResolvedValue::Bool(true)
         );
     }
@@ -829,7 +830,8 @@ mod tests {
         let expr = Expression::parse("max(2, abs(-5))").expect("expression should parse");
         let flags = GameFlags::default();
         assert_eq!(
-            expr.evaluate(empty_context(&flags)).expect("expression should evaluate"),
+            expr.evaluate(empty_context(&flags))
+                .expect("expression should evaluate"),
             ResolvedValue::Int(5)
         );
     }

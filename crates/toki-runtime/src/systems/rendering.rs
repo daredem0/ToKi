@@ -282,10 +282,7 @@ impl RenderingSystem {
             .surface_to_viewport_local_position(position)
     }
 
-    pub fn surface_to_logical_viewport_position(
-        &self,
-        position: glam::Vec2,
-    ) -> Option<glam::Vec2> {
+    pub fn surface_to_logical_viewport_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
         self.viewport_presentation()
             .surface_to_logical_viewport_position(position)
     }

@@ -129,12 +129,16 @@ impl RuleEngine<'_> {
             }
             RuleAction::ShowUi { ui_id } => {
                 if !ui_id.as_str().trim().is_empty() {
-                    command_buffer.push(RuleCommand::ShowUi { ui_id: ui_id.clone() });
+                    command_buffer.push(RuleCommand::ShowUi {
+                        ui_id: ui_id.clone(),
+                    });
                 }
             }
             RuleAction::HideUi { ui_id } => {
                 if !ui_id.as_str().trim().is_empty() {
-                    command_buffer.push(RuleCommand::HideUi { ui_id: ui_id.clone() });
+                    command_buffer.push(RuleCommand::HideUi {
+                        ui_id: ui_id.clone(),
+                    });
                 }
             }
             RuleAction::UpdateUiBinding {
@@ -178,19 +182,17 @@ impl RuleEngine<'_> {
             RuleAction::Spawn {
                 entity_type,
                 position,
-            } => {
-                match position.resolve(self.value_path_context(context)) {
-                    Ok(position) => command_buffer.push(RuleCommand::Spawn {
-                        entity_type: *entity_type,
-                        position: glam::IVec2::new(position[0], position[1]),
-                    }),
-                    Err(error) => tracing::warn!(
-                        error = %error,
-                        action = ?action,
-                        "Failed to resolve spawn position expression"
-                    ),
-                }
-            }
+            } => match position.resolve(self.value_path_context(context)) {
+                Ok(position) => command_buffer.push(RuleCommand::Spawn {
+                    entity_type: *entity_type,
+                    position: glam::IVec2::new(position[0], position[1]),
+                }),
+                Err(error) => tracing::warn!(
+                    error = %error,
+                    action = ?action,
+                    "Failed to resolve spawn position expression"
+                ),
+            },
             RuleAction::DestroySelf { target } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
                     RuleCommand::DestroySelf { entity_id }
@@ -198,12 +200,11 @@ impl RuleEngine<'_> {
             }
             RuleAction::DamageEntity { target, amount } => {
                 match amount.resolve(self.value_path_context(context)) {
-                    Ok(amount) => self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                        RuleCommand::DamageEntity {
-                            entity_id,
-                            amount,
-                        }
-                    }),
+                    Ok(amount) => {
+                        self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                            RuleCommand::DamageEntity { entity_id, amount }
+                        })
+                    }
                     Err(error) => tracing::warn!(
                         error = %error,
                         action = ?action,
@@ -213,12 +214,11 @@ impl RuleEngine<'_> {
             }
             RuleAction::HealEntity { target, amount } => {
                 match amount.resolve(self.value_path_context(context)) {
-                    Ok(amount) => self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                        RuleCommand::HealEntity {
-                            entity_id,
-                            amount,
-                        }
-                    }),
+                    Ok(amount) => {
+                        self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                            RuleCommand::HealEntity { entity_id, amount }
+                        })
+                    }
                     Err(error) => tracing::warn!(
                         error = %error,
                         action = ?action,

@@ -54,10 +54,7 @@ impl ViewportPresentation {
         Some(glam::Vec2::new(position.x - rect.x, position.y - rect.y))
     }
 
-    pub fn surface_to_logical_viewport_position(
-        &self,
-        position: glam::Vec2,
-    ) -> Option<glam::Vec2> {
+    pub fn surface_to_logical_viewport_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
         self.surface_to_viewport_local_position(position)
             .map(|surface_local| surface_local / self.layout.resolved_scale.max(f32::EPSILON))
     }
@@ -290,9 +287,7 @@ mod tests {
         assert!((block.border_thickness - 4.0).abs() < 0.01);
         let text = block.text.as_ref().expect("text should exist");
         assert_eq!(text.position, glam::Vec2::new(160.0, 92.0));
-        assert!(
-            (text.style.size_px - 8.0 * presentation.runtime_ui_scale_factor()).abs() < 0.01
-        );
+        assert!((text.style.size_px - 8.0 * presentation.runtime_ui_scale_factor()).abs() < 0.01);
     }
 
     #[test]

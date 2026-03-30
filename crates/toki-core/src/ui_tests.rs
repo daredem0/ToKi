@@ -1,6 +1,6 @@
 use super::{
-    transform_logical_ui_composition, transform_logical_ui_rect, UiBlock, UiComposition, UiRect,
-    UiTextBlock,
+    runtime_ui_text_scale, transform_logical_ui_composition, transform_logical_ui_rect, UiBlock,
+    UiComposition, UiRect, UiTextBlock,
 };
 use crate::text::{TextAnchor, TextStyle, TextWeight};
 
@@ -126,4 +126,14 @@ fn logical_ui_transform_scales_rects_borders_and_text() {
     let text = block.text.as_ref().expect("text should exist");
     assert_eq!(text.position, glam::vec2(160.0, 96.0));
     assert!((text.style.size_px - 32.0).abs() < 0.01);
+}
+
+#[test]
+fn runtime_ui_text_scale_stays_consistent_for_common_hud_viewports() {
+    let gb_like = runtime_ui_text_scale(glam::vec2(160.0, 144.0), glam::vec2(480.0, 432.0));
+    let widescreen = runtime_ui_text_scale(glam::vec2(320.0, 180.0), glam::vec2(1280.0, 720.0));
+
+    assert!(gb_like > 0.3 && gb_like <= 1.0);
+    assert!(widescreen > 0.3 && widescreen <= 1.0);
+    assert!((gb_like - widescreen).abs() < 0.3);
 }

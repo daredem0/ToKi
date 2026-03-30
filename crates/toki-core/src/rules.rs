@@ -358,10 +358,7 @@ pub enum RuleFlagValueSource {
 }
 
 impl RuleFlagValueSource {
-    pub fn resolve(
-        &self,
-        context: ValuePathContext<'_, '_>,
-    ) -> Result<FlagValue, ExpressionError> {
+    pub fn resolve(&self, context: ValuePathContext<'_, '_>) -> Result<FlagValue, ExpressionError> {
         match self {
             Self::Literal(value) => Ok(value.clone()),
             Self::Expression { expr } => Ok(Expression::parse(expr)?
@@ -397,10 +394,7 @@ impl RuleFlagValueSource {
 #[serde(untagged)]
 pub enum RuleVec2IntSource {
     Literal([i32; 2]),
-    Expression {
-        x: RuleIntSource,
-        y: RuleIntSource,
-    },
+    Expression { x: RuleIntSource, y: RuleIntSource },
 }
 
 impl RuleVec2IntSource {
@@ -408,10 +402,7 @@ impl RuleVec2IntSource {
         Self::Literal(value)
     }
 
-    pub fn resolve(
-        &self,
-        context: ValuePathContext<'_, '_>,
-    ) -> Result<[i32; 2], ExpressionError> {
+    pub fn resolve(&self, context: ValuePathContext<'_, '_>) -> Result<[i32; 2], ExpressionError> {
         match self {
             Self::Literal(value) => Ok(*value),
             Self::Expression { x, y } => Ok([x.resolve(context)?, y.resolve(context)?]),

@@ -7,11 +7,19 @@ use toki_core::ui_layout::{
     UiWidgetNode, UiWidgetStyle,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum UiCanvasInteraction {
     Pan,
-    MoveWidget { widget_id: String },
-    ResizeWidget { widget_id: String },
+    MoveWidget {
+        widget_id: String,
+        press_origin: [f32; 2],
+        start_offset: [f32; 2],
+    },
+    ResizeWidget {
+        widget_id: String,
+        press_origin: [f32; 2],
+        start_size: [f32; 2],
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -40,7 +48,7 @@ impl UiEditorState {
         ];
         let root = UiWidgetNode {
             id: root_id.clone().into(),
-            title: "Root".to_string(),
+            title: "Viewport Root".to_string(),
             layout: UiLayoutSpec {
                 anchor: UiAnchor::Stretch,
                 size: viewport_size,
@@ -60,11 +68,17 @@ impl UiEditorState {
                 title: "Title".to_string(),
                 layout: UiLayoutSpec {
                     anchor: UiAnchor::TopLeft,
-                    offset: [16.0, 16.0],
-                    size: [180.0, 28.0],
+                    offset: [8.0, 8.0],
+                    size: [96.0, 18.0],
                     ..UiLayoutSpec::default()
                 },
-                style: UiWidgetStyle::default(),
+                style: UiWidgetStyle {
+                    typography: toki_core::ui_layout::UiTypography {
+                        font_size_px: Some(8),
+                        ..Default::default()
+                    },
+                    ..UiWidgetStyle::default()
+                },
                 event_id: None,
                 focusable: false,
                 visible_if: None,
@@ -72,7 +86,7 @@ impl UiEditorState {
                 kind: UiWidgetKind::Label {
                     content: UiTextTemplate {
                         segments: vec![UiTextSegment::Literal {
-                            text: "HUD Label".to_string(),
+                            text: "HUD".to_string(),
                         }],
                     },
                 },
@@ -93,7 +107,7 @@ impl UiEditorState {
             dirty: true,
             status_message: Some("Created new UI layout draft".to_string()),
             zoom: 1.0,
-            pan: [16.0, 16.0],
+            pan: [12.0, 12.0],
             canvas_interaction: None,
             views_by_layout: HashMap::new(),
             view_dirty: false,
@@ -139,7 +153,7 @@ impl UiEditorState {
     pub fn sync_active_view_from_layout(&mut self) {
         let Some(layout_id) = self.selected_layout_id.clone() else {
             self.zoom = 1.0;
-            self.pan = [16.0, 16.0];
+            self.pan = [12.0, 12.0];
             return;
         };
         let view = self
@@ -180,21 +194,30 @@ impl UiEditorState {
     #[cfg(test)]
     pub fn begin_move_widget(&mut self, widget_id: String) {
         self.select_widget(widget_id.clone());
-        self.canvas_interaction = Some(UiCanvasInteraction::MoveWidget { widget_id });
+        self.canvas_interaction = Some(UiCanvasInteraction::MoveWidget {
+            widget_id,
+            press_origin: [0.0, 0.0],
+            start_offset: [0.0, 0.0],
+        });
     }
 
     #[cfg(test)]
     pub fn begin_resize_widget(&mut self, widget_id: String) {
         self.select_widget(widget_id.clone());
-        self.canvas_interaction = Some(UiCanvasInteraction::ResizeWidget { widget_id });
+        self.canvas_interaction = Some(UiCanvasInteraction::ResizeWidget {
+            widget_id,
+            press_origin: [0.0, 0.0],
+            start_size: [0.0, 0.0],
+        });
     }
-
 }
 
 pub(crate) fn sync_ui_layout_registry(ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
     let layout_names = project_assets.get_ui_layout_names();
     let ui_state_ref = &mut crate::ui::editor_context::ui_editor_state_mut(ui_state).ui;
-    if ui_state_ref.draft.is_none() && ui_state_ref.selected_layout_id.is_none() && !layout_names.is_empty()
+    if ui_state_ref.draft.is_none()
+        && ui_state_ref.selected_layout_id.is_none()
+        && !layout_names.is_empty()
     {
         if let Ok(Some(layout)) = project_assets.load_ui_layout(&layout_names[0]) {
             ui_state_ref.load_layout(layout);
@@ -273,6 +296,10 @@ mod tests {
         let layout = state.draft.expect("draft should exist");
         assert_eq!(layout.id.as_str(), "ui_1");
         assert_eq!(layout.root.id.as_str(), "root");
+        assert_eq!(layout.root.title, "Viewport Root");
+        assert_eq!(layout.root.children.len(), 1);
+        assert_eq!(layout.root.children[0].layout.offset, [8.0, 8.0]);
+        assert_eq!(layout.root.children[0].layout.size, [96.0, 18.0]);
         assert_eq!(state.selected_widget_id.as_deref(), Some("label_1"));
         assert!(state.dirty);
     }
@@ -293,7 +320,13 @@ mod tests {
             title: "HUD".to_string(),
             startup_visible: true,
             z_order: 0,
-            root: UiWidgetNode::default(),
+            root: UiWidgetNode {
+                children: vec![UiWidgetNode {
+                    id: "label_1".into(),
+                    ..UiWidgetNode::default()
+                }],
+                ..UiWidgetNode::default()
+            },
         });
 
         assert_eq!(state.zoom, 1.5);
@@ -308,12 +341,11 @@ mod tests {
         state.begin_move_widget("progress_1".to_string());
 
         assert_eq!(state.selected_widget_id.as_deref(), Some("progress_1"));
-        assert_eq!(
+        assert!(matches!(
             state.canvas_interaction,
-            Some(UiCanvasInteraction::MoveWidget {
-                widget_id: "progress_1".to_string(),
-            })
-        );
+            Some(UiCanvasInteraction::MoveWidget { ref widget_id, .. })
+                if widget_id == "progress_1"
+        ));
     }
 
     #[test]
@@ -323,11 +355,10 @@ mod tests {
         state.begin_resize_widget("label_2".to_string());
 
         assert_eq!(state.selected_widget_id.as_deref(), Some("label_2"));
-        assert_eq!(
+        assert!(matches!(
             state.canvas_interaction,
-            Some(UiCanvasInteraction::ResizeWidget {
-                widget_id: "label_2".to_string(),
-            })
-        );
+            Some(UiCanvasInteraction::ResizeWidget { ref widget_id, .. })
+                if widget_id == "label_2"
+        ));
     }
 }

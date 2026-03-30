@@ -80,7 +80,8 @@ pub fn runtime_ui_text_scale(
     logical_viewport_size: glam::Vec2,
     presented_viewport_size: glam::Vec2,
 ) -> f32 {
-    let reference_size = glam::Vec2::new(logical_viewport_size.x * 7.0, logical_viewport_size.y * 7.0);
+    let reference_size =
+        glam::Vec2::new(logical_viewport_size.x * 7.0, logical_viewport_size.y * 7.0);
     let size_ratio = (presented_viewport_size.x / reference_size.x)
         .min(presented_viewport_size.y / reference_size.y)
         .clamp(0.0, 1.0);

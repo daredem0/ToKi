@@ -1,9 +1,9 @@
+use crate::fonts::resolve_preview_font_family;
 use crate::project::{Project, ProjectAssets};
 use crate::ui::editor_ui::{sync_ui_layout_registry, EditorUI, UiCanvasInteraction};
-use crate::fonts::resolve_preview_font_family;
 use egui::{
     text::{LayoutJob, TextFormat},
-    Color32, FontId, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2,
+    Color32, CursorIcon, FontId, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2,
 };
 use std::collections::{BTreeSet, HashMap};
 use toki_core::expression::Expression;
@@ -11,8 +11,8 @@ use toki_core::flags::{FlagValue, GameFlags};
 use toki_core::rules::TriggerContext;
 use toki_core::text::{TextAnchor, TextSlant, TextWeight};
 use toki_core::ui::{
-    runtime_ui_text_scale, transform_logical_ui_composition_with_scales,
-    transform_logical_ui_rect, UiBlock, UiComposition, UiRect,
+    runtime_ui_text_scale, transform_logical_ui_composition_with_scales, transform_logical_ui_rect,
+    UiBlock, UiComposition, UiRect,
 };
 use toki_core::ui_layout::{
     UiAnchor, UiBinding, UiBindingContext, UiCollectionBinding, UiCollectionRowTemplate,
@@ -23,6 +23,8 @@ use toki_core::ui_layout::{
 use toki_core::value_path::{ValuePath, ValuePathContext};
 
 const PREVIEW_MIN_HEIGHT: f32 = 320.0;
+const UI_SNAP_GRID: f32 = 4.0;
+const UI_EDGE_MARGIN: f32 = 8.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WidgetKindChoice {
@@ -31,6 +33,23 @@ enum WidgetKindChoice {
     ProgressBar,
     GridContainer,
     ScrollList,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WidgetPreset {
+    Label,
+    HealthBar,
+    InventoryList,
+    StatusPanel,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WidgetPositionPreset {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+    Center,
 }
 
 pub(crate) fn render_ui_editor(
@@ -74,6 +93,7 @@ pub(crate) fn render_ui_editor_inspector_panel(
     let declared_flags = project
         .map(|project| project.metadata.runtime.flags.declarations.as_slice())
         .unwrap_or(&[]);
+    let preview_viewport_size = ui_preview_viewport_size(project);
     let selected_widget_id = ui_state.ui_editor_context().ui.selected_widget_id.clone();
     let mut next_selected_widget_id = selected_widget_id.clone();
     let mut dirty = false;
@@ -89,13 +109,26 @@ pub(crate) fn render_ui_editor_inspector_panel(
             .as_mut()
             .expect("checked above");
         ui.collapsing("Widget Tree", |ui| {
+            let mut remove_widget_id = None::<String>;
             render_widget_tree(
                 ui,
                 &layout.root,
                 selected_widget_id.as_deref(),
                 0,
                 &mut next_selected_widget_id,
+                &mut remove_widget_id,
             );
+            if let Some(widget_id) = remove_widget_id {
+                match remove_widget_by_id(&mut layout.root, &widget_id) {
+                    Some(parent_id) => {
+                        next_selected_widget_id = Some(parent_id);
+                        dirty = true;
+                    }
+                    None => {
+                        next_selected_widget_id = Some("root".to_string());
+                    }
+                }
+            }
         });
         ui.separator();
         let inspector_selected_widget_id = next_selected_widget_id.clone();
@@ -105,6 +138,7 @@ pub(crate) fn render_ui_editor_inspector_panel(
             inspector_selected_widget_id.as_deref(),
             declared_flags,
             &font_choices,
+            preview_viewport_size,
             &mut next_selected_widget_id,
         );
         ui.separator();
@@ -200,7 +234,10 @@ fn render_ui_editor_main(
     if dirty {
         ui_state.ui_editor_context_mut().ui.dirty = true;
     }
-    ui_state.ui_editor_context_mut().ui.persist_active_view_into_layout();
+    ui_state
+        .ui_editor_context_mut()
+        .ui
+        .persist_active_view_into_layout();
     ui_state.ui_editor_context_mut().ui.draft = Some(layout);
 }
 
@@ -246,8 +283,9 @@ fn handle_ui_editor_shortcuts(
             if let Some(new_widget_id) = duplicate_widget(&mut layout.root, &widget_id) {
                 let editor_state = &mut ui_state.ui_editor_context_mut().ui;
                 editor_state.selected_widget_id = Some(new_widget_id.clone());
-                editor_state.status_message =
-                    Some(format!("Duplicated widget '{widget_id}' to '{new_widget_id}'."));
+                editor_state.status_message = Some(format!(
+                    "Duplicated widget '{widget_id}' to '{new_widget_id}'."
+                ));
                 editor_state.dirty = true;
             }
         }
@@ -256,10 +294,11 @@ fn handle_ui_editor_shortcuts(
     if focus_pressed {
         if let Some(selected_widget_id) = ui_state.ui_editor_context().ui.selected_widget_id.clone()
         {
-            if let Some(frame) = compute_preview(&layout.root, declared_flags_stub(), preview_viewport_size)
-                .frames
-                .into_iter()
-                .find(|frame| frame.widget_id.as_str() == selected_widget_id)
+            if let Some(frame) =
+                compute_preview(&layout.root, declared_flags_stub(), preview_viewport_size)
+                    .frames
+                    .into_iter()
+                    .find(|frame| frame.widget_id.as_str() == selected_widget_id)
             {
                 let editor_state = &mut ui_state.ui_editor_context_mut().ui;
                 editor_state.pan = [
@@ -274,7 +313,7 @@ fn handle_ui_editor_shortcuts(
     if reset_view_pressed {
         let editor_state = &mut ui_state.ui_editor_context_mut().ui;
         editor_state.zoom = 1.0;
-        editor_state.pan = [16.0, 16.0];
+        editor_state.pan = [12.0, 12.0];
         editor_state.persist_active_view_into_layout();
     }
 
@@ -295,7 +334,8 @@ fn render_ui_layout_settings(
             let mut id_value = layout.id.to_string();
             if ui.text_edit_singleline(&mut id_value).changed() {
                 layout.id = id_value.into();
-                ui_state.ui_editor_context_mut().ui.selected_layout_id = Some(layout.id.to_string());
+                ui_state.ui_editor_context_mut().ui.selected_layout_id =
+                    Some(layout.id.to_string());
                 changed = true;
             }
         });
@@ -320,35 +360,44 @@ fn render_ui_layout_settings(
 fn render_ui_toolbar(ui: &mut Ui, ui_state: &mut EditorUI, layout: &mut UiLayoutAsset) -> bool {
     let mut changed = false;
     ui.horizontal_wrapped(|ui| {
+        ui.strong("Quick Add:");
+        for preset in [
+            WidgetPreset::Label,
+            WidgetPreset::HealthBar,
+            WidgetPreset::InventoryList,
+            WidgetPreset::StatusPanel,
+        ] {
+            if ui
+                .button(format!("+ {}", widget_preset_label(preset)))
+                .clicked()
+            {
+                changed |= insert_new_widget_under_selection(
+                    ui_state,
+                    layout,
+                    create_widget_preset(preset, layout),
+                    &format!("Added {} preset.", widget_preset_label(preset)),
+                );
+            }
+        }
+
+        ui.separator();
+        ui.strong("Advanced:");
         for kind in [
-            WidgetKindChoice::Label,
             WidgetKindChoice::Image,
             WidgetKindChoice::ProgressBar,
             WidgetKindChoice::GridContainer,
             WidgetKindChoice::ScrollList,
         ] {
-            if ui.button(format!("+ {}", widget_kind_choice_label(kind))).clicked() {
-                let selected_widget_id = ui_state.ui_editor_context().ui.selected_widget_id.clone();
-                let parent_id = selected_widget_id
-                    .as_deref()
-                    .and_then(|widget_id| {
-                        find_widget(&layout.root, widget_id).and_then(|widget| {
-                            if can_have_children(widget) {
-                                Some(widget.id.to_string())
-                            } else {
-                                find_parent_id(&layout.root, widget_id)
-                            }
-                        })
-                    })
-                    .unwrap_or_else(|| "root".to_string());
-                let widget = create_widget(kind, layout);
-                let widget_id = widget.id.to_string();
-                if insert_child_widget(&mut layout.root, &parent_id, widget) {
-                    ui_state.ui_editor_context_mut().ui.select_widget(widget_id);
-                    ui_state.ui_editor_context_mut().ui.status_message =
-                        Some(format!("Added {} widget.", widget_kind_choice_label(kind)));
-                    changed = true;
-                }
+            if ui
+                .button(format!("+ {}", widget_kind_choice_label(kind)))
+                .clicked()
+            {
+                changed |= insert_new_widget_under_selection(
+                    ui_state,
+                    layout,
+                    create_widget(kind, layout),
+                    &format!("Added {} widget.", widget_kind_choice_label(kind)),
+                );
             }
         }
     });
@@ -363,7 +412,10 @@ fn render_ui_layout_canvas(
     preview_viewport_size: glam::Vec2,
 ) -> bool {
     let mut changed = false;
-    let desired_size = egui::vec2(ui.available_width(), ui.available_height().max(PREVIEW_MIN_HEIGHT));
+    let desired_size = egui::vec2(
+        ui.available_width(),
+        ui.available_height().max(PREVIEW_MIN_HEIGHT),
+    );
     let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
     let painter = ui.painter_at(rect);
     let (mut zoom, mut pan, selected_widget_id, canvas_interaction) = {
@@ -404,10 +456,7 @@ fn render_ui_layout_canvas(
     }
 
     let preview = compute_preview(&layout.root, declared_flags, preview_viewport_size);
-    let origin = Vec2::new(
-        rect.left() + pan[0],
-        rect.top() + pan[1],
-    );
+    let origin = Vec2::new(rect.left() + pan[0], rect.top() + pan[1]);
     let viewport_rect = Rect::from_min_size(
         Pos2::new(origin.x, origin.y),
         Vec2::new(
@@ -432,25 +481,45 @@ fn render_ui_layout_canvas(
         &ui_editor_font_choices(ui_state),
     );
 
-    let pointer_pos = response.interact_pointer_pos().or_else(|| response.hover_pos());
-    let drag_start_pos = ui.input(|input| input.pointer.press_origin()).or(pointer_pos);
+    let pointer_pos = response
+        .interact_pointer_pos()
+        .or_else(|| response.hover_pos());
+    let drag_start_pos = ui
+        .input(|input| input.pointer.press_origin())
+        .or(pointer_pos);
     let hovered_widget_id = pointer_pos.and_then(|pointer_pos| {
         topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
     });
+    let hovered_resize_widget_id = drag_start_pos.and_then(|pointer_pos| {
+        hovered_widget_id.as_deref().and_then(|widget_id| {
+            resize_handle_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos, widget_id)
+        })
+    });
     let mut next_canvas_interaction = canvas_interaction;
     let mut next_selected_widget_id = selected_widget_id.clone();
+    if hovered_resize_widget_id.is_some() {
+        ui.output_mut(|output| output.cursor_icon = CursorIcon::ResizeNwSe);
+    } else if hovered_widget_id.is_some() {
+        ui.output_mut(|output| output.cursor_icon = CursorIcon::Grab);
+    }
     for frame in preview.frames.iter().rev() {
         let screen_rect = scaled_rect(frame.rect, origin, zoom);
         let is_selected = selected_widget_id.as_deref() == Some(frame.widget_id.as_str());
+        let is_hovered = hovered_widget_id.as_deref() == Some(frame.widget_id.as_str());
         let stroke_color = if is_selected {
             Color32::from_rgb(255, 210, 90)
+        } else if is_hovered {
+            Color32::from_rgb(120, 190, 255)
         } else {
             Color32::from_rgba_unmultiplied(200, 200, 200, 110)
         };
         painter.rect_stroke(
             screen_rect,
             2.0,
-            Stroke::new(if is_selected { 2.0 } else { 1.0 }, stroke_color),
+            Stroke::new(
+                if is_selected || is_hovered { 2.0 } else { 1.0 },
+                stroke_color,
+            ),
             StrokeKind::Inside,
         );
 
@@ -458,18 +527,40 @@ fn render_ui_layout_canvas(
             && frame.widget_id.as_str() != "root"
         {
             let handle_rect = resize_handle_rect(screen_rect);
-            painter.rect_filled(handle_rect, 1.0, Color32::from_rgb(255, 210, 90));
+            let handle_color =
+                if hovered_resize_widget_id.as_deref() == Some(frame.widget_id.as_str()) {
+                    Color32::from_rgb(255, 240, 140)
+                } else {
+                    Color32::from_rgb(255, 210, 90)
+                };
+            painter.rect_filled(handle_rect, 1.0, handle_color);
         }
     }
 
     let resize_target_widget_id = drag_start_pos.and_then(|pointer_pos| {
         selected_widget_id
             .as_deref()
-            .and_then(|widget_id| resize_handle_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos, widget_id))
+            .and_then(|widget_id| {
+                resize_handle_widget_id_at_point(
+                    &preview.frames,
+                    origin,
+                    zoom,
+                    pointer_pos,
+                    widget_id,
+                )
+            })
             .or_else(|| {
-                topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos).as_deref().and_then(|widget_id| {
-                    resize_handle_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos, widget_id)
-                })
+                topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
+                    .as_deref()
+                    .and_then(|widget_id| {
+                        resize_handle_widget_id_at_point(
+                            &preview.frames,
+                            origin,
+                            zoom,
+                            pointer_pos,
+                            widget_id,
+                        )
+                    })
             })
     });
 
@@ -480,13 +571,31 @@ fn render_ui_layout_canvas(
     if response.drag_started() && next_canvas_interaction.is_none() {
         if let Some(widget_id) = resize_target_widget_id {
             next_selected_widget_id = Some(widget_id.clone());
-            next_canvas_interaction = Some(UiCanvasInteraction::ResizeWidget { widget_id });
+            let start_size = find_widget(&layout.root, &widget_id)
+                .map(|widget| widget.layout.size)
+                .unwrap_or([16.0, 16.0]);
+            let press_origin = drag_start_pos.unwrap_or(Pos2::new(rect.left(), rect.top()));
+            next_canvas_interaction = Some(UiCanvasInteraction::ResizeWidget {
+                widget_id,
+                press_origin: [press_origin.x, press_origin.y],
+                start_size,
+            });
         } else if let Some(widget_id) = drag_start_pos
-            .and_then(|pointer_pos| topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos))
+            .and_then(|pointer_pos| {
+                topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
+            })
             .or(hovered_widget_id)
         {
             next_selected_widget_id = Some(widget_id.clone());
-            next_canvas_interaction = Some(UiCanvasInteraction::MoveWidget { widget_id });
+            let start_offset = find_widget(&layout.root, &widget_id)
+                .map(|widget| widget.layout.offset)
+                .unwrap_or([0.0, 0.0]);
+            let press_origin = drag_start_pos.unwrap_or(Pos2::new(rect.left(), rect.top()));
+            next_canvas_interaction = Some(UiCanvasInteraction::MoveWidget {
+                widget_id,
+                press_origin: [press_origin.x, press_origin.y],
+                start_offset,
+            });
         } else {
             next_canvas_interaction = Some(UiCanvasInteraction::Pan);
         }
@@ -494,23 +603,46 @@ fn render_ui_layout_canvas(
 
     let pointer_down = ui.ctx().input(|input| input.pointer.primary_down());
     let delta = ui.ctx().input(|input| input.pointer.delta());
+    let current_pointer_pos = ui.ctx().input(|input| input.pointer.interact_pos());
     match next_canvas_interaction.as_ref() {
         Some(UiCanvasInteraction::Pan) if pointer_down && response.dragged() => {
             pan[0] += delta.x;
             pan[1] += delta.y;
             changed = true;
         }
-        Some(UiCanvasInteraction::MoveWidget { widget_id }) if pointer_down => {
-            if let Some(widget) = find_widget_mut(&mut layout.root, widget_id) {
-                widget.layout.offset[0] += delta.x / zoom;
-                widget.layout.offset[1] += delta.y / zoom;
+        Some(UiCanvasInteraction::MoveWidget {
+            widget_id,
+            press_origin,
+            start_offset,
+        }) if pointer_down => {
+            if let (Some(widget), Some(pointer_pos)) = (
+                find_widget_mut(&mut layout.root, widget_id),
+                current_pointer_pos,
+            ) {
+                let total_delta = [
+                    (pointer_pos.x - press_origin[0]) / zoom,
+                    (pointer_pos.y - press_origin[1]) / zoom,
+                ];
+                widget.layout.offset[0] = snap_to_grid(start_offset[0] + total_delta[0]);
+                widget.layout.offset[1] = snap_to_grid(start_offset[1] + total_delta[1]);
                 changed = true;
             }
         }
-        Some(UiCanvasInteraction::ResizeWidget { widget_id }) if pointer_down => {
-            if let Some(widget) = find_widget_mut(&mut layout.root, widget_id) {
-                widget.layout.size[0] = (widget.layout.size[0] + delta.x / zoom).max(16.0);
-                widget.layout.size[1] = (widget.layout.size[1] + delta.y / zoom).max(16.0);
+        Some(UiCanvasInteraction::ResizeWidget {
+            widget_id,
+            press_origin,
+            start_size,
+        }) if pointer_down => {
+            if let (Some(widget), Some(pointer_pos)) = (
+                find_widget_mut(&mut layout.root, widget_id),
+                current_pointer_pos,
+            ) {
+                let total_delta = [
+                    (pointer_pos.x - press_origin[0]) / zoom,
+                    (pointer_pos.y - press_origin[1]) / zoom,
+                ];
+                widget.layout.size[0] = snap_to_grid((start_size[0] + total_delta[0]).max(16.0));
+                widget.layout.size[1] = snap_to_grid((start_size[1] + total_delta[1]).max(16.0));
                 changed = true;
             }
         }
@@ -523,12 +655,11 @@ fn render_ui_layout_canvas(
 
     if response.double_clicked() {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
-            let widget = create_widget(WidgetKindChoice::Label, layout);
+            let mut widget = create_widget_preset(WidgetPreset::Label, layout);
             let widget_id = widget.id.to_string();
-            let mut widget = widget;
             widget.layout.offset = [
-                (pointer_pos.x - rect.left() - pan[0]) / zoom,
-                (pointer_pos.y - rect.top() - pan[1]) / zoom,
+                snap_to_grid((pointer_pos.x - rect.left() - pan[0]) / zoom),
+                snap_to_grid((pointer_pos.y - rect.top() - pan[1]) / zoom),
             ];
             if insert_child_widget(&mut layout.root, "root", widget) {
                 next_selected_widget_id = Some(widget_id);
@@ -555,16 +686,30 @@ fn render_widget_tree(
     selected_widget_id: Option<&str>,
     depth: usize,
     next_selected_widget_id: &mut Option<String>,
+    remove_widget_id: &mut Option<String>,
 ) {
     ui.horizontal(|ui| {
         ui.add_space(depth as f32 * 12.0);
         let selected = selected_widget_id == Some(widget.id.as_str());
-        if ui
-            .selectable_label(selected, format!("{} ({})", widget.title, widget.id))
-            .clicked()
-        {
+        let label = if widget.id.as_str() == "root" {
+            "Viewport Root".to_string()
+        } else {
+            format!("{} ({})", widget.title, widget.id)
+        };
+        let response = ui.selectable_label(selected, label);
+        if response.clicked() {
             *next_selected_widget_id = Some(widget.id.to_string());
         }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if widget.id.as_str() != "root"
+                && ui
+                    .small_button("🗑")
+                    .on_hover_text("Delete widget")
+                    .clicked()
+            {
+                *remove_widget_id = Some(widget.id.to_string());
+            }
+        });
     });
     for child in &widget.children {
         render_widget_tree(
@@ -573,6 +718,7 @@ fn render_widget_tree(
             selected_widget_id,
             depth + 1,
             next_selected_widget_id,
+            remove_widget_id,
         );
     }
 }
@@ -583,6 +729,7 @@ fn render_selected_widget_inspector(
     selected_widget_id: Option<&str>,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
     font_choices: &[String],
+    preview_viewport_size: glam::Vec2,
     next_selected_widget_id: &mut Option<String>,
 ) -> bool {
     let Some(selected_widget_id) = selected_widget_id else {
@@ -595,93 +742,123 @@ fn render_selected_widget_inspector(
     };
     let widget_before = widget.clone();
     let mut changed = false;
+    let is_root = widget.id.as_str() == "root";
 
     ui.heading("Selected Widget");
     ui.separator();
+    if is_root {
+        ui.small("Root acts as the logical viewport container. Root children are placed independently by anchor, offset, and size.");
+        ui.separator();
+    }
     ui.horizontal(|ui| {
         ui.label("Id:");
-        let mut widget_id = widget.id.to_string();
-        if ui.text_edit_singleline(&mut widget_id).changed() {
-            widget.id = widget_id.clone().into();
-            *next_selected_widget_id = Some(widget_id);
-            changed = true;
+        if is_root {
+            ui.monospace("root");
+        } else {
+            let mut widget_id = widget.id.to_string();
+            if ui.text_edit_singleline(&mut widget_id).changed() {
+                widget.id = widget_id.clone().into();
+                *next_selected_widget_id = Some(widget_id);
+                changed = true;
+            }
         }
     });
     ui.horizontal(|ui| {
         ui.label("Title:");
         changed |= ui.text_edit_singleline(&mut widget.title).changed();
     });
-    ui.horizontal(|ui| {
-        ui.label("Kind:");
-        let current_kind = widget_kind_choice(widget);
-        let mut selected_kind = current_kind;
-        egui::ComboBox::from_id_salt(("ui_widget_kind", widget.id.as_str()))
-            .selected_text(widget_kind_choice_label(current_kind))
-            .show_ui(ui, |ui| {
-                for candidate in [
-                    WidgetKindChoice::Label,
-                    WidgetKindChoice::Image,
-                    WidgetKindChoice::ProgressBar,
-                    WidgetKindChoice::GridContainer,
-                    WidgetKindChoice::ScrollList,
-                ] {
-                    ui.selectable_value(
-                        &mut selected_kind,
-                        candidate,
-                        widget_kind_choice_label(candidate),
-                    );
+    if !is_root {
+        ui.horizontal(|ui| {
+            ui.label("Kind:");
+            let current_kind = widget_kind_choice(widget);
+            let mut selected_kind = current_kind;
+            egui::ComboBox::from_id_salt(("ui_widget_kind", widget.id.as_str()))
+                .selected_text(widget_kind_choice_label(current_kind))
+                .show_ui(ui, |ui| {
+                    for candidate in [
+                        WidgetKindChoice::Label,
+                        WidgetKindChoice::Image,
+                        WidgetKindChoice::ProgressBar,
+                        WidgetKindChoice::GridContainer,
+                        WidgetKindChoice::ScrollList,
+                    ] {
+                        ui.selectable_value(
+                            &mut selected_kind,
+                            candidate,
+                            widget_kind_choice_label(candidate),
+                        );
+                    }
+                });
+            if selected_kind != current_kind {
+                widget.kind = default_widget_kind(selected_kind);
+                changed = true;
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label("Event Id:");
+            let mut event_id = widget.event_id.clone().unwrap_or_default();
+            if ui.text_edit_singleline(&mut event_id).changed() {
+                widget.event_id = if event_id.trim().is_empty() {
+                    None
+                } else {
+                    Some(event_id)
+                };
+                changed = true;
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label("Visible If:");
+            changed |= render_optional_template_editor(
+                ui,
+                ("ui_widget_visible_if", widget.id.as_str()),
+                &mut widget.visible_if,
+                &bool_expression_choices(declared_flags),
+                "None",
+                "Custom",
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.label("Enabled If:");
+            changed |= render_optional_template_editor(
+                ui,
+                ("ui_widget_enabled_if", widget.id.as_str()),
+                &mut widget.enabled_if,
+                &bool_expression_choices(declared_flags),
+                "None",
+                "Custom",
+            );
+        });
+        ui.horizontal(|ui| {
+            changed |= ui.checkbox(&mut widget.focusable, "Focusable").changed();
+        });
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Position:");
+            for preset in [
+                WidgetPositionPreset::TopLeft,
+                WidgetPositionPreset::TopRight,
+                WidgetPositionPreset::BottomLeft,
+                WidgetPositionPreset::BottomRight,
+                WidgetPositionPreset::Center,
+            ] {
+                if ui.button(widget_position_label(preset)).clicked() {
+                    apply_widget_position_preset(widget, preset, preview_viewport_size);
+                    changed = true;
                 }
-            });
-        if selected_kind != current_kind {
-            widget.kind = default_widget_kind(selected_kind);
-            changed = true;
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.label("Event Id:");
-        let mut event_id = widget.event_id.clone().unwrap_or_default();
-        if ui.text_edit_singleline(&mut event_id).changed() {
-            widget.event_id = if event_id.trim().is_empty() {
-                None
-            } else {
-                Some(event_id)
-            };
-            changed = true;
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.label("Visible If:");
-        let mut visible_if = widget.visible_if.clone().unwrap_or_default();
-        if ui.text_edit_singleline(&mut visible_if).changed() {
-            widget.visible_if = if visible_if.trim().is_empty() {
-                None
-            } else {
-                Some(visible_if)
-            };
-            changed = true;
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.label("Enabled If:");
-        let mut enabled_if = widget.enabled_if.clone().unwrap_or_default();
-        if ui.text_edit_singleline(&mut enabled_if).changed() {
-            widget.enabled_if = if enabled_if.trim().is_empty() {
-                None
-            } else {
-                Some(enabled_if)
-            };
-            changed = true;
-        }
-    });
-    ui.horizontal(|ui| {
-        changed |= ui.checkbox(&mut widget.focusable, "Focusable").changed();
-    });
+            }
+        });
+    }
     ui.separator();
     render_layout_spec_editor(ui, &mut widget.layout);
     ui.separator();
     render_typography_editor(ui, &mut widget.style.typography, font_choices);
     ui.separator();
-    render_widget_kind_editor(ui, widget, declared_flags);
+    if is_root {
+        ui.small(
+            "Root has no per-widget content. Add or select a child widget to author HUD content.",
+        );
+    } else {
+        render_widget_kind_editor(ui, widget, declared_flags);
+    }
     changed |= *widget != widget_before;
     changed
 }
@@ -719,8 +896,16 @@ fn render_layout_spec_editor(ui: &mut Ui, layout: &mut toki_core::ui_layout::UiL
         });
         ui.horizontal(|ui| {
             ui.label("Size:");
-            ui.add(egui::DragValue::new(&mut layout.size[0]).speed(1.0).range(1.0..=4096.0));
-            ui.add(egui::DragValue::new(&mut layout.size[1]).speed(1.0).range(1.0..=4096.0));
+            ui.add(
+                egui::DragValue::new(&mut layout.size[0])
+                    .speed(1.0)
+                    .range(1.0..=4096.0),
+            );
+            ui.add(
+                egui::DragValue::new(&mut layout.size[1])
+                    .speed(1.0)
+                    .range(1.0..=4096.0),
+            );
         });
     });
 }
@@ -754,7 +939,7 @@ fn render_typography_editor(ui: &mut Ui, typography: &mut UiTypography, font_cho
 
         ui.horizontal(|ui| {
             ui.label("Size:");
-            let mut font_size = typography.font_size_px.unwrap_or(14) as i32;
+            let mut font_size = typography.font_size_px.unwrap_or(8) as i32;
             if ui
                 .add(egui::DragValue::new(&mut font_size).range(6..=128))
                 .changed()
@@ -843,19 +1028,24 @@ fn render_widget_kind_editor(
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
 ) {
     match &mut widget.kind {
-        UiWidgetKind::Label { content } => render_text_template_editor(ui, content),
+        UiWidgetKind::Label { content } => render_text_template_editor(ui, content, declared_flags),
         UiWidgetKind::Image { image_id } => {
             ui.horizontal(|ui| {
                 ui.label("Image Id:");
                 ui.text_edit_singleline(image_id);
             });
         }
-        UiWidgetKind::ProgressBar { value } => render_progress_binding_editor(ui, value),
+        UiWidgetKind::ProgressBar { value } => {
+            render_progress_binding_editor(ui, value, declared_flags)
+        }
         UiWidgetKind::GridContainer { columns, spacing } => {
             ui.horizontal(|ui| {
                 ui.label("Columns:");
                 let mut value = *columns as i32;
-                if ui.add(egui::DragValue::new(&mut value).range(1..=16)).changed() {
+                if ui
+                    .add(egui::DragValue::new(&mut value).range(1..=16))
+                    .changed()
+                {
                     *columns = value.max(1) as u16;
                 }
             });
@@ -908,14 +1098,20 @@ fn render_widget_kind_editor(
             ui.horizontal(|ui| {
                 ui.label("Row Height:");
                 let mut value = *row_height as i32;
-                if ui.add(egui::DragValue::new(&mut value).range(12..=256)).changed() {
+                if ui
+                    .add(egui::DragValue::new(&mut value).range(12..=256))
+                    .changed()
+                {
                     *row_height = value.max(12) as u16;
                 }
             });
             ui.horizontal(|ui| {
                 ui.label("Row Spacing:");
                 let mut value = *row_spacing as i32;
-                if ui.add(egui::DragValue::new(&mut value).range(0..=64)).changed() {
+                if ui
+                    .add(egui::DragValue::new(&mut value).range(0..=64))
+                    .changed()
+                {
                     *row_spacing = value.max(0) as u16;
                 }
             });
@@ -929,13 +1125,15 @@ fn render_widget_kind_editor(
     }
 }
 
-fn render_text_template_editor(ui: &mut Ui, template: &mut UiTextTemplate) {
+fn render_text_template_editor(
+    ui: &mut Ui,
+    template: &mut UiTextTemplate,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
     if template.segments.is_empty() {
-        template
-            .segments
-            .push(UiTextSegment::Literal {
-                text: "Label".to_string(),
-            });
+        template.segments.push(UiTextSegment::Literal {
+            text: "Label".to_string(),
+        });
     }
     ui.collapsing("Text Content", |ui| {
         let segment_count = template.segments.len();
@@ -953,7 +1151,12 @@ fn render_text_template_editor(ui: &mut Ui, template: &mut UiTextTemplate) {
                         ui.text_edit_singleline(text);
                     }
                     UiTextSegment::Binding { binding } => {
-                        render_binding_editor(ui, binding, ("ui_text_binding", index));
+                        render_binding_editor(
+                            ui,
+                            binding,
+                            ("ui_text_binding", index),
+                            declared_flags,
+                        );
                     }
                 }
                 let mut kind = match segment {
@@ -992,7 +1195,11 @@ fn render_text_template_editor(ui: &mut Ui, template: &mut UiTextTemplate) {
     });
 }
 
-fn render_progress_binding_editor(ui: &mut Ui, binding: &mut UiProgressBinding) {
+fn render_progress_binding_editor(
+    ui: &mut Ui,
+    binding: &mut UiProgressBinding,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
     ui.collapsing("Progress Binding", |ui| {
         let mut mode = match binding {
             UiProgressBinding::CurrentMax { .. } => 0,
@@ -1026,13 +1233,13 @@ fn render_progress_binding_editor(ui: &mut Ui, binding: &mut UiProgressBinding) 
         match binding {
             UiProgressBinding::CurrentMax { current, max } => {
                 ui.label("Current");
-                render_binding_editor(ui, current, ("ui_progress_current", 0));
+                render_binding_editor(ui, current, ("ui_progress_current", 0), declared_flags);
                 ui.label("Max");
-                render_binding_editor(ui, max, ("ui_progress_max", 0));
+                render_binding_editor(ui, max, ("ui_progress_max", 0), declared_flags);
             }
             UiProgressBinding::Percent { percent } => {
                 ui.label("Percent");
-                render_binding_editor(ui, percent, ("ui_progress_percent", 0));
+                render_binding_editor(ui, percent, ("ui_progress_percent", 0), declared_flags);
             }
         }
     });
@@ -1099,7 +1306,12 @@ fn render_collection_row_template_editor(ui: &mut Ui, template: &mut UiCollectio
     });
 }
 
-fn render_binding_editor(ui: &mut Ui, binding: &mut UiBinding, id_salt: impl std::hash::Hash) {
+fn render_binding_editor(
+    ui: &mut Ui,
+    binding: &mut UiBinding,
+    id_salt: impl std::hash::Hash + Copy,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
     let mut mode = match binding {
         UiBinding::ValuePath { .. } => 0,
         UiBinding::Expression { .. } => 1,
@@ -1123,10 +1335,7 @@ fn render_binding_editor(ui: &mut Ui, binding: &mut UiBinding, id_salt: impl std
     }
     match binding {
         UiBinding::ValuePath { path, key } => {
-            ui.horizontal(|ui| {
-                ui.label("Path:");
-                ui.text_edit_singleline(path);
-            });
+            render_value_path_picker(ui, ("ui_binding_path", id_salt), path, declared_flags);
             ui.horizontal(|ui| {
                 ui.label("Override Key:");
                 let mut key_value = key.clone().unwrap_or_default();
@@ -1140,10 +1349,13 @@ fn render_binding_editor(ui: &mut Ui, binding: &mut UiBinding, id_salt: impl std
             });
         }
         UiBinding::Expression { expression, key } => {
-            ui.horizontal(|ui| {
-                ui.label("Expression:");
-                ui.text_edit_singleline(expression);
-            });
+            render_expression_template_editor(
+                ui,
+                ("ui_binding_expression", id_salt),
+                expression,
+                &numeric_expression_choices(declared_flags),
+                "Custom",
+            );
             ui.horizontal(|ui| {
                 ui.label("Override Key:");
                 let mut key_value = key.clone().unwrap_or_default();
@@ -1157,6 +1369,225 @@ fn render_binding_editor(ui: &mut Ui, binding: &mut UiBinding, id_salt: impl std
             });
         }
     }
+}
+
+fn render_value_path_picker(
+    ui: &mut Ui,
+    id_salt: impl std::hash::Hash + Copy,
+    path: &mut String,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
+    let choices = value_path_choices(declared_flags);
+    ui.horizontal(|ui| {
+        ui.label("Path:");
+        let current_choice = if choices.iter().any(|choice| choice == path) {
+            path.clone()
+        } else {
+            "Custom".to_string()
+        };
+        let mut selected = current_choice;
+        egui::ComboBox::from_id_salt(("ui_value_path_choice", id_salt))
+            .selected_text(selected.clone())
+            .show_ui(ui, |ui| {
+                for choice in &choices {
+                    ui.selectable_value(&mut selected, choice.clone(), choice);
+                }
+                ui.selectable_value(&mut selected, "Custom".to_string(), "Custom");
+            });
+        if selected != "Custom" && selected != *path {
+            *path = selected;
+        } else if selected == "Custom" && choices.iter().any(|choice| choice == path) {
+            path.clear();
+        }
+    });
+    if !choices.iter().any(|choice| choice == path) {
+        ui.horizontal(|ui| {
+            ui.label("Custom:");
+            ui.text_edit_singleline(path);
+        });
+    }
+}
+
+fn render_expression_template_editor(
+    ui: &mut Ui,
+    id_salt: impl std::hash::Hash + Copy,
+    expression: &mut String,
+    templates: &[String],
+    custom_label: &str,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Expression:");
+        let current_choice = if templates.iter().any(|choice| choice == expression) {
+            expression.clone()
+        } else {
+            custom_label.to_string()
+        };
+        let mut selected = current_choice;
+        egui::ComboBox::from_id_salt(("ui_expression_template", id_salt))
+            .selected_text(selected.clone())
+            .show_ui(ui, |ui| {
+                for choice in templates {
+                    ui.selectable_value(&mut selected, choice.clone(), choice);
+                }
+                ui.selectable_value(&mut selected, custom_label.to_string(), custom_label);
+            });
+        if selected != custom_label && selected != *expression {
+            *expression = selected;
+        } else if selected == custom_label && templates.iter().any(|choice| choice == expression) {
+            expression.clear();
+        }
+    });
+    if !templates.iter().any(|choice| choice == expression) {
+        ui.horizontal(|ui| {
+            ui.label("Custom:");
+            ui.text_edit_singleline(expression);
+        });
+    }
+}
+
+fn render_optional_template_editor(
+    ui: &mut Ui,
+    id_salt: impl std::hash::Hash + Copy,
+    value: &mut Option<String>,
+    templates: &[String],
+    none_label: &str,
+    custom_label: &str,
+) -> bool {
+    let before = value.clone();
+    let current_text = value.clone().unwrap_or_default();
+    let current_choice = if value.is_none() {
+        none_label.to_string()
+    } else if templates.iter().any(|choice| choice == &current_text) {
+        current_text.clone()
+    } else {
+        custom_label.to_string()
+    };
+    let mut selected = current_choice;
+    egui::ComboBox::from_id_salt(("ui_optional_template", id_salt))
+        .selected_text(selected.clone())
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut selected, none_label.to_string(), none_label);
+            for choice in templates {
+                ui.selectable_value(&mut selected, choice.clone(), choice);
+            }
+            ui.selectable_value(&mut selected, custom_label.to_string(), custom_label);
+        });
+    if selected == none_label {
+        *value = None;
+    } else if selected != custom_label {
+        *value = Some(selected);
+    } else if value
+        .as_ref()
+        .is_none_or(|expr| templates.iter().any(|choice| choice == expr))
+    {
+        *value = Some(String::new());
+    }
+    if value
+        .as_ref()
+        .is_some_and(|expr| !templates.iter().any(|choice| choice == expr))
+    {
+        let mut custom_value = current_text;
+        ui.horizontal(|ui| {
+            ui.label("Custom:");
+            if ui.text_edit_singleline(&mut custom_value).changed() {
+                *value = if custom_value.trim().is_empty() {
+                    None
+                } else {
+                    Some(custom_value.trim().to_string())
+                };
+            }
+        });
+    }
+    *value != before
+}
+
+fn value_path_choices(
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) -> Vec<String> {
+    let mut choices = vec![
+        "player.health".to_string(),
+        "player.max_health".to_string(),
+        "player.active".to_string(),
+        "player.kind".to_string(),
+        "self.health".to_string(),
+        "self.max_health".to_string(),
+        "self.active".to_string(),
+        "self.kind".to_string(),
+        "target.health".to_string(),
+        "target.max_health".to_string(),
+        "target.active".to_string(),
+        "target.kind".to_string(),
+    ];
+    choices.extend(
+        declared_flags
+            .iter()
+            .map(|flag| format!("flags.{}", flag.id))
+            .collect::<Vec<_>>(),
+    );
+    choices.sort();
+    choices.dedup();
+    choices
+}
+
+fn bool_expression_choices(
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) -> Vec<String> {
+    let mut choices = vec![
+        "player.active".to_string(),
+        "self.active".to_string(),
+        "target.active".to_string(),
+        "player.health > 0".to_string(),
+        "self.health > 0".to_string(),
+        "target.health > 0".to_string(),
+    ];
+    choices.extend(
+        declared_flags
+            .iter()
+            .filter_map(|flag| match flag.default_value {
+                FlagValue::Bool(_) => Some(format!("flags.{}", flag.id)),
+                _ => None,
+            }),
+    );
+    choices.extend(
+        declared_flags
+            .iter()
+            .filter_map(|flag| match flag.default_value {
+                FlagValue::Bool(_) => Some(format!("!flags.{}", flag.id)),
+                _ => None,
+            }),
+    );
+    choices.sort();
+    choices.dedup();
+    choices
+}
+
+fn numeric_expression_choices(
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) -> Vec<String> {
+    let mut choices = vec![
+        "0".to_string(),
+        "1".to_string(),
+        "10".to_string(),
+        "25".to_string(),
+        "50".to_string(),
+        "100".to_string(),
+        "player.health".to_string(),
+        "player.max_health".to_string(),
+        "self.health".to_string(),
+        "target.health".to_string(),
+        "min(player.health, player.max_health)".to_string(),
+    ];
+    choices.extend(
+        declared_flags
+            .iter()
+            .filter_map(|flag| match flag.default_value {
+                FlagValue::Int(_) => Some(format!("flags.{}", flag.id)),
+                _ => None,
+            }),
+    );
+    choices.sort();
+    choices.dedup();
+    choices
 }
 
 struct PreviewOutput {
@@ -1243,7 +1674,10 @@ fn validate_widget(
     ] {
         if let Some(expression) = gate {
             if let Err(error) = Expression::parse(expression) {
-                issues.push(format!("{} on '{}' is invalid: {}", label, widget.id, error));
+                issues.push(format!(
+                    "{} on '{}' is invalid: {}",
+                    label, widget.id, error
+                ));
             }
         }
     }
@@ -1257,7 +1691,10 @@ fn validate_widget(
         }
         UiWidgetKind::Image { image_id } => {
             if image_id.trim().is_empty() {
-                issues.push(format!("Image widget '{}' requires a non-empty image id", widget.id));
+                issues.push(format!(
+                    "Image widget '{}' requires a non-empty image id",
+                    widget.id
+                ));
             }
         }
         UiWidgetKind::ProgressBar { value } => match value {
@@ -1271,23 +1708,36 @@ fn validate_widget(
         },
         UiWidgetKind::GridContainer { columns, .. } => {
             if *columns == 0 {
-                issues.push(format!("GridContainer '{}' must have at least one column", widget.id));
+                issues.push(format!(
+                    "GridContainer '{}' must have at least one column",
+                    widget.id
+                ));
             }
         }
         UiWidgetKind::ScrollList { row_height, .. } => {
             if *row_height == 0 {
-                issues.push(format!("ScrollList '{}' row height must be positive", widget.id));
+                issues.push(format!(
+                    "ScrollList '{}' row height must be positive",
+                    widget.id
+                ));
             }
         }
     }
     issues
 }
 
-fn validate_binding(binding: &UiBinding, issues: &mut Vec<String>, widget_id: &toki_core::UiWidgetId) {
+fn validate_binding(
+    binding: &UiBinding,
+    issues: &mut Vec<String>,
+    widget_id: &toki_core::UiWidgetId,
+) {
     match binding {
         UiBinding::ValuePath { path, .. } => {
             if let Err(error) = ValuePath::parse(path) {
-                issues.push(format!("Widget '{}' has invalid value path '{}': {}", widget_id, path, error));
+                issues.push(format!(
+                    "Widget '{}' has invalid value path '{}': {}",
+                    widget_id, path, error
+                ));
             }
         }
         UiBinding::Expression { expression, .. } => {
@@ -1318,6 +1768,25 @@ fn widget_kind_choice_label(kind: WidgetKindChoice) -> &'static str {
         WidgetKindChoice::ProgressBar => "ProgressBar",
         WidgetKindChoice::GridContainer => "GridContainer",
         WidgetKindChoice::ScrollList => "ScrollList",
+    }
+}
+
+fn widget_preset_label(preset: WidgetPreset) -> &'static str {
+    match preset {
+        WidgetPreset::Label => "Label",
+        WidgetPreset::HealthBar => "Health Bar",
+        WidgetPreset::InventoryList => "Inventory List",
+        WidgetPreset::StatusPanel => "Status Panel",
+    }
+}
+
+fn widget_position_label(preset: WidgetPositionPreset) -> &'static str {
+    match preset {
+        WidgetPositionPreset::TopLeft => "Top Left",
+        WidgetPositionPreset::TopRight => "Top Right",
+        WidgetPositionPreset::BottomLeft => "Bottom Left",
+        WidgetPositionPreset::BottomRight => "Bottom Right",
+        WidgetPositionPreset::Center => "Center",
     }
 }
 
@@ -1371,8 +1840,8 @@ fn create_widget(kind: WidgetKindChoice, layout: &UiLayoutAsset) -> UiWidgetNode
     UiWidgetNode {
         id: id.clone().into(),
         title: id.clone(),
-        layout: UiLayoutSpecForKind(kind),
-        style: Default::default(),
+        layout: ui_layout_spec_for_kind(kind),
+        style: hud_widget_style(kind),
         event_id: None,
         focusable: false,
         visible_if: None,
@@ -1382,19 +1851,198 @@ fn create_widget(kind: WidgetKindChoice, layout: &UiLayoutAsset) -> UiWidgetNode
     }
 }
 
-#[allow(non_snake_case)]
-fn UiLayoutSpecForKind(kind: WidgetKindChoice) -> toki_core::ui_layout::UiLayoutSpec {
+fn create_widget_preset(preset: WidgetPreset, layout: &UiLayoutAsset) -> UiWidgetNode {
+    match preset {
+        WidgetPreset::Label => create_widget(WidgetKindChoice::Label, layout),
+        WidgetPreset::HealthBar => {
+            let mut widget = create_widget(WidgetKindChoice::ProgressBar, layout);
+            widget.title = "Health Bar".to_string();
+            widget.layout.size = [72.0, 12.0];
+            widget.layout.offset = [8.0, 28.0];
+            widget.kind = UiWidgetKind::ProgressBar {
+                value: UiProgressBinding::CurrentMax {
+                    current: UiBinding::ValuePath {
+                        path: "player.health".to_string(),
+                        key: None,
+                    },
+                    max: UiBinding::ValuePath {
+                        path: "player.max_health".to_string(),
+                        key: None,
+                    },
+                },
+            };
+            widget
+        }
+        WidgetPreset::InventoryList => {
+            let mut widget = create_widget(WidgetKindChoice::ScrollList, layout);
+            widget.title = "Inventory List".to_string();
+            widget.layout.anchor = UiAnchor::TopRight;
+            widget.layout.offset = [-UI_EDGE_MARGIN, UI_EDGE_MARGIN];
+            widget.layout.size = [64.0, 80.0];
+            widget.kind = UiWidgetKind::ScrollList {
+                collection: UiCollectionBinding::PlayerInventory,
+                row_height: 12,
+                row_spacing: 2,
+                row_template: UiCollectionRowTemplate {
+                    segments: vec![
+                        UiCollectionTextSegment::ItemId,
+                        UiCollectionTextSegment::Literal {
+                            text: " x".to_string(),
+                        },
+                        UiCollectionTextSegment::ItemCount,
+                    ],
+                },
+            };
+            widget.style.typography.font_size_px = Some(8);
+            widget
+        }
+        WidgetPreset::StatusPanel => {
+            let mut widget = create_widget(WidgetKindChoice::GridContainer, layout);
+            widget.title = "Status Panel".to_string();
+            widget.layout.anchor = UiAnchor::BottomLeft;
+            widget.layout.offset = [UI_EDGE_MARGIN, -UI_EDGE_MARGIN];
+            widget.layout.size = [84.0, 44.0];
+            widget.kind = UiWidgetKind::GridContainer {
+                columns: 1,
+                spacing: UiSpacing {
+                    left: 2,
+                    top: 2,
+                    right: 0,
+                    bottom: 0,
+                },
+            };
+            widget.children.push(UiWidgetNode {
+                id: unique_widget_id(&layout.root, WidgetKindChoice::Label).into(),
+                title: "Status".to_string(),
+                layout: toki_core::ui_layout::UiLayoutSpec {
+                    size: [72.0, 14.0],
+                    ..Default::default()
+                },
+                style: hud_widget_style(WidgetKindChoice::Label),
+                event_id: None,
+                focusable: false,
+                visible_if: None,
+                enabled_if: None,
+                kind: UiWidgetKind::Label {
+                    content: UiTextTemplate {
+                        segments: vec![UiTextSegment::Literal {
+                            text: "Status".to_string(),
+                        }],
+                    },
+                },
+                children: Vec::new(),
+            });
+            widget
+        }
+    }
+}
+
+fn ui_layout_spec_for_kind(kind: WidgetKindChoice) -> toki_core::ui_layout::UiLayoutSpec {
     toki_core::ui_layout::UiLayoutSpec {
         size: match kind {
-            WidgetKindChoice::Label => [160.0, 28.0],
-            WidgetKindChoice::Image => [96.0, 96.0],
-            WidgetKindChoice::ProgressBar => [180.0, 24.0],
-            WidgetKindChoice::GridContainer => [220.0, 120.0],
-            WidgetKindChoice::ScrollList => [220.0, 128.0],
+            WidgetKindChoice::Label => [96.0, 18.0],
+            WidgetKindChoice::Image => [48.0, 48.0],
+            WidgetKindChoice::ProgressBar => [80.0, 12.0],
+            WidgetKindChoice::GridContainer => [96.0, 48.0],
+            WidgetKindChoice::ScrollList => [72.0, 84.0],
         },
-        offset: [24.0, 24.0],
+        offset: [UI_EDGE_MARGIN, UI_EDGE_MARGIN],
         ..Default::default()
     }
+}
+
+fn hud_widget_style(kind: WidgetKindChoice) -> toki_core::ui_layout::UiWidgetStyle {
+    let font_size_px = match kind {
+        WidgetKindChoice::Label | WidgetKindChoice::ScrollList => Some(8),
+        WidgetKindChoice::ProgressBar => Some(8),
+        WidgetKindChoice::Image | WidgetKindChoice::GridContainer => None,
+    };
+    toki_core::ui_layout::UiWidgetStyle {
+        typography: UiTypography {
+            font_size_px,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+fn apply_widget_position_preset(
+    widget: &mut UiWidgetNode,
+    preset: WidgetPositionPreset,
+    preview_viewport_size: glam::Vec2,
+) {
+    let size = widget.layout.size;
+    match preset {
+        WidgetPositionPreset::TopLeft => {
+            widget.layout.anchor = UiAnchor::TopLeft;
+            widget.layout.offset = [UI_EDGE_MARGIN, UI_EDGE_MARGIN];
+        }
+        WidgetPositionPreset::TopRight => {
+            widget.layout.anchor = UiAnchor::TopRight;
+            widget.layout.offset = [-UI_EDGE_MARGIN, UI_EDGE_MARGIN];
+        }
+        WidgetPositionPreset::BottomLeft => {
+            widget.layout.anchor = UiAnchor::BottomLeft;
+            widget.layout.offset = [UI_EDGE_MARGIN, -UI_EDGE_MARGIN];
+        }
+        WidgetPositionPreset::BottomRight => {
+            widget.layout.anchor = UiAnchor::BottomRight;
+            widget.layout.offset = [-UI_EDGE_MARGIN, -UI_EDGE_MARGIN];
+        }
+        WidgetPositionPreset::Center => {
+            widget.layout.anchor = UiAnchor::Center;
+            widget.layout.offset = [0.0, 0.0];
+            widget.layout.size[0] = widget.layout.size[0].min(preview_viewport_size.x.max(1.0));
+            widget.layout.size[1] = widget.layout.size[1].min(preview_viewport_size.y.max(1.0));
+        }
+    }
+    widget.layout.offset[0] = snap_to_grid(widget.layout.offset[0]);
+    widget.layout.offset[1] = snap_to_grid(widget.layout.offset[1]);
+    widget.layout.size[0] = snap_to_grid(size[0]).max(16.0);
+    widget.layout.size[1] = snap_to_grid(size[1]).max(16.0);
+}
+
+fn insert_new_widget_under_selection(
+    ui_state: &mut EditorUI,
+    layout: &mut UiLayoutAsset,
+    widget: UiWidgetNode,
+    status_message: &str,
+) -> bool {
+    let parent_id = preferred_parent_id(
+        layout,
+        ui_state
+            .ui_editor_context()
+            .ui
+            .selected_widget_id
+            .as_deref(),
+    );
+    let widget_id = widget.id.to_string();
+    if insert_child_widget(&mut layout.root, &parent_id, widget) {
+        let editor_state = &mut ui_state.ui_editor_context_mut().ui;
+        editor_state.select_widget(widget_id);
+        editor_state.status_message = Some(status_message.to_string());
+        true
+    } else {
+        false
+    }
+}
+
+fn preferred_parent_id(layout: &UiLayoutAsset, selected_widget_id: Option<&str>) -> String {
+    selected_widget_id
+        .and_then(|widget_id| {
+            find_widget(&layout.root, widget_id).and_then(|widget| {
+                if can_have_children(widget) {
+                    Some(widget.id.to_string())
+                } else {
+                    find_parent_id(&layout.root, widget_id)
+                }
+            })
+        })
+        .unwrap_or_else(|| "root".to_string())
+}
+
+fn snap_to_grid(value: f32) -> f32 {
+    (value / UI_SNAP_GRID).round() * UI_SNAP_GRID
 }
 
 fn can_have_children(widget: &UiWidgetNode) -> bool {
@@ -1577,7 +2225,11 @@ fn paint_ui_block(painter: &egui::Painter, block: &UiBlock, available_fonts: &[S
         let galley = painter.layout_job(LayoutJob::single_section(text.content.clone(), format));
         let anchor_position = Pos2::new(text.position.x, text.position.y);
         let galley_pos = align_galley_top_left(anchor_position, galley.size(), text.anchor);
-        painter.galley(galley_pos, galley.clone(), rgba_to_color32(text.style.color));
+        painter.galley(
+            galley_pos,
+            galley.clone(),
+            rgba_to_color32(text.style.color),
+        );
         if matches!(text.style.weight, TextWeight::Bold) {
             painter.galley(
                 Pos2::new(galley_pos.x + 0.75, galley_pos.y),
@@ -1651,7 +2303,10 @@ fn scaled_rect(rect: UiRect, origin: Vec2, scale: f32) -> Rect {
 }
 
 fn resize_handle_rect(screen_rect: Rect) -> Rect {
-    Rect::from_min_size(screen_rect.right_bottom() - Vec2::splat(14.0), Vec2::splat(14.0))
+    Rect::from_min_size(
+        screen_rect.right_bottom() - Vec2::splat(16.0),
+        Vec2::splat(16.0),
+    )
 }
 
 fn topmost_widget_id_at_point(
@@ -1701,10 +2356,19 @@ fn declared_flags_stub() -> &'static [toki_core::project_runtime::ProjectFlagDef
 
 #[cfg(test)]
 mod tests {
-    use super::{resize_handle_rect, resize_handle_widget_id_at_point, scaled_rect, topmost_widget_id_at_point};
+    use super::{
+        apply_widget_position_preset, bool_expression_choices, create_widget_preset,
+        resize_handle_rect, resize_handle_widget_id_at_point, scaled_rect, snap_to_grid,
+        topmost_widget_id_at_point, value_path_choices, WidgetPositionPreset, WidgetPreset,
+    };
     use egui::{pos2, vec2};
+    use toki_core::flags::FlagValue;
+    use toki_core::project_runtime::ProjectFlagDefinition;
     use toki_core::ui::UiRect;
-    use toki_core::ui_layout::UiWidgetFrame;
+    use toki_core::ui_layout::{
+        UiBinding, UiCollectionBinding, UiProgressBinding, UiWidgetFrame, UiWidgetKind,
+        UiWidgetNode,
+    };
 
     #[test]
     fn child_widget_wins_hit_test_over_root() {
@@ -1758,12 +2422,134 @@ mod tests {
         let inside = handle_rect.center();
 
         assert_eq!(
-            resize_handle_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, inside, "child").as_deref(),
+            resize_handle_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, inside, "child")
+                .as_deref(),
             Some("child")
         );
         assert_eq!(
-            resize_handle_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, pos2(25.0, 25.0), "child"),
+            resize_handle_widget_id_at_point(
+                &frames,
+                vec2(0.0, 0.0),
+                1.0,
+                pos2(25.0, 25.0),
+                "child"
+            ),
             None
         );
+    }
+
+    #[test]
+    fn health_bar_preset_uses_player_health_bindings() {
+        let layout = toki_core::ui_layout::UiLayoutAsset {
+            root: UiWidgetNode::default(),
+            ..Default::default()
+        };
+        let widget = create_widget_preset(WidgetPreset::HealthBar, &layout);
+        match widget.kind {
+            UiWidgetKind::ProgressBar {
+                value: UiProgressBinding::CurrentMax { current, max },
+            } => {
+                assert_eq!(
+                    current,
+                    UiBinding::ValuePath {
+                        path: "player.health".to_string(),
+                        key: None,
+                    }
+                );
+                assert_eq!(
+                    max,
+                    UiBinding::ValuePath {
+                        path: "player.max_health".to_string(),
+                        key: None,
+                    }
+                );
+            }
+            other => panic!("unexpected widget kind: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inventory_list_preset_uses_player_inventory_collection() {
+        let layout = toki_core::ui_layout::UiLayoutAsset {
+            root: UiWidgetNode::default(),
+            ..Default::default()
+        };
+        let widget = create_widget_preset(WidgetPreset::InventoryList, &layout);
+        match widget.kind {
+            UiWidgetKind::ScrollList {
+                collection,
+                row_template,
+                ..
+            } => {
+                assert_eq!(collection, UiCollectionBinding::PlayerInventory);
+                assert!(matches!(
+                    row_template.segments.as_slice(),
+                    [
+                        toki_core::ui_layout::UiCollectionTextSegment::ItemId,
+                        toki_core::ui_layout::UiCollectionTextSegment::Literal { .. },
+                        toki_core::ui_layout::UiCollectionTextSegment::ItemCount
+                    ]
+                ));
+            }
+            other => panic!("unexpected widget kind: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn position_preset_places_widget_in_requested_corner() {
+        let mut widget = UiWidgetNode {
+            id: "label".into(),
+            layout: toki_core::ui_layout::UiLayoutSpec {
+                size: [48.0, 12.0],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        apply_widget_position_preset(
+            &mut widget,
+            WidgetPositionPreset::BottomRight,
+            glam::vec2(160.0, 144.0),
+        );
+        assert_eq!(
+            widget.layout.anchor,
+            toki_core::ui_layout::UiAnchor::BottomRight
+        );
+        assert_eq!(widget.layout.offset, [-8.0, -8.0]);
+    }
+
+    #[test]
+    fn snap_to_grid_rounds_to_four_pixel_steps() {
+        assert_eq!(snap_to_grid(1.9), 0.0);
+        assert_eq!(snap_to_grid(5.9), 4.0);
+        assert_eq!(snap_to_grid(6.1), 8.0);
+    }
+
+    #[test]
+    fn value_path_choices_include_known_entity_paths_and_declared_flags() {
+        let choices = value_path_choices(&[ProjectFlagDefinition {
+            id: "coins".to_string(),
+            default_value: FlagValue::Int(0),
+        }]);
+        assert!(choices.contains(&"player.health".to_string()));
+        assert!(choices.contains(&"self.active".to_string()));
+        assert!(choices.contains(&"flags.coins".to_string()));
+    }
+
+    #[test]
+    fn bool_expression_choices_include_bool_flags_and_common_templates() {
+        let choices = bool_expression_choices(&[
+            ProjectFlagDefinition {
+                id: "door_open".to_string(),
+                default_value: FlagValue::Bool(false),
+            },
+            ProjectFlagDefinition {
+                id: "coins".to_string(),
+                default_value: FlagValue::Int(0),
+            },
+        ]);
+        assert!(choices.contains(&"flags.door_open".to_string()));
+        assert!(choices.contains(&"!flags.door_open".to_string()));
+        assert!(choices.contains(&"player.active".to_string()));
+        assert!(!choices.contains(&"flags.coins".to_string()));
     }
 }

@@ -3,9 +3,7 @@ use crate::rule_graph_ui::{
     rule_graph_action_summary, rule_graph_condition_summary, rule_graph_trigger_summary,
     RuleGraphSummaryStyle,
 };
-use toki_core::rules::{
-    InteractionMode, RuleFlagValueSource, RuleIntSource, RuleVec2IntSource,
-};
+use toki_core::rules::{InteractionMode, RuleFlagValueSource, RuleIntSource, RuleVec2IntSource};
 use toki_core::FlagValue;
 
 impl PanelSystem {
@@ -78,7 +76,9 @@ impl PanelSystem {
     ) -> bool {
         match condition {
             RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => false,
-            RuleCondition::Expression { expression } => ui.text_edit_singleline(expression).changed(),
+            RuleCondition::Expression { expression } => {
+                ui.text_edit_singleline(expression).changed()
+            }
             RuleCondition::TargetExists { target } => {
                 Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"))
             }
@@ -368,22 +368,37 @@ impl PanelSystem {
             } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::teleport_target"));
-                changed |=
-                    Self::edit_rule_int_source(ui, &format!("{id_prefix}::tile_x"), "Tile X:", tile_x);
-                changed |=
-                    Self::edit_rule_int_source(ui, &format!("{id_prefix}::tile_y"), "Tile Y:", tile_y);
+                changed |= Self::edit_rule_int_source(
+                    ui,
+                    &format!("{id_prefix}::tile_x"),
+                    "Tile X:",
+                    tile_x,
+                );
+                changed |= Self::edit_rule_int_source(
+                    ui,
+                    &format!("{id_prefix}::tile_y"),
+                    "Tile Y:",
+                    tile_y,
+                );
                 changed
             }
             RuleAction::SetFlag { flag, value } => {
                 let mut changed = Self::edit_flag_name(ui, flag);
-                changed |=
-                    Self::edit_rule_flag_value_source(ui, &format!("{id_prefix}::flag_value"), value);
+                changed |= Self::edit_rule_flag_value_source(
+                    ui,
+                    &format!("{id_prefix}::flag_value"),
+                    value,
+                );
                 changed
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 let mut changed = Self::edit_flag_name(ui, flag);
-                changed |=
-                    Self::edit_rule_int_source(ui, &format!("{id_prefix}::increment"), "Amount:", amount);
+                changed |= Self::edit_rule_int_source(
+                    ui,
+                    &format!("{id_prefix}::increment"),
+                    "Amount:",
+                    amount,
+                );
                 changed
             }
             RuleAction::ClearFlag { flag } => Self::edit_flag_name(ui, flag),
@@ -537,9 +552,7 @@ impl PanelSystem {
             RuleIntSource::Literal(literal) => {
                 ui.horizontal(|ui| {
                     ui.label("Value:");
-                    changed |= ui
-                        .add(egui::DragValue::new(literal).speed(1.0))
-                        .changed();
+                    changed |= ui.add(egui::DragValue::new(literal).speed(1.0)).changed();
                 });
             }
             RuleIntSource::Expression { expr } => {
@@ -614,7 +627,11 @@ impl PanelSystem {
         ui.horizontal(|ui| {
             ui.label("Value Source:");
             egui::ComboBox::from_id_salt((id_salt, "source_mode"))
-                .selected_text(if is_expression { "Expression" } else { "Literal" })
+                .selected_text(if is_expression {
+                    "Expression"
+                } else {
+                    "Literal"
+                })
                 .show_ui(ui, |ui| {
                     changed |= ui
                         .selectable_value(&mut selected_expression, false, "Literal")

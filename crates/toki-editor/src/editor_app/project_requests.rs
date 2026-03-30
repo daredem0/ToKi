@@ -225,7 +225,10 @@ impl EditorApp {
 
     pub(super) fn handle_save_project_request(&mut self) {
         if let Err(error) = self.persist_dirty_ui_layout_draft() {
-            tracing::error!("Failed to save UI layout draft before project save: {}", error);
+            tracing::error!(
+                "Failed to save UI layout draft before project save: {}",
+                error
+            );
             return;
         }
 

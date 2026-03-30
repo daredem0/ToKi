@@ -12,9 +12,8 @@ use toki_core::game::{
     SceneSystem,
 };
 use toki_core::rules::{
-    InteractionMode, Rule, RuleAction, RuleCondition, RuleFlagValueSource, RuleIntSource,
-    RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType, RuleTarget, RuleTrigger,
-    RuleVec2IntSource,
+    InteractionMode, Rule, RuleAction, RuleCondition, RuleFlagValueSource, RuleIntSource, RuleKey,
+    RuleSet, RuleSoundChannel, RuleSpawnEntityType, RuleTarget, RuleTrigger, RuleVec2IntSource,
 };
 use toki_core::{
     entity::EntityKind,

@@ -6,8 +6,8 @@ use toki_core::entity::EntityDefinition;
 use toki_core::game::SceneSystem;
 use toki_core::project_assets::{
     discover_project_dialog_paths, discover_project_entity_definition_paths,
-    discover_project_scene_paths, first_existing_path, resolve_project_scene_path,
-    discover_project_ui_paths,
+    discover_project_scene_paths, discover_project_ui_paths, first_existing_path,
+    resolve_project_scene_path,
 };
 use toki_core::project_content::{
     build_game_state_from_project_content as shared_build_game_state_from_project_content,

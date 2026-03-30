@@ -14,8 +14,8 @@ use toki_core::entity::{
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
-    RuleSpawnEntityType, RuleTarget, RuleTrigger, RuleVec2IntSource,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
+    RuleTarget, RuleTrigger, RuleVec2IntSource,
 };
 use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 use toki_core::Scene;
@@ -1061,9 +1061,9 @@ fn validate_rule_set_for_scene_warns_for_undeclared_flags() {
             }],
             actions: vec![RuleAction::SetFlag {
                 flag: "missing_flag".to_string(),
-                value: toki_core::rules::RuleFlagValueSource::Literal(
-                    toki_core::FlagValue::Bool(true),
-                ),
+                value: toki_core::rules::RuleFlagValueSource::Literal(toki_core::FlagValue::Bool(
+                    true,
+                )),
             }],
         }],
     };

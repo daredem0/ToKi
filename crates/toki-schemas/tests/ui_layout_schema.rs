@@ -2,8 +2,8 @@ use jsonschema::JSONSchema;
 use serde_json::{json, Value};
 
 fn compile_ui_layout_schema() -> JSONSchema {
-    let schema: Value =
-        serde_json::from_str(toki_schemas::UI_LAYOUT_SCHEMA).expect("ui layout schema should parse");
+    let schema: Value = serde_json::from_str(toki_schemas::UI_LAYOUT_SCHEMA)
+        .expect("ui layout schema should parse");
     JSONSchema::compile(&schema).expect("ui layout schema should compile")
 }
 

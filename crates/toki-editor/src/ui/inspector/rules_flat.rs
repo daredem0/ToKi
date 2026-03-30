@@ -647,7 +647,12 @@ impl InspectorSystem {
         );
         changed |= Self::render_rule_vec2_source_editor(
             ui,
-            ("rule_set_velocity", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            (
+                "rule_set_velocity",
+                ctx.scene_name,
+                ctx.rule_index,
+                ctx.action_index,
+            ),
             "Velocity:",
             velocity,
         );
@@ -677,7 +682,8 @@ impl InspectorSystem {
                     }
                 });
         });
-        changed |= Self::render_rule_vec2_source_editor(ui, (id_salt, "spawn"), "Position:", position);
+        changed |=
+            Self::render_rule_vec2_source_editor(ui, (id_salt, "spawn"), "Position:", position);
         changed
     }
 
@@ -748,7 +754,12 @@ impl InspectorSystem {
         );
         changed |= Self::render_rule_int_source_editor(
             ui,
-            ("rule_amount", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            (
+                "rule_amount",
+                ctx.scene_name,
+                ctx.rule_index,
+                ctx.action_index,
+            ),
             "Amount:",
             amount,
         );
@@ -817,13 +828,23 @@ impl InspectorSystem {
         );
         changed |= Self::render_rule_int_source_editor(
             ui,
-            ("rule_teleport_x", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            (
+                "rule_teleport_x",
+                ctx.scene_name,
+                ctx.rule_index,
+                ctx.action_index,
+            ),
             "Tile X:",
             tile_x,
         );
         changed |= Self::render_rule_int_source_editor(
             ui,
-            ("rule_teleport_y", ctx.scene_name, ctx.rule_index, ctx.action_index),
+            (
+                "rule_teleport_y",
+                ctx.scene_name,
+                ctx.rule_index,
+                ctx.action_index,
+            ),
             "Tile Y:",
             tile_y,
         );

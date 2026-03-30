@@ -149,9 +149,7 @@ impl InspectorSystem {
             RuleIntSource::Literal(literal) => {
                 ui.horizontal(|ui| {
                     ui.label("Value:");
-                    changed |= ui
-                        .add(egui::DragValue::new(literal).speed(1.0))
-                        .changed();
+                    changed |= ui.add(egui::DragValue::new(literal).speed(1.0)).changed();
                 });
             }
             RuleIntSource::Expression { expr } => {
@@ -251,7 +249,7 @@ impl InspectorSystem {
         let mut selected_mode = current_mode;
         ui.horizontal(|ui| {
             ui.label("Value Source:");
-                egui::ComboBox::from_id_salt((&id_salt, "mode"))
+            egui::ComboBox::from_id_salt((&id_salt, "mode"))
                 .selected_text(match current_mode {
                     FlagSourceMode::Literal => "Literal",
                     FlagSourceMode::Expression => "Expression",
@@ -531,9 +529,7 @@ impl InspectorSystem {
                                     condition_index + 1
                                 ),
                             });
-                        } else if let Some(message) =
-                            Self::validate_expression_string(expression)
-                        {
+                        } else if let Some(message) = Self::validate_expression_string(expression) {
                             issues.push(RuleValidationIssue {
                                 rule_index,
                                 action_index: None,
@@ -866,8 +862,7 @@ impl InspectorSystem {
                     RuleAction::TeleportEntity { tile_x, tile_y, .. } => {
                         for (axis_label, source) in [("tile_x", tile_x), ("tile_y", tile_y)] {
                             if let Some(expression) = source.expression() {
-                                if let Some(message) =
-                                    Self::validate_expression_string(expression)
+                                if let Some(message) = Self::validate_expression_string(expression)
                                 {
                                     issues.push(RuleValidationIssue {
                                         rule_index,

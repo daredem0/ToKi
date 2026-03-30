@@ -2,9 +2,7 @@ use glam::IVec2;
 use tempfile::tempdir;
 use toki_core::entity::EntityAttributes;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
-use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
-};
+use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
 use super::{EditorUI, MapEditorDraft, ProjectRequest, Selection};
 use crate::project::Project;

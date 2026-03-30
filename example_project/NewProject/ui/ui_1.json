@@ -119,8 +119,8 @@
         "layout": {
           "anchor": "top_left",
           "offset": [
-            80.0,
-            95.0
+            76.0,
+            124.0
           ],
           "size": [
             75.0,
@@ -162,7 +162,7 @@
             "mode": "percent",
             "percent": {
               "kind": "expression",
-              "expression": "50",
+              "expression": "min(flags.coins, 4)",
               "key": null
             }
           }

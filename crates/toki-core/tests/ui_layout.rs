@@ -41,8 +41,7 @@ fn ui_layout_asset_json_roundtrips() {
     };
 
     let json = serde_json::to_string_pretty(&layout).expect("layout should serialize");
-    let decoded: UiLayoutAsset =
-        serde_json::from_str(&json).expect("layout should deserialize");
+    let decoded: UiLayoutAsset = serde_json::from_str(&json).expect("layout should deserialize");
     assert_eq!(decoded.id, layout.id);
     assert_eq!(decoded.title, layout.title);
     assert!(decoded.startup_visible);
@@ -110,35 +109,25 @@ fn ui_layout_engine_composes_bindings_progress_and_frames() {
         None,
     );
 
-    assert!(
-        output
-            .composition
-            .blocks
-            .iter()
-            .any(|block| block
-                .text
-                .as_ref()
-                .is_some_and(|text| text.content.contains("Coins: 7")))
-    );
-    assert!(
-        output
-            .widget_frames
-            .iter()
-            .any(|frame| frame.widget_id.as_str() == "coins")
-    );
-    assert!(
-        output
-            .hitboxes
-            .iter()
-            .any(|hitbox| hitbox.widget_id.as_str() == "coins" && hitbox.event_id.is_some())
-    );
-    assert!(
-        output
-            .composition
-            .blocks
-            .iter()
-            .any(|block| block.fill_color.is_some() && block.rect.width > 20.0 && block.rect.height > 2.0)
-    );
+    assert!(output.composition.blocks.iter().any(|block| block
+        .text
+        .as_ref()
+        .is_some_and(|text| text.content.contains("Coins: 7"))));
+    assert!(output
+        .widget_frames
+        .iter()
+        .any(|frame| frame.widget_id.as_str() == "coins"));
+    assert!(output
+        .hitboxes
+        .iter()
+        .any(|hitbox| hitbox.widget_id.as_str() == "coins" && hitbox.event_id.is_some()));
+    assert!(output
+        .composition
+        .blocks
+        .iter()
+        .any(|block| block.fill_color.is_some()
+            && block.rect.width > 20.0
+            && block.rect.height > 2.0));
 }
 
 #[test]
@@ -190,17 +179,15 @@ fn ui_controller_handles_visibility_binding_updates_and_click_events() {
         binding_context(&entity_manager, &flags, &overrides),
     );
     assert_eq!(rendered.len(), 1);
-    assert!(
-        rendered[0]
-            .output
-            .composition
-            .blocks
-            .iter()
-            .any(|block| block
-                .text
-                .as_ref()
-                .is_some_and(|text| text.content.contains("Inventory")))
-    );
+    assert!(rendered[0]
+        .output
+        .composition
+        .blocks
+        .iter()
+        .any(|block| block
+            .text
+            .as_ref()
+            .is_some_and(|text| text.content.contains("Inventory"))));
 
     let click_position = rendered[0]
         .output

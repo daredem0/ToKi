@@ -153,12 +153,10 @@ impl UiBinding {
         }
 
         match self {
-            Self::ValuePath { path, .. } => {
-                crate::value_path::ValuePath::parse(path)
-                    .map_err(ExpressionError::from)?
-                    .resolve(context.value_paths)
-                    .map_err(ExpressionError::from)
-            }
+            Self::ValuePath { path, .. } => crate::value_path::ValuePath::parse(path)
+                .map_err(ExpressionError::from)?
+                .resolve(context.value_paths)
+                .map_err(ExpressionError::from),
             Self::Expression { expression, .. } => {
                 Expression::parse(expression)?.evaluate(context.value_paths)
             }
@@ -191,13 +189,8 @@ pub enum UiCollectionTextSegment {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum UiProgressBinding {
-    CurrentMax {
-        current: UiBinding,
-        max: UiBinding,
-    },
-    Percent {
-        percent: UiBinding,
-    },
+    CurrentMax { current: UiBinding, max: UiBinding },
+    Percent { percent: UiBinding },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -342,7 +335,7 @@ fn default_ui_font_family() -> String {
 }
 
 const fn default_ui_font_size_px() -> u16 {
-    14
+    8
 }
 
 const fn default_ui_text_color() -> [u8; 4] {
@@ -566,9 +559,9 @@ impl UiLayoutEngine {
 
                 let columns = (*columns).max(1) as usize;
                 let children = &widget.children;
-                let cell_width =
-                    (content_rect.width - spacing.horizontal() * (columns.saturating_sub(1) as f32))
-                        / columns as f32;
+                let cell_width = (content_rect.width
+                    - spacing.horizontal() * (columns.saturating_sub(1) as f32))
+                    / columns as f32;
                 let cell_height = children
                     .iter()
                     .map(|child| child.layout.size[1])
@@ -854,8 +847,13 @@ impl UiController {
             };
             let mut surface_context = context;
             surface_context.binding_overrides = &surface.binding_overrides;
-            let output =
-                UiLayoutEngine::compose(layout, theme, viewport_size, surface_context, Some(surface));
+            let output = UiLayoutEngine::compose(
+                layout,
+                theme,
+                viewport_size,
+                surface_context,
+                Some(surface),
+            );
             if let Some(hitbox) = output
                 .hitboxes
                 .into_iter()
@@ -994,16 +992,8 @@ fn text_style_for_widget(widget: &UiWidgetNode, theme: &UiTheme) -> TextStyle {
             .font_size_px
             .map(f32::from)
             .unwrap_or(theme.base_font_size_px as f32),
-        weight: widget
-            .style
-            .typography
-            .weight
-            .unwrap_or(TextWeight::Normal),
-        slant: widget
-            .style
-            .typography
-            .slant
-            .unwrap_or(TextSlant::Normal),
+        weight: widget.style.typography.weight.unwrap_or(TextWeight::Normal),
+        slant: widget.style.typography.slant.unwrap_or(TextSlant::Normal),
         color: color_to_f32(widget.style.text_color.unwrap_or(theme.foreground_color)),
     }
 }
@@ -1032,7 +1022,10 @@ fn text_anchor_position(rect: UiRect, anchor: TextAnchor, inset: f32) -> glam::V
     }
 }
 
-fn render_text_template(template: &UiTextTemplate, context: UiBindingContext<'_, '_, '_>) -> String {
+fn render_text_template(
+    template: &UiTextTemplate,
+    context: UiBindingContext<'_, '_, '_>,
+) -> String {
     template
         .segments
         .iter()
@@ -1067,8 +1060,16 @@ fn resolve_progress_fraction(
 ) -> f32 {
     match binding {
         UiProgressBinding::CurrentMax { current, max } => {
-            let current = current.resolve(context).ok().and_then(value_as_int).unwrap_or_default();
-            let max = max.resolve(context).ok().and_then(value_as_int).unwrap_or(1);
+            let current = current
+                .resolve(context)
+                .ok()
+                .and_then(value_as_int)
+                .unwrap_or_default();
+            let max = max
+                .resolve(context)
+                .ok()
+                .and_then(value_as_int)
+                .unwrap_or(1);
             if max <= 0 {
                 0.0
             } else {
@@ -1258,8 +1259,8 @@ mod tests {
                             },
                             UiTextSegment::Binding {
                                 binding: UiBinding::ValuePath {
-                                path: "flags.coins".to_string(),
-                                key: None,
+                                    path: "flags.coins".to_string(),
+                                    key: None,
                                 },
                             },
                         ],
@@ -1299,8 +1300,8 @@ mod tests {
                                     },
                                     UiTextSegment::Binding {
                                         binding: UiBinding::ValuePath {
-                                        path: "flags.health".to_string(),
-                                        key: None,
+                                            path: "flags.health".to_string(),
+                                            key: None,
                                         },
                                     },
                                 ],
@@ -1350,11 +1351,10 @@ mod tests {
             None,
         );
 
-        assert!(output
-            .composition
-            .blocks
-            .iter()
-            .any(|block| block.text.as_ref().is_some_and(|text| text.content == "HP 25")));
+        assert!(output.composition.blocks.iter().any(|block| block
+            .text
+            .as_ref()
+            .is_some_and(|text| text.content == "HP 25")));
         assert!(output
             .composition
             .blocks
@@ -1418,15 +1418,20 @@ mod tests {
             &layout,
             &UiTheme::default(),
             glam::Vec2::new(160.0, 144.0),
-            binding_context(&entity_manager, &flags, Some(player_id), &HashMap::new(), &[]),
+            binding_context(
+                &entity_manager,
+                &flags,
+                Some(player_id),
+                &HashMap::new(),
+                &[],
+            ),
             None,
         );
 
-        assert!(output
-            .composition
-            .blocks
-            .iter()
-            .any(|block| block.text.as_ref().is_some_and(|text| text.content == "potion x3")));
+        assert!(output.composition.blocks.iter().any(|block| block
+            .text
+            .as_ref()
+            .is_some_and(|text| text.content == "potion x3")));
         assert!(output
             .hitboxes
             .iter()
@@ -1528,7 +1533,10 @@ mod tests {
             glam::Vec2::new(10.0, 10.0),
             binding_context(&entity_manager, &flags, None, &HashMap::new(), &[]),
         ));
-        assert_eq!(controller.take_emitted_events(), vec!["continue".to_string()]);
+        assert_eq!(
+            controller.take_emitted_events(),
+            vec!["continue".to_string()]
+        );
 
         assert!(controller.focus_next(
             &UiTheme::default(),
@@ -1571,13 +1579,18 @@ mod tests {
             &layout,
             &UiTheme::default(),
             glam::Vec2::new(160.0, 144.0),
-            binding_context(&entity_manager, &flags, None, &HashMap::new(), &declared_flags),
+            binding_context(
+                &entity_manager,
+                &flags,
+                None,
+                &HashMap::new(),
+                &declared_flags,
+            ),
             None,
         );
-        assert!(output
-            .composition
-            .blocks
-            .iter()
-            .any(|block| block.text.as_ref().is_some_and(|text| text.content == "quest_state=new")));
+        assert!(output.composition.blocks.iter().any(|block| block
+            .text
+            .as_ref()
+            .is_some_and(|text| text.content == "quest_state=new")));
     }
 }

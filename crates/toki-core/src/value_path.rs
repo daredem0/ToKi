@@ -174,7 +174,9 @@ impl ValuePath {
                         .inventory(entity_id)
                         .map(|inventory| ResolvedValue::Int(inventory.item_count(item_id) as i32))
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
-                    ValuePathAccessor::Flag(_) => unreachable!("flag access only valid on flags root"),
+                    ValuePathAccessor::Flag(_) => {
+                        unreachable!("flag access only valid on flags root")
+                    }
                 }
             }
         }
@@ -204,7 +206,10 @@ impl std::fmt::Display for ValuePath {
     }
 }
 
-fn parse_entity_accessor(path: &str, segments: &[&str]) -> Result<ValuePathAccessor, ValuePathError> {
+fn parse_entity_accessor(
+    path: &str,
+    segments: &[&str],
+) -> Result<ValuePathAccessor, ValuePathError> {
     match segments {
         [_, "health"] => Ok(ValuePathAccessor::Health),
         [_, "max_health"] => Ok(ValuePathAccessor::MaxHealth),
@@ -264,7 +269,10 @@ mod tests {
     #[test]
     fn reject_invalid_flag_shape() {
         let error = ValuePath::parse("flags.a.b").expect_err("invalid path should fail");
-        assert!(matches!(error, super::ValuePathError::InvalidStructure { .. }));
+        assert!(matches!(
+            error,
+            super::ValuePathError::InvalidStructure { .. }
+        ));
     }
 
     #[test]

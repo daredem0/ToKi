@@ -131,6 +131,18 @@ impl EditorApp {
             return;
         };
 
+        if let Err(error) = self.persist_dirty_ui_layout_draft() {
+            tracing::error!(
+                "Cannot export game: failed to save current UI layout draft: {}",
+                error
+            );
+            return;
+        }
+
+        if let Some(project) = self.core.project_manager.current_project.as_mut() {
+            crate::editor_services::graph_metadata::copy_ui_into_project(&self.core.ui, project);
+        }
+
         if let Err(error) = self
             .core
             .project_manager

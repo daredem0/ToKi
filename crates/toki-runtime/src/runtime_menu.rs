@@ -185,7 +185,8 @@ impl App {
 
     fn authored_ui_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
         if self.rendering.has_gpu() {
-            self.rendering.surface_to_logical_viewport_position(position)
+            self.rendering
+                .surface_to_logical_viewport_position(position)
         } else {
             Some(position)
         }

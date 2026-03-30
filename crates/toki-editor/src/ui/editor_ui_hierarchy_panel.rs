@@ -1,8 +1,6 @@
 use super::EditorUI;
+use crate::ui::editor_ui::{sync_dialog_registry, sync_ui_layout_registry, CenterPanelTab};
 use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
-use crate::ui::{
-    editor_ui::{sync_dialog_registry, sync_ui_layout_registry, CenterPanelTab},
-};
 impl EditorUI {
     pub fn render_hierarchy_and_maps_combined_panel(
         &mut self,
