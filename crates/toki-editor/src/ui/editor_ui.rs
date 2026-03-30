@@ -78,7 +78,8 @@ pub(crate) use editor_ui_menu_editor::{
 };
 pub(crate) use editor_ui_ui_editor::{
     clear_ui_layout_view_dirty, export_ui_layout_views_for_project, is_ui_layout_view_dirty,
-    load_ui_layout_views_from_project, sync_ui_layout_registry, UiEditorState,
+    load_ui_layout_views_from_project, sync_ui_layout_registry, UiCanvasInteraction,
+    UiEditorState,
 };
 pub(crate) use editor_ui_sprite_editor::{
     begin_new_sprite_canvas_dialog, cancel_new_sprite_canvas_dialog, CanvasSide, DualCanvasLayout,

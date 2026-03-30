@@ -234,6 +234,85 @@ fn ui_controller_handles_visibility_binding_updates_and_click_events() {
 }
 
 #[test]
+fn root_level_widgets_keep_independent_positions() {
+    let entity_manager = toki_core::entity::EntityManager::default();
+    let flags = GameFlags::default();
+    let overrides = HashMap::new();
+
+    let mut root = UiWidgetNode::default();
+    root.children = vec![
+        UiWidgetNode {
+            id: "label".into(),
+            title: "Label".to_string(),
+            layout: toki_core::ui_layout::UiLayoutSpec {
+                anchor: toki_core::ui_layout::UiAnchor::TopLeft,
+                offset: [0.0, 0.0],
+                size: [80.0, 60.0],
+                ..Default::default()
+            },
+            kind: UiWidgetKind::Label {
+                content: UiTextTemplate {
+                    segments: vec![UiTextSegment::Literal {
+                        text: "Top Left".to_string(),
+                    }],
+                },
+            },
+            ..UiWidgetNode::default()
+        },
+        UiWidgetNode {
+            id: "progress".into(),
+            title: "Progress".to_string(),
+            layout: toki_core::ui_layout::UiLayoutSpec {
+                anchor: toki_core::ui_layout::UiAnchor::TopRight,
+                offset: [0.0, 0.0],
+                size: [40.0, 12.0],
+                ..Default::default()
+            },
+            kind: UiWidgetKind::ProgressBar {
+                value: UiProgressBinding::Percent {
+                    percent: UiBinding::Expression {
+                        expression: "50".to_string(),
+                        key: None,
+                    },
+                },
+            },
+            ..UiWidgetNode::default()
+        },
+    ];
+
+    let layout = UiLayoutAsset {
+        id: "hud".into(),
+        title: "HUD".to_string(),
+        startup_visible: true,
+        z_order: 0,
+        root,
+    };
+
+    let output = UiLayoutEngine::compose(
+        &layout,
+        &UiTheme::default(),
+        glam::vec2(160.0, 144.0),
+        binding_context(&entity_manager, &flags, &overrides),
+        None,
+    );
+
+    let label_frame = output
+        .widget_frames
+        .iter()
+        .find(|frame| frame.widget_id.as_str() == "label")
+        .expect("label frame should exist");
+    let progress_frame = output
+        .widget_frames
+        .iter()
+        .find(|frame| frame.widget_id.as_str() == "progress")
+        .expect("progress frame should exist");
+
+    assert!(label_frame.rect.y <= 12.0);
+    assert!(progress_frame.rect.y <= 12.0);
+    assert!(progress_frame.rect.x > label_frame.rect.x + label_frame.rect.width);
+}
+
+#[test]
 fn label_text_defaults_to_center_and_honors_typography_overrides() {
     let entity_manager = toki_core::entity::EntityManager::default();
     let flags = GameFlags::default();

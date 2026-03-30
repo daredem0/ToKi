@@ -7,6 +7,13 @@ use toki_core::ui_layout::{
     UiWidgetNode, UiWidgetStyle,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum UiCanvasInteraction {
+    Pan,
+    MoveWidget { widget_id: String },
+    ResizeWidget { widget_id: String },
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct UiEditorState {
     pub selected_layout_id: Option<String>,
@@ -17,6 +24,7 @@ pub(crate) struct UiEditorState {
     pub status_message: Option<String>,
     pub zoom: f32,
     pub pan: [f32; 2],
+    pub canvas_interaction: Option<UiCanvasInteraction>,
     pub views_by_layout: HashMap<String, UiEditorLayoutState>,
     pub view_dirty: bool,
 }
@@ -86,6 +94,7 @@ impl UiEditorState {
             status_message: Some("Created new UI layout draft".to_string()),
             zoom: 1.0,
             pan: [16.0, 16.0],
+            canvas_interaction: None,
             views_by_layout: HashMap::new(),
             view_dirty: false,
         };
@@ -113,6 +122,7 @@ impl UiEditorState {
             .unwrap_or_default();
         self.zoom = view.zoom;
         self.pan = view.pan;
+        self.canvas_interaction = None;
     }
 
     pub fn select_widget(&mut self, widget_id: String) {
@@ -166,6 +176,19 @@ impl UiEditorState {
             self.view_dirty = true;
         }
     }
+
+    #[cfg(test)]
+    pub fn begin_move_widget(&mut self, widget_id: String) {
+        self.select_widget(widget_id.clone());
+        self.canvas_interaction = Some(UiCanvasInteraction::MoveWidget { widget_id });
+    }
+
+    #[cfg(test)]
+    pub fn begin_resize_widget(&mut self, widget_id: String) {
+        self.select_widget(widget_id.clone());
+        self.canvas_interaction = Some(UiCanvasInteraction::ResizeWidget { widget_id });
+    }
+
 }
 
 pub(crate) fn sync_ui_layout_registry(ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
@@ -276,5 +299,35 @@ mod tests {
         assert_eq!(state.zoom, 1.5);
         assert_eq!(state.pan, [48.0, 24.0]);
         assert_eq!(state.selected_widget_id.as_deref(), Some("label_1"));
+    }
+
+    #[test]
+    fn begin_move_widget_selects_it_for_inspector() {
+        let mut state = UiEditorState::default();
+
+        state.begin_move_widget("progress_1".to_string());
+
+        assert_eq!(state.selected_widget_id.as_deref(), Some("progress_1"));
+        assert_eq!(
+            state.canvas_interaction,
+            Some(UiCanvasInteraction::MoveWidget {
+                widget_id: "progress_1".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn begin_resize_widget_selects_it_for_inspector() {
+        let mut state = UiEditorState::default();
+
+        state.begin_resize_widget("label_2".to_string());
+
+        assert_eq!(state.selected_widget_id.as_deref(), Some("label_2"));
+        assert_eq!(
+            state.canvas_interaction,
+            Some(UiCanvasInteraction::ResizeWidget {
+                widget_id: "label_2".to_string(),
+            })
+        );
     }
 }

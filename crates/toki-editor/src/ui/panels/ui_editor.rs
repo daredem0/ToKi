@@ -1,5 +1,5 @@
 use crate::project::{Project, ProjectAssets};
-use crate::ui::editor_ui::{sync_ui_layout_registry, EditorUI};
+use crate::ui::editor_ui::{sync_ui_layout_registry, EditorUI, UiCanvasInteraction};
 use crate::fonts::resolve_preview_font_family;
 use egui::{
     text::{LayoutJob, TextFormat},
@@ -366,12 +366,13 @@ fn render_ui_layout_canvas(
     let desired_size = egui::vec2(ui.available_width(), ui.available_height().max(PREVIEW_MIN_HEIGHT));
     let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
     let painter = ui.painter_at(rect);
-    let (mut zoom, mut pan, selected_widget_id) = {
+    let (mut zoom, mut pan, selected_widget_id, canvas_interaction) = {
         let editor_state = &ui_state.ui_editor_context().ui;
         (
             editor_state.zoom,
             editor_state.pan,
             editor_state.selected_widget_id.clone(),
+            editor_state.canvas_interaction.clone(),
         )
     };
 
@@ -431,15 +432,15 @@ fn render_ui_layout_canvas(
         &ui_editor_font_choices(ui_state),
     );
 
-    let mut widget_dragged = false;
+    let pointer_pos = response.interact_pointer_pos().or_else(|| response.hover_pos());
+    let drag_start_pos = ui.input(|input| input.pointer.press_origin()).or(pointer_pos);
+    let hovered_widget_id = pointer_pos.and_then(|pointer_pos| {
+        topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
+    });
+    let mut next_canvas_interaction = canvas_interaction;
     let mut next_selected_widget_id = selected_widget_id.clone();
     for frame in preview.frames.iter().rev() {
         let screen_rect = scaled_rect(frame.rect, origin, zoom);
-        let response = ui.interact(
-            screen_rect,
-            ui.id().with(("ui_widget_frame", frame.widget_id.as_str())),
-            Sense::click_and_drag(),
-        );
         let is_selected = selected_widget_id.as_deref() == Some(frame.widget_id.as_str());
         let stroke_color = if is_selected {
             Color32::from_rgb(255, 210, 90)
@@ -453,49 +454,71 @@ fn render_ui_layout_canvas(
             StrokeKind::Inside,
         );
 
-        if response.clicked() {
-            next_selected_widget_id = Some(frame.widget_id.to_string());
+        if (is_selected || next_selected_widget_id.as_deref() == Some(frame.widget_id.as_str()))
+            && frame.widget_id.as_str() != "root"
+        {
+            let handle_rect = resize_handle_rect(screen_rect);
+            painter.rect_filled(handle_rect, 1.0, Color32::from_rgb(255, 210, 90));
         }
+    }
 
-        if response.dragged() && frame.widget_id.as_str() != "root" {
-            widget_dragged = true;
-            if let Some(widget) = find_widget_mut(&mut layout.root, frame.widget_id.as_str()) {
-                let delta = ui.ctx().input(|input| input.pointer.delta());
+    let resize_target_widget_id = drag_start_pos.and_then(|pointer_pos| {
+        selected_widget_id
+            .as_deref()
+            .and_then(|widget_id| resize_handle_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos, widget_id))
+            .or_else(|| {
+                topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos).as_deref().and_then(|widget_id| {
+                    resize_handle_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos, widget_id)
+                })
+            })
+    });
+
+    if response.clicked() {
+        next_selected_widget_id = hovered_widget_id.clone();
+    }
+
+    if response.drag_started() && next_canvas_interaction.is_none() {
+        if let Some(widget_id) = resize_target_widget_id {
+            next_selected_widget_id = Some(widget_id.clone());
+            next_canvas_interaction = Some(UiCanvasInteraction::ResizeWidget { widget_id });
+        } else if let Some(widget_id) = drag_start_pos
+            .and_then(|pointer_pos| topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos))
+            .or(hovered_widget_id)
+        {
+            next_selected_widget_id = Some(widget_id.clone());
+            next_canvas_interaction = Some(UiCanvasInteraction::MoveWidget { widget_id });
+        } else {
+            next_canvas_interaction = Some(UiCanvasInteraction::Pan);
+        }
+    }
+
+    let pointer_down = ui.ctx().input(|input| input.pointer.primary_down());
+    let delta = ui.ctx().input(|input| input.pointer.delta());
+    match next_canvas_interaction.as_ref() {
+        Some(UiCanvasInteraction::Pan) if pointer_down && response.dragged() => {
+            pan[0] += delta.x;
+            pan[1] += delta.y;
+            changed = true;
+        }
+        Some(UiCanvasInteraction::MoveWidget { widget_id }) if pointer_down => {
+            if let Some(widget) = find_widget_mut(&mut layout.root, widget_id) {
                 widget.layout.offset[0] += delta.x / zoom;
                 widget.layout.offset[1] += delta.y / zoom;
                 changed = true;
             }
         }
-
-        if is_selected && frame.widget_id.as_str() != "root" {
-            let handle_rect = Rect::from_min_size(
-                screen_rect.right_bottom() - Vec2::splat(10.0),
-                Vec2::splat(10.0),
-            );
-            painter.rect_filled(handle_rect, 1.0, Color32::from_rgb(255, 210, 90));
-            let handle_response = ui.interact(
-                handle_rect,
-                ui.id().with(("ui_widget_resize", frame.widget_id.as_str())),
-                Sense::drag(),
-            );
-            if handle_response.dragged() {
-                let delta = ui.ctx().input(|input| input.pointer.delta());
-                if let Some(widget) = find_widget_mut(&mut layout.root, frame.widget_id.as_str()) {
-                    widget.layout.size[0] = (widget.layout.size[0] + delta.x / zoom)
-                        .max(16.0);
-                    widget.layout.size[1] = (widget.layout.size[1] + delta.y / zoom)
-                        .max(16.0);
-                    changed = true;
-                }
+        Some(UiCanvasInteraction::ResizeWidget { widget_id }) if pointer_down => {
+            if let Some(widget) = find_widget_mut(&mut layout.root, widget_id) {
+                widget.layout.size[0] = (widget.layout.size[0] + delta.x / zoom).max(16.0);
+                widget.layout.size[1] = (widget.layout.size[1] + delta.y / zoom).max(16.0);
+                changed = true;
             }
         }
+        _ => {}
     }
 
-    if response.dragged() && !widget_dragged {
-        let delta = ui.ctx().input(|input| input.pointer.delta());
-        pan[0] += delta.x;
-        pan[1] += delta.y;
-        changed = true;
+    if !pointer_down {
+        next_canvas_interaction = None;
     }
 
     if response.double_clicked() {
@@ -517,6 +540,7 @@ fn render_ui_layout_canvas(
     let editor_state = &mut ui_state.ui_editor_context_mut().ui;
     editor_state.zoom = zoom;
     editor_state.pan = pan;
+    editor_state.canvas_interaction = next_canvas_interaction;
     if next_selected_widget_id != editor_state.selected_widget_id {
         editor_state.selected_widget_id = next_selected_widget_id;
         editor_state.view_dirty = true;
@@ -1626,6 +1650,42 @@ fn scaled_rect(rect: UiRect, origin: Vec2, scale: f32) -> Rect {
     )
 }
 
+fn resize_handle_rect(screen_rect: Rect) -> Rect {
+    Rect::from_min_size(screen_rect.right_bottom() - Vec2::splat(14.0), Vec2::splat(14.0))
+}
+
+fn topmost_widget_id_at_point(
+    frames: &[UiWidgetFrame],
+    origin: Vec2,
+    scale: f32,
+    pointer_pos: Pos2,
+) -> Option<String> {
+    frames
+        .iter()
+        .rev()
+        .filter(|frame| frame.widget_id.as_str() != "root")
+        .find(|frame| scaled_rect(frame.rect, origin, scale).contains(pointer_pos))
+        .map(|frame| frame.widget_id.to_string())
+}
+
+fn resize_handle_widget_id_at_point(
+    frames: &[UiWidgetFrame],
+    origin: Vec2,
+    scale: f32,
+    pointer_pos: Pos2,
+    widget_id: &str,
+) -> Option<String> {
+    frames
+        .iter()
+        .find(|frame| frame.widget_id.as_str() == widget_id)
+        .and_then(|frame| {
+            let screen_rect = scaled_rect(frame.rect, origin, scale);
+            resize_handle_rect(screen_rect)
+                .contains(pointer_pos)
+                .then(|| frame.widget_id.to_string())
+        })
+}
+
 fn rgba_to_color32(rgba: [f32; 4]) -> Color32 {
     Color32::from_rgba_unmultiplied(
         (rgba[0].clamp(0.0, 1.0) * 255.0).round() as u8,
@@ -1637,4 +1697,73 @@ fn rgba_to_color32(rgba: [f32; 4]) -> Color32 {
 
 fn declared_flags_stub() -> &'static [toki_core::project_runtime::ProjectFlagDefinition] {
     &[]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{resize_handle_rect, resize_handle_widget_id_at_point, scaled_rect, topmost_widget_id_at_point};
+    use egui::{pos2, vec2};
+    use toki_core::ui::UiRect;
+    use toki_core::ui_layout::UiWidgetFrame;
+
+    #[test]
+    fn child_widget_wins_hit_test_over_root() {
+        let frames = vec![
+            UiWidgetFrame {
+                widget_id: "root".into(),
+                rect: UiRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 160.0,
+                    height: 144.0,
+                },
+                enabled: true,
+            },
+            UiWidgetFrame {
+                widget_id: "child".into(),
+                rect: UiRect {
+                    x: 20.0,
+                    y: 20.0,
+                    width: 40.0,
+                    height: 20.0,
+                },
+                enabled: true,
+            },
+        ];
+
+        assert_eq!(
+            topmost_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, pos2(30.0, 30.0)).as_deref(),
+            Some("child")
+        );
+        assert_eq!(
+            topmost_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, pos2(4.0, 4.0)),
+            None
+        );
+    }
+
+    #[test]
+    fn resize_handle_hit_test_uses_lower_right_corner() {
+        let frames = vec![UiWidgetFrame {
+            widget_id: "child".into(),
+            rect: UiRect {
+                x: 20.0,
+                y: 20.0,
+                width: 40.0,
+                height: 20.0,
+            },
+            enabled: true,
+        }];
+        let screen_rect = scaled_rect(frames[0].rect, vec2(0.0, 0.0), 1.0);
+        let handle_rect = resize_handle_rect(screen_rect);
+        let inside = handle_rect.center();
+
+        assert_eq!(
+            resize_handle_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, inside, "child").as_deref(),
+            Some("child")
+        );
+        assert_eq!(
+            resize_handle_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, pos2(25.0, 25.0), "child"),
+            None
+        );
+    }
 }

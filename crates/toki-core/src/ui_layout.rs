@@ -550,6 +550,20 @@ impl UiLayoutEngine {
                 });
             }
             UiWidgetKind::GridContainer { columns, spacing } => {
+                if widget.id.as_str() == "root" {
+                    for child in &widget.children {
+                        Self::compose_widget(
+                            child,
+                            content_rect,
+                            theme,
+                            context,
+                            surface_state,
+                            output,
+                        );
+                    }
+                    return;
+                }
+
                 let columns = (*columns).max(1) as usize;
                 let children = &widget.children;
                 let cell_width =
