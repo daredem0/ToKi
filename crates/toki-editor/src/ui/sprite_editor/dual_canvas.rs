@@ -84,6 +84,8 @@ pub struct CanvasState {
     pub selected_cell: Option<usize>,
     /// Whether to show the sheet cell grid overlay
     pub show_cell_grid: bool,
+    /// Whether to show symmetry cross lines at each cell's center
+    pub show_cell_cross: bool,
     /// Show 3x3 tiled preview around the active tile
     pub tile_preview: bool,
     /// Line tool: start position when dragging
@@ -124,6 +126,7 @@ impl Default for CanvasState {
             cell_size: glam::UVec2::new(16, 16),
             selected_cell: None,
             show_cell_grid: false,
+            show_cell_cross: false,
             tile_preview: false,
             line_start_pos: None,
             selection_start_pos: None,

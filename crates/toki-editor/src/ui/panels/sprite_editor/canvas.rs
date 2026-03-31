@@ -51,25 +51,17 @@ pub fn render_canvas_viewport(
             .pan_by(glam::Vec2::new(delta.x, delta.y));
     }
 
-    // Handle scroll zoom
+    // Handle scroll zoom (damped so mouse wheel isn't too aggressive)
     if response.hovered() {
         let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
-        if scroll_delta != 0.0 {
-            if scroll_delta > 0.0 {
-                ui_state
-                    .sprite_editor_context_mut()
-                    .sprite
-                    .canvas_state_mut(render_side)
-                    .viewport
-                    .zoom_in();
-            } else {
-                ui_state
-                    .sprite_editor_context_mut()
-                    .sprite
-                    .canvas_state_mut(render_side)
-                    .viewport
-                    .zoom_out();
-            }
+        if scroll_delta.abs() > 1.0 {
+            let factor = 1.0 + scroll_delta.clamp(-20.0, 20.0) * 0.005;
+            let vp = &mut ui_state
+                .sprite_editor_context_mut()
+                .sprite
+                .canvas_state_mut(render_side)
+                .viewport;
+            vp.zoom = (vp.zoom * factor).clamp(vp.zoom_min, vp.zoom_max);
         }
     }
 
@@ -174,6 +166,21 @@ pub fn render_canvas_viewport(
                 canvas,
                 canvas_state.cell_size,
                 canvas_state.selected_cell,
+            );
+        }
+    }
+
+    // Draw cell cross overlay (symmetry axes per cell)
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    if canvas_state.show_cell_cross && canvas_state.show_cell_grid {
+        if let Some(canvas) = &canvas_state.canvas {
+            draw_cell_cross(
+                &painter,
+                rect,
+                &canvas_state.viewport,
+                canvas,
+                canvas_state.cell_size,
             );
         }
     }
@@ -661,6 +668,57 @@ fn draw_cell_grid(
 
             painter.rect_filled(cell_rect, 0.0, fill);
             painter.rect_stroke(cell_rect, 0.0, highlight_stroke, egui::StrokeKind::Inside);
+        }
+    }
+}
+
+fn draw_cell_cross(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+    cell_size: glam::UVec2,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+    let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+    let stroke = egui::Stroke::new(
+        1.5,
+        egui::Color32::from_rgba_unmultiplied(180, 140, 30, 200),
+    );
+
+    let cols = canvas.width / cell_size.x.max(1);
+    let rows = canvas.height / cell_size.y.max(1);
+    let canvas_screen_bottom = canvas_screen_min.y + canvas.height as f32 * zoom;
+    let canvas_screen_right = canvas_screen_min.x + canvas.width as f32 * zoom;
+
+    // Vertical midpoint lines (one per column, spanning that column's rows)
+    for col in 0..cols {
+        let pixel_x = col * cell_size.x + cell_size.x / 2;
+        let screen_x = canvas_screen_min.x + pixel_x as f32 * zoom;
+        if screen_x >= rect.left() && screen_x <= rect.right() {
+            painter.line_segment(
+                [
+                    egui::pos2(screen_x, rect.top().max(canvas_screen_min.y)),
+                    egui::pos2(screen_x, rect.bottom().min(canvas_screen_bottom)),
+                ],
+                stroke,
+            );
+        }
+    }
+
+    // Horizontal midpoint lines (one per row, spanning that row's columns)
+    for row in 0..rows {
+        let pixel_y = row * cell_size.y + cell_size.y / 2;
+        let screen_y = canvas_screen_min.y + pixel_y as f32 * zoom;
+        if screen_y >= rect.top() && screen_y <= rect.bottom() {
+            painter.line_segment(
+                [
+                    egui::pos2(rect.left().max(canvas_screen_min.x), screen_y),
+                    egui::pos2(rect.right().min(canvas_screen_right), screen_y),
+                ],
+                stroke,
+            );
         }
     }
 }
