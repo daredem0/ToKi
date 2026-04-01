@@ -162,6 +162,7 @@ impl InspectorSystem {
                 &active_source.texture_path,
             )
         };
+        let mut gallery_object_selected = false;
         if let Some(texture) = texture {
             if let Some(texture_size) = active_source.object_sheet.image_size() {
                 ui.separator();
@@ -194,6 +195,7 @@ impl InspectorSystem {
                     &active_source.object_sheet,
                     &active_source.object_names,
                     &mut selected_object,
+                    &mut gallery_object_selected,
                 );
             }
         }
@@ -210,22 +212,10 @@ impl InspectorSystem {
             scene_context.placement.preview_cached_frame = None;
         }
 
-        ui.separator();
-        let can_place = build_decoration_placement_draft(
-            &project_path,
-            &selected_sheet,
-            &selected_object,
-        )
-        .is_some();
-        if ui
-            .add_enabled(can_place, egui::Button::new("Place Object"))
-            .clicked()
-        {
-            if let Some(draft) = build_decoration_placement_draft(
-                &project_path,
-                &selected_sheet,
-                &selected_object,
-            ) {
+        if gallery_object_selected {
+            if let Some(draft) =
+                build_decoration_placement_draft(&project_path, &selected_sheet, &selected_object)
+            {
                 ui_state
                     .scene_viewport_context_mut()
                     .placement
@@ -235,7 +225,8 @@ impl InspectorSystem {
                 }
             }
         }
-        ui.small("Place decorations directly in the scene viewport.");
+        ui.separator();
+        ui.small("Click an object in the palette to enter placement mode. Press Enter or Escape to exit.");
     }
 }
 
@@ -246,6 +237,7 @@ fn render_object_gallery_grid(
     object_sheet: &toki_core::assets::object_sheet::ObjectSheetMeta,
     object_names: &[String],
     selected_object_name: &mut String,
+    gallery_object_selected: &mut bool,
 ) {
     const COLUMNS: usize = 4;
     const SLOT_SIZE: f32 = 64.0;
@@ -272,6 +264,7 @@ fn render_object_gallery_grid(
                             .clicked()
                             {
                                 *selected_object_name = object_name.clone();
+                                *gallery_object_selected = true;
                             }
                             ui.add_sized(
                                 [SLOT_SIZE, 16.0],

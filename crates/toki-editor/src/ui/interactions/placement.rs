@@ -145,6 +145,7 @@ impl PlacementInteraction {
             );
 
             if Self::try_place_entity(ui_state, &entity_def_name, world_pos, config, viewport) {
+                viewport.mark_dirty();
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
@@ -165,6 +166,7 @@ impl PlacementInteraction {
                 world_pos.y
             );
             if Self::try_place_decoration(ui_state, decoration_draft, world_pos, viewport) {
+                viewport.mark_dirty();
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
@@ -185,6 +187,7 @@ impl PlacementInteraction {
                 world_pos.y
             );
             if Self::try_place_scene_anchor(ui_state, anchor_draft, world_pos) {
+                viewport.mark_dirty();
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
@@ -337,8 +340,9 @@ impl PlacementInteraction {
         };
 
         let world_pos_i32 = Self::placement_world_position_to_entity_position(world_pos);
+        let new_id = Self::next_entity_id(ui_state.scenes[scene_index].entities());
         let entity = build_decoration_entity(
-            Self::next_entity_id(ui_state.scenes[scene_index].entities()),
+            new_id,
             DecorationSpec {
                 position: world_pos_i32,
                 size: draft.size_px,
@@ -364,10 +368,14 @@ impl PlacementInteraction {
             return false;
         }
 
-        editor_commands::execute(
+        let changed = editor_commands::execute(
             ui_state,
             EditorCommand::add_entity(active_scene_name, entity),
-        )
+        );
+        if changed {
+            ui_state.set_selection(crate::ui::editor_ui::Selection::Entity(new_id));
+        }
+        changed
     }
 
     /// Create entity in the active scene, returns true if successful

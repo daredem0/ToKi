@@ -574,6 +574,30 @@ impl ApplicationHandler for EditorApp {
                     if let PhysicalKey::Code(key_code) = event.physical_key {
                         // Handle other editor keyboard shortcuts
                         match key_code {
+                            KeyCode::Enter | KeyCode::NumpadEnter => {
+                                if self.core.ui.workspace.center_panel_tab
+                                    == CenterPanelTab::SceneViewport
+                                    && self
+                                        .core
+                                        .ui
+                                        .scene_viewport_context()
+                                        .placement
+                                        .is_in_placement_mode()
+                                {
+                                    self.core
+                                        .ui
+                                        .scene_viewport_context_mut()
+                                        .placement
+                                        .exit_placement_mode();
+                                    if let Some(viewport) = &mut self.viewports.scene {
+                                        viewport.mark_dirty();
+                                    }
+                                    if let Some(window) = &self.platform.window {
+                                        window.request_redraw();
+                                    }
+                                    return;
+                                }
+                            }
                             KeyCode::Delete => {
                                 if self.core.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SceneViewport
@@ -926,6 +950,10 @@ impl EditorApp {
                 .placement
                 .entity_move_drag
                 .is_none()
+            && crate::ui::editor_context::scene_viewport_context(ui_state)
+                .placement
+                .scene_anchor_draft()
+                .is_none()
         {
             let is_valid = crate::ui::editor_context::scene_viewport_context(ui_state)
                 .placement
@@ -934,7 +962,8 @@ impl EditorApp {
             match (
                 crate::ui::editor_context::scene_viewport_context(ui_state)
                     .placement
-                    .entity_definition(),
+                    .kind
+                    .as_ref(),
                 &crate::ui::editor_context::scene_viewport_context(ui_state)
                     .placement
                     .preview_position,
@@ -942,7 +971,7 @@ impl EditorApp {
                     .placement
                     .preview_cached_frame,
             ) {
-                (Some(_entity_def), Some(position), Some(cached_frame)) => {
+                (Some(_), Some(position), Some(cached_frame)) => {
                     Some((*position, cached_frame.clone(), is_valid))
                 }
                 _ => None,
