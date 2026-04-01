@@ -2,9 +2,9 @@ use glam::{IVec2, UVec2};
 mod support;
 use support::{test_atlas, test_entity_definition, test_tilemap};
 use toki_core::entity::{
-    build_decoration_entity, CombatComponent, DecorationSpec, Entity, EntityKind, EntityStats,
-    MovementComponent, MovementProfile, OptionalEntityComponents, PickupDef, PrimaryProjectileDef,
-    StoredEntity,
+    build_decoration_entity, CombatComponent, DecorationSpec, Entity, EntityFootprint,
+    EntityGrounding, EntityKind, EntityStats, MovementComponent, MovementProfile,
+    OptionalEntityComponents, PickupDef, PrimaryProjectileDef, StoredEntity,
 };
 use toki_core::game::{
     AudioChannel, AudioEvent, GameSimulation, InputAction, InputSystem, RenderQueryService,
@@ -75,6 +75,31 @@ fn create_solid_test_atlas() -> toki_core::assets::atlas::AtlasMeta {
     atlas
 }
 
+fn atlas_with_directional_player_tiles() -> toki_core::assets::atlas::AtlasMeta {
+    let mut atlas = test_atlas();
+    atlas.tiles.insert(
+        "player/right".to_string(),
+        toki_core::assets::atlas::TileInfo {
+            position: UVec2::new(1, 0),
+            properties: toki_core::assets::atlas::TileProperties {
+                solid: false,
+                trigger: false,
+            },
+        },
+    );
+    atlas.tiles.insert(
+        "player/left".to_string(),
+        toki_core::assets::atlas::TileInfo {
+            position: UVec2::new(2, 0),
+            properties: toki_core::assets::atlas::TileProperties {
+                solid: false,
+                trigger: false,
+            },
+        },
+    );
+    atlas
+}
+
 fn spawn_definition_entity(
     state: &mut GameState,
     definition: &toki_core::entity::EntityDefinition,
@@ -119,6 +144,39 @@ fn prepare_player_attack_clips(state: &mut GameState) {
         loop_mode: LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
+}
+
+fn prepare_player_directional_idle_clips(state: &mut GameState) {
+    use toki_core::animation::{AnimationClip, AnimationState, LoopMode};
+
+    let player = state
+        .world_mut()
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .rendering
+        .animation_controller
+        .as_mut()
+        .expect("player animation controller should exist");
+    controller.add_clip(AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players".to_string(),
+        frame_tile_names: vec!["player/right".to_string()],
+        frame_positions: None,
+        frame_duration_ms: 100.0,
+        frame_durations_ms: None,
+        loop_mode: LoopMode::Loop,
+    });
+    controller.add_clip(AnimationClip {
+        state: AnimationState::IdleLeft,
+        atlas_name: "players".to_string(),
+        frame_tile_names: vec!["player/left".to_string()],
+        frame_positions: None,
+        frame_duration_ms: 100.0,
+        frame_durations_ms: None,
+        loop_mode: LoopMode::Loop,
+    });
 }
 
 #[test]
@@ -756,4 +814,195 @@ fn movement_and_collision_audio_events_use_entity_audio_configuration() {
             ..
         } if sound_id == "custom_hit"
     )));
+}
+
+#[test]
+fn world_bounds_clamp_uses_grounded_footprint_not_full_sprite_size() {
+    let mut state = GameState::new(create_test_sprite());
+    let player_id = player_id(&state);
+    {
+        let player = state
+            .world_mut()
+            .entity_manager_mut()
+            .get_entity_mut(player_id)
+            .expect("player should exist");
+        player.size = UVec2::new(32, 32);
+        player.rendering.grounding = EntityGrounding {
+            origin: Some([16, 31]),
+            footprint: Some(EntityFootprint::new([8, 24], [16, 8])),
+        };
+    }
+    state
+        .world_mut()
+        .entity_manager_mut()
+        .movement_mut(player_id)
+        .expect("player movement should exist")
+        .speed = 10.0;
+
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    for _ in 0..20 {
+        GameSimulation::tick_fixed(
+            &mut state,
+            UVec2::new(100, 100),
+            &test_tilemap(),
+            &test_atlas(),
+        );
+    }
+
+    assert_eq!(player_position(&state).x, 76);
+}
+
+#[test]
+fn profile_scoped_input_moves_only_entities_with_matching_player_wasd_profile() {
+    let mut state = GameState::new(create_test_sprite());
+    let helper_before = IVec2::new(48, 0);
+    let npc_before = IVec2::new(80, 0);
+
+    let mut helper = test_entity_definition("helper", "human");
+    helper.components.movement = Some(MovementComponent {
+        speed: 2.0,
+        movement_profile: MovementProfile::PlayerWasd,
+        can_move: true,
+    });
+    let helper_id = spawn_definition_entity(&mut state, &helper, helper_before);
+
+    let mut npc = test_entity_definition("npc", "creature");
+    npc.components.movement = Some(MovementComponent {
+        speed: 2.0,
+        movement_profile: MovementProfile::None,
+        can_move: true,
+    });
+    let npc_id = spawn_definition_entity(&mut state, &npc, npc_before);
+
+    let player_before = player_position(&state);
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
+    GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(160, 160),
+        &test_tilemap(),
+        &test_atlas(),
+    );
+
+    assert!(player_position(&state).x > player_before.x);
+    assert!(
+        state.world()
+            .entity_manager()
+            .get_entity(helper_id)
+            .expect("helper should exist")
+            .position
+            .x
+            > helper_before.x
+    );
+    assert_eq!(
+        state.world()
+            .entity_manager()
+            .get_entity(npc_id)
+            .expect("npc should exist")
+            .position,
+        npc_before
+    );
+}
+
+#[test]
+fn primary_action_uses_authored_attack_power_stat_for_damage() {
+    let mut state = GameState::new(create_test_sprite());
+    prepare_player_attack_clips(&mut state);
+    let player_id = player_id(&state);
+    let target_position = player_position(&state) + IVec2::new(16, 0);
+
+    {
+        let combat = state
+            .world_mut()
+            .entity_manager_mut()
+            .combat_mut(player_id)
+            .expect("player combat should exist");
+        combat
+            .stats
+            .base
+            .insert("attack_power".to_string(), 3);
+        combat
+            .stats
+            .current
+            .insert("attack_power".to_string(), 3);
+    }
+
+    let mut target = test_entity_definition("stat_target", "creature");
+    target.components.combat = Some(CombatComponent {
+        health: Some(20),
+        stats: EntityStats::from_legacy_health(Some(20)),
+    });
+    let target_id = spawn_definition_entity(
+        &mut state,
+        &target,
+        target_position,
+    );
+
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
+        MovementProfile::PlayerWasd,
+        InputAction::Primary,
+    );
+    GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(160, 160),
+        &test_tilemap(),
+        &test_atlas(),
+    );
+
+    assert_eq!(
+        state.world()
+            .entity_manager()
+            .combat(target_id)
+            .and_then(|combat| combat.current_stat("health")),
+        Some(17)
+    );
+}
+
+#[test]
+fn render_queries_use_directional_clip_tiles_and_flip_left_states() {
+    use toki_core::animation::AnimationState;
+
+    let mut state = GameState::new(create_test_sprite());
+    prepare_player_directional_idle_clips(&mut state);
+    let atlas = atlas_with_directional_player_tiles();
+    let texture_size = UVec2::new(48, 16);
+    let player_id = player_id(&state);
+
+    {
+        let player = state
+            .world_mut()
+            .entity_manager_mut()
+            .get_player_mut()
+            .expect("player should exist");
+        player
+            .rendering
+            .animation_controller
+            .as_mut()
+            .expect("controller should exist")
+            .play(AnimationState::IdleRight);
+    }
+    let service = render_queries(&state);
+    let right_frame = service.current_sprite_frame(&atlas, texture_size);
+    assert!(!service.entity_sprite_flip_x(player_id));
+
+    {
+        let player = state
+            .world_mut()
+            .entity_manager_mut()
+            .get_player_mut()
+            .expect("player should exist");
+        player
+            .rendering
+            .animation_controller
+            .as_mut()
+            .expect("controller should exist")
+            .play(AnimationState::IdleLeft);
+    }
+    let service = render_queries(&state);
+    let left_frame = service.current_sprite_frame(&atlas, texture_size);
+    assert!(service.entity_sprite_flip_x(player_id));
+    assert_ne!(
+        (right_frame.u0, right_frame.u1, right_frame.v0, right_frame.v1),
+        (left_frame.u0, left_frame.u1, left_frame.v0, left_frame.v1)
+    );
 }

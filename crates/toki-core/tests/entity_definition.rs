@@ -488,3 +488,60 @@ fn entity_definition_preserves_authored_attack_power_stat() {
         Some(8)
     );
 }
+
+#[test]
+fn entity_definition_unknown_category_defaults_to_npc_runtime_kind() {
+    let mut entity_def = sample_definition();
+    entity_def.category = "mystery_type".to_string();
+
+    let bundle = entity_def
+        .create_spawn_bundle(IVec2::new(10, 10), 55)
+        .expect("definition should build");
+
+    assert_eq!(bundle.entity.entity_kind, EntityKind::Npc);
+}
+
+#[test]
+fn entity_definition_accepts_directional_locomotion_states() {
+    let mut entity_def = sample_definition();
+    entity_def.animations.clips = vec![
+        AnimationClipDef {
+            state: "idle_left".to_string(),
+            frame_tiles: vec!["player/idle_left".to_string()],
+            frame_positions: None,
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: "loop".to_string(),
+        },
+        AnimationClipDef {
+            state: "walk_right".to_string(),
+            frame_tiles: vec!["player/walk_right".to_string()],
+            frame_positions: None,
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: "loop".to_string(),
+        },
+    ];
+    entity_def.animations.default_state = "idle_left".to_string();
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 5)
+        .expect("definition should instantiate");
+    let controller = entity
+        .rendering
+        .animation_controller
+        .expect("controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::IdleLeft);
+    assert!(controller.clips.contains_key(&AnimationState::WalkRight));
+}
+
+#[test]
+fn entity_definition_create_audio_component_preserves_configured_values() {
+    let entity_def = sample_definition();
+
+    let audio = entity_def.create_audio_component();
+    assert_eq!(audio.footstep_trigger_distance, 16.0);
+    assert_eq!(audio.hearing_radius, 192);
+    assert_eq!(audio.movement_sound.as_deref(), Some("player_footsteps"));
+    assert_eq!(audio.collision_sound.as_deref(), Some("player_collision"));
+}
