@@ -138,7 +138,7 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
 
     let mut scene_a = Scene::new("A".to_string());
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(8, 8));
-    let mut player = state
+    let player = state
         .world()
         .entity_manager()
         .get_entity(player_id)

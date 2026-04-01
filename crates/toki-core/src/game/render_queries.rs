@@ -427,8 +427,7 @@ mod tests {
         EntityStats, OptionalEntityComponents, ProjectileState, StaticObjectRenderDef,
     };
 
-    fn spawn_test_entity(
-        entity_manager: &mut EntityManager,
+    struct TestEntitySpec {
         entity_kind: crate::entity::EntityKind,
         position: glam::IVec2,
         size: glam::UVec2,
@@ -436,9 +435,20 @@ mod tests {
         solid: bool,
         active: bool,
         components: OptionalEntityComponents,
+    }
+
+    fn spawn_test_entity(
+        entity_manager: &mut EntityManager,
+        spec: TestEntitySpec,
     ) -> crate::entity::EntityId {
         entity_manager.spawn_entity(
-            entity_kind, position, size, rendering, solid, active, components,
+            spec.entity_kind,
+            spec.position,
+            spec.size,
+            spec.rendering,
+            spec.solid,
+            spec.active,
+            spec.components,
         )
     }
 
@@ -447,53 +457,59 @@ mod tests {
         let mut entity_manager = EntityManager::new();
         let visible_id = spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(4, 8),
-            glam::UVec2::new(16, 16),
-            EntityRendering::default(),
-            true,
-            true,
-            OptionalEntityComponents {
-                combat: Some(CombatComponent {
-                    health: Some(20),
-                    stats: EntityStats::from_legacy_health(Some(20)),
-                }),
-                ..Default::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(4, 8),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering::default(),
+                solid: true,
+                active: true,
+                components: OptionalEntityComponents {
+                    combat: Some(CombatComponent {
+                        health: Some(20),
+                        stats: EntityStats::from_legacy_health(Some(20)),
+                    }),
+                    ..Default::default()
+                },
             },
         );
         let hidden_id = spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(20, 8),
-            glam::UVec2::new(16, 16),
-            EntityRendering {
-                visible: false,
-                ..EntityRendering::default()
-            },
-            true,
-            true,
-            OptionalEntityComponents {
-                combat: Some(CombatComponent {
-                    health: Some(20),
-                    stats: EntityStats::from_legacy_health(Some(20)),
-                }),
-                ..Default::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(20, 8),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering {
+                    visible: false,
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: OptionalEntityComponents {
+                    combat: Some(CombatComponent {
+                        health: Some(20),
+                        stats: EntityStats::from_legacy_health(Some(20)),
+                    }),
+                    ..Default::default()
+                },
             },
         );
         let inactive_id = spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(36, 8),
-            glam::UVec2::new(16, 16),
-            EntityRendering::default(),
-            true,
-            false,
-            OptionalEntityComponents {
-                combat: Some(CombatComponent {
-                    health: Some(20),
-                    stats: EntityStats::from_legacy_health(Some(20)),
-                }),
-                ..Default::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(36, 8),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering::default(),
+                solid: true,
+                active: false,
+                components: OptionalEntityComponents {
+                    combat: Some(CombatComponent {
+                        health: Some(20),
+                        stats: EntityStats::from_legacy_health(Some(20)),
+                    }),
+                    ..Default::default()
+                },
             },
         );
 
@@ -511,69 +527,77 @@ mod tests {
         let mut entity_manager = EntityManager::new();
         spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(10, 20),
-            glam::UVec2::new(16, 16),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "crate".to_string(),
-                }),
-                ..EntityRendering::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "crate".to_string(),
+                    }),
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
         spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(30, 20),
-            glam::UVec2::new(16, 16),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "hidden".to_string(),
-                }),
-                visible: false,
-                ..EntityRendering::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(30, 20),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "hidden".to_string(),
+                    }),
+                    visible: false,
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
         spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(50, 20),
-            glam::UVec2::new(16, 16),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "inactive".to_string(),
-                }),
-                has_shadow: false,
-                ..EntityRendering::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(50, 20),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "inactive".to_string(),
+                    }),
+                    has_shadow: false,
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: false,
+                components: Default::default(),
             },
-            true,
-            false,
-            Default::default(),
         );
         let projectile_id = spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Projectile,
-            glam::IVec2::new(70, 20),
-            glam::UVec2::new(8, 8),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "bullet".to_string(),
-                }),
-                ..EntityRendering::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Projectile,
+                position: glam::IVec2::new(70, 20),
+                size: glam::UVec2::new(8, 8),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "bullet".to_string(),
+                    }),
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
         entity_manager
             .storage_mut()
@@ -602,19 +626,21 @@ mod tests {
         let mut entity_manager = EntityManager::new();
         spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(10, 20),
-            glam::UVec2::new(16, 16),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "crate".to_string(),
-                }),
-                ..EntityRendering::default()
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "crate".to_string(),
+                    }),
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
@@ -635,23 +661,25 @@ mod tests {
         let mut entity_manager = EntityManager::new();
         spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(10, 20),
-            glam::UVec2::new(32, 48),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "tree".to_string(),
-                }),
-                grounding: EntityGrounding {
-                    origin: Some([16, 47]),
-                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(32, 48),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "tree".to_string(),
+                    }),
+                    grounding: EntityGrounding {
+                        origin: Some([16, 47]),
+                        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+                    },
+                    ..EntityRendering::default()
                 },
-                ..EntityRendering::default()
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
@@ -672,23 +700,25 @@ mod tests {
         let mut entity_manager = EntityManager::new();
         spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(10, 20),
-            glam::UVec2::new(16, 16),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "player".to_string(),
-                }),
-                grounding: EntityGrounding {
-                    origin: Some([8, 15]),
-                    footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(16, 16),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "player".to_string(),
+                    }),
+                    grounding: EntityGrounding {
+                        origin: Some([8, 15]),
+                        footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
+                    },
+                    ..EntityRendering::default()
                 },
-                ..EntityRendering::default()
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
@@ -709,43 +739,47 @@ mod tests {
         let mut entity_manager = EntityManager::new();
         let lower_id = spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(0, 0),
-            glam::UVec2::new(32, 48),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "lower".to_string(),
-                }),
-                grounding: EntityGrounding {
-                    origin: Some([16, 47]),
-                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(0, 0),
+                size: glam::UVec2::new(32, 48),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "lower".to_string(),
+                    }),
+                    grounding: EntityGrounding {
+                        origin: Some([16, 47]),
+                        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+                    },
+                    ..EntityRendering::default()
                 },
-                ..EntityRendering::default()
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
         let upper_id = spawn_test_entity(
             &mut entity_manager,
-            crate::entity::EntityKind::Npc,
-            glam::IVec2::new(0, 24),
-            glam::UVec2::new(32, 48),
-            EntityRendering {
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: "objects".to_string(),
-                    object_name: "upper".to_string(),
-                }),
-                grounding: EntityGrounding {
-                    origin: Some([16, 47]),
-                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Npc,
+                position: glam::IVec2::new(0, 24),
+                size: glam::UVec2::new(32, 48),
+                rendering: EntityRendering {
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "upper".to_string(),
+                    }),
+                    grounding: EntityGrounding {
+                        origin: Some([16, 47]),
+                        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+                    },
+                    ..EntityRendering::default()
                 },
-                ..EntityRendering::default()
+                solid: true,
+                active: true,
+                components: Default::default(),
             },
-            true,
-            true,
-            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);

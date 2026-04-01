@@ -3,7 +3,6 @@ use super::{
     screen_to_world_from_camera, world_to_i32_floor, SceneViewport, ViewportSizingMode,
 };
 use crate::project::assets::ProjectAssets;
-use std::collections::HashMap;
 use toki_core::game::RenderQueryService;
 use toki_core::graphics::image::save_image_rgba8;
 use toki_core::palette::resolve_palette;

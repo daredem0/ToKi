@@ -12,7 +12,7 @@ use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     AiBehavior, AiComponent, AiConfig, AnimationClipDef, AnimationsDef, AudioDef, CollisionDef,
     CombatComponent, ComponentsDef, ControlRole, Entity, EntityAudioSettings, EntityDefinition,
-    EntityKind, EntityRendering, EntityStats, Inventory, MovementComponent, MovementProfile,
+    EntityKind, EntityRendering, EntityStats, MovementComponent, MovementProfile,
     MovementSoundTrigger, RenderingDef,
 };
 use toki_core::game::SceneSystem;

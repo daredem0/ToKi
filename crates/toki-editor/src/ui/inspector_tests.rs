@@ -9,10 +9,10 @@ use std::fs;
 use toki_core::animation::AnimationState;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    build_decoration_entity, decoration_collision_box, AiComponent, CombatComponent, ComponentsDef,
-    ControlRole, DecorationSpec, EntityKind, EntityManager, EntityRendering, EntityStats,
-    InteractionComponent, MovementComponent, MovementSoundTrigger, OptionalEntityComponents,
-    StoredEntity, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    build_decoration_entity, decoration_collision_box, AiComponent, CombatComponent, ControlRole,
+    DecorationSpec, EntityKind, EntityManager, EntityRendering, EntityStats, MovementComponent,
+    MovementSoundTrigger, OptionalEntityComponents, StoredEntity, ATTACK_POWER_STAT_ID,
+    HEALTH_STAT_ID,
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{

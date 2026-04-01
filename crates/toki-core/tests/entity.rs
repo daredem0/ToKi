@@ -205,20 +205,6 @@ impl DefinitionSpawnExt for EntityManager {
     }
 }
 
-trait EntityManagerTestExt {
-    fn next_entity_id_for_test(&self) -> EntityId;
-}
-
-impl EntityManagerTestExt for EntityManager {
-    fn next_entity_id_for_test(&self) -> EntityId {
-        self.active_entities()
-            .into_iter()
-            .max()
-            .unwrap_or(0)
-            .saturating_add(1)
-    }
-}
-
 #[test]
 fn test_entity_manager_creation() {
     let manager = EntityManager::new();
@@ -401,7 +387,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
             ..Default::default()
         },
     ));
-    let loaded = manager
+    let _loaded = manager
         .get_entity(entity_id)
         .expect("existing entity should be stored");
 

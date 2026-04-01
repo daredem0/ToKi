@@ -147,14 +147,6 @@ fn clear_entity_stats(state: &mut GameState, entity_id: u32) {
     combat.health = None;
 }
 
-fn entity_health(state: &GameState, entity_id: u32) -> Option<u32> {
-    state
-        .world()
-        .entity_manager()
-        .combat(entity_id)
-        .and_then(|combat| combat.health)
-}
-
 fn set_entity_interactable(state: &mut GameState, entity_id: u32, interactable: bool) {
     state.world_mut().entity_manager_mut().set_interaction(
         entity_id,
@@ -391,7 +383,7 @@ fn expression_damage_amount_resolves_against_flags() {
         &create_test_atlas(),
     );
 
-    let player = state
+    let _player = state
         .world()
         .entity_manager()
         .get_entity(player_id)

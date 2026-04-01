@@ -13,8 +13,7 @@ use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef, Entity,
     EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, EntityRendering, EntityStats,
-    Inventory, MovementComponent, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
-    StaticObjectRenderDef,
+    Inventory, MovementSoundTrigger, PickupDef, RenderingDef, StaticObjectRenderDef,
 };
 use toki_core::game::SceneSystem;
 use toki_core::scene::{SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
