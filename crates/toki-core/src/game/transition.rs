@@ -22,6 +22,17 @@ pub(super) struct SceneTransitionPlanner<'a> {
 }
 
 impl<'a> SceneTransitionPlanner<'a> {
+    fn next_non_conflicting_entity_id(
+        entity_manager: &EntityManager,
+        preferred_id: crate::entity::EntityId,
+    ) -> crate::entity::EntityId {
+        if entity_manager.get_entity(preferred_id).is_none() {
+            return preferred_id;
+        }
+
+        entity_manager.entity_ids_iter().max().unwrap_or(0) + 1
+    }
+
     pub(super) fn new(entity_definitions: &'a HashMap<EntityDefName, EntityDefinition>) -> Self {
         Self { entity_definitions }
     }
@@ -60,7 +71,9 @@ impl<'a> SceneTransitionPlanner<'a> {
                     spawn_point_id,
                     preserved_player,
                 )?;
-                let player_id = player.entity.id;
+                let player_id =
+                    Self::next_non_conflicting_entity_id(&entity_manager, player.entity.id);
+                player.entity.id = player_id;
                 self.reset_spawned_player_transient_state(
                     &mut player.entity,
                     scene,
@@ -98,7 +111,9 @@ impl<'a> SceneTransitionPlanner<'a> {
             } else {
                 Self::reset_player_transient_state(&mut player.entity, None);
             }
-            let player_id = player.entity.id;
+            let player_id =
+                Self::next_non_conflicting_entity_id(&entity_manager, player.entity.id);
+            player.entity.id = player_id;
             entity_manager.add_existing_stored_entity(player);
             entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
             if let Some(player) = entity_manager.get_entity_mut(player_id) {

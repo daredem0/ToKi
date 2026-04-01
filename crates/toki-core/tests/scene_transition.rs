@@ -1,8 +1,9 @@
-use glam::IVec2;
+use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use toki_core::entity::{
-    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, RenderingDef,
+    build_decoration_entity, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef,
+    CollisionDef, ControlRole, DecorationSpec, EntityDefinition, EntityKind, MovementProfile,
+    MovementSoundTrigger, RenderingDef,
 };
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
 use toki_core::{animation::AnimationState, game::SceneSystem, GameState};
@@ -173,4 +174,70 @@ fn scene_transition_preserves_durable_player_state() {
             .item_count("coin"),
         3
     );
+}
+
+#[test]
+fn scene_transition_remaps_preserved_player_id_when_destination_scene_uses_it() {
+    let mut game_state = GameState::new_empty();
+    game_state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
+
+    let mut scene_a = Scene::new("Scene A".to_string());
+    scene_a.add_anchor(scene_anchor(
+        "spawn_a",
+        IVec2::new(8, 8),
+        Some(SceneAnchorFacing::Down),
+    ));
+    scene_a.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".into(),
+        spawn_point_id: "spawn_a".to_string(),
+    });
+    scene_a.add_entity(build_decoration_entity(
+        27,
+        DecorationSpec::new(IVec2::new(0, 0), UVec2::new(16, 16), "items", "coin"),
+    ));
+
+    let mut scene_b = Scene::new("Scene B".to_string());
+    scene_b.add_anchor(scene_anchor("door", IVec2::new(64, 64), None));
+    scene_b.add_entity(build_decoration_entity(
+        28,
+        DecorationSpec::new(IVec2::new(32, 32), UVec2::new(16, 16), "items", "gem"),
+    ));
+
+    SceneSystem::add_scene(&mut game_state, scene_a);
+    SceneSystem::add_scene(&mut game_state, scene_b);
+    SceneSystem::load(&mut game_state, "Scene A").expect("initial scene should load");
+
+    let startup_player_id = game_state.world().player_id().expect("player should exist");
+    assert_eq!(startup_player_id, 28);
+
+    SceneSystem::transition(&mut game_state, "Scene B", "door")
+        .expect("scene transition should succeed");
+
+    let transitioned_player_id = game_state.world().player_id().expect("player should exist");
+    assert_eq!(transitioned_player_id, 29);
+
+    let destination_entity = game_state
+        .world()
+        .entity_manager()
+        .get_entity(28)
+        .expect("authored scene entity should still exist");
+    assert_eq!(destination_entity.entity_kind, EntityKind::Decoration);
+    let static_render = destination_entity
+        .attributes
+        .rendering
+        .static_object_render
+        .as_ref()
+        .expect("destination entity should keep its static render");
+    assert_eq!(static_render.sheet, "items");
+    assert_eq!(static_render.object_name, "gem");
+
+    let player = game_state
+        .world()
+        .entity_manager()
+        .get_entity(transitioned_player_id)
+        .expect("remapped player should exist");
+    assert_eq!(player.entity_kind, EntityKind::Player);
+    assert_eq!(player.position, IVec2::new(64, 64));
 }
