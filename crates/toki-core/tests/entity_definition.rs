@@ -260,3 +260,231 @@ fn entity_definition_rejects_unknown_loop_mode() {
         EntityDefinitionError::UnknownLoopMode { .. }
     ));
 }
+
+#[test]
+fn entity_definition_copies_authored_primary_projectile() {
+    let mut entity_def = sample_definition();
+    entity_def.components.primary_projectile = Some(PrimaryProjectileDef {
+        sheet: "effects".to_string(),
+        object_name: "fireball".to_string(),
+        size: [8, 8],
+        speed: 6,
+        damage: 4,
+        lifetime_ticks: 12,
+        spawn_offset: [1, -2],
+    });
+
+    let bundle = entity_def
+        .create_spawn_bundle(IVec2::new(10, 20), 3)
+        .expect("definition should build");
+
+    let projectile = bundle
+        .optional_components
+        .primary_projectile
+        .expect("primary projectile should be copied");
+    assert_eq!(projectile.sheet, "effects");
+    assert_eq!(projectile.object_name, "fireball");
+    assert_eq!(projectile.size, [8, 8]);
+    assert_eq!(projectile.speed, 6);
+}
+
+#[test]
+fn entity_definition_copies_authored_pickup() {
+    let mut entity_def = sample_definition();
+    entity_def.category = "item".to_string();
+    entity_def.solid = false;
+    entity_def.collision.enabled = false;
+    entity_def.components.combat = None;
+    entity_def.components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 5,
+    });
+
+    let bundle = entity_def
+        .create_spawn_bundle(IVec2::new(4, 5), 9)
+        .expect("definition should build");
+
+    let pickup = bundle
+        .optional_components
+        .pickup
+        .expect("pickup should be copied");
+    assert_eq!(pickup.item_id, "coin");
+    assert_eq!(pickup.count, 5);
+}
+
+#[test]
+fn entity_definition_create_audio_component_trims_blank_audio_fields() {
+    let mut entity_def = sample_definition();
+    entity_def.audio.movement_sound = "   ".to_string();
+    entity_def.audio.collision_sound = Some("  hit_custom  ".to_string());
+
+    let audio = entity_def.create_audio_component();
+    assert_eq!(audio.movement_sound, None);
+    assert_eq!(audio.collision_sound.as_deref(), Some("hit_custom"));
+}
+
+#[test]
+fn entity_definition_rendering_defaults_has_shadow_to_true_when_missing() {
+    let json = r#"
+    {
+      "name": "shadow_test",
+      "display_name": "Shadow Test",
+      "description": "Missing has_shadow should default to true",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "solid": true,
+      "active": true,
+      "components": {},
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "movement_sound": "step"
+      },
+      "animations": {
+        "atlas_name": "players",
+        "clips": [],
+        "default_state": "idle"
+      },
+      "category": "human",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(json).expect("definition should deserialize");
+    assert!(entity_def.rendering.has_shadow);
+}
+
+#[test]
+fn entity_definition_defaults_grounding_to_collision_footprint() {
+    let entity_def = sample_definition();
+
+    let grounding = entity_def.get_grounding();
+    assert_eq!(grounding.origin, None);
+    assert_eq!(
+        grounding.footprint,
+        Some(EntityFootprint::new([0, 0], [16, 16]))
+    );
+
+    let collision = entity_def
+        .get_collision_box()
+        .expect("collision should exist");
+    assert_eq!(collision.offset, IVec2::new(0, 0));
+    assert_eq!(collision.size, glam::UVec2::new(16, 16));
+}
+
+#[test]
+fn entity_definition_uses_explicit_grounding_for_collision_and_sorting() {
+    let mut entity_def = sample_definition();
+    entity_def.rendering.grounding = EntityGrounding {
+        origin: Some([8, 30]),
+        footprint: Some(EntityFootprint::new([4, 20], [10, 6])),
+    };
+    entity_def.collision.offset = [0, 0];
+    entity_def.collision.size = [32, 32];
+
+    let grounding = entity_def.get_grounding();
+    assert_eq!(grounding.origin, Some([8, 30]));
+    assert_eq!(
+        grounding.footprint,
+        Some(EntityFootprint::new([4, 20], [10, 6]))
+    );
+
+    let collision = entity_def
+        .get_collision_box()
+        .expect("collision should exist");
+    assert_eq!(collision.offset, IVec2::new(4, 20));
+    assert_eq!(collision.size, glam::UVec2::new(10, 6));
+}
+
+#[test]
+fn entity_definition_accepts_optional_attack_animation_states() {
+    let mut entity_def = sample_definition();
+    entity_def.animations.clips.push(AnimationClipDef {
+        state: "attack_right".to_string(),
+        frame_tiles: vec!["player/attack_0".to_string(), "player/attack_1".to_string()],
+        frame_positions: None,
+        frame_duration_ms: 90.0,
+        frame_durations_ms: None,
+        loop_mode: "once".to_string(),
+    });
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("definition should instantiate");
+    let controller = entity
+        .rendering
+        .animation_controller
+        .expect("controller should exist");
+    assert!(controller.clips.contains_key(&AnimationState::AttackRight));
+}
+
+#[test]
+fn entity_definition_supports_position_based_animation_frames() {
+    let mut entity_def = sample_definition();
+    entity_def.animations.clips[1].frame_tiles.clear();
+    entity_def.animations.clips[1].frame_positions = Some(vec![[0, 0], [1, 0], [2, 0]]);
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 2)
+        .expect("definition should instantiate");
+    let controller = entity
+        .rendering
+        .animation_controller
+        .expect("controller should exist");
+    let walk = controller
+        .clips
+        .get(&AnimationState::Walk)
+        .expect("walk clip should exist");
+    assert_eq!(walk.frame_tile_names, Vec::<String>::new());
+    assert_eq!(walk.frame_positions, Some(vec![[0, 0], [1, 0], [2, 0]]));
+}
+
+#[test]
+fn entity_definition_supports_per_frame_durations() {
+    let mut entity_def = sample_definition();
+    entity_def.animations.clips[1].frame_durations_ms = Some(vec![100.0, 150.0, 200.0]);
+    entity_def.animations.clips[1]
+        .frame_tiles
+        .push("player/walk_2".to_string());
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 2)
+        .expect("definition should instantiate");
+    let controller = entity
+        .rendering
+        .animation_controller
+        .expect("controller should exist");
+    let walk = controller
+        .clips
+        .get(&AnimationState::Walk)
+        .expect("walk clip should exist");
+    assert_eq!(walk.frame_durations_ms, Some(vec![100.0, 150.0, 200.0]));
+    assert_eq!(walk.frame_tile_names.len(), 3);
+}
+
+#[test]
+fn entity_definition_preserves_authored_attack_power_stat() {
+    let entity_def = sample_definition();
+
+    let bundle = entity_def
+        .create_spawn_bundle(IVec2::new(100, 200), 42)
+        .expect("definition should build");
+    assert_eq!(
+        bundle
+            .optional_components
+            .combat
+            .as_ref()
+            .expect("combat should exist")
+            .current_stat(ATTACK_POWER_STAT_ID),
+        Some(8)
+    );
+}
