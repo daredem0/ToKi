@@ -42,12 +42,48 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_right_a",
+                "goblin/walk_right_b",
+                "goblin/walk_right_c",
+                "goblin/walk_right_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Walk": {
+              "state": "Walk",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_a",
+                "goblin/walk_b",
+                "goblin/walk_c",
+                "goblin/walk_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "IdleDown": {
               "state": "IdleDown",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
                 "goblin/idle_down_a",
                 "goblin/idle_down_b"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkUp": {
+              "state": "WalkUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_up_a",
+                "goblin/walk_up_b",
+                "goblin/walk_up_c",
+                "goblin/walk_up_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -64,26 +100,14 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_left_a",
-                "goblin/idle_left_b"
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
               ],
               "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_up_a",
-                "goblin/walk_up_b",
-                "goblin/walk_up_c",
-                "goblin/walk_up_d"
-              ],
-              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
             "WalkDown": {
@@ -108,46 +132,22 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "Walk": {
-              "state": "Walk",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_a",
-                "goblin/walk_b",
-                "goblin/walk_c",
-                "goblin/walk_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_right_a",
-                "goblin/walk_right_b",
-                "goblin/walk_right_c",
-                "goblin/walk_right_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "IdleRight": {
               "state": "IdleRight",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
                 "goblin/idle_right_a",
                 "goblin/idle_right_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_left_a",
+                "goblin/idle_left_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -201,8 +201,8 @@
     {
       "id": 2,
       "position": [
-        184,
-        600
+        192,
+        624
       ],
       "size": [
         16,
@@ -234,6 +234,16 @@
         "has_shadow": true,
         "animation_controller": {
           "clips": {
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/idle_down_a",
+                "slime/idle_down_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "IdleLeft": {
               "state": "IdleLeft",
               "atlas_name": "creatures_palette4.json",
@@ -244,26 +254,14 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkDown": {
-              "state": "WalkDown",
+            "Walk": {
+              "state": "Walk",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/walk_down_a",
-                "slime/walk_down_b",
-                "slime/walk_down_c",
-                "slime/walk_down_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_up_a",
-                "slime/walk_up_b",
-                "slime/walk_up_c",
-                "slime/walk_up_d"
+                "slime/walk_a",
+                "slime/walk_b",
+                "slime/walk_c",
+                "slime/walk_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -278,24 +276,14 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "WalkUp": {
+              "state": "WalkUp",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/idle_down_a",
-                "slime/idle_down_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "Walk": {
-              "state": "Walk",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_a",
-                "slime/walk_b",
-                "slime/walk_c",
-                "slime/walk_d"
+                "slime/walk_up_a",
+                "slime/walk_up_b",
+                "slime/walk_up_c",
+                "slime/walk_up_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -322,14 +310,14 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkLeft": {
-              "state": "WalkLeft",
+            "WalkDown": {
+              "state": "WalkDown",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/walk_left_a",
-                "slime/walk_left_b",
-                "slime/walk_left_c",
-                "slime/walk_left_d"
+                "slime/walk_down_a",
+                "slime/walk_down_b",
+                "slime/walk_down_c",
+                "slime/walk_down_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -342,6 +330,18 @@
                 "slime/idle_b"
               ],
               "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_left_a",
+                "slime/walk_left_b",
+                "slime/walk_left_c",
+                "slime/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             }
           },
@@ -428,28 +428,6 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_left_a",
-                "goblin/walk_left_b",
-                "goblin/walk_left_c",
-                "goblin/walk_left_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleDown": {
-              "state": "IdleDown",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_down_a",
-                "goblin/idle_down_b"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "WalkRight": {
               "state": "WalkRight",
               "atlas_name": "goblin.json",
@@ -462,22 +440,24 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_down_a",
+                "goblin/walk_down_b",
+                "goblin/walk_down_c",
+                "goblin/walk_down_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "Idle": {
               "state": "Idle",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
                 "goblin/idle_a",
                 "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleLeft": {
-              "state": "IdleLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_left_a",
-                "goblin/idle_left_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -504,16 +484,46 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkDown": {
-              "state": "WalkDown",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/walk_down_a",
-                "goblin/walk_down_b",
-                "goblin/walk_down_c",
-                "goblin/walk_down_d"
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_left_a",
+                "goblin/walk_left_b",
+                "goblin/walk_left_c",
+                "goblin/walk_left_d"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_down_a",
+                "goblin/idle_down_b"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_left_a",
+                "goblin/idle_left_b"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
             "WalkUp": {
@@ -526,16 +536,6 @@
                 "goblin/walk_up_d"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -621,22 +621,36 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "IdleUp": {
-              "state": "IdleUp",
+            "Walk": {
+              "state": "Walk",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
+                "goblin/walk_a",
+                "goblin/walk_b",
+                "goblin/walk_c",
+                "goblin/walk_d"
               ],
-              "frame_duration_ms": 300.0,
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleRight": {
-              "state": "IdleRight",
+            "WalkUp": {
+              "state": "WalkUp",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_right_a",
-                "goblin/idle_right_b"
+                "goblin/walk_up_a",
+                "goblin/walk_up_b",
+                "goblin/walk_up_c",
+                "goblin/walk_up_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_a",
+                "goblin/idle_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -663,40 +677,6 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "Walk": {
-              "state": "Walk",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_a",
-                "goblin/walk_b",
-                "goblin/walk_c",
-                "goblin/walk_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_up_a",
-                "goblin/walk_up_b",
-                "goblin/walk_up_c",
-                "goblin/walk_up_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "WalkDown": {
               "state": "WalkDown",
               "atlas_name": "goblin.json",
@@ -709,16 +689,24 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "WalkRight": {
-              "state": "WalkRight",
+            "IdleRight": {
+              "state": "IdleRight",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/walk_right_a",
-                "goblin/walk_right_b",
-                "goblin/walk_right_c",
-                "goblin/walk_right_d"
+                "goblin/idle_right_a",
+                "goblin/idle_right_b"
               ],
-              "frame_duration_ms": 150.0,
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
             "IdleLeft": {
@@ -729,6 +717,18 @@
                 "goblin/idle_left_b"
               ],
               "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_right_a",
+                "goblin/walk_right_b",
+                "goblin/walk_right_c",
+                "goblin/walk_right_d"
+              ],
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             }
           },
@@ -814,58 +814,6 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_left_a",
-                "goblin/walk_left_b",
-                "goblin/walk_left_c",
-                "goblin/walk_left_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleLeft": {
-              "state": "IdleLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_left_a",
-                "goblin/idle_left_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleRight": {
-              "state": "IdleRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_right_a",
-                "goblin/idle_right_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "goblin.json",
@@ -902,6 +850,18 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_left_a",
+                "goblin/walk_left_b",
+                "goblin/walk_left_c",
+                "goblin/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "WalkDown": {
               "state": "WalkDown",
               "atlas_name": "goblin.json",
@@ -914,6 +874,36 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
+            "IdleRight": {
+              "state": "IdleRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_right_a",
+                "goblin/idle_right_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_a",
+                "goblin/idle_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "IdleDown": {
               "state": "IdleDown",
               "atlas_name": "goblin.json",
@@ -922,6 +912,16 @@
                 "goblin/idle_down_b"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_left_a",
+                "goblin/idle_left_b"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -1007,6 +1007,68 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_a",
+                "goblin/idle_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleRight": {
+              "state": "IdleRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_right_a",
+                "goblin/idle_right_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_left_a",
+                "goblin/walk_left_b",
+                "goblin/walk_left_c",
+                "goblin/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_left_a",
+                "goblin/idle_left_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_down_a",
+                "goblin/idle_down_b"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "WalkUp": {
               "state": "WalkUp",
               "atlas_name": "goblin.json",
@@ -1031,58 +1093,6 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_down_a",
-                "goblin/idle_down_b"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleLeft": {
-              "state": "IdleLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_left_a",
-                "goblin/idle_left_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleRight": {
-              "state": "IdleRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_right_a",
-                "goblin/idle_right_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_left_a",
-                "goblin/walk_left_b",
-                "goblin/walk_left_c",
-                "goblin/walk_left_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "WalkRight": {
               "state": "WalkRight",
               "atlas_name": "goblin.json",
@@ -1093,16 +1103,6 @@
                 "goblin/walk_right_d"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
             "Walk": {
@@ -1162,6 +1162,1181 @@
         ],
         "trigger": false
       }
+    },
+    {
+      "id": 7,
+      "position": [
+        256,
+        512
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_1"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 8,
+      "position": [
+        240,
+        512
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_0"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 9,
+      "position": [
+        272,
+        512
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_2"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 10,
+      "position": [
+        240,
+        528
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_9"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 11,
+      "position": [
+        256,
+        528
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_10"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 12,
+      "position": [
+        272,
+        528
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_10"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 13,
+      "position": [
+        256,
+        544
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_21"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 14,
+      "position": [
+        272,
+        544
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_23"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 15,
+      "position": [
+        240,
+        544
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_16"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 16,
+      "position": [
+        296,
+        560
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_0"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 17,
+      "position": [
+        312,
+        560
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_1"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 18,
+      "position": [
+        328,
+        560
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_1"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 19,
+      "position": [
+        344,
+        560
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_2"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 20,
+      "position": [
+        296,
+        576
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_9"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 21,
+      "position": [
+        312,
+        576
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_10"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 22,
+      "position": [
+        328,
+        576
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_10"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 23,
+      "position": [
+        344,
+        576
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_9"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 24,
+      "position": [
+        344,
+        592
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_22"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 25,
+      "position": [
+        296,
+        592
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_22"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 26,
+      "position": [
+        328,
+        592
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_17"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 27,
+      "position": [
+        312,
+        592
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_17"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 28,
+      "position": [
+        312,
+        608
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_21"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 29,
+      "position": [
+        328,
+        608
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_23"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 30,
+      "position": [
+        296,
+        608
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_22"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 31,
+      "position": [
+        344,
+        608
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "attributes": {
+        "health": null,
+        "speed": 2.0,
+        "solid": true,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 1,
+        "static_object_render": {
+          "sheet": "house_tileset16x16",
+          "object_name": "object_16"
+        },
+        "active": false,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "legacy_default",
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
     }
   ],
   "rules": {
@@ -1205,7 +2380,7 @@
       "kind": "SpawnPoint",
       "position": [
         200,
-        536
+        528
       ],
       "facing": "Right"
     }
