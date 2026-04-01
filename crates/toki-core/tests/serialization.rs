@@ -83,8 +83,8 @@ fn create_save_test_state() -> GameState {
 
 fn player_definition(name: &str) -> EntityDefinition {
     let mut definition = test_definition(name, "human");
-    definition.attributes.can_move = true;
-    definition.attributes.has_inventory = true;
+    definition.components.movement.get_or_insert_default().can_move = true;
+    definition.components.inventory = Some(Inventory::default());
     definition
 }
 
@@ -129,27 +129,11 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.entity_kind, deserialized.entity_kind);
     assert_eq!(entity.definition_name, deserialized.definition_name);
 
-    // Verify attributes
-    assert_eq!(
-        entity.attributes.gameplay.health,
-        deserialized.attributes.gameplay.health
-    );
-    assert_eq!(
-        entity.attributes.gameplay.speed,
-        deserialized.attributes.gameplay.speed
-    );
-    assert_eq!(
-        entity.attributes.gameplay.solid,
-        deserialized.attributes.gameplay.solid
-    );
-    assert_eq!(
-        entity.attributes.rendering.visible,
-        deserialized.attributes.rendering.visible
-    );
-    assert_eq!(
-        entity.attributes.behavior.active,
-        deserialized.attributes.behavior.active
-    );
+    assert_eq!(entity.rendering.visible, deserialized.rendering.visible);
+    assert_eq!(entity.rendering.has_shadow, deserialized.rendering.has_shadow);
+    assert_eq!(entity.rendering.render_layer, deserialized.rendering.render_layer);
+    assert_eq!(entity.solid, deserialized.solid);
+    assert_eq!(entity.active, deserialized.active);
 }
 
 #[test]
@@ -164,8 +148,10 @@ fn test_entity_minimal_fields() {
         persistent_across_saves: false,
         control_role: ControlRole::None,
         audio: EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: EntityRendering::default(),
         collision_box: None,
+        solid: false,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     };
@@ -178,12 +164,9 @@ fn test_entity_minimal_fields() {
     assert_eq!(entity.entity_kind, deserialized.entity_kind);
     assert_eq!(deserialized.definition_name, None);
     assert!(deserialized.collision_box.is_none());
-    assert!(deserialized
-        .attributes
-        .rendering
-        .animation_controller
-        .is_none());
-    assert_eq!(deserialized.attributes.gameplay.health, None);
+    assert!(deserialized.rendering.animation_controller.is_none());
+    assert!(!deserialized.solid);
+    assert!(deserialized.active);
 }
 
 #[test]
@@ -350,13 +333,22 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
     });
     let mut wounded_npc = persistent_npc(2, IVec2::new(110, 120));
     wounded_npc.persistent_across_saves = false;
-    wounded_npc.attributes.gameplay.health = Some(100);
+    let wounded_npc = StoredEntity::new(
+        wounded_npc,
+        OptionalEntityComponents {
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats::from_legacy_health(Some(100)),
+            }),
+            ..Default::default()
+        },
+    );
     let mut dropped_item = create_test_entity();
     dropped_item.id = 3;
     dropped_item.entity_kind = EntityKind::Item;
     dropped_item.control_role = ControlRole::None;
     dropped_item.position = IVec2::new(132, 120);
-    side_scene.add_entity(wounded_npc);
+    side_scene.add_stored_entity(wounded_npc);
     side_scene.add_entity(dropped_item);
 
     SceneSystem::add_scene(&mut state, main_scene.clone());
@@ -367,10 +359,8 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
 
     let entity_manager = state.world_mut().entity_manager_mut();
     entity_manager
-        .get_entity_mut(2)
-        .expect("npc should exist")
-        .attributes
-        .gameplay
+        .combat_mut(2)
+        .expect("npc combat component should exist")
         .health = Some(25);
     entity_manager.despawn_entity(3);
 
@@ -399,8 +389,9 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
     );
     assert_eq!(
         restored_scene
-            .get_entity(2)
-            .and_then(|entity| entity.attributes.gameplay.health),
+            .components()
+            .combat(2)
+            .and_then(|combat| combat.health),
         Some(25),
         "damaged npc health should restore from the save"
     );
@@ -737,7 +728,7 @@ fn test_entity_deserialization_ignores_legacy_audio_fields() {
 }
 
 #[test]
-fn test_stored_entity_deserializes_legacy_flat_optional_component_shape() {
+fn test_stored_entity_deserializes_componentized_shape() {
     let json = serde_json::json!({
         "id": 7,
         "position": [12, 18],
@@ -745,22 +736,42 @@ fn test_stored_entity_deserializes_legacy_flat_optional_component_shape() {
         "entity_kind": "Player",
         "category": "human",
         "control_role": "player_character",
-        "attributes": {
-            "health": 9,
-            "stats": { "health": { "base": 9, "current": 5 } },
-            "speed": 2.5,
-            "solid": true,
+        "audio": {
+            "footstep_trigger_distance": 32.0,
+            "hearing_radius": 192,
+            "movement_sound_trigger": "distance",
+            "movement_sound": "step",
+            "collision_sound": null
+        },
+        "rendering": {
             "visible": true,
             "has_shadow": true,
-            "animation_controller": null,
             "render_layer": 2,
-            "grounding": {},
-            "active": true,
-            "can_move": true,
-            "interactable": false,
-            "interaction_reach": 0,
-            "ai_config": { "behavior": "none" },
-            "movement_profile": "player_wasd",
+            "grounding": {}
+        },
+        "collision_box": null,
+        "solid": true,
+        "active": true,
+        "tags": ["hero"],
+        "components": {
+            "movement": {
+                "speed": 2.5,
+                "movement_profile": "player_wasd",
+                "can_move": true
+            },
+            "ai": {
+                "ai_config": { "behavior": "none" }
+            },
+            "interaction": {
+                "interaction_reach": 0
+            },
+            "combat": {
+                "health": 9,
+                "stats": {
+                    "base": { "health": 9 },
+                    "current": { "health": 5 }
+                }
+            },
             "primary_projectile": {
                 "sheet": "effects",
                 "object_name": "arrow",
@@ -787,23 +798,33 @@ fn test_stored_entity_deserializes_legacy_flat_optional_component_shape() {
                 "items": {
                     "coin": 8
                 }
-            },
-            "has_inventory": true
-        },
-        "collision_box": null,
-        "tags": ["hero"]
+            }
+        }
     });
 
     let stored: StoredEntity =
-        serde_json::from_value(json).expect("legacy flat entity json should deserialize");
+        serde_json::from_value(json).expect("componentized entity json should deserialize");
 
     assert_eq!(stored.entity.id, 7);
-    assert_eq!(stored.entity.attributes.gameplay.health, Some(9));
     assert_eq!(
-        stored.entity.attributes.current_stat(HEALTH_STAT_ID),
+        stored
+            .components
+            .combat
+            .as_ref()
+            .expect("combat should deserialize")
+            .health,
         Some(9)
     );
-    assert!(stored.entity.attributes.behavior.has_inventory);
+    assert_eq!(
+        stored
+            .components
+            .combat
+            .as_ref()
+            .expect("combat should deserialize")
+            .current_stat(HEALTH_STAT_ID),
+        Some(5)
+    );
+    assert!(stored.components.inventory.is_some());
     assert_eq!(
         stored
             .components

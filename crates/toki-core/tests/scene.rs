@@ -1,8 +1,8 @@
 use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{
-    AiConfig, ControlRole, Entity, EntityAttributes, EntityBehavior, EntityGameplay, EntityKind,
-    EntityRendering, MovementProfile, OptionalEntityComponents, PickupDef, StoredEntity,
+    ControlRole, Entity, EntityAudioSettings, EntityGrounding, EntityKind, EntityRendering,
+    OptionalEntityComponents, PickupDef, StoredEntity,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
@@ -30,34 +30,19 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         definition_name: None,
         persistent_across_saves: false,
         control_role: ControlRole::PlayerCharacter,
-        audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes {
-            gameplay: EntityGameplay {
-                health: Some(100),
-                stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
-                speed: 2.0,
-                solid: true,
-            },
-            rendering: EntityRendering {
-                visible: true,
-                has_shadow: true,
-                palette_override: None,
-                animation_controller: Some(controller),
-                static_object_render: None,
-                grounding: Default::default(),
-                render_layer: 0,
-            },
-            behavior: EntityBehavior {
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::PlayerWasd,
-                has_inventory: false,
-            },
+        audio: EntityAudioSettings::default(),
+        rendering: EntityRendering {
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            animation_controller: Some(controller),
+            static_object_render: None,
+            grounding: EntityGrounding::default(),
+            render_layer: 0,
         },
         collision_box: None,
+        solid: true,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }

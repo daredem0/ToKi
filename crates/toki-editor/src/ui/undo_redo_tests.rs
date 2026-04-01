@@ -5,7 +5,7 @@ use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
 use glam::IVec2;
 use tempfile::tempdir;
-use toki_core::entity::{Entity, EntityAttributes};
+use toki_core::entity::{Entity, EntityRendering, OptionalEntityComponents, StoredEntity};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 
@@ -20,8 +20,10 @@ fn sample_entity(id: u32, position: IVec2) -> Entity {
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::None,
         audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: EntityRendering::default(),
         collision_box: None,
+        solid: true,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }
@@ -392,27 +394,36 @@ fn update_entities_command_restores_previous_state_on_undo() {
         .add_entity(before.clone());
 
     let mut after = before.clone();
-    after.attributes.rendering.visible = false;
-    after.attributes.rendering.render_layer = 9;
+    after.rendering.visible = false;
+    after.rendering.render_layer = 9;
 
-    let command =
-        EditorCommand::update_entities("Main Scene", vec![before.clone()], vec![after.clone()]);
+    let command = EditorCommand::update_entities(
+        "Main Scene",
+        vec![StoredEntity::new(
+            before.clone(),
+            OptionalEntityComponents::default(),
+        )],
+        vec![StoredEntity::new(
+            after.clone(),
+            OptionalEntityComponents::default(),
+        )],
+    );
     assert!(history.execute(command, &mut ui_state, None));
 
     let entity = main_scene_entities(&ui_state)
         .into_iter()
         .find(|entity| entity.id == 42)
         .expect("entity should exist");
-    assert!(!entity.attributes.rendering.visible);
-    assert_eq!(entity.attributes.rendering.render_layer, 9);
+    assert!(!entity.rendering.visible);
+    assert_eq!(entity.rendering.render_layer, 9);
 
     assert!(history.undo(&mut ui_state, None));
     let entity = main_scene_entities(&ui_state)
         .into_iter()
         .find(|entity| entity.id == 42)
         .expect("entity should exist");
-    assert!(entity.attributes.rendering.visible);
-    assert_eq!(entity.attributes.rendering.render_layer, 0);
+    assert!(entity.rendering.visible);
+    assert_eq!(entity.rendering.render_layer, 0);
 }
 
 #[test]

@@ -8,8 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::entity::{
-    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-    RenderingDef,
+    AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
+    EntityDefinition, EntityStats, RenderingDef,
 };
 use toki_core::scene::SceneAnchorKind;
 
@@ -27,22 +27,14 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: Some(10),
-            stats: std::collections::HashMap::new(),
-            speed: 1.0,
-            solid: true,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: toki_core::entity::AiConfig::from_legacy_behavior(
-                toki_core::entity::AiBehavior::Wander,
-            ),
-            movement_profile: toki_core::entity::MovementProfile::None,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: false,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            combat: Some(CombatComponent {
+                health: Some(10),
+                stats: EntityStats::from_legacy_health(Some(10)),
+            }),
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,

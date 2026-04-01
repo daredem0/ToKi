@@ -15,8 +15,9 @@ use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChanne
 use toki_core::text::{TextStyle, TextWeight};
 use toki_core::{
     entity::{
-        AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-        MovementProfile, MovementSoundTrigger, RenderingDef,
+        AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
+        EntityDefinition, EntityStats, Inventory, MovementComponent, MovementProfile,
+        MovementSoundTrigger, RenderingDef,
     },
     scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry},
     Scene,
@@ -60,23 +61,29 @@ fn write_player_definition(project_path: &std::path::Path, name: &str) {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: Some(100),
-            stats: std::collections::HashMap::from([
-                ("health".to_string(), 100),
-                ("attack_power".to_string(), 8),
-            ]),
-            speed: 2.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: toki_core::entity::AiConfig::default(),
-            movement_profile: MovementProfile::PlayerWasd,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: true,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            movement: Some(MovementComponent {
+                speed: 2.0,
+                movement_profile: MovementProfile::PlayerWasd,
+                can_move: true,
+            }),
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats {
+                    base: std::collections::HashMap::from([
+                        ("health".to_string(), 100),
+                        ("attack_power".to_string(), 8),
+                    ]),
+                    current: std::collections::HashMap::from([
+                        ("health".to_string(), 100),
+                        ("attack_power".to_string(), 8),
+                    ]),
+                },
+            }),
+            inventory: Some(Inventory::default()),
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,

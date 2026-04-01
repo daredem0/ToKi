@@ -449,7 +449,10 @@ fn toggles_from_definition_defaults() {
 #[test]
 fn toggles_from_definition_detects_health() {
     let mut def = make_test_definition();
-    def.attributes.health = Some(50);
+    def.components.combat = Some(toki_core::entity::CombatComponent {
+        health: Some(50),
+        stats: toki_core::entity::EntityStats::from_legacy_health(Some(50)),
+    });
 
     let toggles = ComponentToggles::from_definition(&def);
     assert!(toggles.health_enabled);
@@ -458,7 +461,7 @@ fn toggles_from_definition_detects_health() {
 #[test]
 fn toggles_from_definition_detects_inventory() {
     let mut def = make_test_definition();
-    def.attributes.has_inventory = true;
+    def.components.inventory = Some(Default::default());
 
     let toggles = ComponentToggles::from_definition(&def);
     assert!(toggles.inventory_enabled);
@@ -468,10 +471,12 @@ fn toggles_from_definition_detects_inventory() {
 fn toggles_from_definition_detects_ai() {
     use toki_core::entity::{AiBehavior, AiConfig};
     let mut def = make_test_definition();
-    def.attributes.ai_config = AiConfig {
-        behavior: AiBehavior::Chase,
-        detection_radius: 128,
-    };
+    def.components.ai = Some(toki_core::entity::AiComponent {
+        ai_config: AiConfig {
+            behavior: AiBehavior::Chase,
+            detection_radius: 128,
+        },
+    });
 
     let toggles = ComponentToggles::from_definition(&def);
     assert!(toggles.ai_enabled);
@@ -560,27 +565,47 @@ fn edit_state_sync_tags_handles_empty() {
 fn edit_state_toggle_health() {
     let mut state = make_edit_state();
     assert!(!state.toggles.health_enabled);
-    assert!(state.definition.attributes.health.is_none());
+    assert!(state
+        .definition
+        .components
+        .combat
+        .as_ref()
+        .and_then(|combat| combat.health)
+        .is_none());
 
     state.toggle_health();
     assert!(state.toggles.health_enabled);
-    assert_eq!(state.definition.attributes.health, Some(100));
+    assert_eq!(
+        state
+            .definition
+            .components
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.health),
+        Some(100)
+    );
     assert!(state.dirty);
 
     state.toggle_health();
     assert!(!state.toggles.health_enabled);
-    assert!(state.definition.attributes.health.is_none());
+    assert!(state
+        .definition
+        .components
+        .combat
+        .as_ref()
+        .and_then(|combat| combat.health)
+        .is_none());
 }
 
 #[test]
 fn edit_state_toggle_inventory() {
     let mut state = make_edit_state();
     assert!(!state.toggles.inventory_enabled);
-    assert!(!state.definition.attributes.has_inventory);
+    assert!(state.definition.components.inventory.is_none());
 
     state.toggle_inventory();
     assert!(state.toggles.inventory_enabled);
-    assert!(state.definition.attributes.has_inventory);
+    assert!(state.definition.components.inventory.is_some());
     assert!(state.dirty);
 }
 
@@ -590,22 +615,47 @@ fn edit_state_toggle_ai() {
     let mut state = make_edit_state();
     assert!(!state.toggles.ai_enabled);
     assert_eq!(
-        state.definition.attributes.ai_config.behavior,
+        state
+            .definition
+            .components
+            .ai
+            .as_ref()
+            .map(|ai| ai.ai_config.behavior)
+            .unwrap_or(AiBehavior::None),
         AiBehavior::None
     );
 
     state.toggle_ai();
     assert!(state.toggles.ai_enabled);
     assert_eq!(
-        state.definition.attributes.ai_config.behavior,
-        AiBehavior::Wander
+        state
+            .definition
+            .components
+            .ai
+            .as_ref()
+            .map(|ai| ai.ai_config.behavior),
+        Some(AiBehavior::Wander)
     );
-    assert_eq!(state.definition.attributes.ai_config.detection_radius, 128);
+    assert_eq!(
+        state
+            .definition
+            .components
+            .ai
+            .as_ref()
+            .map(|ai| ai.ai_config.detection_radius),
+        Some(128)
+    );
 
     state.toggle_ai();
     assert!(!state.toggles.ai_enabled);
     assert_eq!(
-        state.definition.attributes.ai_config.behavior,
+        state
+            .definition
+            .components
+            .ai
+            .as_ref()
+            .map(|ai| ai.ai_config.behavior)
+            .unwrap_or(AiBehavior::None),
         AiBehavior::None
     );
 }
@@ -694,7 +744,10 @@ fn validation_fails_for_zero_size() {
 fn validation_fails_for_zero_health_when_enabled() {
     let mut state = make_edit_state();
     state.toggles.health_enabled = true;
-    state.definition.attributes.health = Some(0);
+    state.definition.components.combat = Some(toki_core::entity::CombatComponent {
+        health: Some(0),
+        stats: toki_core::entity::EntityStats::from_legacy_health(Some(0)),
+    });
 
     assert!(!state.validate());
     assert!(state.has_error("health"));
@@ -704,7 +757,10 @@ fn validation_fails_for_zero_health_when_enabled() {
 fn validation_skips_health_when_disabled() {
     let mut state = make_edit_state();
     state.toggles.health_enabled = false;
-    state.definition.attributes.health = Some(0);
+    state.definition.components.combat = Some(toki_core::entity::CombatComponent {
+        health: Some(0),
+        stats: toki_core::entity::EntityStats::from_legacy_health(Some(0)),
+    });
 
     assert!(state.validate());
 }
@@ -741,7 +797,12 @@ fn default_definition_has_collision_enabled() {
 #[test]
 fn default_definition_has_no_health() {
     let def = create_default_definition("test", "Test", "npc");
-    assert!(def.attributes.health.is_none());
+    assert!(def
+        .components
+        .combat
+        .as_ref()
+        .and_then(|combat| combat.health)
+        .is_none());
 }
 
 #[test]
@@ -753,11 +814,21 @@ fn default_definition_has_sensible_defaults() {
     assert_eq!(def.category, "enemy");
     assert_eq!(def.rendering.size, [32, 32]);
     assert!(def.rendering.visible);
-    assert_eq!(def.attributes.speed, 100.0);
-    assert!(def.attributes.solid);
-    assert!(def.attributes.active);
-    assert!(def.attributes.can_move);
-    assert!(!def.attributes.interactable);
+    assert_eq!(
+        def.components
+            .movement
+            .as_ref()
+            .map(|movement| movement.speed),
+        Some(100.0)
+    );
+    assert!(def.solid);
+    assert!(def.active);
+    assert!(def
+        .components
+        .movement
+        .as_ref()
+        .is_some_and(|movement| movement.can_move));
+    assert!(def.components.interaction.is_none());
     assert!(def.collision.enabled);
     assert_eq!(def.collision.size, [32, 32]);
     assert!(!def.collision.trigger);

@@ -683,18 +683,18 @@ indexed_palette_override = "gb_default"
     "visible": true,
     "has_shadow": true
   },
-  "attributes": {
-    "health": 10,
-    "stats": { "health": 10 },
-    "speed": 0.0,
-    "solid": false,
-    "active": true,
-    "can_move": false,
-    "interactable": false,
-    "interaction_reach": 0,
-    "ai_config": { "behavior": "none", "detection_radius": 0 },
-    "movement_profile": "none",
-    "has_inventory": false
+  "solid": false,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 0.0,
+      "movement_profile": "none",
+      "can_move": false
+    },
+    "combat": {
+      "health": 10,
+      "stats": { "base": { "health": 10 }, "current": { "health": 10 } }
+    }
   },
   "collision": {
     "enabled": false,
@@ -739,18 +739,18 @@ indexed_palette_override = "gb_default"
     "has_shadow": true,
     "palette_override": "night"
   },
-  "attributes": {
-    "health": 10,
-    "stats": { "health": 10 },
-    "speed": 0.0,
-    "solid": false,
-    "active": true,
-    "can_move": false,
-    "interactable": false,
-    "interaction_reach": 0,
-    "ai_config": { "behavior": "none", "detection_radius": 0 },
-    "movement_profile": "none",
-    "has_inventory": false
+  "solid": false,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 0.0,
+      "movement_profile": "none",
+      "can_move": false
+    },
+    "combat": {
+      "health": 10,
+      "stats": { "base": { "health": 10 }, "current": { "health": 10 } }
+    }
   },
   "collision": {
     "enabled": false,
@@ -794,17 +794,14 @@ indexed_palette_override = "gb_default"
     "visible": true,
     "has_shadow": true
   },
-  "attributes": {
-    "health": null,
-    "speed": 0.0,
-    "solid": false,
-    "active": true,
-    "can_move": false,
-    "interactable": false,
-    "interaction_reach": 0,
-    "ai_config": { "behavior": "none", "detection_radius": 0 },
-    "movement_profile": "none",
-    "has_inventory": false
+  "solid": false,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 0.0,
+      "movement_profile": "none",
+      "can_move": false
+    }
   },
   "collision": {
     "enabled": false,
@@ -858,11 +855,7 @@ indexed_palette_override = "gb_default"
         "movement_sound": null,
         "collision_sound": null
       },
-      "attributes": {
-        "health": 10,
-        "stats": { "base": { "health": 10 }, "current": { "health": 10 } },
-        "speed": 0.0,
-        "solid": false,
+      "rendering": {
         "visible": true,
         "has_shadow": true,
         "palette_override": "night",
@@ -882,16 +875,23 @@ indexed_palette_override = "gb_default"
           "is_finished": false
         },
         "render_layer": 1,
-        "active": true,
-        "can_move": false,
-        "interactable": false,
-        "interaction_reach": 0,
-        "ai_config": { "behavior": "none", "detection_radius": 0 },
-        "movement_profile": "none",
-        "has_inventory": false
+        "grounding": {}
       },
       "collision_box": null,
-      "tags": ["palette_demo", "indexed_override"]
+      "solid": false,
+      "active": true,
+      "tags": ["palette_demo", "indexed_override"],
+      "components": {
+        "movement": {
+          "speed": 0.0,
+          "movement_profile": "none",
+          "can_move": false
+        },
+        "combat": {
+          "health": 10,
+          "stats": { "base": { "health": 10 }, "current": { "health": 10 } }
+        }
+      }
     },
     {
       "id": 3,
@@ -908,10 +908,7 @@ indexed_palette_override = "gb_default"
         "movement_sound": null,
         "collision_sound": null
       },
-      "attributes": {
-        "health": null,
-        "speed": 0.0,
-        "solid": false,
+      "rendering": {
         "visible": true,
         "has_shadow": true,
         "animation_controller": {
@@ -930,16 +927,19 @@ indexed_palette_override = "gb_default"
           "is_finished": false
         },
         "render_layer": 1,
-        "active": true,
-        "can_move": false,
-        "interactable": false,
-        "interaction_reach": 0,
-        "ai_config": { "behavior": "none", "detection_radius": 0 },
-        "movement_profile": "none",
-        "has_inventory": false
+        "grounding": {}
       },
       "collision_box": null,
-      "tags": ["palette_demo", "truecolor_control"]
+      "solid": false,
+      "active": true,
+      "tags": ["palette_demo", "truecolor_control"],
+      "components": {
+        "movement": {
+          "speed": 0.0,
+          "movement_profile": "none",
+          "can_move": false
+        }
+      }
     }
   ],
   "rules": { "rules": [] },

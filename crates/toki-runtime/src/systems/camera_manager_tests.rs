@@ -1,7 +1,7 @@
 use super::CameraManager;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::entity::{Entity, EntityAttributes, EntityKind};
+use toki_core::entity::{Entity, EntityKind, EntityRendering};
 
 fn sample_camera_manager() -> CameraManager {
     let camera = Camera {
@@ -56,8 +56,10 @@ fn update_with_follow_mode_moves_camera_and_view_matrix_matches() {
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::PlayerCharacter,
         audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: EntityRendering::default(),
         collision_box: None,
+        solid: true,
+        active: true,
         definition_name: None,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),

@@ -1,6 +1,5 @@
 use glam::IVec2;
 use tempfile::tempdir;
-use toki_core::entity::EntityAttributes;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
@@ -22,8 +21,10 @@ fn sample_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::None,
         audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: toki_core::entity::EntityRendering::default(),
         collision_box: None,
+        solid: true,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }

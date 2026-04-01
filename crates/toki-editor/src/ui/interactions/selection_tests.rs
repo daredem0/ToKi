@@ -5,9 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use toki_core::entity::{
-    build_decoration_entity, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef,
-    CollisionDef, DecorationSpec, EntityAttributes, EntityDefinition, EntityKind, EntityManager,
-    RenderingDef,
+    build_decoration_entity, AnimationClipDef, AnimationsDef, AudioDef, CollisionDef,
+    CombatComponent, ComponentsDef, DecorationSpec, EntityDefinition, EntityKind, EntityManager,
+    EntityStats, RenderingDef,
 };
 use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 
@@ -39,22 +39,14 @@ fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> Entit
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: Some(50),
-            stats: std::collections::HashMap::new(),
-            speed: 1.0,
-            solid: true,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: toki_core::entity::AiConfig::from_legacy_behavior(
-                toki_core::entity::AiBehavior::Wander,
-            ),
-            movement_profile: toki_core::entity::MovementProfile::None,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: false,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            combat: Some(CombatComponent {
+                health: Some(50),
+                stats: EntityStats::from_legacy_health(Some(50)),
+            }),
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,
@@ -153,7 +145,10 @@ fn resolve_entity_definition_name_prefers_entity_metadata() {
         EntityKind::Npc,
         IVec2::new(10, 20),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let mut entity = manager
         .get_entity(entity_id)
@@ -193,7 +188,10 @@ fn resolve_entity_definition_name_falls_back_to_entity_type_name() {
         EntityKind::Player,
         IVec2::new(0, 0),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let entity = manager
         .get_entity(entity_id)
@@ -212,7 +210,10 @@ fn update_scene_entity_position_moves_target_entity() {
         EntityKind::Npc,
         IVec2::new(10, 20),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let entity = manager
         .get_entity(entity_id)
@@ -324,13 +325,19 @@ fn drag_entities_for_start_uses_multi_selection_when_clicking_selected_entity() 
         EntityKind::Npc,
         IVec2::new(0, 0),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let second_id = manager.spawn_entity(
         EntityKind::Npc,
         IVec2::new(32, 0),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let first = manager
         .get_entity(first_id)
@@ -367,13 +374,19 @@ fn update_scene_entities_position_moves_all_dragged_entities_by_delta() {
         EntityKind::Npc,
         IVec2::new(10, 20),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let second_id = manager.spawn_entity(
         EntityKind::Npc,
         IVec2::new(30, 40),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let first = manager
         .get_entity(first_id)
@@ -564,13 +577,19 @@ fn collect_scene_entities_in_world_rect_returns_intersecting_scene_entities() {
         EntityKind::Npc,
         IVec2::new(0, 0),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
     let second_id = manager.spawn_entity(
         EntityKind::Npc,
         IVec2::new(48, 48),
         UVec2::new(16, 16),
-        EntityAttributes::default(),
+        toki_core::entity::EntityRendering::default(),
+        true,
+        true,
+        Default::default(),
     );
 
     let scene = ui_state

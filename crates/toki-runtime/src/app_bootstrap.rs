@@ -510,8 +510,8 @@ mod tests {
     use super::*;
     use std::fs;
     use toki_core::entity::{
-        AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile,
-        MovementSoundTrigger, RenderingDef,
+        AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef, EntityDefinition,
+        EntityStats, MovementComponent, MovementProfile, MovementSoundTrigger, RenderingDef,
     };
     use toki_core::FlagValue;
 
@@ -531,20 +531,19 @@ mod tests {
                 static_object: None,
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: Some(100),
-                stats: std::collections::HashMap::new(),
-                speed: 1.0,
-                solid: true,
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: toki_core::entity::AiConfig::default(),
-                movement_profile: MovementProfile::None,
-                primary_projectile: None,
-                pickup: None,
-                has_inventory: false,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                movement: Some(MovementComponent {
+                    speed: 1.0,
+                    movement_profile: MovementProfile::None,
+                    can_move: true,
+                }),
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats::from_legacy_health(Some(100)),
+                }),
+                ..Default::default()
             },
             collision: CollisionDef {
                 enabled: false,

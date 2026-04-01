@@ -236,23 +236,14 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
             }),
             grounding: Default::default(),
         },
-        attributes: toki_core::entity::AttributesDef {
-            health: None,
-            stats: HashMap::new(),
-            speed: 0.0,
-            solid: false,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: toki_core::entity::AiConfig::default(),
-            movement_profile: toki_core::entity::MovementProfile::None,
-            primary_projectile: None,
+        solid: false,
+        active: true,
+        components: toki_core::entity::ComponentsDef {
             pickup: Some(toki_core::entity::PickupDef {
                 item_id: "coin".to_string(),
                 count: 1,
             }),
-            has_inventory: false,
+            ..Default::default()
         },
         collision: toki_core::entity::CollisionDef {
             enabled: true,

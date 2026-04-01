@@ -11,9 +11,10 @@ use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, Entity, EntityAttributes,
-    EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, MovementProfile,
-    MovementSoundTrigger, PickupDef, RenderingDef, StaticObjectRenderDef,
+    AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef, Entity,
+    EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, EntityRendering, EntityStats,
+    Inventory, MovementComponent, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
+    StaticObjectRenderDef,
 };
 use toki_core::game::SceneSystem;
 use toki_core::scene::{SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
@@ -528,8 +529,10 @@ fn solid_entity(id: u32, position: IVec2) -> Entity {
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::None,
         audio: toki_core::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: EntityRendering::default(),
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        solid: true,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }
@@ -606,23 +609,14 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
             }),
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: None,
-            stats: HashMap::new(),
-            speed: 0.0,
-            solid: false,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::None,
-            primary_projectile: None,
+        solid: false,
+        active: true,
+        components: ComponentsDef {
             pickup: Some(PickupDef {
                 item_id: "coin".to_string(),
                 count: 1,
             }),
-            has_inventory: false,
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,
@@ -702,21 +696,9 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
             }),
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: None,
-            stats: HashMap::new(),
-            speed: 0.0,
-            solid: false,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::None,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: false,
-        },
+        solid: false,
+        active: true,
+        components: ComponentsDef::default(),
         collision: CollisionDef {
             enabled: true,
             offset: [0, 0],
@@ -797,20 +779,15 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 static_object: None,
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: Some(100),
-                stats: HashMap::new(),
-                speed: 0.0,
-                solid: true,
-                active: true,
-                can_move: false,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::None,
-                primary_projectile: None,
-                pickup: None,
-                has_inventory: true,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats::from_legacy_health(Some(100)),
+                }),
+                inventory: Some(Inventory::default()),
+                ..Default::default()
             },
             collision: CollisionDef {
                 enabled: true,
@@ -851,20 +828,14 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 static_object: None,
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: Some(100),
-                stats: HashMap::new(),
-                speed: 0.0,
-                solid: true,
-                active: true,
-                can_move: false,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::None,
-                primary_projectile: None,
-                pickup: None,
-                has_inventory: false,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats::from_legacy_health(Some(100)),
+                }),
+                ..Default::default()
             },
             collision: CollisionDef {
                 enabled: true,
@@ -959,20 +930,14 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
                 footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
             },
         },
-        attributes: AttributesDef {
-            health: Some(100),
-            stats: HashMap::new(),
-            speed: 0.0,
-            solid: true,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::None,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: false,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats::from_legacy_health(Some(100)),
+            }),
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,
@@ -1011,7 +976,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
     let mut stale_scene_entity = soldier_definition
         .create_entity(IVec2::new(24, 48), 15)
         .expect("scene entity should instantiate");
-    stale_scene_entity.attributes.rendering.grounding = EntityGrounding::default();
+    stale_scene_entity.rendering.grounding = EntityGrounding::default();
     stale_scene_entity.collision_box = Some(CollisionBox::solid_box(stale_scene_entity.size));
     scene.add_entity(stale_scene_entity);
 
@@ -1029,7 +994,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
         .find(|entity| entity.definition_name.as_deref() == Some("soldier"))
         .expect("soldier should exist in preview");
     assert_eq!(
-        soldier.attributes.rendering.grounding.footprint,
+        soldier.rendering.grounding.footprint,
         Some(EntityFootprint::new([4, 12], [8, 4]))
     );
     let collision_box = soldier
@@ -1099,21 +1064,9 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
                 }),
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: None,
-                stats: HashMap::new(),
-                speed: 0.0,
-                solid: false,
-                active: true,
-                can_move: false,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::None,
-                primary_projectile: None,
-                pickup: None,
-                has_inventory: false,
-            },
+            solid: false,
+            active: true,
+            components: ComponentsDef::default(),
             collision: CollisionDef {
                 enabled: true,
                 offset: [0, 0],
@@ -1211,21 +1164,9 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
                 }),
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: None,
-                stats: HashMap::new(),
-                speed: 0.0,
-                solid: false,
-                active: true,
-                can_move: false,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::None,
-                primary_projectile: None,
-                pickup: None,
-                has_inventory: false,
-            },
+            solid: false,
+            active: true,
+            components: ComponentsDef::default(),
             collision: CollisionDef {
                 enabled: true,
                 offset: [0, 0],

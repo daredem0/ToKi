@@ -1,9 +1,9 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use toki_core::entity::{
-    build_decoration_entity, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef,
-    CollisionDef, ControlRole, DecorationSpec, EntityDefinition, EntityKind, MovementProfile,
-    MovementSoundTrigger, RenderingDef,
+    build_decoration_entity, AnimationClipDef, AnimationsDef, AudioDef, CollisionDef,
+    CombatComponent, ComponentsDef, ControlRole, DecorationSpec, EntityDefinition, EntityKind,
+    EntityStats, Inventory, MovementComponent, MovementProfile, MovementSoundTrigger, RenderingDef,
 };
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
 use toki_core::{animation::AnimationState, game::SceneSystem, GameState};
@@ -22,20 +22,29 @@ fn player_definition(name: &str) -> EntityDefinition {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: Some(100),
-            stats: HashMap::from([("health".to_string(), 100), ("attack_power".to_string(), 8)]),
-            speed: 2.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: toki_core::entity::AiConfig::default(),
-            movement_profile: MovementProfile::PlayerWasd,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: true,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            movement: Some(MovementComponent {
+                speed: 2.0,
+                movement_profile: MovementProfile::PlayerWasd,
+                can_move: true,
+            }),
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats {
+                    base: HashMap::from([
+                        ("health".to_string(), 100),
+                        ("attack_power".to_string(), 8),
+                    ]),
+                    current: HashMap::from([
+                        ("health".to_string(), 100),
+                        ("attack_power".to_string(), 8),
+                    ]),
+                },
+            }),
+            inventory: Some(Inventory::default()),
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,
@@ -101,11 +110,14 @@ fn scene_transition_preserves_durable_player_state() {
 
     let mut scene_a = Scene::new("Scene A".to_string());
     let mut hero = player_definition("player")
-        .create_entity(IVec2::new(8, 8), 7)
+        .create_spawn_bundle(IVec2::new(8, 8), 7)
         .expect("hero should instantiate");
-    hero.control_role = ControlRole::PlayerCharacter;
-    hero.entity_kind = EntityKind::Player;
-    scene_a.add_entity(hero);
+    hero.entity.control_role = ControlRole::PlayerCharacter;
+    hero.entity.entity_kind = EntityKind::Player;
+    scene_a.add_stored_entity(toki_core::entity::StoredEntity::new(
+        hero.entity,
+        hero.optional_components,
+    ));
 
     let mut scene_b = Scene::new("Scene B".to_string());
     scene_b.add_anchor(scene_anchor(
@@ -126,9 +138,8 @@ fn scene_transition_preserves_durable_player_state() {
     {
         let entity_manager = game_state.world_mut().entity_manager_mut();
         entity_manager
-            .get_entity_mut(player_id)
-            .expect("player should exist")
-            .attributes
+            .combat_mut(player_id)
+            .expect("player combat component should exist")
             .apply_stat_delta("health", -35);
         entity_manager
             .storage_mut()
@@ -139,7 +150,6 @@ fn scene_transition_preserves_durable_player_state() {
             .get_entity_mut(player_id)
             .expect("player should exist");
         let controller = player
-            .attributes
             .rendering
             .animation_controller
             .as_mut()
@@ -162,7 +172,14 @@ fn scene_transition_preserves_durable_player_state() {
     );
     assert_eq!(player.position, IVec2::new(128, 64));
     assert_eq!(player.definition_name.as_deref(), Some("player_knight"));
-    assert_eq!(player.attributes.current_stat("health"), Some(65));
+    assert_eq!(
+        game_state
+            .world()
+            .entity_manager()
+            .combat(player_id)
+            .and_then(|combat| combat.current_stat("health")),
+        Some(65)
+    );
     assert_eq!(
         game_state
             .world()
@@ -225,7 +242,6 @@ fn scene_transition_remaps_preserved_player_id_when_destination_scene_uses_it() 
         .expect("authored scene entity should still exist");
     assert_eq!(destination_entity.entity_kind, EntityKind::Decoration);
     let static_render = destination_entity
-        .attributes
         .rendering
         .static_object_render
         .as_ref()

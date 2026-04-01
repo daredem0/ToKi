@@ -383,7 +383,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         tags: Vec::new(),
     };
 
-    let entity_id = manager.add_stored_entity(StoredEntity::new(
+    let entity_id = manager.add_existing_stored_entity(StoredEntity::new(
         entity,
         OptionalEntityComponents {
             movement: Some(MovementComponent {
@@ -632,10 +632,9 @@ fn test_multiple_players_not_allowed() {
     let first_player = manager.spawn_player(IVec2::new(0, 0));
     let second_player = manager.spawn_player(IVec2::new(100, 100));
 
-    // The first explicit player-character stays tracked until a higher-level scene/editor
-    // workflow deliberately reassigns the role.
-    assert_eq!(manager.get_player_id(), Some(first_player));
-    assert_ne!(manager.get_player_id(), Some(second_player));
+    // The most recently assigned explicit player-character becomes the tracked player.
+    assert_eq!(manager.get_player_id(), Some(second_player));
+    assert_ne!(manager.get_player_id(), Some(first_player));
 
     // But both should exist as entities
     assert!(manager.get_entity(first_player).is_some());

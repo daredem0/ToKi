@@ -151,23 +151,14 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
             }),
             grounding: Default::default(),
         },
-        attributes: toki_core::entity::AttributesDef {
-            health: None,
-            stats: HashMap::new(),
-            speed: 0.0,
-            solid: false,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: toki_core::entity::AiConfig::default(),
-            movement_profile: toki_core::entity::MovementProfile::None,
-            primary_projectile: None,
+        solid: false,
+        active: true,
+        components: toki_core::entity::ComponentsDef {
             pickup: Some(toki_core::entity::PickupDef {
                 item_id: "coin".to_string(),
                 count: 1,
             }),
-            has_inventory: false,
+            ..Default::default()
         },
         collision: toki_core::entity::CollisionDef {
             enabled: true,
@@ -306,7 +297,6 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
         .get_player_mut()
         .expect("player should exist");
     let controller = player
-        .attributes
         .rendering
         .animation_controller
         .as_mut()
@@ -349,7 +339,7 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
         .world()
         .entity_manager()
         .get_entity(player_id)
-        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
+        .and_then(|entity| entity.rendering.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(
         current_state,

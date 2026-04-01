@@ -2,7 +2,9 @@ use glam::{IVec2, UVec2};
 use toki_core::camera::{
     viewport_to_world, world_to_viewport, Camera, CameraController, CameraMode, RuntimeState,
 };
-use toki_core::entity::{Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind};
+use toki_core::entity::{
+    Entity, EntityAudioSettings, EntityId, EntityKind, EntityRendering,
+};
 
 fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
     Entity {
@@ -15,8 +17,10 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::PlayerCharacter,
         audio: EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: EntityRendering::default(),
         collision_box: None,
+        solid: false,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }

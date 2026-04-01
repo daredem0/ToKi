@@ -23,7 +23,7 @@ fn sample_decoration(id: u32, position: IVec2, visible: bool) -> toki_core::enti
             format!("object_{id}"),
         ),
     );
-    entity.attributes.rendering.visible = visible;
+    entity.rendering.visible = visible;
     entity
 }
 
