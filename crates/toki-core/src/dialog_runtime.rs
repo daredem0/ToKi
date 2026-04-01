@@ -484,14 +484,24 @@ impl DialogController {
         match condition {
             DialogCondition::HealthBelow { target, threshold } => {
                 resolve_dialog_target(game_state, context, *target)
-                    .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
-                    .and_then(|entity| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
+                    .and_then(|entity_id| {
+                        game_state
+                            .world()
+                            .entity_manager()
+                            .combat(entity_id)
+                            .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
+                    })
                     .is_some_and(|health| health < *threshold)
             }
             DialogCondition::HealthAbove { target, threshold } => {
                 resolve_dialog_target(game_state, context, *target)
-                    .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
-                    .and_then(|entity| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
+                    .and_then(|entity_id| {
+                        game_state
+                            .world()
+                            .entity_manager()
+                            .combat(entity_id)
+                            .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
+                    })
                     .is_some_and(|health| health > *threshold)
             }
             DialogCondition::HasInventoryItem {

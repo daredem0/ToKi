@@ -780,22 +780,13 @@ impl SelectionInteraction {
         if definition.rendering.size == [entity.size.x, entity.size.y] {
             score += 4;
         }
-        if definition.attributes.speed == entity.attributes.gameplay.speed {
+        if definition.solid == entity.solid {
             score += 2;
         }
-        if definition.attributes.solid == entity.attributes.gameplay.solid {
-            score += 2;
-        }
-        if definition.attributes.can_move == entity.attributes.behavior.can_move {
+        if definition.active == entity.active {
             score += 1;
         }
-        if definition.attributes.active == entity.attributes.behavior.active {
-            score += 1;
-        }
-        if definition.rendering.render_layer == entity.attributes.rendering.render_layer {
-            score += 1;
-        }
-        if definition.attributes.health == entity.attributes.gameplay.health {
+        if definition.rendering.render_layer == entity.rendering.render_layer {
             score += 1;
         }
         if definition.collision.enabled == entity.collision_box.is_some() {

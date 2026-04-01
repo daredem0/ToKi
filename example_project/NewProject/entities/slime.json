@@ -12,21 +12,6 @@
     "has_shadow": true,
     "palette_override": ""
   },
-  "attributes": {
-    "health": 50,
-    "speed": 1.0,
-    "solid": true,
-    "active": true,
-    "can_move": false,
-    "interactable": false,
-    "interaction_reach": 0,
-    "ai_config": {
-      "behavior": "wander",
-      "detection_radius": 0
-    },
-    "movement_profile": "legacy_default",
-    "has_inventory": false
-  },
   "collision": {
     "enabled": true,
     "offset": [
@@ -157,5 +142,31 @@
     "creature",
     "monster",
     "small"
-  ]
+  ],
+  "solid": true,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 1.0,
+      "movement_profile": "legacy_default",
+      "can_move": false
+    },
+    "ai": {
+      "ai_config": {
+        "behavior": "wander",
+        "detection_radius": 0
+      }
+    },
+    "combat": {
+      "health": 50,
+      "stats": {
+        "base": {
+          "health": 50
+        },
+        "current": {
+          "health": 50
+        }
+      }
+    }
+  }
 }

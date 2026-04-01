@@ -17,7 +17,7 @@ impl GameState {
                 continue;
             };
             let Some(animation_controller) =
-                entity.attributes.rendering.animation_controller.as_mut()
+                entity.rendering.animation_controller.as_mut()
             else {
                 continue;
             };

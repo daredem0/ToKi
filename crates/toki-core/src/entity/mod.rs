@@ -9,6 +9,7 @@
 
 mod builder;
 mod category;
+mod components;
 mod decoration;
 mod definition;
 mod manager;
@@ -19,20 +20,21 @@ mod wire;
 // Re-export all public types
 pub use builder::EntityBuilder;
 pub use category::{default_category_for_kind, runtime_entity_kind_for_category};
+pub use components::{AiComponent, CombatComponent, InteractionComponent, MovementComponent};
 pub use decoration::{build_decoration_entity, decoration_collision_box, DecorationSpec};
 pub use definition::{
-    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
+    AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, ComponentsDef, EntityDefinition,
     EntityDefinitionError, RenderingDef,
 };
 pub use manager::EntityManager;
 pub use model::{
-    AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
-    EntityAudioSettings, EntityBehavior, EntityFootprint, EntityGameplay, EntityGrounding,
-    EntityId, EntityKind, EntityRendering, EntityStats, MovementProfile, MovementSoundTrigger,
-    StaticObjectRenderDef, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    AiBehavior, AiConfig, ControlRole, Entity, EntityAudioComponent, EntityAudioSettings,
+    EntityFootprint, EntityGrounding, EntityId, EntityKind, EntityRendering, EntityStats,
+    MovementProfile, MovementSoundTrigger, StaticObjectRenderDef, ATTACK_POWER_STAT_ID,
+    HEALTH_STAT_ID,
 };
 pub use storage::{
     EntitySpawnBundle, EntityStorage, Inventory, OptionalComponentRegistry,
     OptionalEntityComponents, PickupDef, PrimaryProjectileDef, ProjectileState, SparseComponentMap,
 };
-pub use wire::{EntityAttributesWire, EntityWire, StoredEntity};
+pub use wire::{EntityComponentsWire, EntityWire, StoredEntity};

@@ -2,7 +2,7 @@ use glam::{IVec2, UVec2};
 mod support;
 use support::{test_atlas, test_entity_definition, test_tilemap};
 use toki_core::animation::{AnimationClip, AnimationState, LoopMode};
-use toki_core::entity::{MovementProfile, PrimaryProjectileDef};
+use toki_core::entity::{CombatComponent, EntityStats, MovementProfile, PrimaryProjectileDef};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
     game::{GameSimulation, InputAction, InputSystem, RenderQueryService},
@@ -68,7 +68,6 @@ fn projectile_damage_resolves_and_despawns_on_hit() {
         .get_player_mut()
         .expect("player should exist");
     let controller = player
-        .attributes
         .rendering
         .animation_controller
         .as_mut()
@@ -94,7 +93,10 @@ fn projectile_damage_resolves_and_despawns_on_hit() {
     controller.play(AnimationState::IdleRight);
 
     let mut target_definition = test_entity_definition("projectile_target", "creature");
-    target_definition.attributes.health = Some(25);
+    target_definition.components.combat = Some(CombatComponent {
+        health: Some(25),
+        stats: EntityStats::from_legacy_health(Some(25)),
+    });
     let target_id = game_state
         .world_mut()
         .entity_manager_mut()
@@ -119,7 +121,14 @@ fn projectile_damage_resolves_and_despawns_on_hit() {
         .entity_manager()
         .get_entity(target_id)
         .expect("target should survive non-lethal projectile damage");
-    assert_eq!(target.attributes.current_stat("health"), Some(17));
+    assert_eq!(
+        game_state
+            .world()
+            .entity_manager()
+            .combat(target.id)
+            .and_then(|combat| combat.current_stat("health")),
+        Some(17)
+    );
     assert!(
         !sprite_render_requests(&game_state)
             .into_iter()

@@ -26,14 +26,13 @@ impl MapObjectInteraction {
         let mut decorations = entities
             .into_iter()
             .filter(|entity| {
-                entity.attributes.rendering.visible
-                    && entity.attributes.rendering.static_object_render.is_some()
+                entity.rendering.visible && entity.rendering.static_object_render.is_some()
             })
             .collect::<Vec<_>>();
         decorations.sort_by_key(|entity| {
             (
                 entity.ground_contact_y(),
-                entity.attributes.rendering.render_layer,
+                entity.rendering.render_layer,
                 entity.id,
             )
         });

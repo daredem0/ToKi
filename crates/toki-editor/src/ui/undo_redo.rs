@@ -218,8 +218,8 @@ impl EditorCommand {
 
     pub fn update_entities(
         scene_name: impl Into<String>,
-        before_entities: Vec<Entity>,
-        after_entities: Vec<Entity>,
+        before_entities: Vec<StoredEntity>,
+        after_entities: Vec<StoredEntity>,
     ) -> Self {
         Self::UpdateEntities(Box::new(UpdateEntitiesCommand {
             scene_name: scene_name.into(),
@@ -487,8 +487,8 @@ impl MoveEntitiesCommand {
 #[derive(Debug, Clone)]
 pub struct UpdateEntitiesCommand {
     scene_name: String,
-    before_entities: Vec<Entity>,
-    after_entities: Vec<Entity>,
+    before_entities: Vec<StoredEntity>,
+    after_entities: Vec<StoredEntity>,
 }
 
 impl UpdateEntitiesCommand {
@@ -626,15 +626,20 @@ fn apply_entity_positions(
     changed
 }
 
-fn apply_entity_snapshots(ui_state: &mut EditorUI, scene_name: &str, snapshots: &[Entity]) -> bool {
+fn apply_entity_snapshots(
+    ui_state: &mut EditorUI,
+    scene_name: &str,
+    snapshots: &[StoredEntity],
+) -> bool {
     let Some(scene) = scene_mut(ui_state, scene_name) else {
         return false;
     };
 
     let mut changed = false;
     for snapshot in snapshots {
-        if let Some(entity) = scene.entity_mut(snapshot.id) {
-            *entity = snapshot.clone();
+        if let Some(index) = scene.entity_index(snapshot.entity.id) {
+            scene.remove_entity(snapshot.entity.id);
+            scene.insert_stored_entity(index, snapshot.clone());
             changed = true;
         }
     }

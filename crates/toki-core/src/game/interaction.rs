@@ -35,7 +35,6 @@ impl GameState {
         let player_pos = player.position;
         let player_size = player.size;
         let player_facing = player
-            .attributes
             .rendering
             .animation_controller
             .as_ref()
@@ -56,7 +55,12 @@ impl GameState {
                     .entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| {
-                        entity.attributes.behavior.interactable && entity.attributes.behavior.active
+                        entity.active
+                            && self
+                                .world
+                                .entity_manager
+                                .interaction(entity_id)
+                                .is_some()
                     })
             })
             .collect::<Vec<_>>();
@@ -67,10 +71,13 @@ impl GameState {
             let Some(interactable) = self.world.entity_manager.get_entity(interactable_id) else {
                 continue;
             };
+            let Some(interaction) = self.world.entity_manager.interaction(interactable_id) else {
+                continue;
+            };
 
             let interactable_pos = interactable.position;
             let interactable_size = interactable.size;
-            let interaction_reach = interactable.attributes.behavior.interaction_reach as i32;
+            let interaction_reach = interaction.interaction_reach as i32;
 
             // Determine spatial relationship
             let spatial = Self::determine_interaction_spatial(

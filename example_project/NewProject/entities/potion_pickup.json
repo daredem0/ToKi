@@ -3,7 +3,10 @@
   "display_name": "Potion Pickup",
   "description": "A collectible potion that adds one potion to inventory on overlap.",
   "rendering": {
-    "size": [16, 16],
+    "size": [
+      16,
+      16
+    ],
     "render_layer": 0,
     "visible": true,
     "static_object": {
@@ -11,24 +14,16 @@
       "object_name": "potion"
     }
   },
-  "attributes": {
-    "health": null,
-    "speed": 0,
-    "solid": false,
-    "active": true,
-    "can_move": false,
-    "ai_behavior": "none",
-    "movement_profile": "none",
-    "pickup": {
-      "item_id": "potion",
-      "count": 1
-    },
-    "has_inventory": false
-  },
   "collision": {
     "enabled": true,
-    "offset": [0, 0],
-    "size": [16, 16],
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
     "trigger": true
   },
   "audio": {
@@ -44,5 +39,22 @@
     "default_state": ""
   },
   "category": "item",
-  "tags": ["pickup", "potion", "collectible"]
+  "tags": [
+    "pickup",
+    "potion",
+    "collectible"
+  ],
+  "solid": false,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 0,
+      "movement_profile": "none",
+      "can_move": false
+    },
+    "pickup": {
+      "item_id": "potion",
+      "count": 1
+    }
+  }
 }

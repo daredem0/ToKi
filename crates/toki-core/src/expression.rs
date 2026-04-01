@@ -801,10 +801,8 @@ mod tests {
         state
             .world_mut()
             .entity_manager_mut()
-            .get_entity_mut(player_id)
+            .combat_mut(player_id)
             .expect("player should exist")
-            .attributes
-            .gameplay
             .stats
             .current
             .insert(HEALTH_STAT_ID.to_string(), 14);

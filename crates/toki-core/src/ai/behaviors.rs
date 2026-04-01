@@ -42,7 +42,7 @@ impl BehaviorUpdate for ChaseHandler {
     ) -> Option<AiUpdateResult> {
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
+        let detection_radius = ctx.entity_manager.ai(entity_id)?.ai_config.detection_radius;
 
         if distance_between(current_position, player_pos) > detection_radius as f32 {
             return IdleWanderHandler.update(entity, entity_id, player_position, ctx, ai_state);
@@ -68,7 +68,7 @@ impl BehaviorUpdate for RunHandler {
     ) -> Option<AiUpdateResult> {
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
+        let detection_radius = ctx.entity_manager.ai(entity_id)?.ai_config.detection_radius;
 
         if distance_between(current_position, player_pos) > detection_radius as f32 {
             return IdleWanderHandler.update(entity, entity_id, player_position, ctx, ai_state);
@@ -114,10 +114,12 @@ impl BehaviorUpdate for WanderHandler {
             3 => IVec2::new(1, 0),
             _ => IVec2::ZERO,
         };
-        let can_move = preview_intended_position(entity, entity.position, direction, ctx)
-            .is_some_and(|candidate| {
-                candidate == entity.position || ctx.is_movement_valid(entity, entity_id, candidate)
-            });
+        let can_move =
+            preview_intended_position(entity, entity_id, entity.position, direction, ctx)
+                .is_some_and(|candidate| {
+                    candidate == entity.position
+                        || ctx.is_movement_valid(entity, entity_id, candidate)
+                });
         build_wander_intent_result(entity_id, can_move, can_move.then_some(direction))
     }
 }
@@ -200,12 +202,17 @@ impl IdleWanderHandler {
         ai_state: &mut AiRuntimeState,
     ) -> Option<AiUpdateResult> {
         let can_move =
-            preview_intended_position(entity, step.current_position, step.direction, ctx)
+            preview_intended_position(entity, entity_id, step.current_position, step.direction, ctx)
                 .is_some_and(|candidate| {
                     candidate == step.current_position
                         || ctx.is_movement_valid(entity, entity_id, candidate)
                 });
-        let new_remaining = step.remaining_distance - entity.attributes.gameplay.speed.max(0.0);
+        let new_remaining = step.remaining_distance
+            - ctx
+                .entity_manager
+                .movement(entity_id)
+                .map(|movement| movement.speed.max(0.0))
+                .unwrap_or(0.0);
 
         if can_move && new_remaining > 0.0 {
             ai_state.wander_phase = WanderPhase::Walking {

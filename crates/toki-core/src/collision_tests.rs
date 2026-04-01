@@ -1,7 +1,7 @@
 use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::TileMap;
-use crate::entity::{Entity, EntityAttributes, EntityKind};
+use crate::entity::{Entity, EntityKind, EntityRendering};
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -69,8 +69,10 @@ fn solid_entity() -> Entity {
         persistent_across_saves: false,
         control_role: crate::entity::ControlRole::None,
         audio: crate::entity::EntityAudioSettings::default(),
-        attributes: EntityAttributes::default(),
+        rendering: EntityRendering::default(),
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        solid: true,
+        active: true,
         tags: Vec::new(),
         movement_accumulator: glam::Vec2::ZERO,
     }

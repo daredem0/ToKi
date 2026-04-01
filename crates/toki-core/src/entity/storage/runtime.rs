@@ -123,7 +123,7 @@ impl EntityStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entity::{ControlRole, EntityAttributes, EntityKind};
+    use crate::entity::{ControlRole, EntityKind, EntityRendering};
     use glam::{IVec2, UVec2};
 
     fn sample_entity(id: EntityId) -> Entity {
@@ -137,8 +137,10 @@ mod tests {
             persistent_across_saves: false,
             control_role: ControlRole::None,
             audio: EntityAudioSettings::default(),
-            attributes: EntityAttributes::default(),
+            rendering: EntityRendering::default(),
             collision_box: None,
+            solid: true,
+            active: true,
             movement_accumulator: glam::Vec2::ZERO,
             tags: Vec::new(),
         }

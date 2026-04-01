@@ -38,8 +38,10 @@ impl GameState {
             .filter(|&entity_id| {
                 self.world
                     .entity_manager
-                    .get_entity(entity_id)
-                    .is_some_and(|entity| entity.attributes.behavior.has_inventory)
+                    .storage()
+                    .components()
+                    .inventory(entity_id)
+                    .is_some()
             })
             .collect::<Vec<_>>();
         collector_ids.sort_unstable();
@@ -54,7 +56,7 @@ impl GameState {
                 self.world
                     .entity_manager
                     .get_entity(entity_id)
-                    .is_some_and(|entity| entity.attributes.behavior.active)
+                    .is_some_and(|entity| entity.active)
             })
             .collect::<Vec<_>>();
         pickup_ids.sort_unstable();
@@ -102,10 +104,14 @@ impl GameState {
         collected.dedup_by_key(|(_, pickup_id, _, _)| *pickup_id);
 
         for (collector_id, pickup_id, item_id, count) in collected {
-            let Some(collector) = self.world.entity_manager.get_entity_mut(collector_id) else {
-                continue;
-            };
-            if !collector.attributes.behavior.has_inventory {
+            if self
+                .world
+                .entity_manager
+                .storage()
+                .components()
+                .inventory(collector_id)
+                .is_none()
+            {
                 continue;
             }
 

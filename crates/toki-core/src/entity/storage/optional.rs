@@ -2,11 +2,21 @@ use super::bundle::{
     Inventory, OptionalEntityComponents, PickupDef, PrimaryProjectileDef, ProjectileState,
 };
 use super::sparse_map::SparseComponentMap;
-use crate::entity::EntityId;
+use crate::entity::{
+    AiComponent, CombatComponent, EntityId, InteractionComponent, MovementComponent,
+};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct OptionalComponentRegistry {
+    #[serde(default, skip_serializing_if = "SparseComponentMap::is_empty")]
+    movements: SparseComponentMap<MovementComponent>,
+    #[serde(default, skip_serializing_if = "SparseComponentMap::is_empty")]
+    ai_components: SparseComponentMap<AiComponent>,
+    #[serde(default, skip_serializing_if = "SparseComponentMap::is_empty")]
+    interactions: SparseComponentMap<InteractionComponent>,
+    #[serde(default, skip_serializing_if = "SparseComponentMap::is_empty")]
+    combats: SparseComponentMap<CombatComponent>,
     #[serde(default, skip_serializing_if = "SparseComponentMap::is_empty")]
     primary_projectiles: SparseComponentMap<PrimaryProjectileDef>,
     #[serde(default, skip_serializing_if = "SparseComponentMap::is_empty")]
@@ -27,7 +37,11 @@ impl OptionalComponentRegistry {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.primary_projectiles.is_empty()
+        self.movements.is_empty()
+            && self.ai_components.is_empty()
+            && self.interactions.is_empty()
+            && self.combats.is_empty()
+            && self.primary_projectiles.is_empty()
             && self.projectiles.is_empty()
             && self.pickups.is_empty()
             && self.inventories.is_empty()
@@ -35,6 +49,10 @@ impl OptionalComponentRegistry {
 
     pub fn optional_components(&self, id: EntityId) -> OptionalEntityComponents {
         OptionalEntityComponents {
+            movement: self.movements.get(id).cloned(),
+            ai: self.ai_components.get(id).cloned(),
+            interaction: self.interactions.get(id).cloned(),
+            combat: self.combats.get(id).cloned(),
             primary_projectile: self.primary_projectiles.get(id).cloned(),
             projectile: self.projectiles.get(id).cloned(),
             pickup: self.pickups.get(id).cloned(),
@@ -47,6 +65,10 @@ impl OptionalComponentRegistry {
         id: EntityId,
         components: OptionalEntityComponents,
     ) {
+        self.set_movement(id, components.movement);
+        self.set_ai(id, components.ai);
+        self.set_interaction(id, components.interaction);
+        self.set_combat(id, components.combat);
         self.set_primary_projectile(id, components.primary_projectile);
         self.set_projectile(id, components.projectile);
         self.set_pickup(id, components.pickup);
@@ -54,10 +76,62 @@ impl OptionalComponentRegistry {
     }
 
     pub fn remove_all(&mut self, id: EntityId) {
+        self.movements.remove(id);
+        self.ai_components.remove(id);
+        self.interactions.remove(id);
+        self.combats.remove(id);
         self.primary_projectiles.remove(id);
         self.projectiles.remove(id);
         self.pickups.remove(id);
         self.inventories.remove(id);
+    }
+
+    pub fn movement(&self, id: EntityId) -> Option<&MovementComponent> {
+        self.movements.get(id)
+    }
+
+    pub fn movement_mut(&mut self, id: EntityId) -> Option<&mut MovementComponent> {
+        self.movements.get_mut(id)
+    }
+
+    pub fn set_movement(&mut self, id: EntityId, movement: Option<MovementComponent>) {
+        Self::set_optional(&mut self.movements, id, movement);
+    }
+
+    pub fn ai(&self, id: EntityId) -> Option<&AiComponent> {
+        self.ai_components.get(id)
+    }
+
+    pub fn ai_mut(&mut self, id: EntityId) -> Option<&mut AiComponent> {
+        self.ai_components.get_mut(id)
+    }
+
+    pub fn set_ai(&mut self, id: EntityId, ai: Option<AiComponent>) {
+        Self::set_optional(&mut self.ai_components, id, ai);
+    }
+
+    pub fn interaction(&self, id: EntityId) -> Option<&InteractionComponent> {
+        self.interactions.get(id)
+    }
+
+    pub fn interaction_mut(&mut self, id: EntityId) -> Option<&mut InteractionComponent> {
+        self.interactions.get_mut(id)
+    }
+
+    pub fn set_interaction(&mut self, id: EntityId, interaction: Option<InteractionComponent>) {
+        Self::set_optional(&mut self.interactions, id, interaction);
+    }
+
+    pub fn combat(&self, id: EntityId) -> Option<&CombatComponent> {
+        self.combats.get(id)
+    }
+
+    pub fn combat_mut(&mut self, id: EntityId) -> Option<&mut CombatComponent> {
+        self.combats.get_mut(id)
+    }
+
+    pub fn set_combat(&mut self, id: EntityId, combat: Option<CombatComponent>) {
+        Self::set_optional(&mut self.combats, id, combat);
     }
 
     pub fn primary_projectile(&self, id: EntityId) -> Option<&PrimaryProjectileDef> {
@@ -118,14 +192,7 @@ impl OptionalComponentRegistry {
     }
 
     pub fn set_inventory(&mut self, id: EntityId, inventory: Option<Inventory>) {
-        match inventory {
-            Some(inventory) if !inventory.is_empty() => {
-                Self::set_optional(&mut self.inventories, id, Some(inventory));
-            }
-            Some(_) | None => {
-                Self::set_optional(&mut self.inventories, id, None);
-            }
-        }
+        Self::set_optional(&mut self.inventories, id, inventory);
     }
 
     pub fn primary_projectile_ids(&self) -> impl Iterator<Item = EntityId> + '_ {
@@ -165,6 +232,10 @@ mod tests {
         registry.apply_optional_components(
             7,
             OptionalEntityComponents {
+                movement: None,
+                ai: None,
+                interaction: None,
+                combat: None,
                 primary_projectile: Some(PrimaryProjectileDef {
                     sheet: "fx".to_string(),
                     object_name: "bolt".to_string(),

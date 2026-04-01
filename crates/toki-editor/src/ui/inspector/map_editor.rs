@@ -292,36 +292,28 @@ impl InspectorSystem {
     }
 
     pub(super) fn set_optional_runtime_stat(
-        attributes: &mut toki_core::entity::EntityAttributes,
+        combat: &mut toki_core::entity::CombatComponent,
         stat_id: &str,
         value: Option<i32>,
     ) -> bool {
-        let previous_base = attributes.gameplay.stats.base.get(stat_id).copied();
-        let previous_current = attributes.gameplay.stats.current.get(stat_id).copied();
+        let previous_base = combat.stats.base.get(stat_id).copied();
+        let previous_current = combat.stats.current.get(stat_id).copied();
         let mut changed = false;
 
         match value {
             Some(value) => {
                 if previous_base != Some(value) {
-                    attributes
-                        .gameplay
-                        .stats
-                        .base
-                        .insert(stat_id.to_string(), value);
+                    combat.stats.base.insert(stat_id.to_string(), value);
                     changed = true;
                 }
                 if previous_current != Some(value) {
-                    attributes
-                        .gameplay
-                        .stats
-                        .current
-                        .insert(stat_id.to_string(), value);
+                    combat.stats.current.insert(stat_id.to_string(), value);
                     changed = true;
                 }
             }
             None => {
-                changed |= attributes.gameplay.stats.base.remove(stat_id).is_some();
-                changed |= attributes.gameplay.stats.current.remove(stat_id).is_some();
+                changed |= combat.stats.base.remove(stat_id).is_some();
+                changed |= combat.stats.current.remove(stat_id).is_some();
             }
         }
 
@@ -329,18 +321,26 @@ impl InspectorSystem {
     }
 
     pub(super) fn set_optional_definition_stat(
-        attributes: &mut toki_core::entity::AttributesDef,
+        components: &mut toki_core::entity::ComponentsDef,
         stat_id: &str,
         value: Option<i32>,
     ) -> bool {
-        let previous = attributes.stats.get(stat_id).copied();
+        let combat = components
+            .combat
+            .get_or_insert_with(toki_core::entity::CombatComponent::default);
+        let previous = combat.stats.base.get(stat_id).copied();
         match value {
             Some(value) if previous != Some(value) => {
-                attributes.stats.insert(stat_id.to_string(), value);
+                combat.stats.base.insert(stat_id.to_string(), value);
+                combat.stats.current.insert(stat_id.to_string(), value);
                 true
             }
             Some(_) => false,
-            None => attributes.stats.remove(stat_id).is_some(),
+            None => {
+                let mut changed = combat.stats.base.remove(stat_id).is_some();
+                changed |= combat.stats.current.remove(stat_id).is_some();
+                changed
+            }
         }
     }
 

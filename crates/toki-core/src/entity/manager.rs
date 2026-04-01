@@ -1,10 +1,11 @@
 //! Entity management - creating, spawning, despawning, and querying entities.
 
 use super::default_category_for_kind;
+use super::components::{AiComponent, CombatComponent, InteractionComponent, MovementComponent};
 use super::definition::{EntityDefinition, EntityDefinitionError};
 use super::model::{
-    ControlRole, Entity, EntityAttributes, EntityAudioComponent, EntityAudioSettings, EntityId,
-    EntityKind,
+    ControlRole, Entity, EntityAudioComponent, EntityAudioSettings, EntityId, EntityKind,
+    EntityRendering,
 };
 use super::storage::{EntitySpawnBundle, EntityStorage, OptionalEntityComponents};
 use super::wire::StoredEntity;
@@ -122,9 +123,7 @@ impl EntityManager {
     pub fn update_animations(&mut self, delta_time_ms: f32) -> HashMap<EntityId, u32> {
         let mut completed_loops = HashMap::new();
         for (entity_id, entity) in self.storage.entities_mut() {
-            if let Some(animation_controller) =
-                &mut entity.attributes.rendering.animation_controller
-            {
+            if let Some(animation_controller) = &mut entity.rendering.animation_controller {
                 let loop_count = animation_controller.update(delta_time_ms);
                 if loop_count > 0 {
                     completed_loops.insert(entity_id, loop_count);
@@ -134,16 +133,20 @@ impl EntityManager {
         completed_loops
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_entity(
         &mut self,
         entity_kind: EntityKind,
         position: IVec2,
         size: UVec2,
-        attributes: EntityAttributes,
+        rendering: EntityRendering,
+        solid: bool,
+        active: bool,
+        optional_components: OptionalEntityComponents,
     ) -> EntityId {
         let id = self.next_id;
         self.next_id += 1;
-        let collision_box = if attributes.gameplay.solid {
+        let collision_box = if solid {
             Some(CollisionBox::solid_box(size))
         } else {
             None
@@ -159,15 +162,17 @@ impl EntityManager {
             persistent_across_saves: false,
             control_role: ControlRole::LegacyDefault,
             audio: EntityAudioSettings::default(),
-            attributes,
+            rendering,
             collision_box,
+            solid,
+            active,
             tags: Vec::new(),
             movement_accumulator: glam::Vec2::ZERO,
         };
 
         self.add_spawn_bundle(EntitySpawnBundle {
             entity,
-            optional_components: OptionalEntityComponents::default(),
+            optional_components,
             audio_component: EntityAudioComponent::default(),
         })
     }
@@ -218,13 +223,15 @@ impl EntityManager {
         let id = bundle.entity.id;
         let entity_kind = bundle.entity.entity_kind;
         let is_player = Self::tracks_player_role(&bundle.entity) && self.player_id.is_none();
-        let is_active = bundle.entity.attributes.behavior.active;
+        let is_active = bundle.entity.active;
 
         if id >= self.next_id {
             self.next_id = id + 1;
         }
 
-        bundle.entity.attributes.ensure_legacy_health_stat();
+        if let Some(combat) = bundle.optional_components.combat.as_mut() {
+            combat.ensure_health_stat();
+        }
         self.storage.insert_spawn_bundle(
             bundle.entity,
             bundle.audio_component,
@@ -356,7 +363,7 @@ impl EntityManager {
     ) -> Option<EntityId> {
         let moving_entity = self.storage.get_entity(moving_entity_id)?;
         let moving_box = moving_entity.collision_box.as_ref()?;
-        if moving_box.trigger || !moving_entity.attributes.gameplay.solid {
+        if moving_box.trigger || !moving_entity.solid {
             return None;
         }
 
@@ -409,7 +416,7 @@ impl EntityManager {
     }
 
     fn is_entity_collidable_candidate(entity: &Entity) -> bool {
-        entity.attributes.gameplay.solid
+        entity.solid
             && entity
                 .collision_box
                 .as_ref()
@@ -420,21 +427,69 @@ impl EntityManager {
         self.storage
             .entities()
             .iter()
-            .filter(|(_, entity)| entity.attributes.rendering.visible)
+            .filter(|(_, entity)| entity.rendering.visible)
             .map(|(id, _)| *id)
             .collect()
     }
 
     pub fn set_entity_active(&mut self, id: EntityId, active: bool) {
         if let Some(entity) = self.storage.get_entity_mut(id) {
-            let was_active = entity.attributes.behavior.active;
-            entity.attributes.behavior.active = active;
+            let was_active = entity.active;
+            entity.active = active;
             if active && !was_active {
                 self.active_entities.insert(id);
             } else if !active && was_active {
                 self.active_entities.remove(&id);
             }
         }
+    }
+
+    pub fn movement(&self, id: EntityId) -> Option<&MovementComponent> {
+        self.storage.components().movement(id)
+    }
+
+    pub fn movement_mut(&mut self, id: EntityId) -> Option<&mut MovementComponent> {
+        self.storage.components_mut().movement_mut(id)
+    }
+
+    pub fn set_movement(&mut self, id: EntityId, movement: Option<MovementComponent>) {
+        self.storage.components_mut().set_movement(id, movement);
+    }
+
+    pub fn ai(&self, id: EntityId) -> Option<&AiComponent> {
+        self.storage.components().ai(id)
+    }
+
+    pub fn ai_mut(&mut self, id: EntityId) -> Option<&mut AiComponent> {
+        self.storage.components_mut().ai_mut(id)
+    }
+
+    pub fn set_ai(&mut self, id: EntityId, ai: Option<AiComponent>) {
+        self.storage.components_mut().set_ai(id, ai);
+    }
+
+    pub fn interaction(&self, id: EntityId) -> Option<&InteractionComponent> {
+        self.storage.components().interaction(id)
+    }
+
+    pub fn interaction_mut(&mut self, id: EntityId) -> Option<&mut InteractionComponent> {
+        self.storage.components_mut().interaction_mut(id)
+    }
+
+    pub fn set_interaction(&mut self, id: EntityId, interaction: Option<InteractionComponent>) {
+        self.storage.components_mut().set_interaction(id, interaction);
+    }
+
+    pub fn combat(&self, id: EntityId) -> Option<&CombatComponent> {
+        self.storage.components().combat(id)
+    }
+
+    pub fn combat_mut(&mut self, id: EntityId) -> Option<&mut CombatComponent> {
+        self.storage.components_mut().combat_mut(id)
+    }
+
+    pub fn set_combat(&mut self, id: EntityId, combat: Option<CombatComponent>) {
+        self.storage.components_mut().set_combat(id, combat);
     }
 }
 

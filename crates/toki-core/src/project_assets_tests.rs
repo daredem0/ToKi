@@ -388,13 +388,13 @@ fn load_scene_from_path_migrates_legacy_tilemap_objects_into_decorations() {
     assert_eq!(entity.entity_kind, crate::entity::EntityKind::Decoration);
     assert_eq!(entity.position, glam::IVec2::new(32, 48));
     assert_eq!(entity.size, glam::UVec2::new(16, 24));
-    assert_eq!(entity.attributes.rendering.grounding.origin, Some([8, 23]));
+    assert_eq!(entity.rendering.grounding.origin, Some([8, 23]));
     assert_eq!(
-        entity.attributes.rendering.grounding.footprint,
+        entity.rendering.grounding.footprint,
         Some(crate::entity::EntityFootprint::new([4, 16], [8, 8]))
     );
     assert_eq!(
-        entity.attributes.rendering.static_object_render,
+        entity.rendering.static_object_render,
         Some(crate::entity::StaticObjectRenderDef {
             sheet: "fauna".to_string(),
             object_name: "bush".to_string(),
@@ -426,20 +426,22 @@ fn load_entity_definition_from_path_reads_definition_json() {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: crate::entity::AttributesDef {
-            health: Some(1),
-            stats: std::collections::HashMap::new(),
-            speed: 1.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: crate::entity::AiConfig::default(),
-            movement_profile: crate::entity::MovementProfile::LegacyDefault,
+        solid: true,
+        active: true,
+        components: crate::entity::ComponentsDef {
+            movement: Some(crate::entity::MovementComponent {
+                speed: 1.0,
+                movement_profile: crate::entity::MovementProfile::LegacyDefault,
+                can_move: true,
+            }),
+            combat: Some(crate::entity::CombatComponent {
+                health: Some(1),
+                stats: crate::entity::EntityStats::from_legacy_health(Some(1)),
+            }),
             primary_projectile: None,
             pickup: None,
-            has_inventory: false,
+            inventory: None,
+            ..Default::default()
         },
         collision: crate::entity::CollisionDef {
             enabled: true,

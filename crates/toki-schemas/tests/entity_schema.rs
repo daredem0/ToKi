@@ -36,17 +36,27 @@ fn entity_schema_accepts_authored_health_and_attack_power_stats() {
             "render_layer": 0,
             "visible": true
         },
-        "attributes": {
-            "health": 30,
-            "stats": {
-                "health": 30,
-                "attack_power": 17
+        "solid": true,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 2,
+                "movement_profile": "legacy_default",
+                "can_move": true
             },
-            "speed": 2,
-            "solid": true,
-            "active": true,
-            "can_move": true,
-            "has_inventory": false
+            "combat": {
+                "health": 30,
+                "stats": {
+                    "base": {
+                        "health": 30,
+                        "attack_power": 17
+                    },
+                    "current": {
+                        "health": 30,
+                        "attack_power": 17
+                    }
+                }
+            }
         },
         "collision": {
             "enabled": true,
@@ -89,16 +99,25 @@ fn entity_schema_rejects_negative_authored_stats() {
             "render_layer": 0,
             "visible": true
         },
-        "attributes": {
-            "health": 30,
-            "stats": {
-                "attack_power": -1
+        "solid": true,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 2,
+                "movement_profile": "legacy_default",
+                "can_move": true
             },
-            "speed": 2,
-            "solid": true,
-            "active": true,
-            "can_move": true,
-            "has_inventory": false
+            "combat": {
+                "health": 30,
+                "stats": {
+                    "base": {
+                        "attack_power": -1
+                    },
+                    "current": {
+                        "attack_power": -1
+                    }
+                }
+            }
         },
         "collision": {
             "enabled": true,
@@ -141,10 +160,24 @@ fn entity_schema_accepts_primary_projectile_authoring() {
             "render_layer": 0,
             "visible": true
         },
-        "attributes": {
-            "health": 30,
-            "stats": {
-                "attack_power": 8
+        "solid": true,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 2,
+                "movement_profile": "legacy_default",
+                "can_move": true
+            },
+            "combat": {
+                "health": 30,
+                "stats": {
+                    "base": {
+                        "attack_power": 8
+                    },
+                    "current": {
+                        "attack_power": 8
+                    }
+                }
             },
             "primary_projectile": {
                 "sheet": "fauna",
@@ -154,12 +187,7 @@ fn entity_schema_accepts_primary_projectile_authoring() {
                 "damage": 8,
                 "lifetime_ticks": 20,
                 "spawn_offset": [0, 0]
-            },
-            "speed": 2,
-            "solid": true,
-            "active": true,
-            "can_move": true,
-            "has_inventory": false
+            }
         },
         "collision": {
             "enabled": true,
@@ -202,8 +230,25 @@ fn entity_schema_rejects_invalid_primary_projectile_lifetime() {
             "render_layer": 0,
             "visible": true
         },
-        "attributes": {
-            "health": 30,
+        "solid": true,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 2,
+                "movement_profile": "legacy_default",
+                "can_move": true
+            },
+            "combat": {
+                "health": 30,
+                "stats": {
+                    "base": {
+                        "health": 30
+                    },
+                    "current": {
+                        "health": 30
+                    }
+                }
+            },
             "primary_projectile": {
                 "sheet": "fauna",
                 "object_name": "rock",
@@ -211,12 +256,7 @@ fn entity_schema_rejects_invalid_primary_projectile_lifetime() {
                 "speed": 4,
                 "damage": 8,
                 "lifetime_ticks": 0
-            },
-            "speed": 2,
-            "solid": true,
-            "active": true,
-            "can_move": true,
-            "has_inventory": false
+            }
         },
         "collision": {
             "enabled": true,
@@ -259,17 +299,18 @@ fn entity_schema_accepts_pickup_authoring() {
             "render_layer": 0,
             "visible": true
         },
-        "attributes": {
-            "health": null,
+        "solid": false,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 0,
+                "movement_profile": "legacy_default",
+                "can_move": false
+            },
             "pickup": {
                 "item_id": "coin",
                 "count": 3
-            },
-            "speed": 0,
-            "solid": false,
-            "active": true,
-            "can_move": false,
-            "has_inventory": false
+            }
         },
         "collision": {
             "enabled": true,
@@ -312,17 +353,18 @@ fn entity_schema_rejects_invalid_pickup_count() {
             "render_layer": 0,
             "visible": true
         },
-        "attributes": {
-            "health": null,
+        "solid": false,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 0,
+                "movement_profile": "legacy_default",
+                "can_move": false
+            },
             "pickup": {
                 "item_id": "coin",
                 "count": 0
-            },
-            "speed": 0,
-            "solid": false,
-            "active": true,
-            "can_move": false,
-            "has_inventory": false
+            }
         },
         "collision": {
             "enabled": true,
@@ -369,17 +411,18 @@ fn entity_schema_accepts_static_object_render_without_animation_clips() {
                 "object_name": "coin"
             }
         },
-        "attributes": {
-            "health": null,
+        "solid": false,
+        "active": true,
+        "components": {
+            "movement": {
+                "speed": 0,
+                "movement_profile": "legacy_default",
+                "can_move": false
+            },
             "pickup": {
                 "item_id": "coin",
                 "count": 1
-            },
-            "speed": 0,
-            "solid": false,
-            "active": true,
-            "can_move": false,
-            "has_inventory": false
+            }
         },
         "collision": {
             "enabled": true,

@@ -2,7 +2,7 @@
 //!
 //! Contains logic for spawning entities as rule actions.
 
-use crate::entity::{EntityAttributes, EntityId, EntityKind};
+use crate::entity::{EntityId, EntityKind, EntityRendering, MovementComponent, OptionalEntityComponents};
 use crate::rules::RuleSpawnEntityType;
 
 use super::GameState;
@@ -35,12 +35,21 @@ impl GameState {
     ) -> EntityId {
         self.world
             .entity_manager
-            .spawn_entity(kind, position, glam::UVec2::new(16, 16), {
-                let mut attributes = EntityAttributes::default();
-                attributes.gameplay.solid = false;
-                attributes.behavior.can_move = can_move;
-                attributes
-            })
+            .spawn_entity(
+                kind,
+                position,
+                glam::UVec2::new(16, 16),
+                EntityRendering::default(),
+                false,
+                true,
+                OptionalEntityComponents {
+                    movement: Some(MovementComponent {
+                        can_move,
+                        ..MovementComponent::default()
+                    }),
+                    ..OptionalEntityComponents::default()
+                },
+            )
     }
 
     fn spawn_trigger_entity(&mut self, position: glam::IVec2) -> EntityId {
@@ -48,12 +57,18 @@ impl GameState {
             EntityKind::Trigger,
             position,
             glam::UVec2::new(16, 16),
-            {
-                let mut attributes = EntityAttributes::default();
-                attributes.gameplay.solid = false;
-                attributes.behavior.can_move = false;
-                attributes.rendering.visible = false;
-                attributes
+            EntityRendering {
+                visible: false,
+                ..EntityRendering::default()
+            },
+            false,
+            true,
+            OptionalEntityComponents {
+                movement: Some(MovementComponent {
+                    can_move: false,
+                    ..MovementComponent::default()
+                }),
+                ..OptionalEntityComponents::default()
             },
         )
     }

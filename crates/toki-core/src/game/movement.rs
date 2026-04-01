@@ -139,7 +139,13 @@ impl GameState {
             };
 
             let current_position = entity.position;
-            let entity_speed = entity.attributes.gameplay.speed * ctx.time_scale;
+            let entity_speed = self
+                .world
+                .entity_manager
+                .movement(entity_id)
+                .map(|movement| movement.speed)
+                .unwrap_or(0.0)
+                * ctx.time_scale;
             let mut accumulator = entity.movement_accumulator;
 
             let pixels_x =
@@ -474,7 +480,9 @@ impl GameState {
             let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
-            let held_keys = self.held_keys_for_profile(entity.effective_movement_profile());
+            let held_keys = self.held_keys_for_profile(
+                entity.effective_movement_profile(self.world.entity_manager.movement(entity.id)),
+            );
             let direction = Self::movement_delta_from_keys(&held_keys);
             intended_deltas.insert(entity_id, direction);
             self.apply_accumulated_movement_scaled(
@@ -508,7 +516,7 @@ impl GameState {
                 .world
                 .entity_manager
                 .get_entity_mut(entity_id)
-                .and_then(|entity| entity.attributes.rendering.animation_controller.as_mut())
+                .and_then(|entity| entity.rendering.animation_controller.as_mut())
             {
                 if !Self::action_animation_locks_locomotion(animation_controller) {
                     let actual_delta = final_position - initial_position;

@@ -1,6 +1,6 @@
 use super::{
-    Entity, EntityAttributes, EntityBehavior, EntityBuilder, EntityGameplay, EntityGrounding,
-    EntityId, EntityKind, EntityRendering, StaticObjectRenderDef,
+    Entity, EntityBuilder, EntityGrounding, EntityId, EntityKind, EntityRendering,
+    StaticObjectRenderDef,
 };
 use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
@@ -39,27 +39,17 @@ pub fn build_decoration_entity(id: EntityId, spec: DecorationSpec) -> Entity {
     let collision_box = decoration_collision_box(spec.size, &spec.grounding, spec.solid);
 
     EntityBuilder::new(id, spec.position, spec.size, EntityKind::Decoration)
-        .attributes(EntityAttributes {
-            gameplay: EntityGameplay {
-                solid: spec.solid,
-                ..EntityGameplay::default()
-            },
-            rendering: EntityRendering {
-                visible: spec.visible,
-                static_object_render: Some(StaticObjectRenderDef {
-                    sheet: spec.sheet,
-                    object_name: spec.object_name,
-                }),
-                grounding: spec.grounding,
-                ..EntityRendering::default()
-            },
-            behavior: EntityBehavior {
-                active: false,
-                can_move: false,
-                interactable: false,
-                ..EntityBehavior::default()
-            },
+        .rendering(EntityRendering {
+            visible: spec.visible,
+            static_object_render: Some(StaticObjectRenderDef {
+                sheet: spec.sheet,
+                object_name: spec.object_name,
+            }),
+            grounding: spec.grounding,
+            ..EntityRendering::default()
         })
+        .solid(spec.solid)
+        .active(false)
         .collision_box_opt(collision_box)
         .build()
 }

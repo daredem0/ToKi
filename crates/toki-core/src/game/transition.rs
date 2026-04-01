@@ -165,13 +165,13 @@ impl<'a> SceneTransitionPlanner<'a> {
         };
 
         let mut hydrated = entity.clone();
-        if !hydrated.attributes.rendering.grounding.is_empty() {
+        if !hydrated.rendering.grounding.is_empty() {
             return hydrated;
         }
 
         if let Some(collision_box) = hydrated.collision_box.as_ref() {
             if Self::is_legacy_default_collision(entity, collision_box) {
-                hydrated.attributes.rendering.grounding = definition.get_grounding();
+                hydrated.rendering.grounding = definition.get_grounding();
                 hydrated.collision_box = definition.get_collision_box();
             }
         }
@@ -211,9 +211,7 @@ impl<'a> SceneTransitionPlanner<'a> {
 
     fn reset_player_transient_state(player: &mut Entity, anchor_facing: Option<SceneAnchorFacing>) {
         player.movement_accumulator = glam::Vec2::ZERO;
-        if let Some(animation_controller) =
-            player.attributes.rendering.animation_controller.as_mut()
-        {
+        if let Some(animation_controller) = player.rendering.animation_controller.as_mut() {
             let facing = anchor_facing
                 .map(Self::scene_anchor_facing_to_animation_state)
                 .or_else(|| {
@@ -237,20 +235,14 @@ impl<'a> SceneTransitionPlanner<'a> {
     }
 
     fn apply_durable_player_state(
-        target: &mut Entity,
+        _target: &mut Entity,
         target_components: &mut OptionalEntityComponents,
         source: &StoredEntity,
     ) {
-        target.attributes.gameplay.health = source.entity.attributes.gameplay.health;
-        target.attributes.gameplay.stats = source.entity.attributes.gameplay.stats.clone();
-        target.attributes.behavior.has_inventory = target.attributes.behavior.has_inventory
-            || source.entity.attributes.behavior.has_inventory
-            || source
-                .components
-                .inventory
-                .as_ref()
-                .is_some_and(|inventory| !inventory.is_empty());
-        target_components.inventory = source.components.inventory.clone();
+        target_components.combat = source.components.combat.clone().or_else(|| target_components.combat.clone());
+        if source.components.inventory.is_some() {
+            target_components.inventory = source.components.inventory.clone();
+        }
         target_components.primary_projectile = source.components.primary_projectile.clone();
     }
 
@@ -286,8 +278,9 @@ mod tests {
     use super::SceneTransitionPlanner;
     use crate::animation::AnimationState;
     use crate::entity::{
-        AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-        ControlRole, EntityDefinition, MovementProfile, MovementSoundTrigger,
+        AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
+        ControlRole, EntityDefinition, EntityStats, Inventory,
+        MovementComponent, MovementProfile, MovementSoundTrigger,
         OptionalEntityComponents, RenderingDef, StoredEntity,
     };
     use crate::entity::{EntityFootprint, EntityGrounding};
@@ -308,20 +301,22 @@ mod tests {
                 static_object: None,
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: Some(100),
-                stats: HashMap::new(),
-                speed: 2.0,
-                solid: true,
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::PlayerWasd,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                movement: Some(MovementComponent {
+                    speed: 2.0,
+                    movement_profile: MovementProfile::PlayerWasd,
+                    can_move: true,
+                }),
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats::from_legacy_health(Some(100)),
+                }),
                 primary_projectile: None,
                 pickup: None,
-                has_inventory: true,
+                inventory: Some(Inventory::default()),
+                ..Default::default()
             },
             collision: CollisionDef {
                 enabled: true,
@@ -369,17 +364,25 @@ mod tests {
             .create_entity(glam::IVec2::new(0, 0), 7)
             .expect("player should instantiate");
         preserved.control_role = ControlRole::PlayerCharacter;
-        preserved.attributes.apply_stat_delta("health", -25);
         let mut preserved_components = OptionalEntityComponents {
+            combat: Some(CombatComponent {
+                health: Some(75),
+                stats: EntityStats::from_legacy_health(Some(100)),
+            }),
             inventory: Some(Default::default()),
             ..OptionalEntityComponents::default()
         };
+        preserved_components
+            .combat
+            .as_mut()
+            .expect("combat should exist")
+            .apply_stat_delta("health", -25);
         preserved_components
             .inventory
             .as_mut()
             .expect("inventory should exist")
             .add_item("coin", 2);
-        if let Some(controller) = preserved.attributes.rendering.animation_controller.as_mut() {
+        if let Some(controller) = preserved.rendering.animation_controller.as_mut() {
             controller.play(AnimationState::AttackLeft);
         }
 
@@ -400,7 +403,13 @@ mod tests {
             .get_entity(prepared_player_id)
             .expect("prepared player should exist");
         assert_eq!(player.position, glam::IVec2::new(32, 48));
-        assert_eq!(player.attributes.current_stat("health"), Some(75));
+        assert_eq!(
+            prepared
+                .entity_manager
+                .combat(player.id)
+                .and_then(|combat| combat.current_stat("health")),
+            Some(75)
+        );
         assert_eq!(
             prepared
                 .entity_manager
@@ -432,20 +441,22 @@ mod tests {
                     footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
                 },
             },
-            attributes: AttributesDef {
-                health: Some(100),
-                stats: HashMap::new(),
-                speed: 2.0,
-                solid: true,
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::PlayerWasd,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                movement: Some(MovementComponent {
+                    speed: 2.0,
+                    movement_profile: MovementProfile::PlayerWasd,
+                    can_move: true,
+                }),
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats::from_legacy_health(Some(100)),
+                }),
                 primary_projectile: None,
                 pickup: None,
-                has_inventory: true,
+                inventory: Some(Inventory::default()),
+                ..Default::default()
             },
             collision: CollisionDef {
                 enabled: true,
@@ -482,7 +493,7 @@ mod tests {
         let mut legacy_entity = definition
             .create_entity(glam::IVec2::new(48, 128), 14)
             .expect("entity should instantiate");
-        legacy_entity.attributes.rendering.grounding = EntityGrounding::default();
+        legacy_entity.rendering.grounding = EntityGrounding::default();
         legacy_entity.collision_box = Some(crate::collision::CollisionBox::solid_box(
             legacy_entity.size,
         ));
@@ -503,7 +514,7 @@ mod tests {
             .expect("player entity should be present");
 
         assert_eq!(
-            entity.attributes.rendering.grounding.footprint,
+            entity.rendering.grounding.footprint,
             Some(EntityFootprint::new([4, 12], [8, 4]))
         );
         let collision_box = entity

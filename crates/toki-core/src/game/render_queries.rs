@@ -51,7 +51,7 @@ impl<'a> RenderQueryService<'a> {
         if let Some(entity) = self.entity_manager.get_entity(entity_id) {
             tracing::trace!("Found entity {} for sprite frame lookup", entity_id);
 
-            if let Some(animation_controller) = &entity.attributes.rendering.animation_controller {
+            if let Some(animation_controller) = &entity.rendering.animation_controller {
                 tracing::trace!("Entity {} has animation controller", entity_id);
 
                 if let Ok(tile_name) = animation_controller.current_tile_name() {
@@ -101,14 +101,14 @@ impl<'a> RenderQueryService<'a> {
     pub fn entity_current_atlas_name(&self, entity_id: EntityId) -> Option<String> {
         self.entity_manager
             .get_entity(entity_id)
-            .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
+            .and_then(|entity| entity.rendering.animation_controller.as_ref())
             .and_then(|controller| controller.current_atlas_name().ok())
     }
 
     pub fn entity_sprite_flip_x(&self, entity_id: EntityId) -> bool {
         self.entity_manager
             .get_entity(entity_id)
-            .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
+            .and_then(|entity| entity.rendering.animation_controller.as_ref())
             .map(|controller| GameState::animation_state_flip_x(controller.current_clip_state))
             .unwrap_or(false)
     }
@@ -132,8 +132,8 @@ impl<'a> RenderQueryService<'a> {
             .iter()
             .filter_map(|&entity_id| {
                 let entity = self.entity_manager.get_entity(entity_id)?;
-                let is_renderable = entity.attributes.rendering.animation_controller.is_some()
-                    || entity.attributes.rendering.static_object_render.is_some()
+                let is_renderable = entity.rendering.animation_controller.is_some()
+                    || entity.rendering.static_object_render.is_some()
                     || projectile_ids.contains(&entity_id);
 
                 tracing::trace!(
@@ -172,15 +172,13 @@ impl<'a> RenderQueryService<'a> {
             .iter()
             .filter_map(|&entity_id| {
                 let entity = self.entity_manager.get_entity(entity_id)?;
-                if !entity.attributes.rendering.visible || !entity.attributes.behavior.active {
+                if !entity.rendering.visible || !entity.active {
                     return None;
                 }
 
-                let current = entity
-                    .attributes
-                    .current_stat(crate::entity::HEALTH_STAT_ID)?;
-                let max = entity
-                    .attributes
+                let combat = self.entity_manager.combat(entity_id)?;
+                let current = combat.current_stat(crate::entity::HEALTH_STAT_ID)?;
+                let max = combat
                     .base_stat(crate::entity::HEALTH_STAT_ID)
                     .or(Some(current))
                     .filter(|value| *value > 0)?;
@@ -208,14 +206,14 @@ impl<'a> RenderQueryService<'a> {
             .into_iter()
             .filter_map(|entity_id| {
                 let entity = self.entity_manager.get_entity(entity_id)?;
-                if !entity.attributes.rendering.has_shadow {
+                if !entity.rendering.has_shadow {
                     return None;
                 }
                 if projectile_ids.contains(&entity_id) {
                     return None;
                 }
-                if entity.attributes.rendering.animation_controller.is_none()
-                    && entity.attributes.rendering.static_object_render.is_none()
+                if entity.rendering.animation_controller.is_none()
+                    && entity.rendering.static_object_render.is_none()
                 {
                     return None;
                 }
@@ -257,11 +255,11 @@ impl<'a> RenderQueryService<'a> {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
                 continue;
             };
-            if !entity.attributes.rendering.visible {
+            if !entity.rendering.visible {
                 continue;
             }
 
-            if let Some(animation_controller) = &entity.attributes.rendering.animation_controller {
+            if let Some(animation_controller) = &entity.rendering.animation_controller {
                 let Ok(atlas_name) = animation_controller.current_atlas_name() else {
                     continue;
                 };
@@ -273,7 +271,7 @@ impl<'a> RenderQueryService<'a> {
                     origin: SpriteRenderOrigin::AnimatedEntity(entity_id),
                     sort_key: SpriteSortKey {
                         primary: entity.ground_contact_y(),
-                        secondary: entity.attributes.rendering.render_layer,
+                        secondary: entity.rendering.render_layer,
                         sequence: animated_sequence,
                     },
                     visual: SpriteVisualRef::AtlasTile {
@@ -282,7 +280,7 @@ impl<'a> RenderQueryService<'a> {
                     },
                     position: entity.position,
                     size: SpriteRenderSize::Explicit(entity.size),
-                    palette_override: entity.attributes.rendering.palette_override.clone(),
+                    palette_override: entity.rendering.palette_override.clone(),
                     flip_x: GameState::animation_state_flip_x(
                         animation_controller.current_clip_state,
                     ),
@@ -291,12 +289,12 @@ impl<'a> RenderQueryService<'a> {
                 continue;
             }
 
-            if let Some(static_render) = &entity.attributes.rendering.static_object_render {
+            if let Some(static_render) = &entity.rendering.static_object_render {
                 requests.push(SpriteRenderRequest {
                     origin: SpriteRenderOrigin::StaticEntity(entity_id),
                     sort_key: SpriteSortKey {
                         primary: entity.ground_contact_y(),
-                        secondary: entity.attributes.rendering.render_layer,
+                        secondary: entity.rendering.render_layer,
                         sequence: static_sequence,
                     },
                     visual: SpriteVisualRef::ObjectSheetObject {
@@ -322,7 +320,7 @@ impl<'a> RenderQueryService<'a> {
                     origin: SpriteRenderOrigin::Projectile(entity_id),
                     sort_key: SpriteSortKey {
                         primary: entity.ground_contact_y(),
-                        secondary: entity.attributes.rendering.render_layer,
+                        secondary: entity.rendering.render_layer,
                         sequence: projectile_sequence,
                     },
                     visual: SpriteVisualRef::ObjectSheetObject {
@@ -425,62 +423,77 @@ impl<'a> RenderQueryService<'a> {
 mod tests {
     use super::{GroundShadow, RenderQueryService};
     use crate::entity::{
-        EntityAttributes, EntityBehavior, EntityFootprint, EntityGameplay, EntityGrounding,
-        EntityManager, EntityRendering, EntityStats, ProjectileState, StaticObjectRenderDef,
+        CombatComponent, EntityFootprint, EntityGrounding, EntityManager, EntityRendering,
+        EntityStats, OptionalEntityComponents, ProjectileState, StaticObjectRenderDef,
     };
 
-    fn entity_attributes() -> EntityAttributes {
-        EntityAttributes::default()
+    fn spawn_test_entity(
+        entity_manager: &mut EntityManager,
+        entity_kind: crate::entity::EntityKind,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        rendering: EntityRendering,
+        solid: bool,
+        active: bool,
+        components: OptionalEntityComponents,
+    ) -> crate::entity::EntityId {
+        entity_manager.spawn_entity(
+            entity_kind, position, size, rendering, solid, active, components,
+        )
     }
 
     #[test]
     fn health_bar_queries_filter_invisible_and_inactive_entities() {
         let mut entity_manager = EntityManager::new();
-        let visible_id = entity_manager.spawn_entity(
+        let visible_id = spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(4, 8),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                gameplay: EntityGameplay {
+            EntityRendering::default(),
+            true,
+            true,
+            OptionalEntityComponents {
+                combat: Some(CombatComponent {
                     health: Some(20),
                     stats: EntityStats::from_legacy_health(Some(20)),
-                    ..EntityGameplay::default()
-                },
-                ..entity_attributes()
+                }),
+                ..Default::default()
             },
         );
-        let hidden_id = entity_manager.spawn_entity(
+        let hidden_id = spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(20, 8),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                gameplay: EntityGameplay {
+            EntityRendering {
+                visible: false,
+                ..EntityRendering::default()
+            },
+            true,
+            true,
+            OptionalEntityComponents {
+                combat: Some(CombatComponent {
                     health: Some(20),
                     stats: EntityStats::from_legacy_health(Some(20)),
-                    ..EntityGameplay::default()
-                },
-                rendering: EntityRendering {
-                    visible: false,
-                    ..EntityRendering::default()
-                },
-                ..entity_attributes()
+                }),
+                ..Default::default()
             },
         );
-        let inactive_id = entity_manager.spawn_entity(
+        let inactive_id = spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(36, 8),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                gameplay: EntityGameplay {
+            EntityRendering::default(),
+            true,
+            false,
+            OptionalEntityComponents {
+                combat: Some(CombatComponent {
                     health: Some(20),
                     stats: EntityStats::from_legacy_health(Some(20)),
-                    ..EntityGameplay::default()
-                },
-                behavior: EntityBehavior {
-                    active: false,
-                    ..EntityBehavior::default()
-                },
-                ..entity_attributes()
+                }),
+                ..Default::default()
             },
         );
 
@@ -496,71 +509,71 @@ mod tests {
     #[test]
     fn ground_shadow_queries_filter_non_renderable_entities() {
         let mut entity_manager = EntityManager::new();
-        entity_manager.spawn_entity(
+        spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(10, 20),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "crate".to_string(),
-                    }),
-                    ..EntityRendering::default()
-                },
-                ..entity_attributes()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "crate".to_string(),
+                }),
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
-        entity_manager.spawn_entity(
+        spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(30, 20),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "hidden".to_string(),
-                    }),
-                    visible: false,
-                    ..EntityRendering::default()
-                },
-                ..entity_attributes()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "hidden".to_string(),
+                }),
+                visible: false,
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
-        entity_manager.spawn_entity(
+        spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(50, 20),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "inactive".to_string(),
-                    }),
-                    has_shadow: false,
-                    ..EntityRendering::default()
-                },
-                behavior: EntityBehavior {
-                    active: false,
-                    ..EntityBehavior::default()
-                },
-                ..entity_attributes()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "inactive".to_string(),
+                }),
+                has_shadow: false,
+                ..EntityRendering::default()
             },
+            true,
+            false,
+            Default::default(),
         );
-        let projectile_id = entity_manager.spawn_entity(
+        let projectile_id = spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Projectile,
             glam::IVec2::new(70, 20),
             glam::UVec2::new(8, 8),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "bullet".to_string(),
-                    }),
-                    ..EntityRendering::default()
-                },
-                ..entity_attributes()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "bullet".to_string(),
+                }),
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
         entity_manager
             .storage_mut()
@@ -587,20 +600,21 @@ mod tests {
     #[test]
     fn ground_shadow_queries_project_flattened_shadow_at_entity_base() {
         let mut entity_manager = EntityManager::new();
-        entity_manager.spawn_entity(
+        spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(10, 20),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "crate".to_string(),
-                    }),
-                    ..EntityRendering::default()
-                },
-                ..entity_attributes()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "crate".to_string(),
+                }),
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
@@ -619,24 +633,25 @@ mod tests {
     #[test]
     fn ground_shadow_queries_follow_narrow_footprint_instead_of_full_sprite_width() {
         let mut entity_manager = EntityManager::new();
-        entity_manager.spawn_entity(
+        spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(10, 20),
             glam::UVec2::new(32, 48),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "tree".to_string(),
-                    }),
-                    grounding: EntityGrounding {
-                        origin: Some([16, 47]),
-                        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
-                    },
-                    ..EntityRendering::default()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "tree".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([16, 47]),
+                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
                 },
-                ..entity_attributes()
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
@@ -655,24 +670,25 @@ mod tests {
     #[test]
     fn ground_shadow_queries_keep_small_footprint_entities_readable() {
         let mut entity_manager = EntityManager::new();
-        entity_manager.spawn_entity(
+        spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(10, 20),
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "player".to_string(),
-                    }),
-                    grounding: EntityGrounding {
-                        origin: Some([8, 15]),
-                        footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
-                    },
-                    ..EntityRendering::default()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "player".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([8, 15]),
+                    footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
                 },
-                ..entity_attributes()
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);
@@ -691,43 +707,45 @@ mod tests {
     #[test]
     fn sprite_render_requests_sort_entities_by_ground_contact_y() {
         let mut entity_manager = EntityManager::new();
-        let lower_id = entity_manager.spawn_entity(
+        let lower_id = spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(0, 0),
             glam::UVec2::new(32, 48),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "lower".to_string(),
-                    }),
-                    grounding: EntityGrounding {
-                        origin: Some([16, 47]),
-                        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
-                    },
-                    ..EntityRendering::default()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "lower".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([16, 47]),
+                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
                 },
-                ..entity_attributes()
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
-        let upper_id = entity_manager.spawn_entity(
+        let upper_id = spawn_test_entity(
+            &mut entity_manager,
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(0, 24),
             glam::UVec2::new(32, 48),
-            EntityAttributes {
-                rendering: EntityRendering {
-                    static_object_render: Some(StaticObjectRenderDef {
-                        sheet: "objects".to_string(),
-                        object_name: "upper".to_string(),
-                    }),
-                    grounding: EntityGrounding {
-                        origin: Some([16, 47]),
-                        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
-                    },
-                    ..EntityRendering::default()
+            EntityRendering {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "upper".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([16, 47]),
+                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
                 },
-                ..entity_attributes()
+                ..EntityRendering::default()
             },
+            true,
+            true,
+            Default::default(),
         );
 
         let facade = RenderQueryService::new(&entity_manager, None, false);

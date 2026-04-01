@@ -10,15 +10,6 @@
     "render_layer": 2,
     "visible": true
   },
-  "attributes": {
-    "health": 100,
-    "speed": 2,
-    "solid": true,
-    "active": true,
-    "can_move": true,
-    "movement_profile": "player_wasd",
-    "has_inventory": true
-  },
   "collision": {
     "enabled": true,
     "offset": [
@@ -67,5 +58,26 @@
     "player",
     "starter",
     "hero"
-  ]
+  ],
+  "solid": true,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 2,
+      "movement_profile": "player_wasd",
+      "can_move": true
+    },
+    "combat": {
+      "health": 100,
+      "stats": {
+        "base": {
+          "health": 100
+        },
+        "current": {
+          "health": 100
+        }
+      }
+    },
+    "inventory": {}
+  }
 }

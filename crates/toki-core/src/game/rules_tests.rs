@@ -8,7 +8,7 @@ use super::rules::{
     RuleSystem,
 };
 use super::GameState;
-use crate::entity::{EntityAttributes, EntityId, EntityKind};
+use crate::entity::{EntityId, EntityKind, EntityRendering, OptionalEntityComponents};
 use crate::rules::{
     InteractionMode, Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget,
     RuleTrigger,
@@ -87,7 +87,10 @@ fn spawn_test_entity(game_state: &mut GameState) -> EntityId {
         EntityKind::Npc,
         glam::IVec2::new(100, 100),
         glam::UVec2::new(16, 16),
-        EntityAttributes::default(),
+        EntityRendering::default(),
+        true,
+        true,
+        OptionalEntityComponents::default(),
     )
 }
 

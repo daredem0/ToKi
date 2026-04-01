@@ -10,14 +10,6 @@
     "render_layer": 2,
     "visible": true
   },
-  "attributes": {
-    "health": 10,
-    "speed": 1,
-    "solid": true,
-    "active": true,
-    "can_move": false,
-    "has_inventory": false
-  },
   "collision": {
     "enabled": true,
     "offset": [
@@ -66,5 +58,25 @@
     "npc",
     "starter",
     "town"
-  ]
+  ],
+  "solid": true,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 1,
+      "movement_profile": "legacy_default",
+      "can_move": false
+    },
+    "combat": {
+      "health": 10,
+      "stats": {
+        "base": {
+          "health": 10
+        },
+        "current": {
+          "health": 10
+        }
+      }
+    }
+  }
 }

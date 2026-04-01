@@ -3,7 +3,9 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use toki_core::entity::{AiBehavior, AiConfig, EntityDefinition};
+use toki_core::entity::{
+    AiBehavior, AiComponent, AiConfig, CombatComponent, EntityDefinition, Inventory,
+};
 
 use super::defaults::{default_pickup_def, default_projectile_def};
 use super::toggles::ComponentToggles;
@@ -58,8 +60,11 @@ impl EntityEditState {
     /// Toggle health component on/off
     pub fn toggle_health(&mut self) {
         self.toggles.health_enabled = !self.toggles.health_enabled;
-        self.definition.attributes.health = if self.toggles.health_enabled {
-            Some(100)
+        self.definition.components.combat = if self.toggles.health_enabled {
+            Some(CombatComponent {
+                health: Some(100),
+                stats: Default::default(),
+            })
         } else {
             None
         };
@@ -69,14 +74,17 @@ impl EntityEditState {
     /// Toggle inventory component on/off
     pub fn toggle_inventory(&mut self) {
         self.toggles.inventory_enabled = !self.toggles.inventory_enabled;
-        self.definition.attributes.has_inventory = self.toggles.inventory_enabled;
+        self.definition.components.inventory = self
+            .toggles
+            .inventory_enabled
+            .then(Inventory::default);
         self.mark_dirty();
     }
 
     /// Toggle projectile component on/off
     pub fn toggle_projectile(&mut self) {
         self.toggles.projectile_enabled = !self.toggles.projectile_enabled;
-        self.definition.attributes.primary_projectile = if self.toggles.projectile_enabled {
+        self.definition.components.primary_projectile = if self.toggles.projectile_enabled {
             Some(default_projectile_def())
         } else {
             None
@@ -87,7 +95,7 @@ impl EntityEditState {
     /// Toggle pickup component on/off
     pub fn toggle_pickup(&mut self) {
         self.toggles.pickup_enabled = !self.toggles.pickup_enabled;
-        self.definition.attributes.pickup = if self.toggles.pickup_enabled {
+        self.definition.components.pickup = if self.toggles.pickup_enabled {
             Some(default_pickup_def())
         } else {
             None
@@ -98,13 +106,15 @@ impl EntityEditState {
     /// Toggle AI component on/off
     pub fn toggle_ai(&mut self) {
         self.toggles.ai_enabled = !self.toggles.ai_enabled;
-        self.definition.attributes.ai_config = if self.toggles.ai_enabled {
-            AiConfig {
-                behavior: AiBehavior::Wander,
-                detection_radius: 128,
-            }
+        self.definition.components.ai = if self.toggles.ai_enabled {
+            Some(AiComponent {
+                ai_config: AiConfig {
+                    behavior: AiBehavior::Wander,
+                    detection_radius: 128,
+                },
+            })
         } else {
-            AiConfig::default()
+            None
         };
         self.mark_dirty();
     }
@@ -175,7 +185,13 @@ impl EntityEditState {
 
     fn validate_health(&mut self) {
         if self.toggles.health_enabled {
-            if let Some(health) = self.definition.attributes.health {
+            if let Some(health) = self
+                .definition
+                .components
+                .combat
+                .as_ref()
+                .and_then(|combat| combat.health)
+            {
                 if health == 0 {
                     self.validation_errors.insert(
                         "health".to_string(),

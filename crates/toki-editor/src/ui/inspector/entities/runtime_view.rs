@@ -23,12 +23,13 @@ impl InspectorSystem {
             ui.label("Entity not found in game state");
             return;
         };
+        let entity_manager = game_state.world().entity_manager();
 
         render_basic_properties(ui, entity);
         render_type_and_role(ui, entity);
         render_visibility_state(ui, entity);
-        render_stats(ui, entity);
-        render_behavior(ui, entity);
+        render_stats(ui, entity_manager, entity);
+        render_behavior(ui, entity_manager, entity);
         render_collision_box(ui, entity);
         render_animation_state(ui, entity);
     }
@@ -65,31 +66,43 @@ fn render_type_and_role(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
 fn render_visibility_state(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
     ui.horizontal(|ui| {
         ui.label("Visible:");
-        ui.label(format!("{}", entity.attributes.rendering.visible));
+        ui.label(format!("{}", entity.rendering.visible));
     });
 
     ui.horizontal(|ui| {
         ui.label("Active:");
-        ui.label(format!("{}", entity.attributes.behavior.active));
+        ui.label(format!("{}", entity.active));
     });
 }
 
-fn render_stats(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
-    if let Some(health) = entity.attributes.gameplay.health {
+fn render_stats(
+    ui: &mut egui::Ui,
+    entity_manager: &toki_core::entity::EntityManager,
+    entity: &toki_core::entity::Entity,
+) {
+    if let Some(health) = entity_manager.combat(entity.id).and_then(|combat| combat.health) {
         ui.horizontal(|ui| {
             ui.label("Health:");
             ui.label(format!("{}", health));
         });
     }
 
-    if let Some(attack_power) = entity.attributes.current_stat(ATTACK_POWER_STAT_ID) {
+    if let Some(attack_power) = entity_manager
+        .combat(entity.id)
+        .and_then(|combat| combat.current_stat(ATTACK_POWER_STAT_ID))
+    {
         ui.horizontal(|ui| {
             ui.label("Attack Power:");
             ui.label(format!("{}", attack_power));
         });
     }
 
-    if entity.attributes.behavior.has_inventory {
+    if entity_manager
+        .storage()
+        .components()
+        .inventory(entity.id)
+        .is_some()
+    {
         ui.horizontal(|ui| {
             ui.label("Has Inventory:");
             ui.label("Yes");
@@ -97,11 +110,14 @@ fn render_stats(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
     }
 }
 
-fn render_behavior(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
-    let is_static_item =
-        entity.category == "item" && entity.attributes.rendering.static_object_render.is_some();
+fn render_behavior(
+    ui: &mut egui::Ui,
+    entity_manager: &toki_core::entity::EntityManager,
+    entity: &toki_core::entity::Entity,
+) {
+    let is_static_item = entity.category == "item" && entity.rendering.static_object_render.is_some();
 
-    if let Some(static_render) = &entity.attributes.rendering.static_object_render {
+    if let Some(static_render) = &entity.rendering.static_object_render {
         ui.horizontal(|ui| {
             ui.label("Static Render:");
             ui.label(format!(
@@ -114,13 +130,18 @@ fn render_behavior(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
     if !is_static_item {
         ui.horizontal(|ui| {
             ui.label("AI:");
-            ui.label(ai_behavior_label(
-                entity.attributes.behavior.ai_config.behavior,
-            ));
-            if ai_behavior_needs_detection_radius(entity.attributes.behavior.ai_config.behavior) {
+            let ai_behavior = entity_manager
+                .ai(entity.id)
+                .map(|ai| ai.ai_config.behavior)
+                .unwrap_or(toki_core::entity::AiBehavior::None);
+            ui.label(ai_behavior_label(ai_behavior));
+            if ai_behavior_needs_detection_radius(ai_behavior) {
                 ui.label(format!(
                     "(radius: {})",
-                    entity.attributes.behavior.ai_config.detection_radius
+                    entity_manager
+                        .ai(entity.id)
+                        .map(|ai| ai.ai_config.detection_radius)
+                        .unwrap_or(0)
                 ));
             }
         });
@@ -129,7 +150,10 @@ fn render_behavior(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
             ui.label("Movement:");
             ui.label(movement_profile_label(
                 entity.control_role,
-                entity.attributes.behavior.movement_profile,
+                entity_manager
+                    .movement(entity.id)
+                    .map(|movement| movement.movement_profile)
+                    .unwrap_or_default(),
             ));
         });
     }
@@ -163,7 +187,7 @@ fn render_collision_box(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
 }
 
 fn render_animation_state(ui: &mut egui::Ui, entity: &toki_core::entity::Entity) {
-    let Some(animation_controller) = &entity.attributes.rendering.animation_controller else {
+    let Some(animation_controller) = &entity.rendering.animation_controller else {
         return;
     };
 

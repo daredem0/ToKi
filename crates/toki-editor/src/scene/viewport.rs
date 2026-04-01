@@ -550,7 +550,7 @@ impl SceneViewport {
         entities.sort_by_key(|entity| {
             (
                 entity.ground_contact_y(),
-                entity.attributes.rendering.render_layer,
+                entity.rendering.render_layer,
                 entity.id,
             )
         });

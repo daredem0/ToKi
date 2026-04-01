@@ -130,12 +130,22 @@ fn render_health_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     if edit.toggles.health_enabled {
         ui.horizontal(|ui| {
             ui.label("  Max HP:");
-            let mut hp = edit.definition.attributes.health.unwrap_or(100) as i32;
+            let mut hp = edit
+                .definition
+                .components
+                .combat
+                .as_ref()
+                .and_then(|combat| combat.health)
+                .unwrap_or(100) as i32;
             if ui
                 .add(egui::DragValue::new(&mut hp).range(1..=99999))
                 .changed()
             {
-                edit.definition.attributes.health = Some(hp.max(1) as u32);
+                edit.definition
+                    .components
+                    .combat
+                    .get_or_insert_with(toki_core::entity::CombatComponent::default)
+                    .health = Some(hp.max(1) as u32);
                 edit.mark_dirty();
             }
         });
@@ -169,7 +179,15 @@ fn render_ai_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui::Entity
     // Behavior dropdown
     ui.horizontal(|ui| {
         ui.label("Behavior:");
-        let current = format!("{:?}", edit.definition.attributes.ai_config.behavior);
+        let current = format!(
+            "{:?}",
+            edit.definition
+                .components
+                .ai
+                .as_ref()
+                .map(|ai| ai.ai_config.behavior)
+                .unwrap_or(AiBehavior::None)
+        );
         egui::ComboBox::from_id_salt("ai_behavior")
             .selected_text(&current)
             .show_ui(ui, |ui| {
@@ -182,7 +200,13 @@ fn render_ai_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui::Entity
                     let label = format!("{:?}", behavior);
                     if ui
                         .selectable_value(
-                            &mut edit.definition.attributes.ai_config.behavior,
+                            &mut edit
+                                .definition
+                                .components
+                                .ai
+                                .get_or_insert_with(toki_core::entity::AiComponent::default)
+                                .ai_config
+                                .behavior,
                             behavior,
                             &label,
                         )
@@ -197,12 +221,23 @@ fn render_ai_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui::Entity
     // Detection radius
     ui.horizontal(|ui| {
         ui.label("Detection Radius:");
-        let mut radius = edit.definition.attributes.ai_config.detection_radius as i32;
+        let mut radius = edit
+            .definition
+            .components
+            .ai
+            .as_ref()
+            .map(|ai| ai.ai_config.detection_radius)
+            .unwrap_or(0) as i32;
         if ui
             .add(egui::DragValue::new(&mut radius).range(0..=1024))
             .changed()
         {
-            edit.definition.attributes.ai_config.detection_radius = radius.max(0) as u32;
+            edit.definition
+                .components
+                .ai
+                .get_or_insert_with(toki_core::entity::AiComponent::default)
+                .ai_config
+                .detection_radius = radius.max(0) as u32;
             edit.mark_dirty();
         }
     });
@@ -236,7 +271,7 @@ fn render_projectile_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     if edit.toggles.projectile_enabled {
-        if let Some(proj) = edit.definition.attributes.primary_projectile.as_mut() {
+        if let Some(proj) = edit.definition.components.primary_projectile.as_mut() {
             egui::CollapsingHeader::new("  Projectile Settings")
                 .default_open(false)
                 .show(ui, |ui| {
@@ -338,7 +373,7 @@ fn render_pickup_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     if edit.toggles.pickup_enabled {
-        if let Some(pickup) = edit.definition.attributes.pickup.as_mut() {
+        if let Some(pickup) = edit.definition.components.pickup.as_mut() {
             egui::CollapsingHeader::new("  Pickup Settings")
                 .default_open(false)
                 .show(ui, |ui| {

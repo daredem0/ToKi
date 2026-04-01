@@ -127,10 +127,10 @@ impl InspectorSystem {
         }
 
         MultiEntityCommonState {
-            visible: common_bool(entities, |entity| entity.attributes.rendering.visible),
-            active: common_bool(entities, |entity| entity.attributes.behavior.active),
+            visible: common_bool(entities, |entity| entity.rendering.visible),
+            active: common_bool(entities, |entity| entity.active),
             collision_enabled: common_bool(entities, |entity| entity.collision_box.is_some()),
-            render_layer: common_i32(entities, |entity| entity.attributes.rendering.render_layer),
+            render_layer: common_i32(entities, |entity| entity.rendering.render_layer),
         }
     }
 
@@ -152,8 +152,8 @@ impl InspectorSystem {
             .entities()
             .iter()
             .filter(|entity| selected_set.contains(&entity.id))
-            .cloned()
-            .collect::<Vec<toki_core::entity::Entity>>();
+            .filter_map(|entity| ui_state.scenes[scene_index].stored_entity(entity.id))
+            .collect::<Vec<toki_core::entity::StoredEntity>>();
 
         if before_entities.is_empty() {
             return false;
@@ -163,7 +163,7 @@ impl InspectorSystem {
         let mut after_entities = Vec::with_capacity(before_entities.len());
         for before_entity in &before_entities {
             let mut after_entity = before_entity.clone();
-            changed |= Self::apply_multi_entity_batch_edit_to_entity(&mut after_entity, edit);
+            changed |= Self::apply_multi_entity_batch_edit_to_entity(&mut after_entity.entity, edit);
             after_entities.push(after_entity);
         }
 
@@ -184,22 +184,22 @@ impl InspectorSystem {
         let mut changed = false;
 
         if let Some(visible) = edit.set_visible {
-            if entity.attributes.rendering.visible != visible {
-                entity.attributes.rendering.visible = visible;
+            if entity.rendering.visible != visible {
+                entity.rendering.visible = visible;
                 changed = true;
             }
         }
 
         if let Some(active) = edit.set_active {
-            if entity.attributes.behavior.active != active {
-                entity.attributes.behavior.active = active;
+            if entity.active != active {
+                entity.active = active;
                 changed = true;
             }
         }
 
         if let Some(render_layer) = edit.set_render_layer {
-            if entity.attributes.rendering.render_layer != render_layer {
-                entity.attributes.rendering.render_layer = render_layer;
+            if entity.rendering.render_layer != render_layer {
+                entity.rendering.render_layer = render_layer;
                 changed = true;
             }
         }

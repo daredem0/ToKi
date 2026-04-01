@@ -151,9 +151,18 @@ impl InspectorSystem {
                                 ui.horizontal(|ui| {
                                     ui.label("Health:");
                                     let mut changed = false;
-                                    let mut health_enabled = definition.attributes.health.is_some();
-                                    let mut health_value =
-                                        definition.attributes.health.unwrap_or(0) as i64;
+                                    let mut health_enabled = definition
+                                        .components
+                                        .combat
+                                        .as_ref()
+                                        .and_then(|combat| combat.health)
+                                        .is_some();
+                                    let mut health_value = definition
+                                        .components
+                                        .combat
+                                        .as_ref()
+                                        .and_then(|combat| combat.health)
+                                        .unwrap_or(0) as i64;
                                     changed |=
                                         ui.checkbox(&mut health_enabled, "Enabled").changed();
                                     if health_enabled {
@@ -171,9 +180,15 @@ impl InspectorSystem {
                                         } else {
                                             None
                                         };
-                                        definition.attributes.health = new_health;
+                                        definition
+                                            .components
+                                            .combat
+                                            .get_or_insert_with(
+                                                toki_core::entity::CombatComponent::default,
+                                            )
+                                            .health = new_health;
                                         Self::set_optional_definition_stat(
-                                            &mut definition.attributes,
+                                            &mut definition.components,
                                             HEALTH_STAT_ID,
                                             new_health.map(|value| value as i32),
                                         );
@@ -189,8 +204,11 @@ impl InspectorSystem {
                                 ui.horizontal(|ui| {
                                     ui.label("Attack Power:");
                                     let mut changed = false;
-                                    let mut attack_power =
-                                        definition.attributes.stats.get(ATTACK_POWER_STAT_ID).copied();
+                                    let mut attack_power = definition
+                                        .components
+                                        .combat
+                                        .as_ref()
+                                        .and_then(|combat| combat.current_stat(ATTACK_POWER_STAT_ID));
                                     let mut attack_power_enabled = attack_power.is_some();
                                     let mut attack_power_value = attack_power.unwrap_or(0) as i64;
                                     changed |= ui
@@ -216,7 +234,7 @@ impl InspectorSystem {
                                             None
                                         };
                                         Self::set_optional_definition_stat(
-                                            &mut definition.attributes,
+                                            &mut definition.components,
                                             ATTACK_POWER_STAT_ID,
                                             attack_power,
                                         );
@@ -514,15 +532,37 @@ impl InspectorSystem {
                                             }
                                         }
 
-                                        // Show attributes
-                                        if let Some(attributes) =
-                                            obj.get("attributes").and_then(|v| v.as_object())
+                                        if let Some(solid) =
+                                            obj.get("solid").and_then(|v| v.as_bool())
+                                        {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Solid:");
+                                                ui.label(format!("{}", solid));
+                                            });
+                                        }
+
+                                        if let Some(active) =
+                                            obj.get("active").and_then(|v| v.as_bool())
+                                        {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Active:");
+                                                ui.label(format!("{}", active));
+                                            });
+                                        }
+
+                                        // Show capability components
+                                        if let Some(components) =
+                                            obj.get("components").and_then(|v| v.as_object())
                                         {
                                             ui.separator();
-                                            ui.label("Attributes:");
+                                            ui.label("Components:");
 
-                                            if let Some(health) =
-                                                attributes.get("health").and_then(|v| v.as_u64())
+                                            if let Some(health) = components
+                                                .get("combat")
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|combat| {
+                                                    combat.get("health").and_then(|v| v.as_u64())
+                                                })
                                             {
                                                 ui.horizontal(|ui| {
                                                     ui.label("Health:");
@@ -530,12 +570,15 @@ impl InspectorSystem {
                                                 });
                                             }
 
-                                            if let Some(attack_power) = attributes
-                                                .get("stats")
+                                            if let Some(attack_power) = components
+                                                .get("combat")
                                                 .and_then(|v| v.as_object())
-                                                .and_then(|stats| {
-                                                    stats
-                                                        .get(ATTACK_POWER_STAT_ID)
+                                                .and_then(|combat| combat.get("stats"))
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|stats| stats.get("base"))
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|base| {
+                                                    base.get(ATTACK_POWER_STAT_ID)
                                                         .and_then(|v| v.as_i64())
                                                 })
                                             {
@@ -545,8 +588,12 @@ impl InspectorSystem {
                                                 });
                                             }
 
-                                            if let Some(speed) =
-                                                attributes.get("speed").and_then(|v| v.as_u64())
+                                            if let Some(speed) = components
+                                                .get("movement")
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|movement| {
+                                                    movement.get("speed").and_then(|v| v.as_f64())
+                                                })
                                             {
                                                 ui.horizontal(|ui| {
                                                     ui.label("Speed:");
@@ -554,26 +601,14 @@ impl InspectorSystem {
                                                 });
                                             }
 
-                                            if let Some(solid) =
-                                                attributes.get("solid").and_then(|v| v.as_bool())
-                                            {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Solid:");
-                                                    ui.label(format!("{}", solid));
-                                                });
-                                            }
-
-                                            if let Some(active) =
-                                                attributes.get("active").and_then(|v| v.as_bool())
-                                            {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Active:");
-                                                    ui.label(format!("{}", active));
-                                                });
-                                            }
-
-                                            if let Some(can_move) =
-                                                attributes.get("can_move").and_then(|v| v.as_bool())
+                                            if let Some(can_move) = components
+                                                .get("movement")
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|movement| {
+                                                    movement
+                                                        .get("can_move")
+                                                        .and_then(|v| v.as_bool())
+                                                })
                                             {
                                                 ui.horizontal(|ui| {
                                                     ui.label("Can Move:");
@@ -581,9 +616,10 @@ impl InspectorSystem {
                                                 });
                                             }
 
-                                            if let Some(has_inventory) = attributes
-                                                .get("has_inventory")
-                                                .and_then(|v| v.as_bool())
+                                            if let Some(has_inventory) = components
+                                                .get("inventory")
+                                                .and_then(|v| v.as_object())
+                                                .map(|_| true)
                                             {
                                                 ui.horizontal(|ui| {
                                                     ui.label("Has Inventory:");

@@ -48,7 +48,7 @@ impl<'a> AiRuntimeApplier<'a> {
     fn apply_result(&mut self, ai_result: AiUpdateResult) {
         if let Some(animation) = ai_result.new_animation {
             if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
-                if let Some(controller) = &mut entity.attributes.rendering.animation_controller {
+                if let Some(controller) = &mut entity.rendering.animation_controller {
                     if controller.current_clip_state != animation {
                         controller.play(animation);
                     }
@@ -72,14 +72,16 @@ impl<'a> AiRuntimeApplier<'a> {
             match spawn_result {
                 Ok(new_entity_id) => {
                     if let Some(entity) = self.entity_manager.get_entity(new_entity_id) {
+                        let ai = self.entity_manager.ai(new_entity_id);
+                        let movement = self.entity_manager.movement(new_entity_id);
                         tracing::debug!(
                             entity_id = new_entity_id,
                             definition_name = ?entity.definition_name,
                             position = ?entity.position,
-                            ai_behavior = ?entity.attributes.behavior.ai_config.behavior,
-                            detection_radius = entity.attributes.behavior.ai_config.detection_radius,
-                            solid = entity.attributes.gameplay.solid,
-                            speed = entity.attributes.gameplay.speed,
+                            ai_behavior = ?ai.map(|component| component.ai_config.behavior),
+                            detection_radius = ai.map(|component| component.ai_config.detection_radius).unwrap_or(0),
+                            solid = entity.solid,
+                            speed = movement.map(|component| component.speed).unwrap_or(0.0),
                             "AI spawn: child entity configuration"
                         );
                     }
@@ -137,8 +139,8 @@ mod tests {
 
     use crate::ai::{AiSpawnRequest, AiSystem, AiUpdateResult, SpawnMode};
     use crate::entity::{
-        AiConfig, AttributesDef, AudioDef, CollisionDef, EntityDefinition, EntityManager,
-        MovementProfile, MovementSoundTrigger, RenderingDef,
+        AiConfig, AudioDef, CollisionDef, CombatComponent, ComponentsDef, EntityDefinition,
+        EntityManager, MovementComponent, MovementProfile, MovementSoundTrigger, RenderingDef,
     };
 
     use super::AiRuntimeApplier;
@@ -158,20 +160,25 @@ mod tests {
                 static_object: None,
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: Some(10),
-                stats: HashMap::new(),
-                speed: 1.0,
-                solid: true,
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::None,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                movement: Some(MovementComponent {
+                    speed: 1.0,
+                    movement_profile: MovementProfile::None,
+                    can_move: true,
+                }),
+                ai: Some(crate::entity::AiComponent {
+                    ai_config: AiConfig::default(),
+                }),
+                interaction: None,
+                combat: Some(CombatComponent {
+                    health: Some(10),
+                    stats: Default::default(),
+                }),
                 primary_projectile: None,
                 pickup: None,
-                has_inventory: false,
+                inventory: None,
             },
             collision: CollisionDef {
                 enabled: true,

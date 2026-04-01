@@ -4,8 +4,9 @@ use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::TileMap;
 use crate::collision::CollisionBox;
 use crate::entity::{
-    AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityBehavior, EntityGameplay,
-    EntityId, EntityKind, EntityManager, EntityRendering,
+    AiBehavior, AiComponent, AiConfig, CombatComponent, ControlRole, Entity, EntityId,
+    EntityKind, EntityManager, EntityRendering, EntityStats, MovementComponent,
+    OptionalEntityComponents, StoredEntity,
 };
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
@@ -29,12 +30,12 @@ fn chase_handler_returns_result_when_player_in_range() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (70, 100) - within detection radius
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(70, 100), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
     let entity = entity_manager.get_entity(2).unwrap();
@@ -60,12 +61,12 @@ fn run_handler_moves_away_from_player() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (120, 100) - within detection radius
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(120, 100), AiBehavior::Run, 64);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
     let entity = entity_manager.get_entity(2).unwrap();
@@ -89,7 +90,7 @@ fn wander_handler_respects_frame_throttling() {
     let atlas = create_test_atlas();
 
     let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Wander);
-    entity_manager.add_existing_entity(entity);
+    entity_manager.add_existing_stored_entity(entity);
 
     let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
     let entity = entity_manager.get_entity(1).unwrap();
@@ -187,7 +188,7 @@ fn ai_context_validates_movement() {
     let world_bounds = UVec2::new(256, 256);
 
     let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Chase);
-    entity_manager.add_existing_entity(entity);
+    entity_manager.add_existing_stored_entity(entity);
 
     let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
     let entity = entity_manager.get_entity(1).unwrap();
@@ -204,12 +205,12 @@ fn ai_context_rejects_movement_into_solid_entity() {
     let world_bounds = UVec2::new(256, 256);
 
     let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Chase);
-    entity_manager.add_existing_entity(entity);
+    entity_manager.add_existing_stored_entity(entity);
 
     // Add a blocking solid entity
     let mut blocker = create_test_entity(2, IVec2::new(60, 50), AiBehavior::None);
-    blocker.attributes.gameplay.solid = true;
-    entity_manager.add_existing_entity(blocker);
+    blocker.entity.solid = true;
+    entity_manager.add_existing_stored_entity(blocker);
 
     let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
     let entity = entity_manager.get_entity(1).unwrap();
@@ -292,7 +293,7 @@ fn create_tilemap_with_horizontal_wall() -> TileMap {
     }
 }
 
-fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> Entity {
+fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> StoredEntity {
     let mut controller = AnimationController::new();
     controller.add_clip(AnimationClip {
         state: AnimationState::Idle,
@@ -314,37 +315,46 @@ fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> En
     });
     controller.play(AnimationState::Idle);
 
-    Entity {
-        id,
-        position,
-        size: UVec2::new(16, 16),
-        entity_kind: EntityKind::Npc,
-        category: "creature".to_string(),
-        definition_name: Some("test_npc".into()),
-        persistent_across_saves: false,
-        control_role: ControlRole::None,
-        audio: Default::default(),
-        attributes: EntityAttributes {
-            gameplay: EntityGameplay {
-                speed: 2.0,
-                ..EntityGameplay::default()
-            },
+    StoredEntity::new(
+        Entity {
+            id,
+            position,
+            size: UVec2::new(16, 16),
+            entity_kind: EntityKind::Npc,
+            category: "creature".to_string(),
+            definition_name: Some("test_npc".into()),
+            persistent_across_saves: false,
+            control_role: ControlRole::None,
+            audio: Default::default(),
             rendering: EntityRendering {
                 animation_controller: Some(controller),
                 ..EntityRendering::default()
             },
-            behavior: EntityBehavior {
+            collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+            solid: true,
+            active: true,
+            movement_accumulator: glam::Vec2::ZERO,
+            tags: Vec::new(),
+        },
+        OptionalEntityComponents {
+            movement: Some(MovementComponent {
+                speed: 2.0,
+                movement_profile: crate::entity::MovementProfile::LegacyDefault,
+                can_move: true,
+            }),
+            ai: Some(AiComponent {
                 ai_config: AiConfig {
                     behavior,
                     detection_radius: 64,
                 },
-                ..EntityBehavior::default()
-            },
+            }),
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats::from_legacy_health(Some(100)),
+            }),
+            ..Default::default()
         },
-        collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
-        movement_accumulator: glam::Vec2::ZERO,
-        tags: Vec::new(),
-    }
+    )
 }
 
 #[test]
@@ -376,12 +386,12 @@ fn ai_system_updates_every_tick() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (50, 100) - within detection radius
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // First update should return results immediately
     let results = ai_system.update(
@@ -412,9 +422,9 @@ fn ai_system_skips_player_entity() {
     let atlas = create_test_atlas();
 
     let mut player = create_test_entity(1, IVec2::new(32, 32), AiBehavior::Wander);
-    player.control_role = ControlRole::PlayerCharacter;
+    player.entity.control_role = ControlRole::PlayerCharacter;
     // player_id is set automatically when adding entity with PlayerCharacter role
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Fast forward to update frame
     for _ in 0..60 {
@@ -449,8 +459,8 @@ fn ai_system_only_updates_wander_entities() {
     let wander_npc = create_test_entity(1, IVec2::new(32, 32), AiBehavior::Wander);
     let idle_npc = create_test_entity(2, IVec2::new(64, 64), AiBehavior::None);
 
-    entity_manager.add_existing_entity(wander_npc);
-    entity_manager.add_existing_entity(idle_npc);
+    entity_manager.add_existing_stored_entity(wander_npc);
+    entity_manager.add_existing_stored_entity(idle_npc);
 
     // Fast forward to update frame
     ai_system.set_frame_counter(59);
@@ -477,7 +487,7 @@ fn ai_system_wander_entity_moves_or_stays() {
     let atlas = create_test_atlas();
 
     let npc = create_test_entity(1, IVec2::new(64, 64), AiBehavior::Wander);
-    entity_manager.add_existing_entity(npc);
+    entity_manager.add_existing_stored_entity(npc);
 
     // Fast forward to update frame
     ai_system.set_frame_counter(59);
@@ -502,16 +512,23 @@ fn create_test_entity_with_detection_radius(
     position: IVec2,
     behavior: AiBehavior,
     detection_radius: u32,
-) -> Entity {
+) -> StoredEntity {
     let mut entity = create_test_entity(id, position, behavior);
-    entity.attributes.behavior.ai_config.detection_radius = detection_radius;
+    entity
+        .components
+        .ai
+        .get_or_insert_with(|| AiComponent {
+            ai_config: AiConfig::default(),
+        })
+        .ai_config
+        .detection_radius = detection_radius;
     entity
 }
 
-fn create_player_entity(id: EntityId, position: IVec2) -> Entity {
+fn create_player_entity(id: EntityId, position: IVec2) -> StoredEntity {
     let mut player = create_test_entity(id, position, AiBehavior::None);
-    player.control_role = ControlRole::PlayerCharacter;
-    player.entity_kind = EntityKind::Player;
+    player.entity.control_role = ControlRole::PlayerCharacter;
+    player.entity.entity_kind = EntityKind::Player;
     player
 }
 
@@ -528,12 +545,12 @@ fn ai_system_chase_moves_toward_player_when_in_radius() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (50, 100) - 50 pixels away, within detection radius of 64
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // Fast forward to update frame
     ai_system.set_frame_counter(59);
@@ -566,12 +583,12 @@ fn ai_system_chase_wanders_with_walk_wait_cycle() {
 
     // Player at (200, 100)
     let player = create_player_entity(1, IVec2::new(200, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (50, 100) - 150 pixels away, outside detection radius of 64
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // First call starts in waiting phase (idle)
     let results = ai_system.update(
@@ -625,12 +642,12 @@ fn ai_system_chase_closes_distance_to_player() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (60, 60) - diagonally away, within detection radius of 100
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(60, 60), AiBehavior::Chase, 100);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     let initial_distance = ((100 - 60) as f32).hypot((100 - 60) as f32);
 
@@ -671,12 +688,12 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (120, 100) - 20 pixels away, within detection radius of 64
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(120, 100), AiBehavior::Run, 64);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     // Fast forward to update frame
     ai_system.set_frame_counter(59);
@@ -712,12 +729,12 @@ fn ai_system_run_wanders_with_walk_wait_cycle() {
 
     // Player at (200, 100)
     let player = create_player_entity(1, IVec2::new(200, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (50, 100) - 150 pixels away, outside detection radius of 64
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Run, 64);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     // First call starts in waiting phase (idle)
     let results = ai_system.update(
@@ -762,12 +779,12 @@ fn ai_system_run_increases_distance_from_player() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (120, 120) - diagonally away, within detection radius of 100
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(120, 120), AiBehavior::Run, 100);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     let initial_distance = ((120 - 100) as f32).hypot((120 - 100) as f32);
 
@@ -808,12 +825,12 @@ fn ai_system_chase_respects_world_bounds() {
 
     // Player at (0, 100) - at the left edge
     let player = create_player_entity(1, IVec2::new(0, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (20, 100) - will try to move left toward player
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(20, 100), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // Fast forward to update frame
     ai_system.set_frame_counter(59);
@@ -850,13 +867,13 @@ fn ai_system_run_respects_world_bounds() {
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (230, 100) - near right edge, will try to move right away from player
     // World bounds are 256x256, entity size is 16x16, so max x is 240
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(230, 100), AiBehavior::Run, 200);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     // Fast forward to update frame
     ai_system.set_frame_counter(59);
@@ -897,13 +914,13 @@ fn ai_system_chase_navigates_around_vertical_wall() {
 
     // Player at (100, 50) - on the right side of the wall
     let player = create_player_entity(1, IVec2::new(100, 50));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (48, 50) - on the left side of the wall, same y as player
     // Primary direction would be right (+x), but wall blocks it
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(48, 50), AiBehavior::Chase, 100);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     let results = ai_system.update(
         &entity_manager,
@@ -936,7 +953,7 @@ fn ai_system_run_navigates_around_horizontal_wall() {
 
     // Player at (50, 100) - below the wall
     let player = create_player_entity(1, IVec2::new(50, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (50, 80) - just above the wall, directly above player
     // Primary direction would be down (-y away from player at y=100), but wall blocks it
@@ -945,7 +962,7 @@ fn ai_system_run_navigates_around_horizontal_wall() {
     // Runner would move up (decrease y), but let's put a wall above
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 48), AiBehavior::Run, 100);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     let results = ai_system.update(
         &entity_manager,
@@ -976,14 +993,18 @@ fn ai_system_chase_tries_perpendicular_when_blocked() {
 
     // Player directly to the right of chaser, wall in between
     let player = create_player_entity(1, IVec2::new(100, 32));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at x=46 - entity size is 16, so right edge is at x=62, just before the wall (64)
     // When it tries to move right (speed=4 -> to x=50, right edge at 66), it would hit the wall
     let mut chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(46, 32), AiBehavior::Chase, 100);
-    chaser.attributes.gameplay.speed = 4.0; // Move 4 pixels per tick to ensure it tries to enter wall
-    entity_manager.add_existing_entity(chaser);
+    chaser
+        .components
+        .movement
+        .get_or_insert_with(MovementComponent::default)
+        .speed = 4.0; // Move 4 pixels per tick to ensure it tries to enter wall
+    entity_manager.add_existing_stored_entity(chaser);
 
     let results = ai_system.update(
         &entity_manager,
@@ -1023,12 +1044,12 @@ fn ai_system_chase_wanders_when_player_outside_radius() {
 
     // Player at (200, 100) - far away
     let player = create_player_entity(1, IVec2::new(200, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser at (50, 50) - 170 pixels away, outside detection radius of 64
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // Advance to wander update frame (every 30 frames for idle wandering)
     ai_system.set_frame_counter(29);
@@ -1061,12 +1082,12 @@ fn ai_system_run_wanders_when_player_outside_radius() {
 
     // Player at (200, 100) - far away
     let player = create_player_entity(1, IVec2::new(200, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Runner at (50, 50) - outside detection radius of 64
     let runner =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Run, 64);
-    entity_manager.add_existing_entity(runner);
+    entity_manager.add_existing_stored_entity(runner);
 
     // Advance to wander update frame (every 30 frames for idle wandering)
     ai_system.set_frame_counter(29);
@@ -1097,12 +1118,12 @@ fn ai_system_chase_idle_wander_is_throttled() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser outside detection radius
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // First update (frame 1) - should not wander yet
     let results = ai_system.update(
@@ -1130,12 +1151,12 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
 
     // Player far away initially
     let player = create_player_entity(1, IVec2::new(200, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Chaser outside detection radius
     let chaser =
         create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
-    entity_manager.add_existing_entity(chaser);
+    entity_manager.add_existing_stored_entity(chaser);
 
     // First update - wandering (player outside)
     ai_system.set_frame_counter(29);
@@ -1184,7 +1205,7 @@ fn ai_system_run_and_multiply_wanders_when_no_threats_or_mates() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // RunAndMultiply entity alone with no compatible entities
     let entity = create_test_entity_with_detection_radius(
@@ -1193,7 +1214,7 @@ fn ai_system_run_and_multiply_wanders_when_no_threats_or_mates() {
         AiBehavior::RunAndMultiply,
         64,
     );
-    entity_manager.add_existing_entity(entity);
+    entity_manager.add_existing_stored_entity(entity);
 
     let results = ai_system.update(
         &entity_manager,
@@ -1218,7 +1239,7 @@ fn ai_system_run_and_multiply_flees_from_player() {
 
     // Player nearby
     let player = create_player_entity(1, IVec2::new(100, 100));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // RunAndMultiply entity within detection radius
     let entity = create_test_entity_with_detection_radius(
@@ -1227,7 +1248,7 @@ fn ai_system_run_and_multiply_flees_from_player() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity_manager.add_existing_entity(entity);
+    entity_manager.add_existing_stored_entity(entity);
 
     let initial_distance = 28.28; // sqrt((120-100)^2 + (120-100)^2) ≈ 28.28
 
@@ -1260,7 +1281,7 @@ fn ai_system_run_and_multiply_seeks_compatible_entity() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // First RunAndMultiply entity
     let entity1 = create_test_entity_with_detection_radius(
@@ -1269,7 +1290,7 @@ fn ai_system_run_and_multiply_seeks_compatible_entity() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity_manager.add_existing_entity(entity1);
+    entity_manager.add_existing_stored_entity(entity1);
 
     // Second compatible entity (same definition_name) within detection radius
     let entity2 = create_test_entity_with_detection_radius(
@@ -1278,7 +1299,7 @@ fn ai_system_run_and_multiply_seeks_compatible_entity() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity_manager.add_existing_entity(entity2);
+    entity_manager.add_existing_stored_entity(entity2);
 
     let results = ai_system.update(
         &entity_manager,
@@ -1311,7 +1332,7 @@ fn ai_system_run_and_multiply_spawns_on_collision() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Two adjacent RunAndMultiply entities (touching at edges)
     let entity1 = create_test_entity_with_detection_radius(
@@ -1320,7 +1341,7 @@ fn ai_system_run_and_multiply_spawns_on_collision() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity_manager.add_existing_entity(entity1);
+    entity_manager.add_existing_stored_entity(entity1);
 
     let entity2 = create_test_entity_with_detection_radius(
         3,
@@ -1328,7 +1349,7 @@ fn ai_system_run_and_multiply_spawns_on_collision() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity_manager.add_existing_entity(entity2);
+    entity_manager.add_existing_stored_entity(entity2);
 
     let results = ai_system.update(
         &entity_manager,
@@ -1372,7 +1393,7 @@ fn ai_system_run_and_multiply_enters_separation_after_spawn() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Two adjacent RunAndMultiply entities (touching at edges)
     let entity1 = create_test_entity_with_detection_radius(
@@ -1381,7 +1402,7 @@ fn ai_system_run_and_multiply_enters_separation_after_spawn() {
         AiBehavior::RunAndMultiply,
         64,
     );
-    entity_manager.add_existing_entity(entity1);
+    entity_manager.add_existing_stored_entity(entity1);
 
     let entity2 = create_test_entity_with_detection_radius(
         3,
@@ -1389,7 +1410,7 @@ fn ai_system_run_and_multiply_enters_separation_after_spawn() {
         AiBehavior::RunAndMultiply,
         64,
     );
-    entity_manager.add_existing_entity(entity2);
+    entity_manager.add_existing_stored_entity(entity2);
 
     // First update triggers spawn and separation
     let _ = ai_system.update(
@@ -1417,7 +1438,7 @@ fn ai_system_run_and_multiply_exits_separation_when_distance_met() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // Entity 2 in separation from entity 3
     let entity1 = create_test_entity_with_detection_radius(
@@ -1426,7 +1447,7 @@ fn ai_system_run_and_multiply_exits_separation_when_distance_met() {
         AiBehavior::RunAndMultiply,
         32, // Small detection radius for quick exit
     );
-    entity_manager.add_existing_entity(entity1);
+    entity_manager.add_existing_stored_entity(entity1);
 
     // Entity 3 far enough away (distance > detection_radius * 2 = 64)
     let entity2 = create_test_entity_with_detection_radius(
@@ -1435,7 +1456,7 @@ fn ai_system_run_and_multiply_exits_separation_when_distance_met() {
         AiBehavior::RunAndMultiply,
         32,
     );
-    entity_manager.add_existing_entity(entity2);
+    entity_manager.add_existing_stored_entity(entity2);
 
     // Manually set separation state
     let state = ai_system.get_or_create_state(2);
@@ -1470,7 +1491,7 @@ fn ai_system_run_and_multiply_ignores_different_definition() {
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
-    entity_manager.add_existing_entity(player);
+    entity_manager.add_existing_stored_entity(player);
 
     // First RunAndMultiply entity
     let entity1 = create_test_entity_with_detection_radius(
@@ -1479,7 +1500,7 @@ fn ai_system_run_and_multiply_ignores_different_definition() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity_manager.add_existing_entity(entity1);
+    entity_manager.add_existing_stored_entity(entity1);
 
     // Second entity with different definition_name
     let mut entity2 = create_test_entity_with_detection_radius(
@@ -1488,8 +1509,8 @@ fn ai_system_run_and_multiply_ignores_different_definition() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity2.definition_name = Some("different_npc".into());
-    entity_manager.add_existing_entity(entity2);
+    entity2.entity.definition_name = Some("different_npc".into());
+    entity_manager.add_existing_stored_entity(entity2);
 
     let results = ai_system.update(
         &entity_manager,

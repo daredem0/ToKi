@@ -115,7 +115,7 @@ impl SceneSystem {
         if let Some(active_scene) = state.scene.scene_manager.active_scene_mut() {
             active_scene.clear_entities();
 
-            for entity_id in state.world.entity_manager.active_entities_iter() {
+            for entity_id in state.world.entity_manager.entity_ids_iter() {
                 if let Some(stored) = state.world.entity_manager.stored_entity(entity_id) {
                     active_scene.add_stored_entity(stored);
                 }

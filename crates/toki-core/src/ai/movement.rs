@@ -48,6 +48,7 @@ fn clamp_entity_position_to_world_bounds(
 
 pub fn preview_intended_position(
     entity: &Entity,
+    entity_id: EntityId,
     current_position: IVec2,
     direction: IVec2,
     ctx: &AiContext,
@@ -57,7 +58,11 @@ pub fn preview_intended_position(
     }
 
     let mut accumulator = entity.movement_accumulator;
-    let speed = entity.attributes.gameplay.speed.max(0.0);
+    let speed = ctx
+        .entity_manager
+        .movement(entity_id)
+        .map(|movement| movement.speed.max(0.0))
+        .unwrap_or(0.0);
     let pixels_x = update_axis_accumulator(&mut accumulator.x, speed, direction.x);
     let pixels_y = update_axis_accumulator(&mut accumulator.y, speed, direction.y);
 
@@ -169,7 +174,7 @@ pub fn try_intent_with_fallback(
             continue;
         }
         let Some(new_position) =
-            preview_intended_position(entity, current_position, direction, ctx)
+            preview_intended_position(entity, entity_id, current_position, direction, ctx)
         else {
             continue;
         };

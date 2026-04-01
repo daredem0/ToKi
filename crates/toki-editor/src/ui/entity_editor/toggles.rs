@@ -18,11 +18,19 @@ impl ComponentToggles {
     /// Create toggles from an EntityDefinition, detecting which components are active
     pub fn from_definition(def: &EntityDefinition) -> Self {
         Self {
-            health_enabled: def.attributes.health.is_some(),
-            inventory_enabled: def.attributes.has_inventory,
-            projectile_enabled: def.attributes.primary_projectile.is_some(),
-            pickup_enabled: def.attributes.pickup.is_some(),
-            ai_enabled: def.attributes.ai_config.behavior != AiBehavior::None,
+            health_enabled: def
+                .components
+                .combat
+                .as_ref()
+                .and_then(|combat| combat.health)
+                .is_some(),
+            inventory_enabled: def.components.inventory.is_some(),
+            projectile_enabled: def.components.primary_projectile.is_some(),
+            pickup_enabled: def.components.pickup.is_some(),
+            ai_enabled: def
+                .components
+                .ai
+                .is_some_and(|component| component.ai_config.behavior != AiBehavior::None),
             collision_enabled: def.collision.enabled,
             audio_enabled: Self::has_audio_config(&def.audio),
         }

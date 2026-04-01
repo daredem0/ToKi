@@ -3,31 +3,24 @@
   "display_name": "TrueColor Flower",
   "description": "True-color control sprite unaffected by indexed palette overrides.",
   "rendering": {
-    "size": [16, 16],
+    "size": [
+      16,
+      16
+    ],
     "render_layer": 1,
     "visible": true,
     "has_shadow": true
   },
-  "attributes": {
-    "health": null,
-    "stats": {},
-    "speed": 0.0,
-    "solid": false,
-    "active": true,
-    "can_move": false,
-    "interactable": false,
-    "interaction_reach": 0,
-    "ai_config": {
-      "behavior": "none",
-      "detection_radius": 0
-    },
-    "movement_profile": "none",
-    "has_inventory": false
-  },
   "collision": {
     "enabled": false,
-    "offset": [0, 0],
-    "size": [16, 16],
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
     "trigger": false
   },
   "audio": {
@@ -42,7 +35,9 @@
     "clips": [
       {
         "state": "idle",
-        "frame_tiles": ["flower/idle"],
+        "frame_tiles": [
+          "flower/idle"
+        ],
         "frame_duration_ms": 300.0,
         "loop_mode": "loop"
       }
@@ -50,5 +45,17 @@
     "default_state": "idle"
   },
   "category": "palette_demo",
-  "tags": ["palette_demo", "truecolor_control"]
+  "tags": [
+    "palette_demo",
+    "truecolor_control"
+  ],
+  "solid": false,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 0.0,
+      "movement_profile": "none",
+      "can_move": false
+    }
+  }
 }

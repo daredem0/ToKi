@@ -49,11 +49,11 @@ impl<'a> StatEffectService<'a> {
     }
 
     pub(super) fn queue_capped_heal(&mut self, entity_id: EntityId, amount: i32) {
-        let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+        let Some(combat) = self.entity_manager.combat(entity_id) else {
             return;
         };
-        let current = entity.attributes.current_stat(HEALTH_STAT_ID).unwrap_or(0);
-        let max = entity.attributes.base_stat(HEALTH_STAT_ID).unwrap_or(0);
+        let current = combat.current_stat(HEALTH_STAT_ID).unwrap_or(0);
+        let max = combat.base_stat(HEALTH_STAT_ID).unwrap_or(0);
         let capped_heal = amount.min(max - current);
         if capped_heal > 0 {
             self.pending_stat_changes.push(StatChangeRequest {
@@ -114,7 +114,7 @@ impl<'a> StatEffectService<'a> {
 
     pub(super) fn set_entity_active(&mut self, entity_id: EntityId, active: bool) {
         if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
-            entity.attributes.behavior.active = active;
+            entity.active = active;
         }
     }
 
@@ -141,13 +141,14 @@ impl<'a> StatEffectService<'a> {
 
         let mut despawn_ids = Vec::new();
         for change in pending_stat_changes {
-            let Some(entity) = self.entity_manager.get_entity_mut(change.target_entity_id) else {
+            let Some(_entity) = self.entity_manager.get_entity_mut(change.target_entity_id) else {
                 continue;
             };
-            let previous_value = entity.attributes.current_stat(&change.stat_id);
-            let Some(new_value) = entity
-                .attributes
-                .apply_stat_delta(&change.stat_id, change.delta)
+            let Some(combat) = self.entity_manager.combat_mut(change.target_entity_id) else {
+                continue;
+            };
+            let previous_value = combat.current_stat(&change.stat_id);
+            let Some(new_value) = combat.apply_stat_delta(&change.stat_id, change.delta)
             else {
                 continue;
             };
@@ -218,7 +219,7 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::StatEffectService;
-    use crate::entity::{EntityManager, EntityStats};
+    use crate::entity::{CombatComponent, EntityManager, EntityRendering, EntityStats, OptionalEntityComponents};
     use crate::game::rules::RuleRuntimeState;
 
     #[test]
@@ -228,19 +229,20 @@ mod tests {
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(0, 0),
             glam::UVec2::new(16, 16),
-            crate::entity::EntityAttributes {
-                gameplay: crate::entity::EntityGameplay {
+            EntityRendering::default(),
+            true,
+            true,
+            OptionalEntityComponents {
+                combat: Some(CombatComponent {
                     health: Some(50),
                     stats: EntityStats::from_legacy_health(Some(50)),
-                    ..crate::entity::EntityGameplay::default()
-                },
-                ..crate::entity::EntityAttributes::default()
+                }),
+                ..Default::default()
             },
         );
         entity_manager
-            .get_entity_mut(entity_id)
+            .combat_mut(entity_id)
             .expect("entity should exist")
-            .attributes
             .apply_stat_delta(crate::entity::HEALTH_STAT_ID, -40);
 
         let mut rule_runtime = RuleRuntimeState::default();
@@ -266,13 +268,15 @@ mod tests {
             crate::entity::EntityKind::Npc,
             glam::IVec2::new(0, 0),
             glam::UVec2::new(16, 16),
-            crate::entity::EntityAttributes {
-                gameplay: crate::entity::EntityGameplay {
+            EntityRendering::default(),
+            true,
+            true,
+            OptionalEntityComponents {
+                combat: Some(CombatComponent {
                     health: Some(10),
                     stats: EntityStats::from_legacy_health(Some(10)),
-                    ..crate::entity::EntityGameplay::default()
-                },
-                ..crate::entity::EntityAttributes::default()
+                }),
+                ..Default::default()
             },
         );
         let mut rule_runtime = RuleRuntimeState::default();

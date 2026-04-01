@@ -139,32 +139,30 @@ impl ValuePath {
                     .ok_or_else(|| ValuePathError::Unresolved(self.to_string()))?;
 
                 match accessor {
-                    ValuePathAccessor::Health => entity
-                        .attributes
-                        .gameplay
-                        .stats
-                        .current(HEALTH_STAT_ID)
+                    ValuePathAccessor::Health => context
+                        .entity_manager
+                        .combat(entity_id)
+                        .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
                         .map(ResolvedValue::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
-                    ValuePathAccessor::MaxHealth => entity
-                        .attributes
-                        .gameplay
-                        .stats
-                        .base(HEALTH_STAT_ID)
-                        .or_else(|| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
+                    ValuePathAccessor::MaxHealth => context
+                        .entity_manager
+                        .combat(entity_id)
+                        .and_then(|combat| {
+                            combat
+                                .base_stat(HEALTH_STAT_ID)
+                                .or_else(|| combat.current_stat(HEALTH_STAT_ID))
+                        })
                         .map(ResolvedValue::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
-                    ValuePathAccessor::Active => {
-                        Ok(ResolvedValue::Bool(entity.attributes.behavior.active))
-                    }
+                    ValuePathAccessor::Active => Ok(ResolvedValue::Bool(entity.active)),
                     ValuePathAccessor::Kind => {
                         Ok(ResolvedValue::String(format!("{:?}", entity.entity_kind)))
                     }
-                    ValuePathAccessor::Stat(stat) => entity
-                        .attributes
-                        .gameplay
-                        .stats
-                        .current(stat)
+                    ValuePathAccessor::Stat(stat) => context
+                        .entity_manager
+                        .combat(entity_id)
+                        .and_then(|combat| combat.current_stat(stat))
                         .map(ResolvedValue::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
                     ValuePathAccessor::InventoryCount(item_id) => context
@@ -337,10 +335,8 @@ mod tests {
         state
             .world_mut()
             .entity_manager_mut()
-            .get_entity_mut(player_id)
+            .combat_mut(player_id)
             .expect("player should exist")
-            .attributes
-            .gameplay
             .stats
             .current
             .insert(HEALTH_STAT_ID.to_string(), 12);
@@ -368,17 +364,10 @@ mod tests {
         let player = state
             .world_mut()
             .entity_manager_mut()
-            .get_entity_mut(player_id)
+            .combat_mut(player_id)
             .expect("player should exist");
+        player.stats.base.insert(HEALTH_STAT_ID.to_string(), 25);
         player
-            .attributes
-            .gameplay
-            .stats
-            .base
-            .insert(HEALTH_STAT_ID.to_string(), 25);
-        player
-            .attributes
-            .gameplay
             .stats
             .current
             .insert(HEALTH_STAT_ID.to_string(), 12);

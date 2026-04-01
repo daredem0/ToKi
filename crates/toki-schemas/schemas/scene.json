@@ -4,14 +4,21 @@
   "title": "ToKi Scene",
   "description": "A scene containing entities, maps, and camera settings for the ToKi game engine",
   "type": "object",
-  "required": ["name", "maps", "entities"],
+  "required": [
+    "name",
+    "maps",
+    "entities"
+  ],
   "properties": {
     "name": {
       "type": "string",
       "description": "The name of the scene"
     },
     "description": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Optional description of the scene"
     },
     "maps": {
@@ -34,10 +41,14 @@
     },
     "camera_position": {
       "anyOf": [
-        {"type": "null"},
+        {
+          "type": "null"
+        },
         {
           "type": "array",
-          "items": {"type": "number"},
+          "items": {
+            "type": "number"
+          },
           "minItems": 2,
           "maxItems": 2
         }
@@ -45,11 +56,17 @@
       "description": "Optional camera position [x, y]"
     },
     "camera_scale": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "description": "Optional camera scale factor"
     },
     "background_music_track_id": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Optional background music track id for this scene"
     },
     "anchors": {
@@ -61,8 +78,12 @@
     },
     "player_entry": {
       "anyOf": [
-        { "type": "null" },
-        { "$ref": "#/definitions/scenePlayerEntry" }
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/scenePlayerEntry"
+        }
       ],
       "description": "Optional scene-authored player entry preview and spawn target"
     }
@@ -70,7 +91,10 @@
   "definitions": {
     "scenePlayerEntry": {
       "type": "object",
-      "required": ["entity_definition_name", "spawn_point_id"],
+      "required": [
+        "entity_definition_name",
+        "spawn_point_id"
+      ],
       "additionalProperties": false,
       "properties": {
         "entity_definition_name": {
@@ -85,7 +109,11 @@
     },
     "sceneAnchor": {
       "type": "object",
-      "required": ["id", "kind", "position"],
+      "required": [
+        "id",
+        "kind",
+        "position"
+      ],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -94,23 +122,38 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["SpawnPoint"]
+          "enum": [
+            "SpawnPoint"
+          ]
         },
         "position": {
           "type": "array",
-          "items": {"type": "integer"},
+          "items": {
+            "type": "integer"
+          },
           "minItems": 2,
           "maxItems": 2
         },
         "facing": {
-          "type": ["string", "null"],
-          "enum": ["Up", "Down", "Left", "Right", null]
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "Up",
+            "Down",
+            "Left",
+            "Right",
+            null
+          ]
         }
       }
     },
     "ruleSet": {
       "type": "object",
-      "required": ["rules"],
+      "required": [
+        "rules"
+      ],
       "properties": {
         "rules": {
           "type": "array",
@@ -123,7 +166,11 @@
     },
     "rule": {
       "type": "object",
-      "required": ["id", "trigger", "actions"],
+      "required": [
+        "id",
+        "trigger",
+        "actions"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -145,21 +192,36 @@
           "oneOf": [
             {
               "type": "string",
-              "enum": ["OnStart", "OnUpdate", "OnPlayerMove", "OnTrigger"]
+              "enum": [
+                "OnStart",
+                "OnUpdate",
+                "OnPlayerMove",
+                "OnTrigger"
+              ]
             },
             {
               "type": "object",
-              "required": ["OnKey"],
+              "required": [
+                "OnKey"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnKey": {
                   "type": "object",
-                  "required": ["key"],
+                  "required": [
+                    "key"
+                  ],
                   "additionalProperties": false,
                   "properties": {
                     "key": {
                       "type": "string",
-                      "enum": ["Up", "Down", "Left", "Right", "DebugToggle"]
+                      "enum": [
+                        "Up",
+                        "Down",
+                        "Left",
+                        "Right",
+                        "DebugToggle"
+                      ]
                     }
                   }
                 }
@@ -167,7 +229,9 @@
             },
             {
               "type": "object",
-              "required": ["OnCollision"],
+              "required": [
+                "OnCollision"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnCollision": {
@@ -176,8 +240,12 @@
                   "properties": {
                     "entity": {
                       "anyOf": [
-                        { "type": "null" },
-                        { "$ref": "#/definitions/ruleTarget" }
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/definitions/ruleTarget"
+                        }
                       ]
                     }
                   }
@@ -186,7 +254,9 @@
             },
             {
               "type": "object",
-              "required": ["OnDamaged"],
+              "required": [
+                "OnDamaged"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnDamaged": {
@@ -195,8 +265,12 @@
                   "properties": {
                     "entity": {
                       "anyOf": [
-                        { "type": "null" },
-                        { "$ref": "#/definitions/ruleTarget" }
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/definitions/ruleTarget"
+                        }
                       ]
                     }
                   }
@@ -205,7 +279,9 @@
             },
             {
               "type": "object",
-              "required": ["OnDeath"],
+              "required": [
+                "OnDeath"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnDeath": {
@@ -214,8 +290,12 @@
                   "properties": {
                     "entity": {
                       "anyOf": [
-                        { "type": "null" },
-                        { "$ref": "#/definitions/ruleTarget" }
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/definitions/ruleTarget"
+                        }
                       ]
                     }
                   }
@@ -224,7 +304,9 @@
             },
             {
               "type": "object",
-              "required": ["OnInteract"],
+              "required": [
+                "OnInteract"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnInteract": {
@@ -233,12 +315,20 @@
                   "properties": {
                     "mode": {
                       "type": "string",
-                      "enum": ["Overlap", "Adjacent", "InFront"]
+                      "enum": [
+                        "Overlap",
+                        "Adjacent",
+                        "InFront"
+                      ]
                     },
                     "entity": {
                       "anyOf": [
-                        { "type": "null" },
-                        { "$ref": "#/definitions/ruleTarget" }
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/definitions/ruleTarget"
+                        }
                       ]
                     }
                   }
@@ -247,12 +337,17 @@
             },
             {
               "type": "object",
-              "required": ["OnTileEnter"],
+              "required": [
+                "OnTileEnter"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnTileEnter": {
                   "type": "object",
-                  "required": ["x", "y"],
+                  "required": [
+                    "x",
+                    "y"
+                  ],
                   "additionalProperties": false,
                   "properties": {
                     "x": {
@@ -271,12 +366,17 @@
             },
             {
               "type": "object",
-              "required": ["OnTileExit"],
+              "required": [
+                "OnTileExit"
+              ],
               "additionalProperties": false,
               "properties": {
                 "OnTileExit": {
                   "type": "object",
-                  "required": ["x", "y"],
+                  "required": [
+                    "x",
+                    "y"
+                  ],
                   "additionalProperties": false,
                   "properties": {
                     "x": {
@@ -302,16 +402,22 @@
             "oneOf": [
               {
                 "type": "string",
-                "enum": ["Always"]
+                "enum": [
+                  "Always"
+                ]
               },
               {
                 "type": "object",
-                "required": ["Expression"],
+                "required": [
+                  "Expression"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "Expression": {
                     "type": "object",
-                    "required": ["expression"],
+                    "required": [
+                      "expression"
+                    ],
                     "additionalProperties": false,
                     "properties": {
                       "expression": {
@@ -324,32 +430,20 @@
               },
               {
                 "type": "object",
-                "required": ["TargetExists"],
+                "required": [
+                  "TargetExists"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "TargetExists": {
                     "type": "object",
-                    "required": ["target"],
+                    "required": [
+                      "target"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" }
-                    }
-                  }
-                }
-              },
-              {
-                "type": "object",
-                "required": ["KeyHeld"],
-                "additionalProperties": false,
-                "properties": {
-                  "KeyHeld": {
-                    "type": "object",
-                    "required": ["key"],
-                    "additionalProperties": false,
-                    "properties": {
-                      "key": {
-                        "type": "string",
-                        "enum": ["Up", "Down", "Left", "Right", "DebugToggle"]
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
                       }
                     }
                   }
@@ -357,15 +451,50 @@
               },
               {
                 "type": "object",
-                "required": ["EntityActive"],
+                "required": [
+                  "KeyHeld"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "KeyHeld": {
+                    "type": "object",
+                    "required": [
+                      "key"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "enum": [
+                          "Up",
+                          "Down",
+                          "Left",
+                          "Right",
+                          "DebugToggle"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "EntityActive"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "EntityActive": {
                     "type": "object",
-                    "required": ["target", "is_active"],
+                    "required": [
+                      "target",
+                      "is_active"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
+                      },
                       "is_active": {
                         "type": "boolean"
                       }
@@ -375,15 +504,22 @@
               },
               {
                 "type": "object",
-                "required": ["HealthBelow"],
+                "required": [
+                  "HealthBelow"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "HealthBelow": {
                     "type": "object",
-                    "required": ["target", "threshold"],
+                    "required": [
+                      "target",
+                      "threshold"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
+                      },
                       "threshold": {
                         "type": "integer"
                       }
@@ -393,15 +529,22 @@
               },
               {
                 "type": "object",
-                "required": ["HealthAbove"],
+                "required": [
+                  "HealthAbove"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "HealthAbove": {
                     "type": "object",
-                    "required": ["target", "threshold"],
+                    "required": [
+                      "target",
+                      "threshold"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
+                      },
                       "threshold": {
                         "type": "integer"
                       }
@@ -411,50 +554,74 @@
               },
               {
                 "type": "string",
-                "enum": ["TriggerOtherIsPlayer"]
+                "enum": [
+                  "TriggerOtherIsPlayer"
+                ]
               },
               {
                 "type": "object",
-                "required": ["EntityIsKind"],
+                "required": [
+                  "EntityIsKind"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "EntityIsKind": {
                     "type": "object",
-                    "required": ["target", "kind"],
+                    "required": [
+                      "target",
+                      "kind"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" },
-                      "kind": { "$ref": "#/definitions/entityKind" }
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
+                      },
+                      "kind": {
+                        "$ref": "#/definitions/entityKind"
+                      }
                     }
                   }
                 }
               },
               {
                 "type": "object",
-                "required": ["TriggerOtherIsKind"],
+                "required": [
+                  "TriggerOtherIsKind"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "TriggerOtherIsKind": {
                     "type": "object",
-                    "required": ["kind"],
+                    "required": [
+                      "kind"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "kind": { "$ref": "#/definitions/entityKind" }
+                      "kind": {
+                        "$ref": "#/definitions/entityKind"
+                      }
                     }
                   }
                 }
               },
               {
                 "type": "object",
-                "required": ["EntityHasTag"],
+                "required": [
+                  "EntityHasTag"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "EntityHasTag": {
                     "type": "object",
-                    "required": ["target", "tag"],
+                    "required": [
+                      "target",
+                      "tag"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
+                      },
                       "tag": {
                         "type": "string",
                         "minLength": 1
@@ -465,12 +632,16 @@
               },
               {
                 "type": "object",
-                "required": ["TriggerOtherHasTag"],
+                "required": [
+                  "TriggerOtherHasTag"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "TriggerOtherHasTag": {
                     "type": "object",
-                    "required": ["tag"],
+                    "required": [
+                      "tag"
+                    ],
                     "additionalProperties": false,
                     "properties": {
                       "tag": {
@@ -483,15 +654,23 @@
               },
               {
                 "type": "object",
-                "required": ["HasInventoryItem"],
+                "required": [
+                  "HasInventoryItem"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "HasInventoryItem": {
                     "type": "object",
-                    "required": ["target", "item_id", "min_count"],
+                    "required": [
+                      "target",
+                      "item_id",
+                      "min_count"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "target": {
+                        "$ref": "#/definitions/ruleTarget"
+                      },
                       "item_id": {
                         "type": "string",
                         "minLength": 1
@@ -521,11 +700,18 @@
       "oneOf": [
         {
           "type": "string",
-          "enum": ["Player", "RuleOwner", "TriggerSelf", "TriggerOther"]
+          "enum": [
+            "Player",
+            "RuleOwner",
+            "TriggerSelf",
+            "TriggerOther"
+          ]
         },
         {
           "type": "object",
-          "required": ["Entity"],
+          "required": [
+            "Entity"
+          ],
           "additionalProperties": false,
           "properties": {
             "Entity": {
@@ -538,23 +724,38 @@
     },
     "entityKind": {
       "type": "string",
-      "enum": ["Player", "Npc", "Item", "Decoration", "Trigger", "Projectile"]
+      "enum": [
+        "Player",
+        "Npc",
+        "Item",
+        "Decoration",
+        "Trigger",
+        "Projectile"
+      ]
     },
     "ruleAction": {
       "oneOf": [
         {
           "type": "object",
-          "required": ["PlaySound"],
+          "required": [
+            "PlaySound"
+          ],
           "additionalProperties": false,
           "properties": {
             "PlaySound": {
               "type": "object",
-              "required": ["channel", "sound_id"],
+              "required": [
+                "channel",
+                "sound_id"
+              ],
               "additionalProperties": false,
               "properties": {
                 "channel": {
                   "type": "string",
-                  "enum": ["Movement", "Collision"]
+                  "enum": [
+                    "Movement",
+                    "Collision"
+                  ]
                 },
                 "sound_id": {
                   "type": "string",
@@ -566,12 +767,16 @@
         },
         {
           "type": "object",
-          "required": ["PlayMusic"],
+          "required": [
+            "PlayMusic"
+          ],
           "additionalProperties": false,
           "properties": {
             "PlayMusic": {
               "type": "object",
-              "required": ["track_id"],
+              "required": [
+                "track_id"
+              ],
               "additionalProperties": false,
               "properties": {
                 "track_id": {
@@ -584,12 +789,17 @@
         },
         {
           "type": "object",
-          "required": ["PlayAnimation"],
+          "required": [
+            "PlayAnimation"
+          ],
           "additionalProperties": false,
           "properties": {
             "PlayAnimation": {
               "type": "object",
-              "required": ["target", "state"],
+              "required": [
+                "target",
+                "state"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -597,7 +807,10 @@
                 },
                 "state": {
                   "type": "string",
-                  "enum": ["Idle", "Walk"]
+                  "enum": [
+                    "Idle",
+                    "Walk"
+                  ]
                 }
               }
             }
@@ -605,12 +818,17 @@
         },
         {
           "type": "object",
-          "required": ["SetVelocity"],
+          "required": [
+            "SetVelocity"
+          ],
           "additionalProperties": false,
           "properties": {
             "SetVelocity": {
               "type": "object",
-              "required": ["target", "velocity"],
+              "required": [
+                "target",
+                "velocity"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -625,17 +843,28 @@
         },
         {
           "type": "object",
-          "required": ["Spawn"],
+          "required": [
+            "Spawn"
+          ],
           "additionalProperties": false,
           "properties": {
             "Spawn": {
               "type": "object",
-              "required": ["entity_type", "position"],
+              "required": [
+                "entity_type",
+                "position"
+              ],
               "additionalProperties": false,
               "properties": {
                 "entity_type": {
                   "type": "string",
-                  "enum": ["PlayerLikeNpc", "Npc", "Item", "Decoration", "Trigger"]
+                  "enum": [
+                    "PlayerLikeNpc",
+                    "Npc",
+                    "Item",
+                    "Decoration",
+                    "Trigger"
+                  ]
                 },
                 "position": {
                   "$ref": "#/definitions/ruleVec2IntSource"
@@ -646,12 +875,16 @@
         },
         {
           "type": "object",
-          "required": ["DestroySelf"],
+          "required": [
+            "DestroySelf"
+          ],
           "additionalProperties": false,
           "properties": {
             "DestroySelf": {
               "type": "object",
-              "required": ["target"],
+              "required": [
+                "target"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -663,12 +896,17 @@
         },
         {
           "type": "object",
-          "required": ["SwitchScene"],
+          "required": [
+            "SwitchScene"
+          ],
           "additionalProperties": false,
           "properties": {
             "SwitchScene": {
               "type": "object",
-              "required": ["scene_name", "spawn_point_id"],
+              "required": [
+                "scene_name",
+                "spawn_point_id"
+              ],
               "additionalProperties": false,
               "properties": {
                 "scene_name": {
@@ -685,12 +923,17 @@
         },
         {
           "type": "object",
-          "required": ["DamageEntity"],
+          "required": [
+            "DamageEntity"
+          ],
           "additionalProperties": false,
           "properties": {
             "DamageEntity": {
               "type": "object",
-              "required": ["target", "amount"],
+              "required": [
+                "target",
+                "amount"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -705,12 +948,17 @@
         },
         {
           "type": "object",
-          "required": ["HealEntity"],
+          "required": [
+            "HealEntity"
+          ],
           "additionalProperties": false,
           "properties": {
             "HealEntity": {
               "type": "object",
-              "required": ["target", "amount"],
+              "required": [
+                "target",
+                "amount"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -725,12 +973,18 @@
         },
         {
           "type": "object",
-          "required": ["AddInventoryItem"],
+          "required": [
+            "AddInventoryItem"
+          ],
           "additionalProperties": false,
           "properties": {
             "AddInventoryItem": {
               "type": "object",
-              "required": ["target", "item_id", "count"],
+              "required": [
+                "target",
+                "item_id",
+                "count"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -750,12 +1004,18 @@
         },
         {
           "type": "object",
-          "required": ["RemoveInventoryItem"],
+          "required": [
+            "RemoveInventoryItem"
+          ],
           "additionalProperties": false,
           "properties": {
             "RemoveInventoryItem": {
               "type": "object",
-              "required": ["target", "item_id", "count"],
+              "required": [
+                "target",
+                "item_id",
+                "count"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -775,12 +1035,17 @@
         },
         {
           "type": "object",
-          "required": ["SetEntityActive"],
+          "required": [
+            "SetEntityActive"
+          ],
           "additionalProperties": false,
           "properties": {
             "SetEntityActive": {
               "type": "object",
-              "required": ["target", "active"],
+              "required": [
+                "target",
+                "active"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -795,12 +1060,18 @@
         },
         {
           "type": "object",
-          "required": ["TeleportEntity"],
+          "required": [
+            "TeleportEntity"
+          ],
           "additionalProperties": false,
           "properties": {
             "TeleportEntity": {
               "type": "object",
-              "required": ["target", "tile_x", "tile_y"],
+              "required": [
+                "target",
+                "tile_x",
+                "tile_y"
+              ],
               "additionalProperties": false,
               "properties": {
                 "target": {
@@ -820,12 +1091,17 @@
         },
         {
           "type": "object",
-          "required": ["SetFlag"],
+          "required": [
+            "SetFlag"
+          ],
           "additionalProperties": false,
           "properties": {
             "SetFlag": {
               "type": "object",
-              "required": ["flag", "value"],
+              "required": [
+                "flag",
+                "value"
+              ],
               "additionalProperties": false,
               "properties": {
                 "flag": {
@@ -841,12 +1117,17 @@
         },
         {
           "type": "object",
-          "required": ["IncrementFlag"],
+          "required": [
+            "IncrementFlag"
+          ],
           "additionalProperties": false,
           "properties": {
             "IncrementFlag": {
               "type": "object",
-              "required": ["flag", "amount"],
+              "required": [
+                "flag",
+                "amount"
+              ],
               "additionalProperties": false,
               "properties": {
                 "flag": {
@@ -869,7 +1150,9 @@
         },
         {
           "type": "object",
-          "required": ["expr"],
+          "required": [
+            "expr"
+          ],
           "additionalProperties": false,
           "properties": {
             "expr": {
@@ -892,7 +1175,10 @@
         },
         {
           "type": "object",
-          "required": ["x", "y"],
+          "required": [
+            "x",
+            "y"
+          ],
           "additionalProperties": false,
           "properties": {
             "x": {
@@ -922,7 +1208,9 @@
         },
         {
           "type": "object",
-          "required": ["expr"],
+          "required": [
+            "expr"
+          ],
           "additionalProperties": false,
           "properties": {
             "expr": {
@@ -935,7 +1223,15 @@
     },
     "sceneEntity": {
       "type": "object",
-      "required": ["id", "position", "size", "entity_type", "attributes", "collision_box"],
+      "required": [
+        "id",
+        "position",
+        "size",
+        "rendering",
+        "collision_box",
+        "solid",
+        "active"
+      ],
       "properties": {
         "id": {
           "type": "integer",
@@ -944,37 +1240,45 @@
         },
         "position": {
           "type": "array",
-          "items": {"type": "integer"},
+          "items": {
+            "type": "integer"
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Entity position [x, y]"
         },
         "size": {
           "type": "array",
-          "items": {"type": "integer", "minimum": 1},
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Entity size [width, height]"
         },
         "entity_type": {
           "type": "string",
-          "description": "Type of entity (Player, NPC, Item, etc.)"
+          "description": "Legacy/runtime entity kind alias"
         },
         "category": {
           "type": "string",
           "description": "Generic category used for editor grouping and authoring"
         },
         "definition_name": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Source entity definition name used to instantiate this runtime entity"
         },
         "control_role": {
           "type": "string",
-          "enum": ["none", "player_character"],
+          "enum": [
+            "none",
+            "player_character"
+          ],
           "description": "Scene-level control role for this entity"
-        },
-        "attributes": {
-          "$ref": "#/definitions/entityAttributes"
         },
         "collision_box": {
           "$ref": "#/definitions/collisionBox"
@@ -991,7 +1295,10 @@
         },
         "movement_sound_trigger": {
           "type": "string",
-          "enum": ["distance", "animation_loop"],
+          "enum": [
+            "distance",
+            "animation_loop"
+          ],
           "description": "How movement sound timing is driven"
         },
         "last_collision_state": {
@@ -999,61 +1306,58 @@
           "description": "Last collision state of the entity"
         },
         "movement_sound": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Sound ID to play when entity moves"
         },
         "collision_sound": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Sound ID to play when entity collides"
-        }
-      }
-    },
-    "entityAttributes": {
-      "type": "object",
-      "required": ["health", "speed", "solid", "visible", "render_layer", "active", "can_move", "has_inventory"],
-      "properties": {
-        "health": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Entity health points"
         },
-        "speed": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Entity movement speed"
+        "entity_kind": {
+          "type": "string",
+          "description": "Runtime entity kind"
+        },
+        "rendering": {
+          "$ref": "#/definitions/entityRendering"
         },
         "solid": {
-          "type": "boolean",
-          "description": "Whether entity blocks movement"
-        },
-        "visible": {
-          "type": "boolean",
-          "description": "Whether entity is rendered"
-        },
-        "animation_controller": {
-          "$ref": "#/definitions/animationController"
-        },
-        "render_layer": {
-          "type": "integer",
-          "description": "Rendering layer (higher values render on top)"
+          "type": "boolean"
         },
         "active": {
-          "type": "boolean",
-          "description": "Whether entity is active in the scene"
+          "type": "boolean"
         },
-        "can_move": {
-          "type": "boolean",
-          "description": "Whether entity can move"
-        },
-        "has_inventory": {
-          "type": "boolean",
-          "description": "Whether entity has an inventory system"
+        "components": {
+          "$ref": "#/definitions/entityComponents"
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "entity_kind"
+          ]
+        },
+        {
+          "required": [
+            "entity_type"
+          ]
+        }
+      ]
     },
     "animationController": {
       "type": "object",
-      "required": ["clips", "current_clip_state", "current_frame_index", "frame_timer", "is_finished"],
+      "required": [
+        "clips",
+        "current_clip_state",
+        "current_frame_index",
+        "frame_timer",
+        "is_finished"
+      ],
       "properties": {
         "clips": {
           "type": "object",
@@ -1086,7 +1390,13 @@
     },
     "animationClip": {
       "type": "object",
-      "required": ["state", "atlas_name", "frame_tile_names", "frame_duration_ms", "loop_mode"],
+      "required": [
+        "state",
+        "atlas_name",
+        "frame_tile_names",
+        "frame_duration_ms",
+        "loop_mode"
+      ],
       "properties": {
         "state": {
           "type": "string",
@@ -1098,7 +1408,9 @@
         },
         "frame_tile_names": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": {
+            "type": "string"
+          },
           "minItems": 1,
           "description": "Array of tile names for animation frames"
         },
@@ -1109,25 +1421,38 @@
         },
         "loop_mode": {
           "type": "string",
-          "enum": ["Loop", "Once", "PingPong"],
+          "enum": [
+            "Loop",
+            "Once",
+            "PingPong"
+          ],
           "description": "How the animation should loop"
         }
       }
     },
     "collisionBox": {
       "type": "object",
-      "required": ["offset", "size", "trigger"],
+      "required": [
+        "offset",
+        "size",
+        "trigger"
+      ],
       "properties": {
         "offset": {
           "type": "array",
-          "items": {"type": "integer"},
+          "items": {
+            "type": "integer"
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Collision box offset from entity position [x, y]"
         },
         "size": {
           "type": "array",
-          "items": {"type": "integer", "minimum": 1},
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Collision box size [width, height]"
@@ -1137,6 +1462,368 @@
           "description": "Whether this is a trigger collision (doesn't block movement)"
         }
       }
+    },
+    "entityRendering": {
+      "type": "object",
+      "required": [
+        "visible",
+        "render_layer"
+      ],
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "has_shadow": {
+          "type": "boolean"
+        },
+        "animation_controller": {
+          "$ref": "#/definitions/animationController"
+        },
+        "render_layer": {
+          "type": "integer"
+        },
+        "static_object_render": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "sheet",
+            "object_name"
+          ],
+          "properties": {
+            "sheet": {
+              "type": "string",
+              "minLength": 1
+            },
+            "object_name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "grounding": {
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "footprint": {
+              "type": "object",
+              "required": [
+                "offset",
+                "size"
+              ],
+              "properties": {
+                "offset": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "size": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "palette_override": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityComponents": {
+      "type": "object",
+      "properties": {
+        "movement": {
+          "$ref": "#/definitions/entityMovementComponent"
+        },
+        "ai": {
+          "$ref": "#/definitions/entityAiComponent"
+        },
+        "interaction": {
+          "$ref": "#/definitions/entityInteractionComponent"
+        },
+        "combat": {
+          "$ref": "#/definitions/entityCombatComponent"
+        },
+        "primary_projectile": {
+          "$ref": "#/definitions/entityPrimaryProjectile"
+        },
+        "projectile": {
+          "$ref": "#/definitions/entityProjectileState"
+        },
+        "pickup": {
+          "$ref": "#/definitions/entityPickup"
+        },
+        "inventory": {
+          "$ref": "#/definitions/entityInventory"
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityMovementComponent": {
+      "type": "object",
+      "required": [
+        "speed",
+        "movement_profile",
+        "can_move"
+      ],
+      "properties": {
+        "speed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "movement_profile": {
+          "type": "string"
+        },
+        "can_move": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityAiComponent": {
+      "type": "object",
+      "required": [
+        "ai_config"
+      ],
+      "properties": {
+        "ai_config": {
+          "type": "object",
+          "required": [
+            "behavior",
+            "detection_radius"
+          ],
+          "properties": {
+            "behavior": {
+              "type": "string"
+            },
+            "detection_radius": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityInteractionComponent": {
+      "type": "object",
+      "required": [
+        "interaction_reach"
+      ],
+      "properties": {
+        "interaction_reach": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityCombatComponent": {
+      "type": "object",
+      "properties": {
+        "health": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "stats": {
+          "$ref": "#/definitions/entityStatsComponent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityStatsComponent": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "current": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityPrimaryProjectile": {
+      "type": "object",
+      "required": [
+        "sheet",
+        "object_name",
+        "size",
+        "speed",
+        "damage",
+        "lifetime_ticks"
+      ],
+      "properties": {
+        "sheet": {
+          "type": "string",
+          "minLength": 1
+        },
+        "object_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "speed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "damage": {
+          "type": "integer"
+        },
+        "lifetime_ticks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "spawn_offset": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityProjectileState": {
+      "type": "object",
+      "required": [
+        "sheet",
+        "object_name",
+        "size",
+        "velocity",
+        "remaining_ticks",
+        "damage"
+      ],
+      "properties": {
+        "sheet": {
+          "type": "string",
+          "minLength": 1
+        },
+        "object_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "velocity": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "remaining_ticks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "damage": {
+          "type": "integer"
+        },
+        "owner_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityPickup": {
+      "type": "object",
+      "required": [
+        "item_id",
+        "count"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityInventory": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

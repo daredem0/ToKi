@@ -192,8 +192,13 @@ pub fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             // Speed
             ui.horizontal(|ui| {
                 ui.label("Speed:");
+                let movement = edit
+                    .definition
+                    .components
+                    .movement
+                    .get_or_insert_with(toki_core::entity::MovementComponent::default);
                 if ui
-                    .add(egui::DragValue::new(&mut edit.definition.attributes.speed).speed(0.1))
+                    .add(egui::DragValue::new(&mut movement.speed).speed(0.1))
                     .changed()
                 {
                     edit.mark_dirty();
@@ -201,44 +206,64 @@ pub fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             });
 
             // Boolean attributes
-            if ui
-                .checkbox(&mut edit.definition.attributes.solid, "Solid")
-                .changed()
-            {
+            if ui.checkbox(&mut edit.definition.solid, "Solid").changed() {
                 edit.mark_dirty();
             }
-            if ui
-                .checkbox(&mut edit.definition.attributes.active, "Active")
-                .changed()
-            {
+            if ui.checkbox(&mut edit.definition.active, "Active").changed() {
                 edit.mark_dirty();
             }
-            if ui
-                .checkbox(&mut edit.definition.attributes.can_move, "Can Move")
-                .changed()
-            {
+            let mut can_move = edit
+                .definition
+                .components
+                .movement
+                .as_ref()
+                .is_some_and(|movement| movement.can_move);
+            if ui.checkbox(&mut can_move, "Can Move").changed() {
+                if can_move {
+                    edit.definition
+                        .components
+                        .movement
+                        .get_or_insert_with(toki_core::entity::MovementComponent::default)
+                        .can_move = true;
+                } else if let Some(movement) = edit.definition.components.movement.as_mut() {
+                    movement.can_move = false;
+                }
                 edit.mark_dirty();
             }
-            if ui
-                .checkbox(&mut edit.definition.attributes.interactable, "Interactable")
-                .changed()
-            {
+            let mut interactable = edit.definition.components.interaction.is_some();
+            if ui.checkbox(&mut interactable, "Interactable").changed() {
+                edit.definition.components.interaction = if interactable {
+                    Some(toki_core::entity::InteractionComponent {
+                        interaction_reach: 32,
+                    })
+                } else {
+                    None
+                };
                 edit.mark_dirty();
             }
 
             // Interaction reach (only if interactable)
-            if edit.definition.attributes.interactable {
-                ui.horizontal(|ui| {
-                    ui.label("Interaction Reach:");
-                    let mut reach = edit.definition.attributes.interaction_reach as i32;
-                    if ui
-                        .add(egui::DragValue::new(&mut reach).range(0..=256))
-                        .changed()
-                    {
-                        edit.definition.attributes.interaction_reach = reach.max(0) as u32;
-                        edit.mark_dirty();
+            if let Some(current_reach) = edit
+                .definition
+                .components
+                .interaction
+                .as_ref()
+                .map(|interaction| interaction.interaction_reach as i32)
+            {
+                let mut reach = current_reach;
+                let changed = ui
+                    .horizontal(|ui| {
+                        ui.label("Interaction Reach:");
+                        ui.add(egui::DragValue::new(&mut reach).range(0..=256))
+                            .changed()
+                    })
+                    .inner;
+                if changed {
+                    if let Some(interaction) = edit.definition.components.interaction.as_mut() {
+                        interaction.interaction_reach = reach.max(0) as u32;
                     }
-                });
+                    edit.mark_dirty();
+                }
             }
         });
 }

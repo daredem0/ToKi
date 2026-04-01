@@ -64,14 +64,16 @@ impl RuleEngine<'_> {
                 .contains(&crate::game::GameState::to_input_key(*key)),
             RuleCondition::EntityActive { target, is_active } => self
                 .resolve_entity(*target, context)
-                .is_some_and(|entity| entity.attributes.behavior.active == *is_active),
+                .is_some_and(|entity| entity.active == *is_active),
             RuleCondition::HealthBelow { target, threshold } => self
                 .resolve_entity(*target, context)
-                .and_then(|entity| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
+                .and_then(|entity| self.entity_manager.combat(entity.id))
+                .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
                 .is_some_and(|health| health < *threshold),
             RuleCondition::HealthAbove { target, threshold } => self
                 .resolve_entity(*target, context)
-                .and_then(|entity| entity.attributes.gameplay.stats.current(HEALTH_STAT_ID))
+                .and_then(|entity| self.entity_manager.combat(entity.id))
+                .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
                 .is_some_and(|health| health > *threshold),
             RuleCondition::TriggerOtherIsPlayer => context
                 .trigger_other

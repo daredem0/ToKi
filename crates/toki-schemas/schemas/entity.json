@@ -4,7 +4,17 @@
   "title": "ToKi Entity Definition",
   "description": "A reusable entity definition template for the ToKi game engine",
   "type": "object",
-  "required": ["name", "display_name", "rendering", "attributes", "collision", "audio", "animations", "category"],
+  "required": [
+    "name",
+    "display_name",
+    "rendering",
+    "solid",
+    "active",
+    "collision",
+    "audio",
+    "animations",
+    "category"
+  ],
   "properties": {
     "name": {
       "type": "string",
@@ -21,9 +31,6 @@
     "rendering": {
       "$ref": "#/definitions/rendering"
     },
-    "attributes": {
-      "$ref": "#/definitions/attributes"
-    },
     "collision": {
       "$ref": "#/definitions/collision"
     },
@@ -39,18 +46,38 @@
     },
     "tags": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": {
+        "type": "string"
+      },
       "description": "Tags for filtering and searching"
+    },
+    "solid": {
+      "type": "boolean",
+      "description": "Whether entity blocks movement"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether entity is active by default"
+    },
+    "components": {
+      "$ref": "#/definitions/components"
     }
   },
   "definitions": {
     "rendering": {
       "type": "object",
-      "required": ["size", "render_layer", "visible"],
+      "required": [
+        "size",
+        "render_layer",
+        "visible"
+      ],
       "properties": {
         "size": {
           "type": "array",
-          "items": {"type": "integer", "minimum": 1},
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Rendering size [width, height] in pixels"
@@ -64,9 +91,15 @@
           "description": "Whether entity is visible by default"
         },
         "static_object": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "description": "Optional object-sheet-backed static render source for entities without animation clips",
-          "required": ["sheet", "object_name"],
+          "required": [
+            "sheet",
+            "object_name"
+          ],
           "properties": {
             "sheet": {
               "type": "string",
@@ -77,110 +110,17 @@
               "minLength": 1
             }
           }
-        }
-      }
-    },
-    "attributes": {
-      "type": "object",
-      "required": ["health", "speed", "solid", "active", "can_move", "has_inventory"],
-      "properties": {
-        "health": {
-          "type": ["integer", "null"],
-          "minimum": 0,
-          "description": "Health points"
-        },
-        "stats": {
-          "type": "object",
-          "description": "Optional authored base stats keyed by stat id",
-          "propertyNames": {
-            "type": "string",
-            "minLength": 1
-          },
-          "additionalProperties": {
-            "type": "integer",
-            "minimum": 0
-          }
-        },
-        "primary_projectile": {
-          "type": ["object", "null"],
-          "description": "Optional projectile spawned by the entity's primary action",
-          "required": ["sheet", "object_name", "size", "speed", "damage", "lifetime_ticks"],
-          "properties": {
-            "sheet": {
-              "type": "string",
-              "minLength": 1
-            },
-            "object_name": {
-              "type": "string",
-              "minLength": 1
-            },
-            "size": {
-              "type": "array",
-              "items": {"type": "integer", "minimum": 1},
-              "minItems": 2,
-              "maxItems": 2
-            },
-            "speed": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "damage": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "lifetime_ticks": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "spawn_offset": {
-              "type": "array",
-              "items": {"type": "integer"},
-              "minItems": 2,
-              "maxItems": 2
-            }
-          }
-        },
-        "pickup": {
-          "type": ["object", "null"],
-          "description": "Optional item stack granted when another entity collects this entity by overlap",
-          "required": ["item_id", "count"],
-          "properties": {
-            "item_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "count": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
-        },
-        "speed": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Movement speed"
-        },
-        "solid": {
-          "type": "boolean",
-          "description": "Whether entity blocks movement"
-        },
-        "active": {
-          "type": "boolean",
-          "description": "Whether entity is active by default"
-        },
-        "can_move": {
-          "type": "boolean",
-          "description": "Whether entity can move"
-        },
-        "has_inventory": {
-          "type": "boolean",
-          "description": "Whether entity has inventory system"
         }
       }
     },
     "collision": {
       "type": "object",
-      "required": ["enabled", "offset", "size", "trigger"],
+      "required": [
+        "enabled",
+        "offset",
+        "size",
+        "trigger"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -188,14 +128,19 @@
         },
         "offset": {
           "type": "array",
-          "items": {"type": "integer"},
+          "items": {
+            "type": "integer"
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Collision box offset from entity center [x, y]"
         },
         "size": {
           "type": "array",
-          "items": {"type": "integer", "minimum": 1},
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
           "minItems": 2,
           "maxItems": 2,
           "description": "Collision box size [width, height]"
@@ -208,7 +153,9 @@
     },
     "audio": {
       "type": "object",
-      "required": ["footstep_trigger_distance"],
+      "required": [
+        "footstep_trigger_distance"
+      ],
       "properties": {
         "footstep_trigger_distance": {
           "type": "number",
@@ -217,22 +164,35 @@
         },
         "movement_sound_trigger": {
           "type": "string",
-          "enum": ["distance", "animation_loop"],
+          "enum": [
+            "distance",
+            "animation_loop"
+          ],
           "description": "How movement sound timing is driven"
         },
         "movement_sound": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Sound ID to play when entity moves"
         },
         "collision_sound": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Sound ID to play when entity collides"
         }
       }
     },
     "animations": {
       "type": "object",
-      "required": ["atlas_name", "clips", "default_state"],
+      "required": [
+        "atlas_name",
+        "clips",
+        "default_state"
+      ],
       "properties": {
         "atlas_name": {
           "type": "string",
@@ -253,7 +213,12 @@
     },
     "animationClip": {
       "type": "object",
-      "required": ["state", "frame_tiles", "frame_duration_ms", "loop_mode"],
+      "required": [
+        "state",
+        "frame_tiles",
+        "frame_duration_ms",
+        "loop_mode"
+      ],
       "properties": {
         "state": {
           "type": "string",
@@ -261,7 +226,9 @@
         },
         "frame_tiles": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": {
+            "type": "string"
+          },
           "minItems": 1,
           "description": "Array of tile names for animation frames"
         },
@@ -272,10 +239,231 @@
         },
         "loop_mode": {
           "type": "string",
-          "enum": ["loop", "once", "ping_pong"],
+          "enum": [
+            "loop",
+            "once",
+            "ping_pong"
+          ],
           "description": "How the animation should loop"
         }
       }
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "movement": {
+          "$ref": "#/definitions/movementComponent"
+        },
+        "ai": {
+          "$ref": "#/definitions/aiComponent"
+        },
+        "interaction": {
+          "$ref": "#/definitions/interactionComponent"
+        },
+        "combat": {
+          "$ref": "#/definitions/combatComponent"
+        },
+        "primary_projectile": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Optional projectile spawned by the entity's primary action",
+          "required": [
+            "sheet",
+            "object_name",
+            "size",
+            "speed",
+            "damage",
+            "lifetime_ticks"
+          ],
+          "properties": {
+            "sheet": {
+              "type": "string",
+              "minLength": 1
+            },
+            "object_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "size": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "speed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "damage": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "lifetime_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "spawn_offset": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "pickup": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Optional item stack granted when another entity collects this entity by overlap",
+          "required": [
+            "item_id",
+            "count"
+          ],
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "inventory": {
+          "$ref": "#/definitions/inventoryComponent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "movementComponent": {
+      "type": "object",
+      "required": [
+        "speed",
+        "movement_profile",
+        "can_move"
+      ],
+      "properties": {
+        "speed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "movement_profile": {
+          "type": "string"
+        },
+        "can_move": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "aiComponent": {
+      "type": "object",
+      "required": [
+        "ai_config"
+      ],
+      "properties": {
+        "ai_config": {
+          "type": "object",
+          "required": [
+            "behavior",
+            "detection_radius"
+          ],
+          "properties": {
+            "behavior": {
+              "type": "string"
+            },
+            "detection_radius": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "interactionComponent": {
+      "type": "object",
+      "required": [
+        "interaction_reach"
+      ],
+      "properties": {
+        "interaction_reach": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "combatComponent": {
+      "type": "object",
+      "properties": {
+        "health": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "stats": {
+          "$ref": "#/definitions/entityStats"
+        }
+      },
+      "additionalProperties": false
+    },
+    "entityStats": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "current": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "inventoryComponent": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

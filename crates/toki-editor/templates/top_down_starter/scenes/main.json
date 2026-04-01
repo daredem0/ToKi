@@ -19,11 +19,23 @@
       "category": "human",
       "definition_name": "player",
       "control_role": "player_character",
-      "attributes": {
-        "health": 100,
-        "speed": 2,
-        "solid": true,
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      },
+      "solid": true,
+      "active": true,
+      "rendering": {
         "visible": true,
+        "has_shadow": true,
+        "render_layer": 2,
         "animation_controller": {
           "clips": {
             "Walk": {
@@ -53,22 +65,26 @@
           "current_frame_index": 0,
           "frame_timer": 0.0,
           "is_finished": false
-        },
-        "render_layer": 2,
-        "active": true,
-        "can_move": true,
-        "has_inventory": true
+        }
       },
-      "collision_box": {
-        "offset": [
-          0,
-          0
-        ],
-        "size": [
-          16,
-          16
-        ],
-        "trigger": false
+      "components": {
+        "movement": {
+          "speed": 2,
+          "movement_profile": "legacy_default",
+          "can_move": true
+        },
+        "combat": {
+          "health": 100,
+          "stats": {
+            "base": {
+              "health": 100
+            },
+            "current": {
+              "health": 100
+            }
+          }
+        },
+        "inventory": {}
       }
     },
     {
@@ -85,11 +101,23 @@
       "category": "human",
       "definition_name": "villager",
       "control_role": "none",
-      "attributes": {
-        "health": 10,
-        "speed": 1,
-        "solid": true,
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      },
+      "solid": true,
+      "active": true,
+      "rendering": {
         "visible": true,
+        "has_shadow": true,
+        "render_layer": 2,
         "animation_controller": {
           "clips": {
             "Walk": {
@@ -119,22 +147,25 @@
           "current_frame_index": 0,
           "frame_timer": 0.0,
           "is_finished": false
-        },
-        "render_layer": 2,
-        "active": true,
-        "can_move": false,
-        "has_inventory": false
+        }
       },
-      "collision_box": {
-        "offset": [
-          0,
-          0
-        ],
-        "size": [
-          16,
-          16
-        ],
-        "trigger": false
+      "components": {
+        "movement": {
+          "speed": 1,
+          "movement_profile": "legacy_default",
+          "can_move": false
+        },
+        "combat": {
+          "health": 10,
+          "stats": {
+            "base": {
+              "health": 10
+            },
+            "current": {
+              "health": 10
+            }
+          }
+        }
       }
     }
   ],

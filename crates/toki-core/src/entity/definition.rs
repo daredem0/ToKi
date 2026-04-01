@@ -3,11 +3,10 @@
 //! These types define the structure for loading entity definitions from files.
 
 use super::builder::EntityBuilder;
+use super::components::{AiComponent, CombatComponent, InteractionComponent, MovementComponent};
 use super::model::{
-    AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
-    EntityAudioSettings, EntityBehavior, EntityGameplay, EntityGrounding, EntityId, EntityKind,
-    EntityRendering, EntityStats, MovementProfile, MovementSoundTrigger, StaticObjectRenderDef,
-    HEALTH_STAT_ID,
+    ControlRole, Entity, EntityAudioComponent, EntityAudioSettings, EntityGrounding, EntityId,
+    EntityKind, EntityRendering, MovementSoundTrigger, StaticObjectRenderDef,
 };
 use super::runtime_entity_kind_for_category;
 use super::storage::{EntitySpawnBundle, OptionalEntityComponents};
@@ -34,7 +33,10 @@ pub struct EntityDefinition {
     pub display_name: String,
     pub description: String,
     pub rendering: RenderingDef,
-    pub attributes: AttributesDef,
+    pub solid: bool,
+    pub active: bool,
+    #[serde(default, skip_serializing_if = "ComponentsDef::is_empty")]
+    pub components: ComponentsDef,
     pub collision: CollisionDef,
     pub audio: AudioDef,
     pub animations: AnimationsDef,
@@ -58,88 +60,33 @@ pub struct RenderingDef {
     pub grounding: EntityGrounding,
 }
 
-/// Wire format for deserializing attributes with backward compatibility
-#[derive(Debug, Clone, Deserialize)]
-struct AttributesDefWire {
-    pub health: Option<u32>,
-    #[serde(default)]
-    pub stats: HashMap<String, i32>,
-    pub speed: f32,
-    pub solid: bool,
-    pub active: bool,
-    pub can_move: bool,
-    #[serde(default)]
-    pub interactable: bool,
-    #[serde(default)]
-    pub interaction_reach: u32,
-    /// Legacy field for backward compatibility
-    #[serde(default)]
-    pub ai_behavior: Option<AiBehavior>,
-    /// New AI configuration (takes precedence over ai_behavior)
-    #[serde(default)]
-    pub ai_config: Option<AiConfig>,
-    #[serde(default)]
-    pub movement_profile: MovementProfile,
-    #[serde(default)]
-    pub primary_projectile: Option<PrimaryProjectileDef>,
-    #[serde(default)]
-    pub pickup: Option<PickupDef>,
-    pub has_inventory: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AttributesDef {
-    pub health: Option<u32>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub stats: HashMap<String, i32>,
-    pub speed: f32,
-    pub solid: bool,
-    pub active: bool,
-    pub can_move: bool,
-    #[serde(default)]
-    pub interactable: bool,
-    #[serde(default)]
-    pub interaction_reach: u32,
-    #[serde(default)]
-    pub ai_config: AiConfig,
-    #[serde(default)]
-    pub movement_profile: MovementProfile,
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ComponentsDef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movement: Option<MovementComponent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai: Option<AiComponent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction: Option<InteractionComponent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<CombatComponent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_projectile: Option<PrimaryProjectileDef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pickup: Option<PickupDef>,
-    pub has_inventory: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inventory: Option<Inventory>,
 }
 
-impl<'de> Deserialize<'de> for AttributesDef {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let wire = AttributesDefWire::deserialize(deserializer)?;
-
-        // Resolve AI config: ai_config takes precedence over legacy ai_behavior
-        let ai_config = match (wire.ai_config, wire.ai_behavior) {
-            (Some(config), _) => config,
-            (None, Some(behavior)) => AiConfig::from_legacy_behavior(behavior),
-            (None, None) => AiConfig::default(),
-        };
-
-        Ok(Self {
-            health: wire.health,
-            stats: wire.stats,
-            speed: wire.speed,
-            solid: wire.solid,
-            active: wire.active,
-            can_move: wire.can_move,
-            interactable: wire.interactable,
-            interaction_reach: wire.interaction_reach,
-            ai_config,
-            movement_profile: wire.movement_profile,
-            primary_projectile: wire.primary_projectile,
-            pickup: wire.pickup,
-            has_inventory: wire.has_inventory,
-        })
+impl ComponentsDef {
+    pub fn is_empty(&self) -> bool {
+        self.movement.is_none()
+            && self.ai.is_none()
+            && self.interaction.is_none()
+            && self.combat.is_none()
+            && self.primary_projectile.is_none()
+            && self.pickup.is_none()
+            && self.inventory.is_none()
     }
 }
 
@@ -229,8 +176,8 @@ impl EntityDefinition {
         let entity_kind = runtime_entity_kind_for_category(&self.category);
         let animation_controller = self.build_animation_controller()?;
         let grounding = self.build_grounding();
-        let (attributes, optional_components) =
-            self.build_attributes(animation_controller, grounding.clone());
+        let rendering = self.build_rendering(animation_controller, grounding.clone());
+        let optional_components = self.build_components();
         let collision_box = self.build_collision_box(&grounding);
         let audio = self.build_audio_settings();
 
@@ -244,7 +191,9 @@ impl EntityDefinition {
         .definition_name(self.name.clone())
         .control_role(ControlRole::LegacyDefault)
         .audio(audio.clone())
-        .attributes(attributes)
+        .rendering(rendering)
+        .solid(self.solid)
+        .active(self.active)
         .collision_box_opt(collision_box)
         .tags(self.tags.clone())
         .build();
@@ -304,67 +253,38 @@ impl EntityDefinition {
         }
     }
 
-    fn build_attributes(
+    fn build_rendering(
         &self,
         animation_controller: Option<AnimationController>,
         grounding: EntityGrounding,
-    ) -> (EntityAttributes, OptionalEntityComponents) {
-        let stats = self.build_stats();
-        let mut attributes = EntityAttributes {
-            gameplay: EntityGameplay {
-                health: self.attributes.health.or_else(|| {
-                    stats
-                        .base(HEALTH_STAT_ID)
-                        .and_then(|v| u32::try_from(v).ok())
-                }),
-                stats,
-                speed: self.attributes.speed,
-                solid: self.attributes.solid,
-            },
-            rendering: EntityRendering {
-                visible: self.rendering.visible,
-                has_shadow: self.rendering.has_shadow,
-                palette_override: self.rendering.palette_override.clone(),
-                animation_controller,
-                render_layer: self.rendering.render_layer,
-                static_object_render: self.rendering.static_object.clone(),
-                grounding,
-            },
-            behavior: EntityBehavior {
-                active: self.attributes.active,
-                can_move: self.attributes.can_move,
-                interactable: self.attributes.interactable,
-                interaction_reach: self.attributes.interaction_reach,
-                ai_config: self.attributes.ai_config,
-                movement_profile: self.attributes.movement_profile,
-                has_inventory: self.attributes.has_inventory,
-            },
-        };
-        attributes.ensure_legacy_health_stat();
-        (
-            attributes,
-            OptionalEntityComponents {
-                primary_projectile: self.attributes.primary_projectile.clone(),
-                projectile: None,
-                pickup: self.attributes.pickup.clone(),
-                inventory: None,
-            },
-        )
+    ) -> EntityRendering {
+        EntityRendering {
+            visible: self.rendering.visible,
+            has_shadow: self.rendering.has_shadow,
+            palette_override: self.rendering.palette_override.clone(),
+            animation_controller,
+            render_layer: self.rendering.render_layer,
+            static_object_render: self.rendering.static_object.clone(),
+            grounding,
+        }
     }
 
-    fn build_stats(&self) -> EntityStats {
-        let mut stats = EntityStats::default();
-        for (stat_id, value) in &self.attributes.stats {
-            let authored_value = (*value).max(0);
-            stats.base.insert(stat_id.clone(), authored_value);
-            stats.current.insert(stat_id.clone(), authored_value);
+    fn build_components(&self) -> OptionalEntityComponents {
+        let mut combat = self.components.combat.clone();
+        if let Some(combat) = combat.as_mut() {
+            combat.ensure_health_stat();
         }
-        if let Some(health) = self.attributes.health {
-            let health = health as i32;
-            stats.base.insert(HEALTH_STAT_ID.to_string(), health);
-            stats.current.insert(HEALTH_STAT_ID.to_string(), health);
+
+        OptionalEntityComponents {
+            movement: self.components.movement,
+            ai: self.components.ai,
+            interaction: self.components.interaction,
+            combat,
+            primary_projectile: self.components.primary_projectile.clone(),
+            projectile: None,
+            pickup: self.components.pickup.clone(),
+            inventory: self.components.inventory.clone(),
         }
-        stats
     }
 
     fn build_grounding(&self) -> EntityGrounding {

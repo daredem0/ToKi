@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use support::{test_atlas, test_tilemap};
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::entity::{
-    AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile, MovementSoundTrigger,
-    OptionalEntityComponents, RenderingDef, StoredEntity,
+    AudioDef, CollisionDef, CombatComponent, ComponentsDef, EntityDefinition, EntityStats,
+    Inventory, MovementComponent, MovementProfile, MovementSoundTrigger, OptionalEntityComponents,
+    RenderingDef, StoredEntity,
 };
 use toki_core::game::{GameSimulation, InputSystem, RenderQueryService, RuleSystem, SceneSystem};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleTrigger};
@@ -26,20 +27,23 @@ fn player_definition(name: &str) -> EntityDefinition {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: Some(100),
-            stats: HashMap::from([("health".to_string(), 100)]),
-            speed: 2.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: Default::default(),
-            movement_profile: MovementProfile::PlayerWasd,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: true,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            movement: Some(MovementComponent {
+                speed: 2.0,
+                movement_profile: MovementProfile::PlayerWasd,
+                can_move: true,
+            }),
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats {
+                    base: HashMap::from([("health".to_string(), 100)]),
+                    current: HashMap::from([("health".to_string(), 100)]),
+                },
+            }),
+            inventory: Some(Inventory::default()),
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,
@@ -149,7 +153,13 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         .as_mut()
         .expect("inventory should exist")
         .add_item("potion", 2);
-    let _ = player.attributes.apply_stat_delta("health", -25);
+    components
+        .combat
+        .get_or_insert_with(|| CombatComponent {
+            health: Some(100),
+            stats: EntityStats::from_legacy_health(Some(100)),
+        })
+        .apply_stat_delta("health", -25);
     scene_a.add_stored_entity(StoredEntity::new(player, components));
 
     let mut scene_b = Scene::new("B".to_string());
@@ -185,7 +195,14 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
             .item_count("potion"),
         2
     );
-    assert_eq!(player.attributes.current_stat("health"), Some(75));
+    assert_eq!(
+        state
+            .world()
+            .player_id()
+            .and_then(|player_id| state.world().entity_manager().combat(player_id))
+            .and_then(|combat| combat.current_stat("health")),
+        Some(75)
+    );
 }
 
 #[test]

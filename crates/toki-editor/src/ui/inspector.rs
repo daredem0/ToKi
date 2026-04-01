@@ -144,7 +144,8 @@ struct RuleAudioChoices {
 }
 
 impl EntityPropertyDraft {
-    fn from_entity(entity: &toki_core::entity::Entity) -> Self {
+    fn from_entity(stored: &toki_core::entity::StoredEntity) -> Self {
+        let entity = &stored.entity;
         let collision = if let Some(collision_box) = &entity.collision_box {
             CollisionDraft {
                 enabled: true,
@@ -165,26 +166,33 @@ impl EntityPropertyDraft {
             }
         };
 
-        let (health_enabled, health_value) = match entity.attributes.gameplay.health {
+        let (health_enabled, health_value) = match stored
+            .components
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.health)
+        {
             Some(value) => (true, value as i64),
             None => (false, 0),
         };
-        let (attack_power_enabled, attack_power_value) =
-            match entity.attributes.current_stat(ATTACK_POWER_STAT_ID) {
-                Some(value) => (true, value as i64),
-                None => (false, 0),
-            };
+        let (attack_power_enabled, attack_power_value) = match stored
+            .components
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.current_stat(ATTACK_POWER_STAT_ID))
+        {
+            Some(value) => (true, value as i64),
+            None => (false, 0),
+        };
 
         Self {
             category: entity.category.clone(),
             static_object_sheet: entity
-                .attributes
                 .rendering
                 .static_object_render
                 .as_ref()
                 .map(|render| render.sheet.clone()),
             static_object_name: entity
-                .attributes
                 .rendering
                 .static_object_render
                 .as_ref()
@@ -194,28 +202,51 @@ impl EntityPropertyDraft {
             position_y: entity.position.y,
             size_x: entity.size.x as i64,
             size_y: entity.size.y as i64,
-            visible: entity.attributes.rendering.visible,
-            has_shadow: entity.attributes.rendering.has_shadow,
+            visible: entity.rendering.visible,
+            has_shadow: entity.rendering.has_shadow,
             palette_override: entity
-                .attributes
                 .rendering
                 .palette_override
                 .clone()
                 .unwrap_or_default(),
-            active: entity.attributes.behavior.active,
-            solid: entity.attributes.gameplay.solid,
-            interactable: entity.attributes.behavior.interactable,
-            interaction_reach: entity.attributes.behavior.interaction_reach,
-            can_move: entity.attributes.behavior.can_move,
-            ai_config: entity.attributes.behavior.ai_config,
-            movement_profile: entity.attributes.behavior.movement_profile,
+            active: entity.active,
+            solid: entity.solid,
+            interactable: stored.components.interaction.is_some(),
+            interaction_reach: stored
+                .components
+                .interaction
+                .as_ref()
+                .map(|interaction| interaction.interaction_reach)
+                .unwrap_or(0),
+            can_move: stored
+                .components
+                .movement
+                .as_ref()
+                .is_some_and(|movement| movement.can_move),
+            ai_config: stored
+                .components
+                .ai
+                .as_ref()
+                .map(|ai| ai.ai_config)
+                .unwrap_or_default(),
+            movement_profile: stored
+                .components
+                .movement
+                .as_ref()
+                .map(|movement| movement.movement_profile)
+                .unwrap_or_default(),
             movement_sound_trigger: entity.audio.movement_sound_trigger,
             footstep_trigger_distance: entity.audio.footstep_trigger_distance,
             hearing_radius: entity.audio.hearing_radius,
             movement_sound: entity.audio.movement_sound.clone().unwrap_or_default(),
-            has_inventory: entity.attributes.behavior.has_inventory,
-            speed: entity.attributes.gameplay.speed as f64,
-            render_layer: entity.attributes.rendering.render_layer,
+            has_inventory: stored.components.inventory.is_some(),
+            speed: stored
+                .components
+                .movement
+                .as_ref()
+                .map(|movement| movement.speed as f64)
+                .unwrap_or(0.0),
+            render_layer: entity.rendering.render_layer,
             persistent_across_saves: entity.persistent_across_saves,
             health_enabled,
             health_value,
@@ -246,15 +277,20 @@ impl EntityPropertyDraft {
             }
         };
 
-        let (health_enabled, health_value) = match definition.attributes.health {
+        let (health_enabled, health_value) = match definition
+            .components
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.health)
+        {
             Some(value) => (true, value as i64),
             None => (false, 0),
         };
         let (attack_power_enabled, attack_power_value) = match definition
-            .attributes
-            .stats
-            .get(ATTACK_POWER_STAT_ID)
-            .copied()
+            .components
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.current_stat(ATTACK_POWER_STAT_ID))
         {
             Some(value) => (true, value as i64),
             None => (false, 0),
@@ -284,19 +320,43 @@ impl EntityPropertyDraft {
                 .palette_override
                 .clone()
                 .unwrap_or_default(),
-            active: definition.attributes.active,
-            solid: definition.attributes.solid,
-            interactable: definition.attributes.interactable,
-            interaction_reach: definition.attributes.interaction_reach,
-            can_move: definition.attributes.can_move,
-            ai_config: definition.attributes.ai_config,
-            movement_profile: definition.attributes.movement_profile,
+            active: definition.active,
+            solid: definition.solid,
+            interactable: definition.components.interaction.is_some(),
+            interaction_reach: definition
+                .components
+                .interaction
+                .as_ref()
+                .map(|interaction| interaction.interaction_reach)
+                .unwrap_or(0),
+            can_move: definition
+                .components
+                .movement
+                .as_ref()
+                .is_some_and(|movement| movement.can_move),
+            ai_config: definition
+                .components
+                .ai
+                .as_ref()
+                .map(|ai| ai.ai_config)
+                .unwrap_or_default(),
+            movement_profile: definition
+                .components
+                .movement
+                .as_ref()
+                .map(|movement| movement.movement_profile)
+                .unwrap_or_default(),
             movement_sound_trigger: definition.audio.movement_sound_trigger,
             footstep_trigger_distance: definition.audio.footstep_trigger_distance,
             hearing_radius: definition.audio.hearing_radius,
             movement_sound: definition.audio.movement_sound.clone(),
-            has_inventory: definition.attributes.has_inventory,
-            speed: definition.attributes.speed as f64,
+            has_inventory: definition.components.inventory.is_some(),
+            speed: definition
+                .components
+                .movement
+                .as_ref()
+                .map(|movement| movement.speed as f64)
+                .unwrap_or(0.0),
             render_layer: definition.rendering.render_layer,
             persistent_across_saves: false,
             health_enabled,

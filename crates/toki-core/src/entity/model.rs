@@ -1,3 +1,4 @@
+use super::components::MovementComponent;
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
 use crate::ids::EntityDefName;
@@ -98,8 +99,10 @@ pub struct Entity {
     pub control_role: ControlRole,
     #[serde(default, skip_serializing_if = "EntityAudioSettings::is_default")]
     pub audio: EntityAudioSettings,
-    pub attributes: EntityAttributes,
+    pub rendering: EntityRendering,
     pub collision_box: Option<CollisionBox>,
+    pub solid: bool,
+    pub active: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(skip, default)]
@@ -329,50 +332,6 @@ impl EntityStats {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EntityGameplay {
-    pub health: Option<u32>,
-    #[serde(default, skip_serializing_if = "EntityStats::is_empty")]
-    pub stats: EntityStats,
-    pub speed: f32,
-    pub solid: bool,
-}
-
-impl Default for EntityGameplay {
-    fn default() -> Self {
-        Self {
-            health: None,
-            stats: EntityStats::default(),
-            speed: 2.0,
-            solid: true,
-        }
-    }
-}
-
-impl EntityGameplay {
-    pub fn ensure_legacy_health_stat(&mut self) {
-        if let Some(health) = self.health {
-            self.stats.ensure_stat(HEALTH_STAT_ID, health as i32);
-        }
-    }
-
-    pub fn current_stat(&self, stat_id: &str) -> Option<i32> {
-        self.stats.current(stat_id)
-    }
-
-    pub fn base_stat(&self, stat_id: &str) -> Option<i32> {
-        self.stats.base(stat_id)
-    }
-
-    pub fn apply_stat_delta(&mut self, stat_id: &str, delta: i32) -> Option<i32> {
-        let new_value = self.stats.apply_delta(stat_id, delta)?;
-        if stat_id == HEALTH_STAT_ID {
-            self.health = u32::try_from(new_value).ok();
-        }
-        Some(new_value)
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityRendering {
     pub visible: bool,
@@ -402,43 +361,6 @@ impl Default for EntityRendering {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EntityBehavior {
-    pub active: bool,
-    pub can_move: bool,
-    #[serde(default)]
-    pub interactable: bool,
-    #[serde(default)]
-    pub interaction_reach: u32,
-    #[serde(default)]
-    pub ai_config: AiConfig,
-    #[serde(default)]
-    pub movement_profile: MovementProfile,
-    #[serde(default)]
-    pub has_inventory: bool,
-}
-
-impl Default for EntityBehavior {
-    fn default() -> Self {
-        Self {
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::default(),
-            has_inventory: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct EntityAttributes {
-    pub gameplay: EntityGameplay,
-    pub rendering: EntityRendering,
-    pub behavior: EntityBehavior,
-}
-
 impl Entity {
     pub fn interaction_bounds(&self) -> (IVec2, UVec2) {
         self.collision_box
@@ -448,17 +370,11 @@ impl Entity {
     }
 
     pub fn resolved_ground_origin(&self) -> IVec2 {
-        self.position
-            + self
-                .attributes
-                .rendering
-                .grounding
-                .resolved_origin(self.size)
+        self.position + self.rendering.grounding.resolved_origin(self.size)
     }
 
     pub fn resolved_footprint(&self) -> EntityFootprint {
-        self.attributes
-            .rendering
+        self.rendering
             .grounding
             .resolved_footprint(self.size, self.collision_box.as_ref())
     }
@@ -476,28 +392,12 @@ impl Entity {
         self.control_role.resolved()
     }
 
-    pub fn effective_movement_profile(&self) -> MovementProfile {
-        self.attributes
-            .behavior
-            .movement_profile
-            .resolved_for_control_role(self.effective_control_role())
-    }
-}
-
-impl EntityAttributes {
-    pub fn ensure_legacy_health_stat(&mut self) {
-        self.gameplay.ensure_legacy_health_stat();
-    }
-
-    pub fn current_stat(&self, stat_id: &str) -> Option<i32> {
-        self.gameplay.current_stat(stat_id)
-    }
-
-    pub fn base_stat(&self, stat_id: &str) -> Option<i32> {
-        self.gameplay.base_stat(stat_id)
-    }
-
-    pub fn apply_stat_delta(&mut self, stat_id: &str, delta: i32) -> Option<i32> {
-        self.gameplay.apply_stat_delta(stat_id, delta)
+    pub fn effective_movement_profile(
+        &self,
+        movement: Option<&MovementComponent>,
+    ) -> MovementProfile {
+        movement
+            .map(|movement| movement.resolved_profile(self.effective_control_role()))
+            .unwrap_or(MovementProfile::None)
     }
 }

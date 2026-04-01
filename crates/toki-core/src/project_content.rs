@@ -33,8 +33,9 @@ pub fn build_game_state_from_project_content(
 mod tests {
     use super::*;
     use crate::entity::{
-        AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-        MovementProfile, MovementSoundTrigger, RenderingDef,
+        AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
+        EntityDefinition, EntityStats, Inventory, MovementComponent, MovementProfile,
+        MovementSoundTrigger, RenderingDef,
     };
     use crate::scene::{SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
     use glam::IVec2;
@@ -53,23 +54,31 @@ mod tests {
                 static_object: None,
                 grounding: Default::default(),
             },
-            attributes: AttributesDef {
-                health: Some(100),
-                stats: std::collections::HashMap::from([
-                    ("health".to_string(), 100),
-                    ("attack_power".to_string(), 8),
-                ]),
-                speed: 2.0,
-                solid: true,
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: crate::entity::AiConfig::default(),
-                movement_profile: MovementProfile::PlayerWasd,
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                movement: Some(MovementComponent {
+                    speed: 2.0,
+                    movement_profile: MovementProfile::PlayerWasd,
+                    can_move: true,
+                }),
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats {
+                        base: std::collections::HashMap::from([
+                            ("health".to_string(), 100),
+                            ("attack_power".to_string(), 8),
+                        ]),
+                        current: std::collections::HashMap::from([
+                            ("health".to_string(), 100),
+                            ("attack_power".to_string(), 8),
+                        ]),
+                    },
+                }),
                 primary_projectile: None,
                 pickup: None,
-                has_inventory: true,
+                inventory: Some(Inventory::default()),
+                ..Default::default()
             },
             collision: CollisionDef {
                 enabled: true,

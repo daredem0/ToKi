@@ -1,5 +1,8 @@
 use super::sparse_map::SparseComponentMap;
-use crate::entity::{Entity, EntityAudioComponent, EntityId};
+use crate::entity::{
+    AiComponent, CombatComponent, Entity, EntityAudioComponent, EntityId, InteractionComponent,
+    MovementComponent,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -58,8 +61,16 @@ pub struct ProjectileState {
     pub owner_id: Option<EntityId>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct OptionalEntityComponents {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movement: Option<MovementComponent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai: Option<AiComponent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction: Option<InteractionComponent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<CombatComponent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_projectile: Option<PrimaryProjectileDef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -72,10 +83,14 @@ pub struct OptionalEntityComponents {
 
 impl OptionalEntityComponents {
     pub fn is_empty(&self) -> bool {
-        self.primary_projectile.is_none()
+        self.movement.is_none()
+            && self.ai.is_none()
+            && self.interaction.is_none()
+            && self.combat.is_none()
+            && self.primary_projectile.is_none()
             && self.projectile.is_none()
             && self.pickup.is_none()
-            && self.inventory.as_ref().is_none_or(Inventory::is_empty)
+            && self.inventory.is_none()
     }
 }
 

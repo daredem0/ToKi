@@ -4,7 +4,7 @@
 
 use super::default_category_for_kind;
 use super::model::{
-    ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind,
+    ControlRole, Entity, EntityAudioSettings, EntityId, EntityKind, EntityRendering,
 };
 use crate::collision::CollisionBox;
 use crate::ids::EntityDefName;
@@ -30,8 +30,10 @@ pub struct EntityBuilder {
     definition_name: Option<EntityDefName>,
     control_role: ControlRole,
     audio: EntityAudioSettings,
-    attributes: EntityAttributes,
+    rendering: EntityRendering,
     collision_box: Option<CollisionBox>,
+    solid: bool,
+    active: bool,
     tags: Vec<String>,
 }
 
@@ -47,8 +49,10 @@ impl EntityBuilder {
             definition_name: None,
             control_role: ControlRole::LegacyDefault,
             audio: EntityAudioSettings::default(),
-            attributes: EntityAttributes::default(),
+            rendering: EntityRendering::default(),
             collision_box: None,
+            solid: true,
+            active: true,
             tags: Vec::new(),
         }
     }
@@ -77,9 +81,21 @@ impl EntityBuilder {
         self
     }
 
-    /// Set the entity attributes.
-    pub fn attributes(mut self, attributes: EntityAttributes) -> Self {
-        self.attributes = attributes;
+    /// Set the entity rendering state.
+    pub fn rendering(mut self, rendering: EntityRendering) -> Self {
+        self.rendering = rendering;
+        self
+    }
+
+    /// Set whether the entity is solid.
+    pub fn solid(mut self, solid: bool) -> Self {
+        self.solid = solid;
+        self
+    }
+
+    /// Set whether the entity is active.
+    pub fn active(mut self, active: bool) -> Self {
+        self.active = active;
         self
     }
 
@@ -123,8 +139,10 @@ impl EntityBuilder {
             persistent_across_saves: false,
             control_role: self.control_role,
             audio: self.audio,
-            attributes: self.attributes,
+            rendering: self.rendering,
             collision_box: self.collision_box,
+            solid: self.solid,
+            active: self.active,
             tags: self.tags,
             movement_accumulator: glam::Vec2::ZERO,
         }

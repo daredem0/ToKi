@@ -1365,13 +1365,17 @@ mod tests {
     #[test]
     fn layout_engine_renders_inventory_scroll_list_rows() {
         let mut entity_manager = EntityManager::new();
-        let mut player_attributes = crate::entity::EntityAttributes::default();
-        player_attributes.behavior.has_inventory = true;
         let player_id = entity_manager.spawn_entity(
             crate::entity::EntityKind::Player,
             glam::IVec2::new(0, 0),
             glam::UVec2::new(16, 16),
-            player_attributes,
+            crate::entity::EntityRendering::default(),
+            true,
+            true,
+            crate::entity::OptionalEntityComponents {
+                inventory: Some(Default::default()),
+                ..Default::default()
+            },
         );
         entity_manager
             .storage_mut()

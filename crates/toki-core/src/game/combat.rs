@@ -1,7 +1,10 @@
 use crate::animation::AnimationState;
 use crate::collision;
 use crate::collision::CollisionBox;
-use crate::entity::{Entity, EntityId, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID};
+use crate::entity::{
+    Entity, EntityId, EntityRendering, MovementComponent, OptionalEntityComponents,
+    ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+};
 
 use super::animation::FacingDirection;
 use super::stat_effects::StatChangeRequest;
@@ -24,11 +27,17 @@ impl GameState {
         facing.to_ivec2()
     }
 
-    fn primary_action_damage_for_entity(entity: &Entity) -> i32 {
-        entity
-            .attributes
-            .current_stat(ATTACK_POWER_STAT_ID)
-            .or_else(|| entity.attributes.base_stat(ATTACK_POWER_STAT_ID))
+    fn primary_action_damage_for_entity(&self, entity: &Entity) -> i32 {
+        self.world
+            .entity_manager
+            .combat(entity.id)
+            .and_then(|combat| combat.current_stat(ATTACK_POWER_STAT_ID))
+            .or_else(|| {
+                self.world
+                    .entity_manager
+                    .combat(entity.id)
+                    .and_then(|combat| combat.base_stat(ATTACK_POWER_STAT_ID))
+            })
             .unwrap_or(10)
     }
 
@@ -49,7 +58,7 @@ impl GameState {
             return Vec::new();
         };
 
-        let damage = Self::primary_action_damage_for_entity(attacker);
+        let damage = self.primary_action_damage_for_entity(attacker);
         if damage <= 0 {
             return Vec::new();
         }
@@ -63,8 +72,13 @@ impl GameState {
             .filter(|&target_id| target_id != attacker_id)
             .filter_map(|target_id| {
                 let target = self.world.entity_manager.get_entity(target_id)?;
-                if !target.attributes.behavior.active
-                    || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
+                if !target.active
+                    || self
+                        .world
+                        .entity_manager
+                        .combat(target_id)
+                        .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
+                        .is_none()
                 {
                     return None;
                 }
@@ -137,18 +151,24 @@ impl GameState {
         let debug_damage = spec.damage.max(0);
         let debug_lifetime_ticks = spec.lifetime_ticks;
 
-        let mut attributes = crate::entity::EntityAttributes::default();
-        attributes.gameplay.speed = 0.0;
-        attributes.gameplay.solid = false;
-        attributes.rendering.visible = true;
-        attributes.behavior.can_move = false;
-        attributes.behavior.ai_config = crate::entity::AiConfig::default();
-        attributes.behavior.movement_profile = crate::entity::MovementProfile::None;
         let projectile_id = self.world.entity_manager.spawn_entity(
             crate::entity::EntityKind::Projectile,
             spawn_position,
             size,
-            attributes,
+            EntityRendering {
+                visible: true,
+                ..EntityRendering::default()
+            },
+            false,
+            true,
+            OptionalEntityComponents {
+                movement: Some(MovementComponent {
+                    speed: 0.0,
+                    can_move: false,
+                    ..MovementComponent::default()
+                }),
+                ..OptionalEntityComponents::default()
+            },
         );
         self.world
             .entity_manager
@@ -204,8 +224,13 @@ impl GameState {
             let Some(target) = self.world.entity_manager.get_entity(target_id) else {
                 continue;
             };
-            if !target.attributes.behavior.active
-                || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
+            if !target.active
+                || self
+                    .world
+                    .entity_manager
+                    .combat(target_id)
+                    .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
+                    .is_none()
                 || self
                     .world
                     .entity_manager
@@ -241,7 +266,7 @@ impl GameState {
                 self.world
                     .entity_manager
                     .get_entity(entity_id)
-                    .is_some_and(|entity| entity.attributes.behavior.active)
+                    .is_some_and(|entity| entity.active)
             })
             .collect::<Vec<_>>();
 
@@ -364,7 +389,7 @@ impl GameState {
                 .world
                 .entity_manager
                 .get_entity_mut(entity_id)
-                .and_then(|entity| entity.attributes.rendering.animation_controller.as_mut())
+                .and_then(|entity| entity.rendering.animation_controller.as_mut())
             else {
                 return false;
             };
@@ -423,7 +448,9 @@ impl GameState {
                 let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                     continue;
                 };
-                if entity.effective_movement_profile() != profile {
+                if entity.effective_movement_profile(self.world.entity_manager.movement(entity_id))
+                    != profile
+                {
                     continue;
                 }
                 self.trigger_entity_primary_action(entity_id);

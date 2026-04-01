@@ -10,9 +10,10 @@ use toki_core::assets::{
 };
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    AiBehavior, AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-    ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityDefinition, EntityKind,
-    MovementProfile, MovementSoundTrigger, RenderingDef,
+    AiBehavior, AiComponent, AiConfig, AnimationClipDef, AnimationsDef, AudioDef, CollisionDef,
+    CombatComponent, ComponentsDef, ControlRole, Entity, EntityAudioSettings, EntityDefinition,
+    EntityKind, EntityRendering, EntityStats, Inventory, MovementComponent, MovementProfile,
+    MovementSoundTrigger, RenderingDef,
 };
 use toki_core::game::SceneSystem;
 use toki_core::{FlagValue, GameState, Scene};
@@ -62,28 +63,29 @@ pub fn test_entity_definition(name: &str, category: &str) -> EntityDefinition {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: Some(100),
-            stats: HashMap::new(),
-            speed: 2.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: if category == "creature" {
-                AiConfig::from_legacy_behavior(AiBehavior::Wander)
-            } else {
-                AiConfig::default()
-            },
-            movement_profile: if category == "human" {
-                MovementProfile::PlayerWasd
-            } else {
-                MovementProfile::None
-            },
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            movement: Some(MovementComponent {
+                speed: 2.0,
+                movement_profile: if category == "human" {
+                    MovementProfile::PlayerWasd
+                } else {
+                    MovementProfile::None
+                },
+                can_move: true,
+            }),
+            ai: (category == "creature").then_some(AiComponent {
+                ai_config: AiConfig::from_legacy_behavior(AiBehavior::Wander),
+            }),
+            combat: Some(CombatComponent {
+                health: Some(100),
+                stats: EntityStats::from_legacy_health(Some(100)),
+            }),
             primary_projectile: None,
             pickup: None,
-            has_inventory: false,
+            inventory: None,
+            ..Default::default()
         },
         collision: CollisionDef {
             enabled: true,
@@ -143,33 +145,18 @@ pub fn test_entity() -> Entity {
             movement_sound: Some("sfx_step".to_string()),
             collision_sound: Some("sfx_hit2".to_string()),
         },
-        attributes: EntityAttributes {
-            gameplay: toki_core::entity::EntityGameplay {
-                health: Some(100),
-                stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
-                speed: 5.0,
-                solid: true,
-            },
-            rendering: toki_core::entity::EntityRendering {
-                visible: true,
-                has_shadow: true,
-                palette_override: None,
-                animation_controller: Some(controller),
-                render_layer: 2,
-                static_object_render: None,
-                grounding: Default::default(),
-            },
-            behavior: toki_core::entity::EntityBehavior {
-                active: true,
-                can_move: true,
-                interactable: false,
-                interaction_reach: 0,
-                ai_config: AiConfig::default(),
-                movement_profile: MovementProfile::PlayerWasd,
-                has_inventory: true,
-            },
+        rendering: EntityRendering {
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            animation_controller: Some(controller),
+            render_layer: 2,
+            static_object_render: None,
+            grounding: Default::default(),
         },
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        solid: true,
+        active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }

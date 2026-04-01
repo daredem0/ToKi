@@ -348,11 +348,10 @@ fn migrate_legacy_tilemap_objects_into_scene(
                 entity.entity_kind == crate::entity::EntityKind::Decoration
                     && entity.position == legacy.position.as_ivec2()
                     && entity.size == legacy.size_px
-                    && entity.attributes.rendering.visible == legacy.visible
-                    && entity.attributes.gameplay.solid == legacy.solid
-                    && entity.attributes.rendering.grounding == legacy.grounding
+                    && entity.rendering.visible == legacy.visible
+                    && entity.solid == legacy.solid
+                    && entity.rendering.grounding == legacy.grounding
                     && entity
-                        .attributes
                         .rendering
                         .static_object_render
                         .as_ref()

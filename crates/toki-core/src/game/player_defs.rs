@@ -1,6 +1,7 @@
 use crate::entity::{
-    AiBehavior, AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-    EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef,
+    AiBehavior, AiComponent, AiConfig, AnimationClipDef, AnimationsDef, AudioDef,
+    CollisionDef, CombatComponent, ComponentsDef, EntityDefinition, Inventory,
+    MovementComponent, MovementProfile, MovementSoundTrigger, RenderingDef,
 };
 use crate::ids::EntityDefName;
 
@@ -31,20 +32,29 @@ fn player_definition(config: PlayerDefinitionConfig) -> EntityDefinition {
             static_object: None,
             grounding: Default::default(),
         },
-        attributes: AttributesDef {
-            health: config.health,
-            stats: std::collections::HashMap::new(),
-            speed: config.speed,
-            solid: true,
-            active: true,
-            can_move: config.can_move,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: config.ai_config,
-            movement_profile: config.movement_profile,
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            movement: Some(MovementComponent {
+                speed: config.speed,
+                movement_profile: config.movement_profile,
+                can_move: config.can_move,
+            }),
+            ai: if config.ai_config.behavior == AiBehavior::None {
+                None
+            } else {
+                Some(AiComponent {
+                    ai_config: config.ai_config,
+                })
+            },
+            interaction: None,
+            combat: Some(CombatComponent {
+                health: config.health,
+                stats: Default::default(),
+            }),
             primary_projectile: None,
             pickup: None,
-            has_inventory: config.has_inventory,
+            inventory: config.has_inventory.then(Inventory::default),
         },
         collision: CollisionDef {
             enabled: true,

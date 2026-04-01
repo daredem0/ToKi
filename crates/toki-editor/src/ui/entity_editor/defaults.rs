@@ -1,10 +1,8 @@
 //! Default entity definitions and component values.
 
-use std::collections::HashMap;
-
 use toki_core::entity::{
-    AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-    EntityGrounding, MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
+    AnimationsDef, AudioDef, CollisionDef, ComponentsDef, EntityDefinition, EntityGrounding,
+    MovementComponent, MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
     RenderingDef,
 };
 
@@ -48,20 +46,20 @@ pub fn create_default_definition(
             static_object: None,
             grounding: EntityGrounding::default(),
         },
-        attributes: AttributesDef {
-            health: None,
-            stats: HashMap::new(),
-            speed: 100.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 32,
-            ai_config: AiConfig::default(),
-            movement_profile: MovementProfile::default(),
+        solid: true,
+        active: true,
+        components: ComponentsDef {
+            movement: Some(MovementComponent {
+                speed: 100.0,
+                movement_profile: MovementProfile::default(),
+                can_move: true,
+            }),
+            ai: None,
+            interaction: None,
+            combat: None,
             primary_projectile: None,
             pickup: None,
-            has_inventory: false,
+            inventory: None,
         },
         collision: CollisionDef {
             enabled: true,

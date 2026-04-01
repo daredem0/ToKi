@@ -68,8 +68,8 @@ impl AiSystem {
                     return None;
                 }
 
-                let entity = entity_manager.get_entity(entity_id)?;
-                let behavior = entity.attributes.behavior.ai_config.behavior;
+                entity_manager.get_entity(entity_id)?;
+                let behavior = entity_manager.ai(entity_id)?.ai_config.behavior;
                 if matches!(
                     behavior,
                     AiBehavior::Wander
@@ -119,10 +119,12 @@ impl AiSystem {
             3 => IVec2::new(1, 0),
             _ => IVec2::ZERO,
         };
-        let can_move = preview_intended_position(entity, entity.position, random_direction, ctx)
-            .is_some_and(|candidate| {
-                candidate == entity.position || ctx.is_movement_valid(entity, entity_id, candidate)
-            });
+        let can_move =
+            preview_intended_position(entity, entity_id, entity.position, random_direction, ctx)
+                .is_some_and(|candidate| {
+                    candidate == entity.position
+                        || ctx.is_movement_valid(entity, entity_id, candidate)
+                });
         Some(build_movement_intent_result(
             entity_id,
             can_move.then_some(random_direction),
@@ -139,7 +141,7 @@ impl AiSystem {
         let entity = ctx.entity_manager.get_entity(entity_id)?;
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
+        let detection_radius = ctx.entity_manager.ai(entity_id)?.ai_config.detection_radius;
 
         let distance = distance_between(current_position, player_pos);
 
@@ -161,7 +163,7 @@ impl AiSystem {
         let entity = ctx.entity_manager.get_entity(entity_id)?;
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
+        let detection_radius = ctx.entity_manager.ai(entity_id)?.ai_config.detection_radius;
 
         let distance = distance_between(current_position, player_pos);
 
@@ -235,13 +237,20 @@ impl AiSystem {
         remaining_distance: f32,
         ctx: &AiContext,
     ) -> Option<AiUpdateResult> {
-        let can_move = preview_intended_position(entity, current_position, direction, ctx)
-            .is_some_and(|candidate| {
-                candidate == current_position || ctx.is_movement_valid(entity, entity_id, candidate)
-            });
+        let can_move =
+            preview_intended_position(entity, entity_id, current_position, direction, ctx)
+                .is_some_and(|candidate| {
+                    candidate == current_position
+                        || ctx.is_movement_valid(entity, entity_id, candidate)
+                });
 
         let state = self.entity_states.get_mut(&entity_id)?;
-        let new_remaining = remaining_distance - entity.attributes.gameplay.speed.max(0.0);
+        let new_remaining = remaining_distance
+            - ctx
+                .entity_manager
+                .movement(entity_id)
+                .map(|movement| movement.speed.max(0.0))
+                .unwrap_or(0.0);
 
         if can_move && new_remaining > 0.0 {
             state.wander_phase = WanderPhase::Walking {

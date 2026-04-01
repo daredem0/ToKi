@@ -28,21 +28,6 @@
       }
     }
   },
-  "attributes": {
-    "health": 150,
-    "speed": 1.0,
-    "solid": true,
-    "active": true,
-    "can_move": true,
-    "interactable": true,
-    "interaction_reach": 16,
-    "ai_config": {
-      "behavior": "wander",
-      "detection_radius": 128
-    },
-    "movement_profile": "legacy_default",
-    "has_inventory": false
-  },
   "collision": {
     "enabled": true,
     "offset": [
@@ -169,5 +154,34 @@
     "default_state": "walk"
   },
   "category": "creature",
-  "tags": []
+  "tags": [],
+  "solid": true,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 1.0,
+      "movement_profile": "legacy_default",
+      "can_move": true
+    },
+    "ai": {
+      "ai_config": {
+        "behavior": "wander",
+        "detection_radius": 128
+      }
+    },
+    "interaction": {
+      "interaction_reach": 16
+    },
+    "combat": {
+      "health": 150,
+      "stats": {
+        "base": {
+          "health": 150
+        },
+        "current": {
+          "health": 150
+        }
+      }
+    }
+  }
 }
