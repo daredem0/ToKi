@@ -1,14 +1,11 @@
 use super::{
-    collect_map_object_sprite_render_requests, resolve_atlas_tile_frame,
-    resolve_object_sheet_frame, resolve_sprite_render_request, resolve_sprite_render_requests,
-    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial,
-    SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteResolveError, SpriteSortKey,
-    SpriteVisualRef,
+    resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_request,
+    resolve_sprite_render_requests, sort_sprite_render_requests, ResolvedSpriteVisual,
+    SpriteAssetResolver, SpriteRenderMaterial, SpriteRenderOrigin, SpriteRenderRequest,
+    SpriteRenderSize, SpriteResolveError, SpriteSortKey, SpriteVisualRef,
 };
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::object_sheet::{ObjectSheetMeta, ObjectSheetType, ObjectSpriteInfo};
-use crate::assets::tilemap::{MapObjectInstance, TileMap};
-use crate::entity::{EntityFootprint, EntityGrounding};
 use crate::sprite::SpriteFrame;
 use std::path::PathBuf;
 
@@ -109,11 +106,7 @@ fn explicit_request_size_overrides_intrinsic_visual_size() {
 #[test]
 fn intrinsic_request_size_uses_visual_intrinsic_size() {
     let request = SpriteRenderRequest {
-        origin: SpriteRenderOrigin::MapObject {
-            sheet_name: "items".to_string(),
-            object_name: "coin".to_string(),
-            position: glam::IVec2::new(0, 0),
-        },
+        origin: SpriteRenderOrigin::StaticEntity(7),
         sort_key: SpriteSortKey {
             primary: 3,
             secondary: 0,
@@ -184,74 +177,6 @@ fn batch_resolution_collects_failures_without_stopping() {
             sheet_name: "missing_sheet".to_string(),
         }
     );
-}
-
-#[test]
-fn map_object_request_collection_uses_intrinsic_size_and_sheet_stem() {
-    let tilemap = TileMap {
-        size: glam::UVec2::new(1, 1),
-        tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string()],
-        objects: vec![MapObjectInstance {
-            sheet: PathBuf::from("assets/sprites/items.json"),
-            object_name: "coin".to_string(),
-            position: glam::UVec2::new(32, 48),
-            size_px: glam::UVec2::new(99, 99),
-            grounding: Default::default(),
-            visible: true,
-            solid: false,
-        }],
-    };
-
-    let requests = collect_map_object_sprite_render_requests(&tilemap);
-    assert_eq!(requests.len(), 1);
-    assert_eq!(
-        requests[0].visual,
-        SpriteVisualRef::ObjectSheetObject {
-            sheet_name: "items".to_string(),
-            object_name: "coin".to_string(),
-        }
-    );
-    assert_eq!(requests[0].size, SpriteRenderSize::Intrinsic);
-}
-
-#[test]
-fn map_object_request_collection_sorts_by_ground_contact_instead_of_visual_height() {
-    let tilemap = TileMap {
-        size: glam::UVec2::new(1, 1),
-        tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string()],
-        objects: vec![
-            MapObjectInstance {
-                sheet: PathBuf::from("props.json"),
-                object_name: "tall_tree".to_string(),
-                position: glam::UVec2::new(0, 0),
-                size_px: glam::UVec2::new(32, 48),
-                grounding: EntityGrounding {
-                    origin: Some([16, 47]),
-                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
-                },
-                visible: true,
-                solid: false,
-            },
-            MapObjectInstance {
-                sheet: PathBuf::from("props.json"),
-                object_name: "crate".to_string(),
-                position: glam::UVec2::new(0, 20),
-                size_px: glam::UVec2::new(16, 16),
-                grounding: Default::default(),
-                visible: true,
-                solid: false,
-            },
-        ],
-    };
-
-    let requests = collect_map_object_sprite_render_requests(&tilemap);
-    assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].sort_key.primary, 48);
-    assert_eq!(requests[1].sort_key.primary, 36);
 }
 
 #[test]
@@ -499,41 +424,6 @@ mod format_sprite_resolve_failure_tests {
         assert!(message.contains("456"));
         assert!(message.contains("arrow"));
         assert!(message.contains("projectiles"));
-    }
-
-    #[test]
-    fn map_object_missing_sheet_formats_correctly() {
-        let origin = SpriteRenderOrigin::MapObject {
-            sheet_name: "decorations".to_string(),
-            object_name: "tree".to_string(),
-            position: glam::IVec2::new(100, 200),
-        };
-        let error = SpriteResolveError::MissingObjectSheet {
-            sheet_name: "decorations".to_string(),
-        };
-
-        let message = format_sprite_resolve_failure(&origin, &error);
-
-        assert!(message.contains("decorations"));
-        assert!(message.contains("sheet"));
-    }
-
-    #[test]
-    fn map_object_missing_object_formats_correctly() {
-        let origin = SpriteRenderOrigin::MapObject {
-            sheet_name: "decorations".to_string(),
-            object_name: "tree".to_string(),
-            position: glam::IVec2::new(100, 200),
-        };
-        let error = SpriteResolveError::MissingObject {
-            sheet_name: "decorations".to_string(),
-            object_name: "tree".to_string(),
-        };
-
-        let message = format_sprite_resolve_failure(&origin, &error);
-
-        assert!(message.contains("tree"));
-        assert!(message.contains("decorations"));
     }
 
     #[test]

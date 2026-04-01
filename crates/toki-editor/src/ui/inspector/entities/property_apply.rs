@@ -5,7 +5,7 @@ use super::types::EntityPropertyDraft;
 use crate::editor_services::commands as editor_commands;
 use crate::ui::editor_ui::EditorUI;
 use crate::ui::undo_redo::EditorCommand;
-use toki_core::entity::{ControlRole, EntityId};
+use toki_core::entity::{decoration_collision_box, ControlRole, EntityId, StaticObjectRenderDef};
 
 pub(super) const HEALTH_STAT_ID: &str = "health";
 pub(super) const ATTACK_POWER_STAT_ID: &str = "attack_power";
@@ -126,6 +126,20 @@ impl InspectorSystem {
             clamp_to_min_one_u32(draft.size_y),
         );
         changed |= set_if_changed(&mut entity.size, new_size);
+        let new_static_render = match (
+            draft.static_object_sheet.as_ref(),
+            draft.static_object_name.as_ref(),
+        ) {
+            (Some(sheet), Some(object_name)) => Some(StaticObjectRenderDef {
+                sheet: sheet.clone(),
+                object_name: object_name.clone(),
+            }),
+            _ => None,
+        };
+        changed |= set_if_changed(
+            &mut entity.attributes.rendering.static_object_render,
+            new_static_render,
+        );
 
         changed |= set_if_changed(&mut entity.attributes.rendering.visible, draft.visible);
         changed |= set_if_changed(
@@ -219,7 +233,25 @@ impl InspectorSystem {
             new_attack_power,
         );
 
-        changed |= apply_entity_collision(entity, draft);
+        if entity.attributes.rendering.static_object_render.is_some() {
+            let new_collision_box =
+                decoration_collision_box(entity.size, &entity.attributes.rendering.grounding, draft.solid);
+            let collision_changed = match (&entity.collision_box, &new_collision_box) {
+                (Some(current), Some(new_box)) => {
+                    current.offset != new_box.offset
+                        || current.size != new_box.size
+                        || current.trigger != new_box.trigger
+                }
+                (None, None) => false,
+                _ => true,
+            };
+            if collision_changed {
+                entity.collision_box = new_collision_box;
+                changed = true;
+            }
+        } else {
+            changed |= apply_entity_collision(entity, draft);
+        }
 
         changed
     }

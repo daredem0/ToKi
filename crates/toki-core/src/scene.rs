@@ -253,6 +253,15 @@ impl Scene {
         self.entities.iter().position(|e| e.id == entity_id)
     }
 
+    pub fn next_entity_id(&self) -> EntityId {
+        self.entities
+            .iter()
+            .map(|entity| entity.id)
+            .max()
+            .unwrap_or(0)
+            + 1
+    }
+
     pub fn remove_entity_at(&mut self, index: usize) -> Option<StoredEntity> {
         if index >= self.entities.len() {
             return None;

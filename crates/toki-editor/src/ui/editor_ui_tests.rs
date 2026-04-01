@@ -286,7 +286,6 @@ fn sync_map_editor_selection_preserves_unsaved_draft() {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
-                objects: vec![],
             },
         },
     );
@@ -320,7 +319,6 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
-                objects: vec![],
             },
         },
     );
@@ -371,7 +369,6 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
-                objects: vec![],
             },
         },
     );
@@ -416,7 +413,6 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
-                objects: vec![],
             },
         },
     );
@@ -616,48 +612,6 @@ fn map_editor_defaults_to_drag_tool() {
 }
 
 #[test]
-fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
-    let mut ui = EditorUI::new();
-
-    crate::ui::editor_ui::sync_map_editor_object_sheet_selection(
-        &mut ui,
-        &[
-            "trees".to_string(),
-            "fauna".to_string(),
-            "props".to_string(),
-        ],
-    );
-
-    assert_eq!(
-        crate::ui::editor_context::map_state_mut(&mut ui)
-            .selected_object_sheet
-            .as_deref(),
-        Some("fauna")
-    );
-}
-
-#[test]
-fn sync_map_editor_object_selection_picks_first_sorted_object() {
-    let mut ui = EditorUI::new();
-
-    crate::ui::editor_ui::sync_map_editor_object_selection(
-        &mut ui,
-        &[
-            "tree_large".to_string(),
-            "bush".to_string(),
-            "flower".to_string(),
-        ],
-    );
-
-    assert_eq!(
-        crate::ui::editor_context::map_state_mut(&mut ui)
-            .selected_object_name
-            .as_deref(),
-        Some("bush")
-    );
-}
-
-#[test]
 fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
     let mut ui = EditorUI::new();
     crate::ui::editor_context::map_state_mut(&mut ui).tool = super::MapEditorTool::PickTile;
@@ -677,106 +631,6 @@ fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
 }
 
 #[test]
-fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
-    let mut ui = EditorUI::new();
-    let grounding = toki_core::entity::EntityGrounding {
-        origin: Some([8, 15]),
-        footprint: Some(toki_core::entity::EntityFootprint::new([4, 12], [8, 4])),
-    };
-    crate::ui::editor_context::map_state_mut(&mut ui).selected_tile_info =
-        Some(super::MapEditorTileInfo {
-            tile_x: 1,
-            tile_y: 2,
-            tile_name: "grass".to_string(),
-            solid: false,
-            trigger: false,
-        });
-    let object = toki_core::assets::tilemap::MapObjectInstance {
-        sheet: std::path::PathBuf::from("fauna.json"),
-        object_name: "bush".to_string(),
-        position: glam::UVec2::new(16, 32),
-        size_px: glam::UVec2::new(16, 16),
-        grounding: grounding.clone(),
-        visible: true,
-        solid: false,
-    };
-
-    crate::ui::editor_ui::select_map_editor_object(&mut ui, 0, &object);
-    assert!(crate::ui::editor_context::map_state_mut(&mut ui)
-        .selected_tile_info
-        .is_none());
-    assert_eq!(
-        crate::ui::editor_context::map_state_mut(&mut ui)
-            .selected_object_info
-            .as_ref()
-            .map(|selected| selected.object_name.as_str()),
-        Some("bush")
-    );
-
-    let tilemap = toki_core::assets::tilemap::TileMap {
-        size: glam::UVec2::new(2, 2),
-        tile_size: glam::UVec2::new(16, 16),
-        atlas: std::path::PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string(); 4],
-        objects: vec![toki_core::assets::tilemap::MapObjectInstance {
-            solid: true,
-            position: glam::UVec2::new(32, 32),
-            ..object.clone()
-        }],
-    };
-
-    crate::ui::editor_ui::sync_selected_map_editor_object_from_tilemap(&mut ui, &tilemap);
-    let selected = crate::ui::editor_context::map_state(&ui)
-        .selected_object_info
-        .as_ref()
-        .expect("selected object should remain");
-    assert_eq!(selected.position, glam::UVec2::new(32, 32));
-    assert_eq!(selected.grounding, grounding);
-    assert!(selected.solid);
-}
-
-#[test]
-fn queue_map_editor_object_property_edit_updates_selected_object_info() {
-    let mut ui = EditorUI::new();
-    let grounding = toki_core::entity::EntityGrounding {
-        origin: Some([8, 15]),
-        footprint: Some(toki_core::entity::EntityFootprint::new([4, 12], [8, 4])),
-    };
-    let object = toki_core::assets::tilemap::MapObjectInstance {
-        sheet: std::path::PathBuf::from("fauna.json"),
-        object_name: "bush".to_string(),
-        position: glam::UVec2::new(16, 16),
-        size_px: glam::UVec2::new(16, 16),
-        grounding: Default::default(),
-        visible: true,
-        solid: false,
-    };
-    crate::ui::editor_ui::select_map_editor_object(&mut ui, 2, &object);
-
-    crate::ui::editor_ui::queue_map_editor_object_property_edit(
-        &mut ui,
-        2,
-        grounding.clone(),
-        false,
-        true,
-    );
-
-    let selected = crate::ui::editor_context::map_state(&ui)
-        .selected_object_info
-        .as_ref()
-        .expect("selected object should exist");
-    assert_eq!(selected.grounding, grounding);
-    assert!(!selected.visible);
-    assert!(selected.solid);
-    let request = crate::ui::editor_ui::take_map_editor_object_property_edit_request(&mut ui)
-        .expect("edit request should exist");
-    assert_eq!(request.object_index, 2);
-    assert_eq!(request.grounding, grounding);
-    assert!(!request.visible);
-    assert!(request.solid);
-}
-
-#[test]
 fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     let mut ui = EditorUI::new();
     ui.set_active_tab(super::CenterPanelTab::MapEditor);
@@ -789,7 +643,6 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
-                objects: vec![],
             },
         },
     );
@@ -839,7 +692,6 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string()],
-                objects: vec![],
             },
         },
     );
@@ -859,69 +711,6 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
     assert!(ui.can_undo());
     assert!(ui.undo());
     assert!(crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui).is_some());
-}
-
-#[test]
-fn map_editor_object_drag_records_undo_history() {
-    let mut ui = EditorUI::new();
-    ui.set_active_tab(super::CenterPanelTab::MapEditor);
-
-    let object_a = toki_core::assets::tilemap::MapObjectInstance {
-        sheet: std::path::PathBuf::from("fauna.json"),
-        object_name: "bush".to_string(),
-        position: glam::UVec2::new(16, 16),
-        size_px: glam::UVec2::new(16, 16),
-        grounding: Default::default(),
-        visible: true,
-        solid: false,
-    };
-    let tilemap_before = toki_core::assets::tilemap::TileMap {
-        size: glam::UVec2::new(4, 4),
-        tile_size: glam::UVec2::new(8, 8),
-        atlas: std::path::PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string(); 16],
-        objects: vec![object_a],
-    };
-
-    crate::ui::editor_ui::set_map_editor_draft(
-        &mut ui,
-        MapEditorDraft {
-            name: "drag_test".to_string(),
-            tilemap: tilemap_before.clone(),
-        },
-    );
-
-    // Simulate drag: snapshot before, start drag, move object, finish drag, snapshot after
-    crate::ui::editor_ui::begin_map_editor_edit(&mut ui, &tilemap_before);
-    crate::ui::editor_ui::begin_map_object_move_drag(&mut ui, 0, glam::Vec2::ZERO);
-
-    let mut tilemap_after = tilemap_before.clone();
-    tilemap_after.objects[0].position = glam::UVec2::new(48, 48);
-    crate::ui::editor_context::map_state_mut(&mut ui)
-        .draft
-        .as_mut()
-        .unwrap()
-        .tilemap = tilemap_after.clone();
-
-    crate::ui::editor_ui::finish_map_object_move_drag(&mut ui);
-    assert!(crate::ui::editor_ui::finish_map_editor_edit(
-        &mut ui,
-        &tilemap_after
-    ));
-
-    // Undo should restore original position
-    assert!(ui.can_undo());
-    assert!(ui.undo());
-    let undone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
-        .expect("undo should queue a tilemap sync");
-    assert_eq!(undone.objects[0].position, glam::UVec2::new(16, 16));
-
-    // Redo should restore dragged position
-    assert!(ui.can_redo());
-    assert!(ui.redo());
-    let redone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
-        .expect("redo should queue a tilemap sync");
-    assert_eq!(redone.objects[0].position, glam::UVec2::new(48, 48));
 }
 
 // =============================================================================

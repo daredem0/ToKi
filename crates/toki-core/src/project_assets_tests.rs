@@ -326,6 +326,90 @@ fn load_scene_from_path_reads_scene_json() {
 }
 
 #[test]
+fn load_scene_from_path_migrates_legacy_tilemap_objects_into_decorations() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project_root = tmp.path().join("project");
+    let scenes_dir = project_root.join("scenes");
+    let tilemaps_dir = project_root.join("assets").join("tilemaps");
+    fs::create_dir_all(&scenes_dir).expect("scenes dir");
+    fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+    let scene_path = scenes_dir.join("Main Scene.json");
+    fs::write(
+        &scene_path,
+        r#"{
+  "name": "Main Scene",
+  "description": null,
+  "maps": ["level_1"],
+  "entities": [],
+  "anchors": [],
+  "player_entry": null,
+  "rules": { "chains": [] },
+  "camera_position": null,
+  "camera_scale": null,
+  "background_music_track_id": null
+}"#,
+    )
+    .expect("write scene");
+    fs::write(
+        tilemaps_dir.join("level_1.json"),
+        r#"{
+  "size": [4, 4],
+  "tile_size": [16, 16],
+  "atlas": "terrain.json",
+  "tiles": [
+    "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass"
+  ],
+  "objects": [
+    {
+      "sheet": "fauna.json",
+      "object_name": "bush",
+      "position": [32, 48],
+      "size_px": [16, 24],
+      "grounding": {
+        "origin": [8, 23],
+        "footprint": { "offset": [4, 16], "size": [8, 8] }
+      },
+      "visible": true,
+      "solid": true
+    }
+  ]
+}"#,
+    )
+    .expect("write tilemap");
+
+    let scene = load_scene_from_path(&scene_path).expect("scene should load");
+    assert_eq!(scene.entities().len(), 1);
+
+    let entity = &scene.entities()[0];
+    assert_eq!(entity.entity_kind, crate::entity::EntityKind::Decoration);
+    assert_eq!(entity.position, glam::IVec2::new(32, 48));
+    assert_eq!(entity.size, glam::UVec2::new(16, 24));
+    assert_eq!(entity.attributes.rendering.grounding.origin, Some([8, 23]));
+    assert_eq!(
+        entity.attributes.rendering.grounding.footprint,
+        Some(crate::entity::EntityFootprint::new([4, 16], [8, 8]))
+    );
+    assert_eq!(
+        entity.attributes.rendering.static_object_render,
+        Some(crate::entity::StaticObjectRenderDef {
+            sheet: "fauna".to_string(),
+            object_name: "bush".to_string(),
+        })
+    );
+    let collision_box = entity
+        .collision_box
+        .as_ref()
+        .expect("migrated solid decoration should have a collision box");
+    assert_eq!(collision_box.offset, glam::IVec2::new(4, 16));
+    assert_eq!(collision_box.size, glam::UVec2::new(8, 8));
+    assert!(!collision_box.trigger);
+}
+
+#[test]
 fn load_entity_definition_from_path_reads_definition_json() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let entity_path = tmp.path().join("slime.json");

@@ -139,7 +139,6 @@ fn placement_collision_assets() -> (TileMap, AtlasMeta) {
             "floor".to_string(),
             "floor".to_string(),
         ],
-        objects: vec![],
     };
 
     (tilemap, atlas)

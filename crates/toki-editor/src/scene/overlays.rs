@@ -48,6 +48,26 @@ pub fn cached_preview_sprite_frame(
     cached.clone()
 }
 
+pub fn cached_decoration_preview_sprite_frame(
+    preview_sprite_frames: &mut std::collections::HashMap<
+        (std::path::PathBuf, String, Option<String>),
+        Option<PlacementPreviewVisual>,
+    >,
+    sheet_name: &str,
+    object_name: &str,
+    project_path: &std::path::Path,
+) -> Option<PlacementPreviewVisual> {
+    let cache_key = (
+        project_path.to_path_buf(),
+        format!("decoration::{sheet_name}::{object_name}"),
+        None,
+    );
+    let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
+        load_decoration_preview_sprite_frame(project_path, sheet_name, object_name)
+    });
+    cached.clone()
+}
+
 pub fn load_preview_sprite_frame(
     entity_def_name: &str,
     project_path: &std::path::Path,
@@ -205,6 +225,44 @@ pub fn load_preview_sprite_frame(
     }
 
     None
+}
+
+pub fn load_decoration_preview_sprite_frame(
+    project_path: &std::path::Path,
+    sheet_name: &str,
+    object_name: &str,
+) -> Option<PlacementPreviewVisual> {
+    let sheet_file = if sheet_name.ends_with(".json") {
+        sheet_name.to_string()
+    } else {
+        format!("{sheet_name}.json")
+    };
+    let object_sheet_path = project_path.join("assets").join("sprites").join(sheet_file);
+    let object_sheet =
+        toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(&object_sheet_path).ok()?;
+    let object_info = object_sheet.objects.get(object_name)?;
+    let texture_size = object_sheet
+        .image_size()
+        .unwrap_or(glam::UVec2::new(16, 16));
+    let uvs = object_sheet.get_object_uvs(object_name, texture_size)?;
+
+    Some(PlacementPreviewVisual {
+        frame: toki_core::sprite::SpriteFrame {
+            u0: uvs[0],
+            v0: uvs[1],
+            u1: uvs[2],
+            v1: uvs[3],
+        },
+        texture_path: object_sheet_path
+            .parent()
+            .map(|parent| parent.join(&object_sheet.image)),
+        texture_image: None,
+        texture_cache_key: None,
+        size: glam::UVec2::new(
+            object_info.size_tiles.x * object_sheet.tile_size.x,
+            object_info.size_tiles.y * object_sheet.tile_size.y,
+        ),
+    })
 }
 
 pub fn build_scene_player_overlay_sprites(

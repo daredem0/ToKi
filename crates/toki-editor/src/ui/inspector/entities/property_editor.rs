@@ -7,6 +7,12 @@ use super::helpers::{
 };
 use super::types::EntityPropertyDraft;
 use crate::config::EditorConfig;
+use crate::ui::editor_ui::EditorUI;
+use crate::ui::object_sheet_browser::{
+    build_decoration_placement_draft, ensure_object_sheet_preview_texture,
+    render_object_gallery_item, resolve_object_sheet_browser_source, sync_selected_object_name,
+    sync_selected_sheet_name,
+};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
@@ -105,6 +111,156 @@ impl InspectorSystem {
             true,
             "Scene Entity Properties",
         )
+    }
+
+    pub(in super::super) fn render_scene_entity_decoration_editor(
+        ui: &mut egui::Ui,
+        ui_state: &mut EditorUI,
+        draft: &mut EntityPropertyDraft,
+        config: Option<&EditorConfig>,
+    ) -> bool {
+        let Some(selected_sheet_name) = draft.static_object_sheet.clone() else {
+            return false;
+        };
+        let Some(project_path) = config.and_then(EditorConfig::current_project_path) else {
+            ui.separator();
+            ui.label("Open a project to edit decoration object sheets.");
+            return false;
+        };
+        let Some(source) =
+            resolve_object_sheet_browser_source(project_path, Some(selected_sheet_name.as_str()))
+        else {
+            ui.separator();
+            ui.label("No object sheets found in assets/sprites.");
+            return false;
+        };
+
+        let mut changed = false;
+        let mut selected_sheet = draft
+            .static_object_sheet
+            .clone()
+            .unwrap_or_else(|| source.selected_sheet_name.clone());
+        let mut selected_object = draft
+            .static_object_name
+            .clone()
+            .or_else(|| source.object_names.first().cloned())
+            .unwrap_or_default();
+
+        let mut normalized_sheet = draft.static_object_sheet.clone();
+        let mut normalized_object = draft.static_object_name.clone();
+        sync_selected_sheet_name(&mut normalized_sheet, &source.sheet_names);
+        sync_selected_object_name(&mut normalized_object, &source.object_names);
+        if normalized_sheet != draft.static_object_sheet {
+            draft.static_object_sheet = normalized_sheet.clone();
+            changed = true;
+        }
+        if normalized_object != draft.static_object_name {
+            draft.static_object_name = normalized_object.clone();
+            changed = true;
+        }
+        if let Some(normalized_sheet) = normalized_sheet {
+            selected_sheet = normalized_sheet;
+        }
+        if let Some(normalized_object) = normalized_object {
+            selected_object = normalized_object;
+        }
+
+        let active_source =
+            resolve_object_sheet_browser_source(project_path, Some(selected_sheet.as_str()))
+                .unwrap_or(source);
+        if !active_source
+            .object_names
+            .iter()
+            .any(|name| name == &selected_object)
+        {
+            selected_object = active_source
+                .object_names
+                .first()
+                .cloned()
+                .unwrap_or_default();
+            changed = true;
+        }
+
+        ui.separator();
+        ui.label("Decoration");
+        ui.horizontal(|ui| {
+            ui.label("Object Sheet:");
+            egui::ComboBox::from_id_salt("scene_entity_static_object_sheet")
+                .selected_text(selected_sheet.as_str())
+                .show_ui(ui, |ui| {
+                    for sheet_name in &active_source.sheet_names {
+                        changed |= ui
+                            .selectable_value(
+                                &mut selected_sheet,
+                                sheet_name.clone(),
+                                sheet_name.as_str(),
+                            )
+                            .changed();
+                    }
+                });
+        });
+        ui.horizontal(|ui| {
+            ui.label("Object:");
+            egui::ComboBox::from_id_salt("scene_entity_static_object_name")
+                .selected_text(selected_object.as_str())
+                .show_ui(ui, |ui| {
+                    for object_name in &active_source.object_names {
+                        changed |= ui
+                            .selectable_value(
+                                &mut selected_object,
+                                object_name.clone(),
+                                object_name.as_str(),
+                            )
+                            .changed();
+                    }
+                });
+        });
+
+        if changed {
+            draft.static_object_sheet = Some(selected_sheet.clone());
+            draft.static_object_name = Some(selected_object.clone());
+
+            if let Some(placement_draft) =
+                build_decoration_placement_draft(project_path, &selected_sheet, &selected_object)
+            {
+                draft.size_x = placement_draft.size_px.x as i64;
+                draft.size_y = placement_draft.size_px.y as i64;
+            }
+
+            let toolbox = &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                .toolbox;
+            toolbox.selected_object_sheet = Some(selected_sheet.clone());
+            toolbox.selected_object_name = Some(selected_object.clone());
+        }
+
+        let texture = {
+            let toolbox = &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                .toolbox;
+            ensure_object_sheet_preview_texture(
+                &mut toolbox.preview_image_path,
+                &mut toolbox.preview_texture,
+                ui.ctx(),
+                &active_source.texture_path,
+            )
+        };
+        if let Some(texture) = texture {
+            if let Some(texture_size) = active_source.object_sheet.image_size() {
+                ui.horizontal(|ui| {
+                    render_object_gallery_item(
+                        ui,
+                        texture.id(),
+                        texture_size,
+                        &active_source.object_sheet,
+                        &selected_object,
+                        true,
+                        72.0,
+                    );
+                    ui.label(selected_object.as_str());
+                });
+            }
+        }
+
+        changed
     }
 
     pub(in super::super) fn render_entity_definition_property_editor(

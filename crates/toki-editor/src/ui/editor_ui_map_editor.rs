@@ -2,18 +2,15 @@ use super::{EditorUI, MapEditorState};
 #[cfg(test)]
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::undo_redo::History;
-use std::path::PathBuf;
-use toki_core::assets::tilemap::{MapObjectInstance, TileMap};
-use toki_core::entity::EntityGrounding;
+use toki_core::assets::tilemap::TileMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub(crate) enum MapEditorTool {
     Drag,
     Brush,
     Fill,
     PickTile,
-    PlaceObject,
-    DeleteObject,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,32 +20,6 @@ pub struct MapEditorTileInfo {
     pub tile_name: String,
     pub solid: bool,
     pub trigger: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MapEditorObjectInfo {
-    pub index: usize,
-    pub sheet: PathBuf,
-    pub object_name: String,
-    pub position: glam::UVec2,
-    pub size_px: glam::UVec2,
-    pub grounding: EntityGrounding,
-    pub visible: bool,
-    pub solid: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MapObjectMoveDragState {
-    pub object_index: usize,
-    pub grab_offset: glam::Vec2,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MapEditorObjectPropertyEditRequest {
-    pub object_index: usize,
-    pub grounding: EntityGrounding,
-    pub visible: bool,
-    pub solid: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -250,9 +221,6 @@ pub(crate) fn set_map_editor_draft(ui_state: &mut EditorUI, draft: MapEditorDraf
         .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
-    crate::ui::editor_context::map_state_mut(ui_state).selected_object_info = None;
-    crate::ui::editor_context::map_state_mut(ui_state).object_edit_requested = None;
-    crate::ui::editor_context::map_state_mut(ui_state).object_move_drag = None;
 }
 
 pub(crate) fn map_editor_selected_label(ui_state: &EditorUI) -> String {
@@ -302,55 +270,6 @@ pub(crate) fn sync_map_editor_brush_selection(ui_state: &mut EditorUI, tile_name
         Some(sorted_names[0].clone());
 }
 
-pub(crate) fn sync_map_editor_object_sheet_selection(
-    ui_state: &mut EditorUI,
-    sheet_names: &[String],
-) {
-    if sheet_names.is_empty() {
-        crate::ui::editor_context::map_state_mut(ui_state).selected_object_sheet = None;
-        return;
-    }
-
-    if ui_state
-        .context::<crate::ui::editor_context::MapEditorContext>(super::CenterPanelTab::MapEditor)
-        .expect("map editor context should exist")
-        .map
-        .selected_object_sheet
-        .as_ref()
-        .is_some_and(|selected| sheet_names.iter().any(|name| name == selected))
-    {
-        return;
-    }
-
-    let mut sorted_names = sheet_names.to_vec();
-    sorted_names.sort();
-    crate::ui::editor_context::map_state_mut(ui_state).selected_object_sheet =
-        Some(sorted_names[0].clone());
-}
-
-pub(crate) fn sync_map_editor_object_selection(ui_state: &mut EditorUI, object_names: &[String]) {
-    if object_names.is_empty() {
-        crate::ui::editor_context::map_state_mut(ui_state).selected_object_name = None;
-        return;
-    }
-
-    if ui_state
-        .context::<crate::ui::editor_context::MapEditorContext>(super::CenterPanelTab::MapEditor)
-        .expect("map editor context should exist")
-        .map
-        .selected_object_name
-        .as_ref()
-        .is_some_and(|selected| object_names.iter().any(|name| name == selected))
-    {
-        return;
-    }
-
-    let mut sorted_names = object_names.to_vec();
-    sorted_names.sort();
-    crate::ui::editor_context::map_state_mut(ui_state).selected_object_name =
-        Some(sorted_names[0].clone());
-}
-
 pub(crate) fn pick_map_editor_tile(ui_state: &mut EditorUI, tile_name: String) {
     crate::ui::editor_context::map_state_mut(ui_state).selected_tile = Some(tile_name);
     crate::ui::editor_context::map_state_mut(ui_state).tool = MapEditorTool::Brush;
@@ -388,110 +307,6 @@ pub(crate) fn clear_map_editor_history(ui_state: &mut EditorUI) {
         .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
-}
-
-pub(crate) fn select_map_editor_object(
-    ui_state: &mut EditorUI,
-    index: usize,
-    object: &MapObjectInstance,
-) {
-    crate::ui::editor_context::map_state_mut(ui_state).selected_object_info =
-        Some(MapEditorObjectInfo {
-            index,
-            sheet: object.sheet.clone(),
-            object_name: object.object_name.clone(),
-            position: object.position,
-            size_px: object.size_px,
-            grounding: object.grounding.clone(),
-            visible: object.visible,
-            solid: object.solid,
-        });
-    crate::ui::editor_context::map_state_mut(ui_state).selected_tile_info = None;
-}
-
-pub(crate) fn clear_map_editor_object_selection(ui_state: &mut EditorUI) {
-    crate::ui::editor_context::map_state_mut(ui_state).selected_object_info = None;
-    crate::ui::editor_context::map_state_mut(ui_state).object_move_drag = None;
-    crate::ui::editor_context::map_state_mut(ui_state).object_edit_requested = None;
-}
-
-pub(crate) fn sync_selected_map_editor_object_from_tilemap(
-    ui_state: &mut EditorUI,
-    tilemap: &TileMap,
-) {
-    let Some(selected) = crate::ui::editor_context::map_state_mut(ui_state)
-        .selected_object_info
-        .as_mut()
-    else {
-        return;
-    };
-    let Some(object) = tilemap.objects.get(selected.index) else {
-        clear_map_editor_object_selection(ui_state);
-        return;
-    };
-    selected.sheet = object.sheet.clone();
-    selected.object_name = object.object_name.clone();
-    selected.position = object.position;
-    selected.size_px = object.size_px;
-    selected.grounding = object.grounding.clone();
-    selected.visible = object.visible;
-    selected.solid = object.solid;
-}
-
-pub(crate) fn begin_map_object_move_drag(
-    ui_state: &mut EditorUI,
-    object_index: usize,
-    grab_offset: glam::Vec2,
-) {
-    crate::ui::editor_context::map_state_mut(ui_state).object_move_drag =
-        Some(MapObjectMoveDragState {
-            object_index,
-            grab_offset,
-        });
-}
-
-pub(crate) fn is_map_object_move_drag_active(ui_state: &EditorUI) -> bool {
-    crate::ui::editor_context::map_state(ui_state)
-        .object_move_drag
-        .is_some()
-}
-
-pub(crate) fn finish_map_object_move_drag(ui_state: &mut EditorUI) {
-    crate::ui::editor_context::map_state_mut(ui_state).object_move_drag = None;
-}
-
-pub(crate) fn queue_map_editor_object_property_edit(
-    ui_state: &mut EditorUI,
-    object_index: usize,
-    grounding: EntityGrounding,
-    visible: bool,
-    solid: bool,
-) {
-    crate::ui::editor_context::map_state_mut(ui_state).object_edit_requested =
-        Some(MapEditorObjectPropertyEditRequest {
-            object_index,
-            grounding: grounding.clone(),
-            visible,
-            solid,
-        });
-    if let Some(selected) = crate::ui::editor_context::map_state_mut(ui_state)
-        .selected_object_info
-        .as_mut()
-    {
-        if selected.index == object_index {
-            selected.grounding = grounding;
-            selected.visible = visible;
-            selected.solid = solid;
-        }
-    }
-}
-
-pub(crate) fn take_map_editor_object_property_edit_request(
-    ui_state: &mut EditorUI,
-) -> Option<MapEditorObjectPropertyEditRequest> {
-    crate::ui::editor_context::map_state_mut(ui_state)
-        .object_edit_requested
-        .take()
 }
 
 pub(crate) fn begin_map_editor_edit(ui_state: &mut EditorUI, before: &TileMap) {

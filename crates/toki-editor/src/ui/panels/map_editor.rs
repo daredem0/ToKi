@@ -95,8 +95,6 @@ impl PanelSystem {
                     MapEditorTool::Brush => "Brush",
                     MapEditorTool::Fill => "Fill",
                     MapEditorTool::PickTile => "Pick Tile",
-                    MapEditorTool::PlaceObject => "Place Object",
-                    MapEditorTool::DeleteObject => "Delete",
                 },
             );
         });
@@ -199,12 +197,6 @@ impl PanelSystem {
         if let Err(error) = viewport.update() {
             tracing::error!("Map editor viewport update error: {error}");
         }
-        if let Some(tilemap) = viewport.tilemap() {
-            crate::ui::editor_ui::sync_selected_map_editor_object_from_tilemap(ui_state, tilemap);
-        }
-        if Self::apply_pending_map_editor_object_edit(ui_state, viewport) {
-            viewport.mark_dirty();
-        }
 
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
@@ -220,36 +212,8 @@ impl PanelSystem {
 
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
-                if !crate::ui::editor_ui::is_map_object_move_drag_active(ui_state) {
-                    crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
-                }
-                if response.drag_started() {
-                    if let Some(drag_start_pos) = response.interact_pointer_pos() {
-                        Self::handle_map_editor_object_drag_start(
-                            ui_state,
-                            viewport,
-                            drag_start_pos,
-                            display_rect,
-                        );
-                    }
-                }
-
-                if crate::ui::editor_ui::is_map_object_move_drag_active(ui_state) {
-                    Self::handle_map_editor_object_drag_update(
-                        ui,
-                        ui_state,
-                        viewport,
-                        display_rect,
-                    );
-                    if response.drag_stopped()
-                        && Self::handle_map_editor_object_drag_release(ui_state, viewport)
-                    {
-                        crate::ui::editor_ui::mark_map_editor_dirty(ui_state);
-                    }
-                    viewport.stop_camera_drag();
-                } else {
-                    Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
-                }
+                crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
+                Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
             }
             MapEditorTool::Brush => {
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
@@ -259,14 +223,6 @@ impl PanelSystem {
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
             MapEditorTool::PickTile => {
-                crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
-                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
-            }
-            MapEditorTool::PlaceObject => {
-                crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
-                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
-            }
-            MapEditorTool::DeleteObject => {
                 crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
@@ -303,32 +259,12 @@ impl PanelSystem {
                 &viewport_ctx,
                 project_path,
             );
-            Self::paint_map_editor_object_preview(
-                ui,
-                ui_state,
-                viewport,
-                &viewport_ctx,
-                project_path,
-            );
         }
 
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
                 if response.clicked() {
-                    if let Some(selected_object_index) =
-                        Self::handle_map_editor_object_select(ui, viewport, &response, display_rect)
-                    {
-                        if let Some(tilemap) = viewport.tilemap() {
-                            if let Some(object) = tilemap.objects.get(selected_object_index) {
-                                crate::ui::editor_ui::select_map_editor_object(
-                                    ui_state,
-                                    selected_object_index,
-                                    object,
-                                );
-                            }
-                        }
-                    } else if let Some(project_path) = project_path.as_deref() {
-                        crate::ui::editor_ui::clear_map_editor_object_selection(ui_state);
+                    if let Some(project_path) = project_path.as_deref() {
                         if let Some(tile_info) = Self::handle_map_editor_tile_inspect(
                             ui,
                             viewport,
@@ -339,8 +275,6 @@ impl PanelSystem {
                             crate::ui::editor_context::map_state_mut(ui_state).selected_tile_info =
                                 tile_info;
                         }
-                    } else {
-                        crate::ui::editor_ui::clear_map_editor_object_selection(ui_state);
                     }
                 }
             }
@@ -393,29 +327,6 @@ impl PanelSystem {
                     Self::handle_map_editor_tile_pick(ui, viewport, &response, display_rect)
                 {
                     crate::ui::editor_ui::pick_map_editor_tile(ui_state, tile_name);
-                }
-            }
-            MapEditorTool::PlaceObject => {
-                if Self::handle_map_editor_object_place(
-                    ui,
-                    ui_state,
-                    viewport,
-                    &response,
-                    display_rect,
-                    project_path.as_deref(),
-                ) {
-                    crate::ui::editor_ui::mark_map_editor_dirty(ui_state);
-                }
-            }
-            MapEditorTool::DeleteObject => {
-                if Self::handle_map_editor_object_delete(
-                    ui,
-                    ui_state,
-                    viewport,
-                    &response,
-                    display_rect,
-                ) {
-                    crate::ui::editor_ui::mark_map_editor_dirty(ui_state);
                 }
             }
         }

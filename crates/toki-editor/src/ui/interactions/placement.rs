@@ -2,12 +2,15 @@ use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::editor_services::commands as editor_commands;
 use crate::scene::SceneViewport;
-use crate::ui::editor_ui::SceneAnchorPlacementDraft;
+use crate::ui::interactions::MapObjectInteraction;
+use crate::ui::editor_ui::{DecorationPlacementDraft, SceneAnchorPlacementDraft};
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
-use toki_core::entity::{Entity, EntityDefinition};
+use toki_core::entity::{
+    build_decoration_entity, decoration_collision_box, DecorationSpec, Entity, EntityDefinition,
+};
 use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 
 /// Handles entity placement interactions
@@ -68,12 +71,19 @@ impl PlacementInteraction {
                     .as_ref()
                     .map(|drag| drag.grab_offset)
                     .unwrap_or(glam::Vec2::ZERO);
-                let world_pos = GridInteraction::drag_target_world_position(
+                let mut world_pos = GridInteraction::drag_target_world_position(
                     cursor_world,
                     grab_offset,
                     viewport.tilemap(),
                     config,
                 );
+                if crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .decoration_draft()
+                    .is_some()
+                {
+                    world_pos = Self::decoration_anchor_world_position(viewport.tilemap(), world_pos);
+                }
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .preview_position = Some(world_pos);
@@ -107,12 +117,19 @@ impl PlacementInteraction {
         tracing::info!("Placement click detected at screen pos: {:?}", click_pos);
 
         let display_rect = viewport.display_rect_in(rect);
-        let world_pos = GridInteraction::placement_pose(
+        let mut world_pos = GridInteraction::placement_pose(
             viewport.screen_to_world_pos_raw(click_pos, display_rect),
             viewport.tilemap(),
             config,
         )
         .world_origin;
+        if crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .decoration_draft()
+            .is_some()
+        {
+            world_pos = Self::decoration_anchor_world_position(viewport.tilemap(), world_pos);
+        }
         if let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state)
             .placement
             .entity_definition()
@@ -128,6 +145,26 @@ impl PlacementInteraction {
             );
 
             if Self::try_place_entity(ui_state, &entity_def_name, world_pos, config, viewport) {
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .exit_placement_mode();
+            }
+            return;
+        }
+
+        if let Some(decoration_draft) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .decoration_draft()
+            .cloned()
+        {
+            tracing::info!(
+                "Placing decoration '{}:{}' at world coordinates ({}, {})",
+                decoration_draft.sheet,
+                decoration_draft.object_name,
+                world_pos.x,
+                world_pos.y
+            );
+            if Self::try_place_decoration(ui_state, decoration_draft, world_pos, viewport) {
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
@@ -153,6 +190,16 @@ impl PlacementInteraction {
                     .exit_placement_mode();
             }
         }
+    }
+
+    fn decoration_anchor_world_position(
+        tilemap: Option<&TileMap>,
+        world_pos: glam::Vec2,
+    ) -> glam::Vec2 {
+        tilemap
+            .and_then(|tilemap| MapObjectInteraction::object_anchor_at_world(tilemap, world_pos))
+            .map(|anchor| anchor.as_vec2())
+            .unwrap_or(world_pos)
     }
 
     fn try_place_scene_anchor(
@@ -264,6 +311,65 @@ impl PlacementInteraction {
         )
     }
 
+    fn try_place_decoration(
+        ui_state: &mut EditorUI,
+        draft: DecorationPlacementDraft,
+        world_pos: glam::Vec2,
+        viewport: &SceneViewport,
+    ) -> bool {
+        let Some(active_scene_name) = ui_state.active_scene.clone() else {
+            tracing::error!("No active scene for decoration placement");
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                .placement
+                .exit_placement_mode();
+            return false;
+        };
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|s| s.name == active_scene_name)
+        else {
+            tracing::error!("Active scene '{}' not found", active_scene_name);
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                .placement
+                .exit_placement_mode();
+            return false;
+        };
+
+        let world_pos_i32 = Self::placement_world_position_to_entity_position(world_pos);
+        let entity = build_decoration_entity(
+            Self::next_entity_id(ui_state.scenes[scene_index].entities()),
+            DecorationSpec {
+                position: world_pos_i32,
+                size: draft.size_px,
+                sheet: draft.sheet.clone(),
+                object_name: draft.object_name.clone(),
+                grounding: draft.grounding.clone(),
+                visible: draft.visible,
+                solid: draft.solid,
+            },
+        );
+
+        let tilemap = viewport.tilemap();
+        let terrain_atlas = tilemap.map(|_| viewport.resources().get_terrain_atlas());
+        let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, terrain_atlas);
+        if !can_place {
+            tracing::warn!(
+                "Cannot place decoration '{}:{}' at position ({}, {}) - collision detected with solid terrain",
+                draft.sheet,
+                draft.object_name,
+                world_pos_i32.x,
+                world_pos_i32.y
+            );
+            return false;
+        }
+
+        editor_commands::execute(
+            ui_state,
+            EditorCommand::add_entity(active_scene_name, entity),
+        )
+    }
+
     /// Create entity in the active scene, returns true if successful
     fn create_entity_in_scene(
         ui_state: &mut EditorUI,
@@ -368,6 +474,30 @@ impl PlacementInteraction {
         {
             return true;
         }
+
+        let world_pos_i32 = Self::placement_world_position_to_entity_position(world_pos);
+        if let Some(decoration_draft) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .decoration_draft()
+        {
+            let collision_box = decoration_collision_box(
+                decoration_draft.size_px,
+                &decoration_draft.grounding,
+                decoration_draft.solid,
+            );
+            return if let Some(tilemap) = viewport.tilemap() {
+                let terrain_atlas = viewport.resources().get_terrain_atlas();
+                toki_core::collision::can_place_collision_box_at_position(
+                    collision_box.as_ref(),
+                    world_pos_i32,
+                    tilemap,
+                    terrain_atlas,
+                )
+            } else {
+                true
+            };
+        }
+
         let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state)
             .placement
             .entity_definition()
@@ -387,8 +517,6 @@ impl PlacementInteraction {
             Ok(entity_def) => entity_def,
             Err(_) => return false,
         };
-
-        let world_pos_i32 = Self::placement_world_position_to_entity_position(world_pos);
 
         let collision_box = entity_def.get_collision_box();
         if let Some(tilemap) = viewport.tilemap() {

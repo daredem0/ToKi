@@ -44,7 +44,6 @@ fn create_collision_test_tilemap() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         tiles,
-        objects: vec![],
     }
 }
 

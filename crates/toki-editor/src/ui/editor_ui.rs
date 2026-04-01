@@ -57,20 +57,15 @@ pub(crate) use editor_ui_graph::{
     rule_graph_for_scene, set_graph_view_for_scene, set_rule_graph_for_scene,
     sync_rule_graph_with_rule_set, SceneRulesGraphCommandData,
 };
+#[allow(unused_imports)]
 pub(crate) use editor_ui_map_editor::{
-    begin_map_editor_edit, begin_map_object_move_drag, begin_new_map_dialog,
-    cancel_map_editor_edit, clear_map_editor_dirty, clear_map_editor_history,
-    clear_map_editor_object_selection, finalize_saved_existing_map,
-    finalize_saved_map_editor_draft, finish_map_editor_edit, finish_map_object_move_drag,
-    has_unsaved_map_editor_changes, has_unsaved_map_editor_draft, is_map_object_move_drag_active,
-    map_editor_selected_label, mark_map_editor_dirty, pick_map_editor_tile,
-    queue_map_editor_object_property_edit, select_map_editor_object, set_map_editor_draft,
-    submit_new_map_request, sync_map_editor_brush_selection, sync_map_editor_object_selection,
-    sync_map_editor_object_sheet_selection, sync_map_editor_selection,
-    sync_selected_map_editor_object_from_tilemap, take_map_editor_object_property_edit_request,
-    take_pending_map_editor_tilemap_sync, MapEditorDraft, MapEditorHistory, MapEditorObjectInfo,
-    MapEditorObjectPropertyEditRequest, MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState,
-    NewMapRequest,
+    begin_map_editor_edit, begin_new_map_dialog, cancel_map_editor_edit, clear_map_editor_dirty,
+    clear_map_editor_history, finalize_saved_existing_map, finalize_saved_map_editor_draft,
+    finish_map_editor_edit, has_unsaved_map_editor_changes, has_unsaved_map_editor_draft,
+    map_editor_selected_label, mark_map_editor_dirty, pick_map_editor_tile, set_map_editor_draft,
+    submit_new_map_request, sync_map_editor_brush_selection, sync_map_editor_selection,
+    take_pending_map_editor_tilemap_sync, MapEditorDraft, MapEditorHistory, MapEditorTileInfo,
+    MapEditorTool, NewMapRequest,
 };
 pub(crate) use editor_ui_menu_editor::{
     select_menu_dialog, select_menu_entry, select_menu_screen, selected_menu_dialog_id,
@@ -137,6 +132,7 @@ pub(crate) enum CenterPanelTab {
 pub(crate) enum RightPanelTab {
     Inspector,
     Project,
+    Toolbox,
 }
 
 #[derive(Debug, Clone)]
@@ -370,8 +366,27 @@ pub struct SceneAnchorPlacementDraft {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecorationPlacementDraft {
+    pub sheet: String,
+    pub object_name: String,
+    pub size_px: glam::UVec2,
+    pub grounding: toki_core::entity::EntityGrounding,
+    pub visible: bool,
+    pub solid: bool,
+}
+
+#[derive(Default)]
+pub struct SceneToolboxState {
+    pub selected_object_sheet: Option<String>,
+    pub selected_object_name: Option<String>,
+    pub preview_image_path: Option<PathBuf>,
+    pub preview_texture: Option<egui::TextureHandle>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlacementKind {
     EntityDefinition(String),
+    Decoration(DecorationPlacementDraft),
     SceneAnchor(SceneAnchorPlacementDraft),
 }
 
@@ -393,6 +408,18 @@ impl PlacementState {
             "Entered placement mode for entity: {:?}",
             self.entity_definition()
         );
+    }
+
+    pub fn enter_decoration_placement_mode(&mut self, draft: DecorationPlacementDraft) {
+        tracing::info!(
+            "Entered placement mode for decoration '{}:{}'",
+            draft.sheet,
+            draft.object_name
+        );
+        self.kind = Some(PlacementKind::Decoration(draft));
+        self.preview_position = None;
+        self.preview_cached_frame = None;
+        self.preview_valid = None;
     }
 
     pub fn enter_scene_anchor_placement_mode(&mut self, draft: SceneAnchorPlacementDraft) {
@@ -428,10 +455,30 @@ impl PlacementState {
         }
     }
 
+    pub fn decoration_draft(&self) -> Option<&DecorationPlacementDraft> {
+        match &self.kind {
+            Some(PlacementKind::Decoration(draft)) => Some(draft),
+            _ => None,
+        }
+    }
+
     pub fn scene_anchor_draft(&self) -> Option<&SceneAnchorPlacementDraft> {
         match &self.kind {
             Some(PlacementKind::SceneAnchor(draft)) => Some(draft),
             _ => None,
+        }
+    }
+
+    pub fn mode_label(&self) -> Option<String> {
+        match &self.kind {
+            Some(PlacementKind::EntityDefinition(name)) => Some(format!("Entity: {name}")),
+            Some(PlacementKind::Decoration(draft)) => {
+                Some(format!("Object: {}/{}", draft.sheet, draft.object_name))
+            }
+            Some(PlacementKind::SceneAnchor(draft)) => {
+                Some(format!("Anchor: {}", draft.suggested_id))
+            }
+            None => None,
         }
     }
 
@@ -514,14 +561,11 @@ pub struct MapEditorState {
     pub draft: Option<MapEditorDraft>,
     pub dirty: bool,
     pub selected_tile: Option<String>,
-    pub selected_object_sheet: Option<String>,
-    pub selected_object_name: Option<String>,
     pub tool: MapEditorTool,
     pub brush_size_tiles: u32,
     pub brush_preview_image_path: Option<PathBuf>,
     pub brush_preview_texture: Option<egui::TextureHandle>,
     pub selected_tile_info: Option<MapEditorTileInfo>,
-    pub selected_object_info: Option<MapEditorObjectInfo>,
     pub show_new_map_dialog: bool,
     pub new_map_name: String,
     pub new_map_width: u32,
@@ -533,8 +577,6 @@ pub struct MapEditorState {
     pub history: MapEditorHistory,
     pub pending_tilemap_sync: Option<TileMap>,
     pub edit_before: Option<TileMap>,
-    pub object_move_drag: Option<MapObjectMoveDragState>,
-    pub object_edit_requested: Option<MapEditorObjectPropertyEditRequest>,
 }
 
 impl Default for MapEditorState {
@@ -546,14 +588,11 @@ impl Default for MapEditorState {
             draft: None,
             dirty: false,
             selected_tile: None,
-            selected_object_sheet: None,
-            selected_object_name: None,
             tool: MapEditorTool::Drag,
             brush_size_tiles: 1,
             brush_preview_image_path: None,
             brush_preview_texture: None,
             selected_tile_info: None,
-            selected_object_info: None,
             show_new_map_dialog: false,
             new_map_name: "new_map".to_string(),
             new_map_width: 32,
@@ -565,8 +604,6 @@ impl Default for MapEditorState {
             history: MapEditorHistory::default(),
             pending_tilemap_sync: None,
             edit_before: None,
-            object_move_drag: None,
-            object_edit_requested: None,
         }
     }
 }

@@ -225,7 +225,6 @@ fn create_test_tilemap() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         tiles: vec!["grass".to_string(); 256], // 16x16 passable tiles
-        objects: Vec::new(),
     }
 }
 
@@ -274,7 +273,6 @@ fn create_tilemap_with_vertical_wall() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         tiles,
-        objects: Vec::new(),
     }
 }
 
@@ -291,7 +289,6 @@ fn create_tilemap_with_horizontal_wall() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         tiles,
-        objects: Vec::new(),
     }
 }
 

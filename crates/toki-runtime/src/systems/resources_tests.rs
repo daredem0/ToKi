@@ -113,7 +113,6 @@ fn resolve_tilemap_atlas_path_prefers_map_directory_relative_atlas() {
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
         tiles: vec!["floor".to_string()],
-        objects: vec![],
     };
 
     let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
@@ -138,7 +137,6 @@ fn resolve_tilemap_atlas_path_falls_back_to_project_sprites_dir() {
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
         tiles: vec!["floor".to_string()],
-        objects: vec![],
     };
 
     let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)

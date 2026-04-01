@@ -217,6 +217,9 @@ impl EditorApp {
         if let Some(viewport) = &mut self.viewports.scene {
             viewport.clear_tilemap();
         }
+        if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
+            map_editor_viewport.clear_tilemap();
+        }
         tracing::debug!("No active scene set, cleared viewport");
     }
 }

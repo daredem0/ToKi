@@ -219,6 +219,33 @@ fn test_entity_interaction_bounds_prefers_collision_box() {
 }
 
 #[test]
+fn build_decoration_entity_uses_grounding_footprint_for_collision_box() {
+    let entity = build_decoration_entity(
+        7,
+        DecorationSpec {
+            position: IVec2::new(32, 48),
+            size: UVec2::new(16, 24),
+            sheet: "fauna.json".to_string(),
+            object_name: "bush".to_string(),
+            grounding: EntityGrounding {
+                origin: Some([8, 23]),
+                footprint: Some(EntityFootprint::new([4, 16], [8, 8])),
+            },
+            visible: true,
+            solid: true,
+        },
+    );
+
+    let collision_box = entity
+        .collision_box
+        .as_ref()
+        .expect("solid decoration should have a collision box");
+    assert_eq!(collision_box.offset, IVec2::new(4, 16));
+    assert_eq!(collision_box.size, UVec2::new(8, 8));
+    assert!(!collision_box.trigger);
+}
+
+#[test]
 fn test_entity_interaction_bounds_falls_back_to_entity_rect_without_collision_box() {
     let mut entity = player_definition()
         .create_entity(IVec2::new(10, 20), 1)

@@ -10,7 +10,6 @@ use crate::config::EditorConfig;
 use crate::project::Project;
 use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
 use std::collections::HashMap;
-use toki_core::assets::object_sheet::ObjectSheetMeta;
 use toki_core::entity::EntityKind;
 use toki_core::entity::{
     AiBehavior, AiConfig, ControlRole, MovementProfile, MovementSoundTrigger, ATTACK_POWER_STAT_ID,
@@ -35,6 +34,7 @@ mod map_editor;
 mod menu_editor;
 mod project;
 mod rules;
+mod scene_viewport_toolbox;
 mod sprite_editor;
 mod ui_editor;
 
@@ -375,6 +375,11 @@ impl InspectorSystem {
                         super::editor_ui::RightPanelTab::Project,
                         "Project",
                     );
+                    ui.selectable_value(
+                        &mut ui_state.workspace.right_panel_tab,
+                        super::editor_ui::RightPanelTab::Toolbox,
+                        "Toolbox",
+                    );
                 });
                 ui.separator();
 
@@ -395,6 +400,17 @@ impl InspectorSystem {
                             Self::render_project_settings_panel(
                                 ui_state,
                                 ui,
+                                project,
+                                project_assets,
+                                config,
+                            );
+                        }
+                        super::editor_ui::RightPanelTab::Toolbox => {
+                            Self::render_toolbox_panel_contents(
+                                ui_state,
+                                ui,
+                                ctx,
+                                game_state,
                                 project,
                                 project_assets,
                                 config,
@@ -451,6 +467,46 @@ impl InspectorSystem {
         };
 
         inspector.render(ui, &mut inspector_ctx);
+    }
+
+    fn render_toolbox_panel_contents(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        game_state: Option<&toki_core::GameState>,
+        mut project: Option<&mut Project>,
+        mut project_assets: Option<&mut crate::project::ProjectAssets>,
+        config: Option<&EditorConfig>,
+    ) {
+        let mut host = super::editor_context::EditorContextHost {
+            scene_viewport: None,
+            map_editor_viewport: None,
+            project: match project.as_mut() {
+                Some(project) => Some(&mut **project),
+                None => None,
+            },
+            project_assets: match project_assets.as_mut() {
+                Some(project_assets) => Some(&mut **project_assets),
+                None => None,
+            },
+            available_map_names: None,
+            config: None,
+            log_capture: None,
+            renderer: None,
+        };
+        let handled = ui_state.with_active_context(|context, shell| {
+            context.render_toolbox(shell, ui, ctx, game_state, &mut host)
+        });
+        if handled {
+            return;
+        }
+
+        ui.label("No tools for this tab.");
+        if matches!(ui_state.active_tab(), super::editor_ui::CenterPanelTab::MapEditor) {
+            ui.small("Map editing tools stay in the map-editor inspector until Phase 6.3.");
+        } else if config.is_none() {
+            ui.small("Open a project to access spatial authoring tools.");
+        }
     }
 
     fn save_entity_definition(

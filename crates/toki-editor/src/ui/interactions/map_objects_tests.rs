@@ -1,7 +1,8 @@
 use super::MapObjectInteraction;
-use glam::UVec2;
+use glam::{IVec2, UVec2};
 use std::path::PathBuf;
-use toki_core::assets::tilemap::{MapObjectInstance, TileMap};
+use toki_core::assets::tilemap::TileMap;
+use toki_core::entity::{build_decoration_entity, DecorationSpec};
 
 fn sample_tilemap() -> TileMap {
     TileMap {
@@ -9,8 +10,21 @@ fn sample_tilemap() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
         tiles: vec!["grass".to_string(); 16],
-        objects: vec![],
     }
+}
+
+fn sample_decoration(id: u32, position: IVec2, visible: bool) -> toki_core::entity::Entity {
+    let mut entity = build_decoration_entity(
+        id,
+        DecorationSpec::new(
+            position,
+            UVec2::new(16, 16),
+            "fauna.json",
+            format!("object_{id}"),
+        ),
+    );
+    entity.attributes.rendering.visible = visible;
+    entity
 }
 
 #[test]
@@ -24,111 +38,25 @@ fn object_anchor_at_world_snaps_to_tile_grid() {
 }
 
 #[test]
-fn place_object_appends_map_object_instance() {
-    let mut tilemap = sample_tilemap();
+fn object_entity_at_world_prefers_topmost_visible_decoration() {
+    let first = sample_decoration(1, IVec2::new(16, 16), true);
+    let second = sample_decoration(2, IVec2::new(16, 16), true);
 
-    let changed = MapObjectInteraction::place_object(
-        &mut tilemap,
-        UVec2::new(16, 32),
-        "fauna.json",
-        "fauna_a",
-        UVec2::new(16, 16),
-    );
-
-    assert!(changed);
     assert_eq!(
-        tilemap.objects,
-        vec![MapObjectInstance {
-            sheet: PathBuf::from("fauna.json"),
-            object_name: "fauna_a".to_string(),
-            position: UVec2::new(16, 32),
-            size_px: UVec2::new(16, 16),
-            grounding: Default::default(),
-            visible: true,
-            solid: true,
-        }]
+        MapObjectInteraction::object_entity_at_world(
+            [&first, &second],
+            glam::Vec2::new(20.0, 20.0)
+        ),
+        Some(2)
     );
 }
 
 #[test]
-fn object_index_at_world_prefers_last_placed_object() {
-    let mut tilemap = sample_tilemap();
-    tilemap.objects = vec![
-        MapObjectInstance {
-            sheet: PathBuf::from("fauna.json"),
-            object_name: "first".to_string(),
-            position: UVec2::new(16, 16),
-            size_px: UVec2::new(16, 16),
-            grounding: Default::default(),
-            visible: true,
-            solid: true,
-        },
-        MapObjectInstance {
-            sheet: PathBuf::from("fauna.json"),
-            object_name: "second".to_string(),
-            position: UVec2::new(16, 16),
-            size_px: UVec2::new(16, 16),
-            grounding: Default::default(),
-            visible: true,
-            solid: true,
-        },
-    ];
+fn object_entity_at_world_ignores_invisible_decorations() {
+    let hidden = sample_decoration(7, IVec2::new(16, 16), false);
 
     assert_eq!(
-        MapObjectInteraction::object_index_at_world(&tilemap, glam::Vec2::new(20.0, 20.0)),
-        Some(1)
-    );
-}
-
-#[test]
-fn move_object_updates_selected_map_object_position() {
-    let mut tilemap = sample_tilemap();
-    MapObjectInteraction::place_object(
-        &mut tilemap,
-        UVec2::new(16, 16),
-        "fauna.json",
-        "fauna_a",
-        UVec2::new(16, 16),
-    );
-
-    assert!(MapObjectInteraction::move_object(
-        &mut tilemap,
-        0,
-        UVec2::new(32, 16)
-    ));
-    assert_eq!(tilemap.objects[0].position, UVec2::new(32, 16));
-}
-
-#[test]
-fn object_index_at_world_ignores_invisible_objects() {
-    let mut tilemap = sample_tilemap();
-    tilemap.objects = vec![MapObjectInstance {
-        sheet: PathBuf::from("fauna.json"),
-        object_name: "hidden".to_string(),
-        position: UVec2::new(16, 16),
-        size_px: UVec2::new(16, 16),
-        grounding: Default::default(),
-        visible: false,
-        solid: true,
-    }];
-
-    assert_eq!(
-        MapObjectInteraction::object_index_at_world(&tilemap, glam::Vec2::new(20.0, 20.0)),
+        MapObjectInteraction::object_entity_at_world([&hidden], glam::Vec2::new(20.0, 20.0)),
         None
     );
-}
-
-#[test]
-fn delete_object_removes_object_at_index() {
-    let mut tilemap = sample_tilemap();
-    MapObjectInteraction::place_object(
-        &mut tilemap,
-        UVec2::new(16, 16),
-        "fauna.json",
-        "fauna_a",
-        UVec2::new(16, 16),
-    );
-
-    assert!(MapObjectInteraction::delete_object(&mut tilemap, 0));
-    assert!(tilemap.objects.is_empty());
 }

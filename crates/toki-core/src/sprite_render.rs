@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::object_sheet::ObjectSheetMeta;
-use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
 use crate::palette::Palette4;
 use crate::sprite::SpriteFrame;
@@ -30,11 +29,6 @@ pub enum SpriteRenderOrigin {
     AnimatedEntity(EntityId),
     StaticEntity(EntityId),
     Projectile(EntityId),
-    MapObject {
-        sheet_name: String,
-        object_name: String,
-        position: glam::IVec2,
-    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -311,17 +305,6 @@ pub fn format_sprite_resolve_failure(
             entity_id, object_name, sheet_name
         ),
         (
-            SpriteRenderOrigin::MapObject { sheet_name, .. },
-            SpriteResolveError::MissingObjectSheet { .. },
-        ) => format!("Map object requested missing object sheet '{}'", sheet_name),
-        (
-            SpriteRenderOrigin::MapObject { sheet_name, .. },
-            SpriteResolveError::MissingObject { object_name, .. },
-        ) => format!(
-            "Map object '{}' missing from object sheet '{}'",
-            object_name, sheet_name
-        ),
-        (
             SpriteRenderOrigin::AnimatedEntity(entity_id),
             SpriteResolveError::AssetLoadFailed { message, .. },
         ) => format!(
@@ -342,61 +325,12 @@ pub fn format_sprite_resolve_failure(
             "Projectile {} sprite asset failed to load: {}",
             entity_id, message
         ),
-        (
-            SpriteRenderOrigin::MapObject {
-                object_name,
-                sheet_name,
-                ..
-            },
-            SpriteResolveError::AssetLoadFailed { message, .. },
-        ) => format!(
-            "Map object '{}' in sheet '{}' failed to load: {}",
-            object_name, sheet_name, message
-        ),
         // Fallback for any combinations not explicitly handled
         _ => format!(
             "Failed to resolve sprite render request for {:?}: {:?}",
             origin, error
         ),
     }
-}
-
-pub fn collect_map_object_sprite_render_requests(tilemap: &TileMap) -> Vec<SpriteRenderRequest> {
-    tilemap
-        .objects
-        .iter()
-        .enumerate()
-        .filter(|(_, object)| object.visible)
-        .filter_map(|(index, object)| {
-            let sheet_name = object
-                .sheet
-                .file_stem()
-                .and_then(|name| name.to_str())
-                .or_else(|| object.sheet.to_str())?
-                .to_string();
-            let object_name = object.object_name.clone();
-            Some(SpriteRenderRequest {
-                origin: SpriteRenderOrigin::MapObject {
-                    sheet_name: sheet_name.clone(),
-                    object_name: object_name.clone(),
-                    position: object.position.as_ivec2(),
-                },
-                sort_key: SpriteSortKey {
-                    primary: object.ground_contact_y(),
-                    secondary: 0,
-                    sequence: index as u32,
-                },
-                visual: SpriteVisualRef::ObjectSheetObject {
-                    sheet_name,
-                    object_name,
-                },
-                position: object.position.as_ivec2(),
-                size: SpriteRenderSize::Intrinsic,
-                palette_override: None,
-                flip_x: false,
-            })
-        })
-        .collect()
 }
 
 #[cfg(test)]

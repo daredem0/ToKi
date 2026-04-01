@@ -1,6 +1,6 @@
 use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use crate::dialog::DialogTree;
-use crate::entity::EntityDefinition;
+use crate::entity::{build_decoration_entity, DecorationSpec, EntityDefinition, EntityGrounding};
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
 };
@@ -13,6 +13,39 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+#[derive(Debug, serde::Deserialize, Default)]
+struct LegacyTileMapObjectsWire {
+    #[serde(default)]
+    objects: Vec<LegacyMapObjectInstance>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct LegacyMapObjectInstance {
+    sheet: PathBuf,
+    object_name: String,
+    position: glam::UVec2,
+    #[serde(default = "default_legacy_map_object_size_px")]
+    size_px: glam::UVec2,
+    #[serde(default, skip_serializing_if = "EntityGrounding::is_empty")]
+    grounding: EntityGrounding,
+    #[serde(default = "default_legacy_map_object_visible")]
+    visible: bool,
+    #[serde(default = "default_legacy_map_object_solid")]
+    solid: bool,
+}
+
+fn default_legacy_map_object_size_px() -> glam::UVec2 {
+    glam::UVec2::new(16, 16)
+}
+
+fn default_legacy_map_object_visible() -> bool {
+    true
+}
+
+fn default_legacy_map_object_solid() -> bool {
+    true
+}
 
 #[derive(Debug, Error)]
 pub enum ProjectAssetError {
@@ -216,7 +249,9 @@ pub fn load_scene_from_path(path: &Path) -> Result<Scene, ProjectAssetError> {
         DEFAULT_TEXT_FILE_SIZE_LIMIT,
         |path, size_bytes, max_bytes| too_large_io_error(path, size_bytes, max_bytes, "scene file"),
     )?;
-    Ok(serde_json::from_str::<Scene>(&json).map_err(CoreError::from)?)
+    let mut scene = serde_json::from_str::<Scene>(&json).map_err(CoreError::from)?;
+    migrate_legacy_tilemap_objects_into_scene(path, &mut scene)?;
+    Ok(scene)
 }
 
 pub fn load_entity_definition_from_path(
@@ -293,6 +328,77 @@ pub fn find_json_files(dir: &Path) -> Result<Vec<PathBuf>, ProjectAssetError> {
         .collect::<Vec<_>>();
     json_files.sort();
     Ok(json_files)
+}
+
+fn migrate_legacy_tilemap_objects_into_scene(
+    scene_path: &Path,
+    scene: &mut Scene,
+) -> Result<(), ProjectAssetError> {
+    let Some(project_root) = scene_path.parent().and_then(Path::parent) else {
+        return Ok(());
+    };
+
+    let mut next_id = scene.next_entity_id();
+    for map_name in scene.maps.clone() {
+        let tilemap_path = tilemap_file_path(project_root, &map_name);
+        let legacy_objects = load_legacy_tilemap_objects(&tilemap_path)?;
+        for legacy in legacy_objects {
+            let sheet = normalize_asset_name(&legacy.sheet.to_string_lossy()).to_string();
+            if scene.entities().iter().any(|entity| {
+                entity.entity_kind == crate::entity::EntityKind::Decoration
+                    && entity.position == legacy.position.as_ivec2()
+                    && entity.size == legacy.size_px
+                    && entity.attributes.rendering.visible == legacy.visible
+                    && entity.attributes.gameplay.solid == legacy.solid
+                    && entity.attributes.rendering.grounding == legacy.grounding
+                    && entity
+                        .attributes
+                        .rendering
+                        .static_object_render
+                        .as_ref()
+                        .is_some_and(|render| {
+                            render.sheet == sheet && render.object_name == legacy.object_name
+                        })
+            }) {
+                continue;
+            }
+            let entity = build_decoration_entity(
+                next_id,
+                DecorationSpec {
+                    position: legacy.position.as_ivec2(),
+                    size: legacy.size_px,
+                    sheet,
+                    object_name: legacy.object_name,
+                    grounding: legacy.grounding,
+                    visible: legacy.visible,
+                    solid: legacy.solid,
+                },
+            );
+            scene.add_entity(entity);
+            next_id += 1;
+        }
+    }
+
+    Ok(())
+}
+
+fn load_legacy_tilemap_objects(
+    path: &Path,
+) -> Result<Vec<LegacyMapObjectInstance>, ProjectAssetError> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let json = read_text_file_with_limit(
+        path,
+        DEFAULT_TEXT_FILE_SIZE_LIMIT,
+        |path, size_bytes, max_bytes| {
+            too_large_io_error(path, size_bytes, max_bytes, "tilemap file")
+        },
+    )?;
+    Ok(serde_json::from_str::<LegacyTileMapObjectsWire>(&json)
+        .map_err(CoreError::from)?
+        .objects)
 }
 
 pub fn find_first_json_file(dir: &Path) -> Result<Option<PathBuf>, ProjectAssetError> {

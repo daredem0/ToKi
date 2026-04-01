@@ -9,8 +9,9 @@ use std::fs;
 use toki_core::animation::AnimationState;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    ControlRole, EntityAttributes, EntityBehavior, EntityGameplay, EntityKind, EntityManager,
-    EntityRendering, MovementSoundTrigger, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    build_decoration_entity, decoration_collision_box, ControlRole, DecorationSpec,
+    EntityAttributes, EntityBehavior, EntityGameplay, EntityKind, EntityManager, EntityRendering,
+    MovementSoundTrigger, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{
@@ -247,6 +248,43 @@ fn apply_entity_property_draft_disables_health_and_collision() {
     assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), None);
     assert_eq!(entity.attributes.current_stat(ATTACK_POWER_STAT_ID), None);
     assert!(entity.collision_box.is_none());
+}
+
+#[test]
+fn apply_entity_property_draft_updates_static_object_render_for_decorations() {
+    let mut entity = build_decoration_entity(
+        9,
+        DecorationSpec::new(IVec2::new(0, 0), UVec2::new(16, 16), "objects", "rock_small"),
+    );
+    entity.attributes.rendering.grounding.origin = Some([8, 15]);
+    let mut draft = EntityPropertyDraft::from_entity(&entity);
+    draft.static_object_sheet = Some("fauna".to_string());
+    draft.static_object_name = Some("tree".to_string());
+    draft.size_x = 32;
+    draft.size_y = 48;
+    draft.solid = true;
+
+    let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
+
+    assert!(changed);
+    let static_render = entity
+        .attributes
+        .rendering
+        .static_object_render
+        .as_ref()
+        .expect("decoration should keep static render");
+    assert_eq!(static_render.sheet, "fauna");
+    assert_eq!(static_render.object_name, "tree");
+    assert_eq!(entity.size, UVec2::new(32, 48));
+    let collision = entity
+        .collision_box
+        .as_ref()
+        .expect("decoration should recompute collision");
+    let expected = decoration_collision_box(entity.size, &entity.attributes.rendering.grounding, true)
+        .expect("expected collision");
+    assert_eq!(collision.offset, expected.offset);
+    assert_eq!(collision.size, expected.size);
+    assert_eq!(collision.trigger, expected.trigger);
 }
 
 #[test]

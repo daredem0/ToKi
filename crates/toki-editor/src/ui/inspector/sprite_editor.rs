@@ -645,6 +645,13 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         .active()
         .show_cell_grid;
     if show_cell_grid {
+        ui.checkbox(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .show_cell_cross,
+            "Show Cell Cross",
+        );
+
         ui.horizontal(|ui| {
             ui.label("Cell Width:");
             if ui

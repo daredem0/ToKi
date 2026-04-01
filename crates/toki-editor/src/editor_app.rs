@@ -574,6 +574,24 @@ impl ApplicationHandler for EditorApp {
                     if let PhysicalKey::Code(key_code) = event.physical_key {
                         // Handle other editor keyboard shortcuts
                         match key_code {
+                            KeyCode::Delete => {
+                                if self.core.ui.workspace.center_panel_tab
+                                    == CenterPanelTab::SceneViewport
+                                {
+                                    let deleted = crate::ui::interactions::SelectionInteraction::delete_selected_spatial(
+                                        &mut self.core.ui,
+                                    );
+                                    if deleted {
+                                        if let Some(viewport) = &mut self.viewports.scene {
+                                            viewport.mark_dirty();
+                                        }
+                                        if let Some(window) = &self.platform.window {
+                                            window.request_redraw();
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
                             KeyCode::Escape => {
                                 self.handle_escape_key();
                                 if let Some(window) = &self.platform.window {
@@ -742,6 +760,10 @@ impl EditorApp {
                 .placement
                 .entity_definition()
                 .map(str::to_string);
+        let placement_decoration = crate::ui::editor_context::scene_viewport_context(&self.core.ui)
+            .placement
+            .decoration_draft()
+            .cloned();
         if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
             placement_entity_definition.as_deref(),
             project_path,
@@ -757,6 +779,16 @@ impl EditorApp {
                     self.core.project_manager.current_project.as_ref(),
                 )
                 .as_deref(),
+            );
+            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
+                .placement
+                .preview_cached_frame = cached_frame;
+        } else if let (Some(draft), Some(project_path)) = (placement_decoration, project_path) {
+            let cached_frame = scene_overlays::cached_decoration_preview_sprite_frame(
+                &mut self.resources.preview_sprite_frames,
+                &draft.sheet,
+                &draft.object_name,
+                project_path,
             );
             crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
                 .placement

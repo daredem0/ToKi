@@ -9,6 +9,7 @@ pub mod inspector;
 pub mod inspector_trait;
 pub mod interactions;
 pub mod menus;
+pub(crate) mod object_sheet_browser;
 pub mod panel_layout;
 pub mod panels;
 pub mod sprite_editor;

@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
-    tilemap::{MapObjectInstance, TileMap},
+    tilemap::TileMap,
 };
-use toki_core::entity::{EntityFootprint, EntityGrounding};
 use toki_core::CoreError;
 
 // Helper function to create a simple test tilemap
@@ -20,7 +19,6 @@ fn create_test_tilemap() -> TileMap {
             "water".to_string(),
             "dirt".to_string(),
         ],
-        objects: vec![],
     }
 }
 
@@ -136,7 +134,6 @@ fn tilemap_validate_empty_map_passes() {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test.json"),
         tiles: vec![],
-        objects: vec![],
     };
 
     assert!(tilemap.validate().is_ok());
@@ -247,7 +244,6 @@ fn tilemap_generate_vertices_empty_map() {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test.json"),
         tiles: vec![],
-        objects: vec![],
     };
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32);
@@ -270,7 +266,6 @@ fn tilemap_generate_vertices_with_larger_map() {
             "grass".to_string(),
             "stone".to_string(),
         ],
-        objects: vec![],
     };
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32);
@@ -315,7 +310,6 @@ fn tilemap_row_major_indexing() {
             "e".to_string(),
             "f".to_string(), // Row 1
         ],
-        objects: vec![],
     };
 
     // First row
@@ -336,7 +330,6 @@ fn tilemap_single_tile_map() {
         tile_size: UVec2::new(32, 32),
         atlas: PathBuf::from("test.json"),
         tiles: vec!["single".to_string()],
-        objects: vec![],
     };
 
     assert!(tilemap.validate().is_ok());
@@ -355,7 +348,6 @@ fn tilemap_chunk_calculations() {
         tile_size: UVec2::new(8, 8), // 8x8 pixel tiles
         atlas: PathBuf::from("test.json"),
         tiles: vec![], // Empty for this test
-        objects: vec![],
     };
 
     // Test chunk count calculation
@@ -374,22 +366,7 @@ fn tilemap_chunk_calculations() {
 }
 
 #[test]
-fn tilemap_deserialization_defaults_objects_for_legacy_maps() {
-    let tilemap: TileMap = serde_json::from_str(
-        r#"{
-            "size": [1, 1],
-            "tile_size": [16, 16],
-            "atlas": "terrain.json",
-            "tiles": ["grass"]
-        }"#,
-    )
-    .expect("legacy tilemap json should parse");
-
-    assert!(tilemap.objects.is_empty());
-}
-
-#[test]
-fn tilemap_deserialization_defaults_object_visibility_solidity_and_size() {
+fn tilemap_deserialization_ignores_legacy_object_storage() {
     let tilemap: TileMap = serde_json::from_str(
         r#"{
             "size": [1, 1],
@@ -405,57 +382,18 @@ fn tilemap_deserialization_defaults_object_visibility_solidity_and_size() {
             ]
         }"#,
     )
-    .expect("legacy object instance should parse");
+    .expect("legacy tilemap json should parse even with deprecated objects");
 
-    assert_eq!(tilemap.objects.len(), 1);
-    assert_eq!(tilemap.objects[0].size_px, UVec2::new(16, 16));
-    assert!(tilemap.objects[0].visible);
-    assert!(tilemap.objects[0].solid);
+    assert_eq!(tilemap.tiles, vec!["grass".to_string()]);
 }
 
 #[test]
-fn tilemap_serialization_round_trips_object_instances() {
+fn tilemap_serialization_round_trips_without_object_storage() {
     let tilemap = TileMap {
         size: UVec2::new(1, 1),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
         tiles: vec!["grass".to_string()],
-        objects: vec![MapObjectInstance {
-            sheet: PathBuf::from("fauna.json"),
-            object_name: "fauna_a".to_string(),
-            position: UVec2::new(16, 32),
-            size_px: UVec2::new(16, 16),
-            grounding: Default::default(),
-            visible: false,
-            solid: true,
-        }],
-    };
-
-    let json = serde_json::to_string(&tilemap).expect("tilemap should serialize");
-    let round_trip: TileMap = serde_json::from_str(&json).expect("tilemap should deserialize");
-
-    assert_eq!(round_trip, tilemap);
-}
-
-#[test]
-fn tilemap_serialization_round_trips_object_grounding() {
-    let tilemap = TileMap {
-        size: UVec2::new(1, 1),
-        tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string()],
-        objects: vec![MapObjectInstance {
-            sheet: PathBuf::from("props.json"),
-            object_name: "tree".to_string(),
-            position: UVec2::new(16, 16),
-            size_px: UVec2::new(32, 48),
-            grounding: EntityGrounding {
-                origin: Some([16, 47]),
-                footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
-            },
-            visible: true,
-            solid: true,
-        }],
     };
 
     let json = serde_json::to_string(&tilemap).expect("tilemap should serialize");

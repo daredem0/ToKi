@@ -1,9 +1,7 @@
 use super::*;
 use crate::editor_types::PlacementPreviewVisual;
 use toki_core::game::RenderQueryService;
-use toki_core::sprite_render::{
-    collect_map_object_sprite_render_requests, format_sprite_resolve_failure, SpriteRenderOrigin,
-};
+use toki_core::sprite_render::{format_sprite_resolve_failure, SpriteRenderOrigin};
 
 impl SceneViewport {
     pub(super) fn prepare_scene_data(
@@ -18,7 +16,6 @@ impl SceneViewport {
 
         self.prepare_tilemap_data(&mut scene_data, project_path);
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
-        self.prepare_tilemap_object_data(&mut scene_data, project_path, project_assets);
         self.prepare_preview_sprite_data(&mut scene_data, overlay_data.placement_preview.clone());
         self.prepare_drag_preview_sprite_data(
             &mut scene_data,
@@ -50,28 +47,6 @@ impl SceneViewport {
         );
 
         scene_data
-    }
-
-    pub(super) fn prepare_tilemap_object_data(
-        &mut self,
-        scene_data: &mut SceneData,
-        project_path: Option<&std::path::Path>,
-        project_assets: &ProjectAssets,
-    ) {
-        let Some(tilemap) = self.tilemap.as_ref().cloned() else {
-            return;
-        };
-        if tilemap.objects.is_empty() {
-            return;
-        }
-
-        let requests = collect_map_object_sprite_render_requests(&tilemap);
-        self.resolve_sprite_requests_into_scene_data(
-            scene_data,
-            project_path,
-            project_assets,
-            &requests,
-        );
     }
 
     pub(super) fn prepare_tilemap_data(
@@ -138,7 +113,6 @@ impl SceneViewport {
             | SpriteRenderOrigin::Projectile(entity_id) => {
                 !self.suppressed_entity_ids.contains(&entity_id)
             }
-            SpriteRenderOrigin::MapObject { .. } => true,
         })
         .collect::<Vec<_>>();
 
@@ -251,7 +225,6 @@ impl SceneViewport {
                     SpriteRenderOrigin::AnimatedEntity(entity_id)
                     | SpriteRenderOrigin::StaticEntity(entity_id)
                     | SpriteRenderOrigin::Projectile(entity_id) => entity_id == preview.entity_id,
-                    SpriteRenderOrigin::MapObject { .. } => false,
                 })
                 .cloned()
             else {

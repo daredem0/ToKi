@@ -15,8 +15,7 @@ use super::editor_domain::{
 };
 use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
 use super::interactions::{
-    CameraInteraction, MapObjectInteraction, MapPaintInteraction, PlacementInteraction,
-    SelectionInteraction,
+    CameraInteraction, MapPaintInteraction, PlacementInteraction, SelectionInteraction,
 };
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
@@ -24,7 +23,7 @@ use crate::editor_tab_strip::{render_tab_strip, EditorTabSpec};
 use crate::editor_viewport::EditorViewportContext;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::entity::EntityKind;
 use toki_core::rules::{
     RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,

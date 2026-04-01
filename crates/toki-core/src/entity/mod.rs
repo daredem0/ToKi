@@ -9,6 +9,7 @@
 
 mod builder;
 mod category;
+mod decoration;
 mod definition;
 mod manager;
 mod model;
@@ -18,6 +19,7 @@ mod wire;
 // Re-export all public types
 pub use builder::EntityBuilder;
 pub use category::{default_category_for_kind, runtime_entity_kind_for_category};
+pub use decoration::{build_decoration_entity, decoration_collision_box, DecorationSpec};
 pub use definition::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
     EntityDefinitionError, RenderingDef,

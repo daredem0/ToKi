@@ -265,6 +265,79 @@ impl SelectionInteraction {
         Self::apply_marquee_selection(ui_state, selected_entity_ids, ctrl_pressed);
     }
 
+    pub fn delete_selected_spatial(ui_state: &mut EditorUI) -> bool {
+        if !ui_state.selected_entity_ids().is_empty() {
+            let Some(active_scene_name) = ui_state.active_scene.clone() else {
+                return false;
+            };
+            let Some(scene_index) = ui_state
+                .scenes
+                .iter()
+                .position(|scene| scene.name == active_scene_name)
+            else {
+                return false;
+            };
+            let scene = &ui_state.scenes[scene_index];
+            let selected_ids = ui_state.selected_entity_ids_vec();
+            let indexed_entities = selected_ids
+                .iter()
+                .filter_map(|entity_id| {
+                    let index = scene.entity_index(*entity_id)?;
+                    let entity = scene.stored_entity(*entity_id)?;
+                    Some(crate::ui::undo_redo::IndexedEntity { index, entity })
+                })
+                .collect::<Vec<_>>();
+            if indexed_entities.is_empty() {
+                return false;
+            }
+
+            let removed = editor_commands::execute(
+                ui_state,
+                EditorCommand::remove_entities(active_scene_name, indexed_entities),
+            );
+            if removed {
+                ui_state.scene_content_changed = true;
+                ui_state.clear_selection();
+            }
+            return removed;
+        }
+
+        let Some(crate::ui::editor_ui::Selection::SceneAnchor {
+            scene_name,
+            anchor_id,
+        }) = ui_state.selection.clone()
+        else {
+            return false;
+        };
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == scene_name)
+        else {
+            return false;
+        };
+        let before_scene = ui_state.scenes[scene_index].clone();
+        let Some(anchor_index) = before_scene
+            .anchors
+            .iter()
+            .position(|anchor| anchor.id == anchor_id)
+        else {
+            return false;
+        };
+        let mut after_scene = before_scene.clone();
+        after_scene.anchors.remove(anchor_index);
+
+        let removed = editor_commands::execute(
+            ui_state,
+            EditorCommand::update_scene(scene_name.clone(), before_scene, after_scene),
+        );
+        if removed {
+            ui_state.scene_content_changed = true;
+            ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(scene_name));
+        }
+        removed
+    }
+
     /// Handle drag release: try to drop entity at release position.
     /// On invalid drop, entity remains at original position (snap back behavior).
     pub fn handle_drag_release(

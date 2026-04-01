@@ -5,8 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use toki_core::entity::{
-    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityAttributes,
-    EntityDefinition, EntityKind, EntityManager, RenderingDef,
+    build_decoration_entity, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef,
+    CollisionDef, DecorationSpec, EntityAttributes, EntityDefinition, EntityKind, EntityManager,
+    RenderingDef,
 };
 use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 
@@ -138,6 +139,13 @@ fn update_scene_entities_position(
     moved
 }
 
+fn sample_decoration_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
+    build_decoration_entity(
+        id,
+        DecorationSpec::new(position, UVec2::new(16, 16), "objects", "rock"),
+    )
+}
+
 #[test]
 fn resolve_entity_definition_name_prefers_entity_metadata() {
     let mut manager = EntityManager::new();
@@ -247,6 +255,65 @@ fn update_scene_entity_position_returns_false_when_scene_missing() {
     let mut ui_state = EditorUI::new();
     let moved = update_scene_entity_position(&mut ui_state, "Missing Scene", 1, IVec2::new(42, 84));
     assert!(!moved);
+}
+
+#[test]
+fn delete_selected_spatial_removes_selected_entity() {
+    let mut ui_state = EditorUI::new();
+    let entity = sample_decoration_entity(7, IVec2::new(32, 48));
+    ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("missing scene")
+        .add_entity(entity);
+    ui_state.set_selection(crate::ui::editor_ui::Selection::Entity(7));
+
+    assert!(SelectionInteraction::delete_selected_spatial(&mut ui_state));
+
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("missing scene");
+    assert!(scene.entity(7).is_none());
+    assert!(ui_state.selection.is_none());
+}
+
+#[test]
+fn delete_selected_spatial_removes_selected_scene_anchor() {
+    let mut ui_state = EditorUI::new();
+    ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("missing scene")
+        .anchors
+        .push(SceneAnchor {
+            id: "spawn".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: IVec2::new(16, 16),
+            facing: None,
+        });
+    ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+        scene_name: "Main Scene".to_string(),
+        anchor_id: "spawn".to_string(),
+    });
+
+    assert!(SelectionInteraction::delete_selected_spatial(&mut ui_state));
+
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("missing scene");
+    assert!(scene.anchors.is_empty());
+    assert_eq!(
+        ui_state.selection,
+        Some(crate::ui::editor_ui::Selection::Scene(
+            "Main Scene".to_string()
+        ))
+    );
 }
 
 #[test]

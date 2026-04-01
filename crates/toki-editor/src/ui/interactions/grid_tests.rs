@@ -10,7 +10,6 @@ fn sample_tilemap(tile_size: UVec2) -> TileMap {
         tile_size,
         atlas: PathBuf::from("test_atlas.json"),
         tiles: vec!["floor".to_string()],
-        objects: vec![],
     }
 }
 

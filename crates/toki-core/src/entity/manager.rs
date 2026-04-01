@@ -332,6 +332,14 @@ impl EntityManager {
         self.active_entities.len()
     }
 
+    pub fn entity_ids(&self) -> Vec<EntityId> {
+        self.storage.entities().keys().copied().collect()
+    }
+
+    pub fn entity_ids_iter(&self) -> impl Iterator<Item = EntityId> + '_ {
+        self.storage.entities().keys().copied()
+    }
+
     pub fn would_collide_with_solid_entity(
         &self,
         moving_entity_id: EntityId,
@@ -354,12 +362,12 @@ impl EntityManager {
 
         let (moving_pos, moving_size) = moving_box.world_bounds(new_position);
 
-        for other_id in &self.active_entities {
-            if *other_id == moving_entity_id {
+        for other_id in self.entity_ids_iter() {
+            if other_id == moving_entity_id {
                 continue;
             }
 
-            let Some(other_entity) = self.storage.get_entity(*other_id) else {
+            let Some(other_entity) = self.storage.get_entity(other_id) else {
                 continue;
             };
             if !Self::is_entity_collidable_candidate(other_entity) {
@@ -372,7 +380,7 @@ impl EntityManager {
                 .expect("collidable entity should have a collision box");
             let (other_pos, other_size) = other_box.world_bounds(other_entity.position);
             if crate::collision::aabb_overlap(moving_pos, moving_size, other_pos, other_size) {
-                return Some(*other_id);
+                return Some(other_id);
             }
         }
 
@@ -380,8 +388,8 @@ impl EntityManager {
     }
 
     pub fn is_spawn_position_free(&self, position: IVec2, size: glam::UVec2) -> bool {
-        for other_id in &self.active_entities {
-            let Some(other_entity) = self.storage.get_entity(*other_id) else {
+        for other_id in self.entity_ids_iter() {
+            let Some(other_entity) = self.storage.get_entity(other_id) else {
                 continue;
             };
             if !Self::is_entity_collidable_candidate(other_entity) {

@@ -538,7 +538,7 @@ impl SceneViewport {
             .game_state
             .world()
             .entity_manager()
-            .active_entities()
+            .visible_entities()
             .into_iter()
             .filter_map(|entity_id| {
                 self.game_state

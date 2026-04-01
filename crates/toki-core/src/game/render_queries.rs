@@ -114,7 +114,7 @@ impl<'a> RenderQueryService<'a> {
     }
 
     pub fn renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
-        let active_entities = self.entity_manager.active_entities();
+        let active_entities = self.entity_manager.entity_ids();
         let projectile_ids = self
             .entity_manager
             .storage()
@@ -128,11 +128,10 @@ impl<'a> RenderQueryService<'a> {
 
         let renderable = self
             .entity_manager
-            .active_entities()
+            .visible_entities()
             .iter()
             .filter_map(|&entity_id| {
                 let entity = self.entity_manager.get_entity(entity_id)?;
-                let is_visible = entity.attributes.rendering.visible;
                 let is_renderable = entity.attributes.rendering.animation_controller.is_some()
                     || entity.attributes.rendering.static_object_render.is_some()
                     || projectile_ids.contains(&entity_id);
@@ -140,11 +139,11 @@ impl<'a> RenderQueryService<'a> {
                 tracing::trace!(
                     "Entity {}: visible={}, is_renderable={}",
                     entity_id,
-                    is_visible,
+                    true,
                     is_renderable
                 );
 
-                if is_visible && is_renderable {
+                if is_renderable {
                     tracing::trace!(
                         "Entity {} is renderable at ({}, {}) with size {}x{}",
                         entity_id,
@@ -205,12 +204,10 @@ impl<'a> RenderQueryService<'a> {
             .projectile_ids()
             .collect::<HashSet<_>>();
         self.entity_manager
-            .active_entities_iter()
+            .visible_entities()
+            .into_iter()
             .filter_map(|entity_id| {
                 let entity = self.entity_manager.get_entity(entity_id)?;
-                if !entity.attributes.rendering.visible || !entity.attributes.behavior.active {
-                    return None;
-                }
                 if !entity.attributes.rendering.has_shadow {
                     return None;
                 }
@@ -256,11 +253,11 @@ impl<'a> RenderQueryService<'a> {
         let mut static_sequence = 0_u32;
         let mut projectile_sequence = 0_u32;
 
-        for entity_id in self.entity_manager.active_entities_iter() {
+        for entity_id in self.entity_manager.entity_ids_iter() {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
                 continue;
             };
-            if !entity.attributes.rendering.visible || !entity.attributes.behavior.active {
+            if !entity.attributes.rendering.visible {
                 continue;
             }
 
@@ -376,7 +373,7 @@ impl<'a> RenderQueryService<'a> {
         }
 
         let mut boxes = Vec::new();
-        for entity_id in self.entity_manager.active_entities_iter() {
+        for entity_id in self.entity_manager.entity_ids_iter() {
             if let Some(entity) = self.entity_manager.get_entity(entity_id) {
                 if let Some(collision_box) = &entity.collision_box {
                     let (world_pos, size) = collision_box.world_bounds(entity.position);

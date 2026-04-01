@@ -127,24 +127,13 @@ fn is_collision_box_blocked(
         }
     }
 
-    collides_with_solid_map_object(tilemap, box_pos, box_size)
+    false
 }
 
 fn tile_blocks_collision(tilemap: &TileMap, atlas: &AtlasMeta, tile_x: u32, tile_y: u32) -> bool {
     tilemap
         .is_tile_solid_at(atlas, tile_x, tile_y)
         .unwrap_or(true)
-}
-
-fn collides_with_solid_map_object(tilemap: &TileMap, box_pos: IVec2, box_size: UVec2) -> bool {
-    tilemap.objects.iter().any(|object| {
-        if !object.solid {
-            return false;
-        }
-
-        let (object_pos, object_size) = object.footprint_world_bounds();
-        aabb_overlap(box_pos, box_size, object_pos, object_size)
-    })
 }
 
 #[cfg(test)]

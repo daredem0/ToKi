@@ -420,7 +420,6 @@ fn movement_test_tilemap() -> TileMap {
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("atlas.json"),
         tiles: vec!["floor".to_string(); 64],
-        objects: vec![],
     }
 }
 
@@ -430,7 +429,6 @@ fn test_tilemap() -> TileMap {
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("atlas.json"),
         tiles: vec!["floor".to_string()],
-        objects: vec![],
     }
 }
 
@@ -449,7 +447,6 @@ fn save_tilemap_asset_writes_map_and_rescans_assets() {
         tile_size: glam::UVec2::new(8, 8),
         atlas: PathBuf::from("terrain.json"),
         tiles: vec!["grass".to_string(); 12],
-        objects: vec![],
     };
 
     let saved_path = manager
@@ -490,7 +487,6 @@ fn save_tilemap_asset_persists_painted_brush_and_fill_changes() {
         tile_size: glam::UVec2::new(8, 8),
         atlas: PathBuf::from("terrain.json"),
         tiles: vec!["grass".to_string(); 9],
-        objects: vec![],
     };
 
     assert!(MapPaintInteraction::paint_brush(
@@ -554,7 +550,6 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
             "grass".to_string(),
             "grass".to_string(),
         ],
-        objects: vec![],
     };
 
     assert!(MapPaintInteraction::paint_tile(

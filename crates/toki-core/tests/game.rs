@@ -4,12 +4,13 @@ use std::path::PathBuf;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
-    tilemap::{MapObjectInstance, TileMap},
+    tilemap::TileMap,
 };
 use toki_core::entity::{
-    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, MovementProfile,
-    MovementSoundTrigger, PickupDef, PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
+    build_decoration_entity, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef,
+    CollisionDef, ControlRole, DecorationSpec, EntityDefinition, EntityFootprint, EntityGrounding,
+    EntityKind, MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
+    RenderingDef, ATTACK_POWER_STAT_ID,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger, RuleVec2IntSource};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -52,7 +53,6 @@ fn create_test_tilemap() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         tiles: vec!["floor".to_string(); 100], // 10x10 grid of floor tiles
-        objects: vec![],
     }
 }
 
@@ -2335,16 +2335,22 @@ fn game_state_player_can_move_through_non_solid_entity() {
 fn game_state_player_is_blocked_by_solid_map_object_collision() {
     let mut game_state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut game_state, IVec2::new(0, 0));
-    let mut tilemap = create_test_tilemap();
-    tilemap.objects.push(MapObjectInstance {
-        sheet: PathBuf::from("fauna.json"),
-        object_name: "bush".to_string(),
-        position: UVec2::new(16, 0),
-        size_px: UVec2::new(16, 16),
-        grounding: Default::default(),
-        visible: true,
-        solid: true,
-    });
+    let tilemap = create_test_tilemap();
+    game_state
+        .world_mut()
+        .entity_manager_mut()
+        .add_existing_entity(build_decoration_entity(
+            99,
+            DecorationSpec {
+                position: IVec2::new(16, 0),
+                size: UVec2::new(16, 16),
+                sheet: "fauna".to_string(),
+                object_name: "bush".to_string(),
+                grounding: Default::default(),
+                visible: true,
+                solid: true,
+            },
+        ));
     let atlas = create_test_atlas();
 
     InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);

@@ -16,7 +16,6 @@ fn sample_tilemap() -> TileMap {
             "water".to_string(),
             "water".to_string(),
         ],
-        objects: vec![],
     }
 }
 

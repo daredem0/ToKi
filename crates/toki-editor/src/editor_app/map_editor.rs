@@ -55,7 +55,6 @@ impl EditorApp {
                     .ok_or_else(|| anyhow::anyhow!("Atlas path has no file name"))?,
             ),
             tiles: vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
-            objects: vec![],
         };
 
         Ok(MapEditorDraft {

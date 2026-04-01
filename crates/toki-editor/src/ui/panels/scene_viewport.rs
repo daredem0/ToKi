@@ -1,5 +1,6 @@
 use super::*;
 use crate::editor_viewport::EditorViewportContext;
+use crate::ui::object_sheet_browser::build_decoration_placement_draft;
 use crate::ui::EditorUI;
 
 impl PanelSystem {
@@ -24,18 +25,83 @@ impl PanelSystem {
         if let Some(cfg) = config.as_deref_mut() {
             let mut toolbar_changed = false;
             let grid_size = Self::effective_grid_size(viewport, cfg);
-            let viewport_cursor = &mut ui_state.scene_viewport_context_mut().viewport_cursor;
+            let current_mode_label = ui_state
+                .scene_viewport_context()
+                .placement
+                .mode_label()
+                .unwrap_or_else(|| "Select".to_string());
+            let object_tool_ready = match (
+                cfg.current_project_path(),
+                ui_state
+                    .scene_viewport_context()
+                    .toolbox
+                    .selected_object_sheet
+                    .as_deref(),
+                ui_state
+                    .scene_viewport_context()
+                    .toolbox
+                    .selected_object_name
+                    .as_deref(),
+            ) {
+                (Some(project_path), Some(sheet), Some(object_name)) => {
+                    build_decoration_placement_draft(project_path, sheet, object_name).is_some()
+                }
+                _ => false,
+            };
+            let mut show_tiles = ui_state.scene_viewport_context().viewport_cursor.show_tiles;
+            let cursor_world_position = ui_state.scene_viewport_context().viewport_cursor.world_position;
             ui.horizontal(|ui| {
                 toolbar_changed = Self::render_grid_toolbar_contents(ui, cfg);
+                ui.separator();
+                ui.label(format!("Mode: {current_mode_label}"));
+                if ui
+                    .add_enabled(object_tool_ready, egui::Button::new("Object Tool"))
+                    .clicked()
+                {
+                    let project_path = cfg
+                        .current_project_path()
+                        .expect("object tool requires current project path");
+                    let toolbox = &ui_state.scene_viewport_context().toolbox;
+                    if let (Some(sheet), Some(object_name)) = (
+                        toolbox.selected_object_sheet.as_deref(),
+                        toolbox.selected_object_name.as_deref(),
+                    ) {
+                        if let Some(draft) =
+                            build_decoration_placement_draft(project_path, sheet, object_name)
+                        {
+                            ui_state
+                                .scene_viewport_context_mut()
+                                .placement
+                                .enter_decoration_placement_mode(draft);
+                            toolbar_changed = true;
+                        }
+                    }
+                }
+                if ui_state
+                    .scene_viewport_context()
+                    .placement
+                    .is_in_placement_mode()
+                    && ui.button("Cancel").clicked()
+                {
+                    ui_state
+                        .scene_viewport_context_mut()
+                        .placement
+                        .exit_placement_mode();
+                    toolbar_changed = true;
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.checkbox(&mut viewport_cursor.show_tiles, "P/T");
+                    ui.checkbox(&mut show_tiles, "P/T");
                     ui.label(Self::viewport_cursor_status_label(
-                        viewport_cursor.world_position,
-                        viewport_cursor.show_tiles,
+                        cursor_world_position,
+                        show_tiles,
                         grid_size,
                     ));
                 });
             });
+            if show_tiles != ui_state.scene_viewport_context().viewport_cursor.show_tiles {
+                ui_state.scene_viewport_context_mut().viewport_cursor.show_tiles = show_tiles;
+                toolbar_changed = true;
+            }
             if toolbar_changed {
                 viewport.mark_dirty();
             }

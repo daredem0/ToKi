@@ -1,7 +1,6 @@
 use toki_core::game::{GroundShadow, RenderQueryService};
 use toki_core::sprite_render::{
-    collect_map_object_sprite_render_requests, format_sprite_resolve_failure,
-    resolve_sprite_render_requests, sort_sprite_render_requests,
+    format_sprite_resolve_failure, resolve_sprite_render_requests, sort_sprite_render_requests,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 
@@ -86,9 +85,6 @@ impl<'a> WorldFramePresenter<'a> {
 
     fn render_world_sprites(&mut self) {
         let mut requests = self.render_queries().sprite_render_requests();
-        requests.extend(collect_map_object_sprite_render_requests(
-            self.resources.get_tilemap(),
-        ));
         sort_sprite_render_requests(&mut requests);
 
         let (resolved, failures) = resolve_sprite_render_requests(self.resources, &requests);

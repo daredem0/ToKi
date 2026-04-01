@@ -1,5 +1,4 @@
 use crate::assets::atlas::AtlasMeta;
-use crate::entity::{EntityFootprint, EntityGrounding};
 use crate::graphics::vertex::QuadVertex;
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
@@ -12,57 +11,12 @@ use std::path::PathBuf;
 
 pub const CHUNK_SIZE: u32 = 16; //16x16 tiles per chunk
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct MapObjectInstance {
-    pub sheet: PathBuf,
-    pub object_name: String,
-    pub position: UVec2,
-    #[serde(default = "default_map_object_size_px")]
-    pub size_px: UVec2,
-    #[serde(default, skip_serializing_if = "EntityGrounding::is_empty")]
-    pub grounding: EntityGrounding,
-    #[serde(default = "default_map_object_visible")]
-    pub visible: bool,
-    #[serde(default = "default_map_object_solid")]
-    pub solid: bool,
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct TileMap {
     pub size: UVec2,        // map dimensions in tiles (width x height)
     pub tile_size: UVec2,   // tile dimensions in pixels (width x height)
     pub atlas: PathBuf,     // path to atlas file
     pub tiles: Vec<String>, // row-major list of tile names
-    #[serde(default)]
-    pub objects: Vec<MapObjectInstance>,
-}
-
-fn default_map_object_size_px() -> UVec2 {
-    UVec2::new(16, 16)
-}
-
-fn default_map_object_visible() -> bool {
-    true
-}
-
-fn default_map_object_solid() -> bool {
-    true
-}
-
-impl MapObjectInstance {
-    pub fn resolved_footprint(&self) -> EntityFootprint {
-        self.grounding.resolved_footprint(self.size_px, None)
-    }
-
-    pub fn footprint_world_bounds(&self) -> (glam::IVec2, UVec2) {
-        self.resolved_footprint()
-            .world_bounds(self.position.as_ivec2())
-    }
-
-    pub fn ground_contact_y(&self) -> i32 {
-        let (pos, size) = self.footprint_world_bounds();
-        pos.y + size.y as i32
-    }
 }
 
 impl TileMap {

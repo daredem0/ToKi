@@ -129,7 +129,6 @@ mod tests {
                 tile_size: glam::UVec2::new(16, 16),
                 atlas: std::path::PathBuf::new(),
                 tiles: vec!["default".to_string()],
-                objects: vec![],
             },
             &AtlasMeta {
                 image: std::path::PathBuf::new(),

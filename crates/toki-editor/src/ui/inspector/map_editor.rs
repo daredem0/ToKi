@@ -31,107 +31,13 @@ impl InspectorSystem {
                 MapEditorTool::PickTile,
                 "Pick Tile",
             );
-            ui.selectable_value(
-                &mut crate::ui::editor_context::map_state_mut(ui_state).tool,
-                MapEditorTool::PlaceObject,
-                "Place Object",
-            );
-            ui.selectable_value(
-                &mut crate::ui::editor_context::map_state_mut(ui_state).tool,
-                MapEditorTool::DeleteObject,
-                "Delete",
-            );
         });
         ui.separator();
 
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
                 ui.label("Primary drag pans the map editor camera.");
-                if let Some(selected_object) = crate::ui::editor_context::map_state_mut(ui_state)
-                    .selected_object_info
-                    .clone()
-                {
-                    ui.separator();
-                    ui.label("Object Info");
-                    ui.horizontal(|ui| {
-                        ui.label("Sheet:");
-                        ui.label(selected_object.sheet.display().to_string());
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Object:");
-                        ui.label(&selected_object.object_name);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Position:");
-                        ui.label(format!(
-                            "{}, {}",
-                            selected_object.position.x, selected_object.position.y
-                        ));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Size:");
-                        ui.label(format!(
-                            "{}x{} px",
-                            selected_object.size_px.x, selected_object.size_px.y
-                        ));
-                    });
-
-                    let mut grounding = selected_object.grounding.clone();
-                    let origin = grounding.origin.get_or_insert([
-                        (selected_object.size_px.x / 2) as i32,
-                        selected_object.size_px.y.saturating_sub(1) as i32,
-                    ]);
-                    ui.separator();
-                    ui.label("Grounding");
-                    let mut grounding_changed = false;
-                    ui.horizontal(|ui| {
-                        ui.label("Origin:");
-                        grounding_changed |= ui
-                            .add(egui::DragValue::new(&mut origin[0]).speed(1))
-                            .changed();
-                        grounding_changed |= ui
-                            .add(egui::DragValue::new(&mut origin[1]).speed(1))
-                            .changed();
-                    });
-                    let footprint = grounding.footprint.get_or_insert_with(|| {
-                        toki_core::entity::EntityFootprint::new(
-                            [0, 0],
-                            [selected_object.size_px.x, selected_object.size_px.y],
-                        )
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Footprint Offset:");
-                        grounding_changed |= ui
-                            .add(egui::DragValue::new(&mut footprint.offset[0]).speed(1))
-                            .changed();
-                        grounding_changed |= ui
-                            .add(egui::DragValue::new(&mut footprint.offset[1]).speed(1))
-                            .changed();
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Footprint Size:");
-                        grounding_changed |= ui
-                            .add(egui::DragValue::new(&mut footprint.size[0]).range(1..=u32::MAX))
-                            .changed();
-                        grounding_changed |= ui
-                            .add(egui::DragValue::new(&mut footprint.size[1]).range(1..=u32::MAX))
-                            .changed();
-                    });
-
-                    let mut visible = selected_object.visible;
-                    let mut solid = selected_object.solid;
-                    let visible_changed = ui.checkbox(&mut visible, "Visible").changed();
-                    let solid_changed = ui.checkbox(&mut solid, "Solid").changed();
-                    if grounding_changed || visible_changed || solid_changed {
-                        crate::ui::editor_ui::queue_map_editor_object_property_edit(
-                            ui_state,
-                            selected_object.index,
-                            grounding,
-                            visible,
-                            solid,
-                        );
-                    }
-                } else if let Some(tile_info) =
+                if let Some(tile_info) =
                     &crate::ui::editor_context::map_state_mut(ui_state).selected_tile_info
                 {
                     ui.separator();
@@ -161,10 +67,7 @@ impl InspectorSystem {
                     match crate::ui::editor_context::map_state_mut(ui_state).tool {
                         MapEditorTool::Brush => "Primary click/drag paints tiles.",
                         MapEditorTool::Fill => "Primary click fills the whole map.",
-                        MapEditorTool::Drag
-                        | MapEditorTool::PickTile
-                        | MapEditorTool::PlaceObject
-                        | MapEditorTool::DeleteObject => unreachable!(),
+                        MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
                     },
                 );
                 if let Some((tile_names, atlas, texture_path)) =
@@ -263,10 +166,7 @@ impl InspectorSystem {
                     match crate::ui::editor_context::map_state_mut(ui_state).tool {
                         MapEditorTool::Brush => "Secondary drag pans the camera.",
                         MapEditorTool::Fill => "Secondary drag pans the camera.",
-                        MapEditorTool::Drag
-                        | MapEditorTool::PickTile
-                        | MapEditorTool::PlaceObject
-                        | MapEditorTool::DeleteObject => unreachable!(),
+                        MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
                     },
                 );
             }
@@ -280,83 +180,6 @@ impl InspectorSystem {
                     ui.separator();
                     ui.label(format!("Current Brush Tile: {}", tile_name));
                 }
-            }
-            MapEditorTool::PlaceObject => {
-                ui.label("Primary click places the selected object on the map.");
-                ui.label("Secondary drag pans the camera.");
-                if let Some((sheet_names, object_names, object_sheet, texture_path)) =
-                    Self::load_map_editor_object_sheet_source(ui_state, config)
-                {
-                    crate::ui::editor_ui::sync_map_editor_object_sheet_selection(
-                        ui_state,
-                        &sheet_names,
-                    );
-                    ui.horizontal(|ui| {
-                        ui.label("Object Sheet:");
-                        egui::ComboBox::from_id_salt("inspector_map_editor_object_sheet_selector")
-                            .selected_text(
-                                crate::ui::editor_context::map_state(ui_state)
-                                    .selected_object_sheet
-                                    .as_deref()
-                                    .unwrap_or("No object sheet selected"),
-                            )
-                            .show_ui(ui, |ui| {
-                                for sheet_name in &sheet_names {
-                                    let is_selected =
-                                        crate::ui::editor_context::map_state_mut(ui_state)
-                                            .selected_object_sheet
-                                            .as_deref()
-                                            == Some(sheet_name.as_str());
-                                    if ui.selectable_label(is_selected, sheet_name).clicked() {
-                                        crate::ui::editor_context::map_state_mut(ui_state)
-                                            .selected_object_sheet = Some(sheet_name.clone());
-                                        crate::ui::editor_context::map_state_mut(ui_state)
-                                            .selected_object_name = None;
-                                    }
-                                }
-                            });
-                    });
-                    crate::ui::editor_ui::sync_map_editor_object_selection(ui_state, &object_names);
-                    ui.separator();
-                    ui.label("Objects");
-                    Self::render_map_editor_object_sheet_gallery(
-                        ui_state,
-                        ui,
-                        ctx,
-                        &object_sheet,
-                        &texture_path,
-                        &object_names,
-                    );
-
-                    if let Some(object_name) = crate::ui::editor_context::map_state_mut(ui_state)
-                        .selected_object_name
-                        .clone()
-                    {
-                        ui.separator();
-                        ui.label(format!("Selected Object: {}", object_name));
-                        if let Some(object_info) = object_sheet.objects.get(&object_name) {
-                            ui.horizontal(|ui| {
-                                ui.label("Size:");
-                                ui.label(format!(
-                                    "{}x{} tiles",
-                                    object_info.size_tiles.x, object_info.size_tiles.y
-                                ));
-                                ui.separator();
-                                ui.label(format!(
-                                    "{}x{} px",
-                                    object_info.size_tiles.x * object_sheet.tile_size.x,
-                                    object_info.size_tiles.y * object_sheet.tile_size.y
-                                ));
-                            });
-                        }
-                    }
-                } else {
-                    ui.label("No object sheets available in assets/sprites.");
-                }
-            }
-            MapEditorTool::DeleteObject => {
-                ui.label("Primary click deletes the clicked visible object from the map.");
-                ui.label("Secondary drag pans the camera.");
             }
         }
 
@@ -412,90 +235,6 @@ impl InspectorSystem {
         Some((tile_names, atlas, texture_path))
     }
 
-    pub(super) fn load_map_editor_object_sheet_source(
-        ui_state: &EditorUI,
-        config: Option<&EditorConfig>,
-    ) -> Option<(
-        Vec<String>,
-        Vec<String>,
-        ObjectSheetMeta,
-        std::path::PathBuf,
-    )> {
-        let project_path = config?.current_project_path()?;
-        let sprites_dir = project_path.join("assets").join("sprites");
-        let mut object_sheets = Vec::new();
-
-        for entry in std::fs::read_dir(&sprites_dir).ok()? {
-            let Ok(entry) = entry else {
-                continue;
-            };
-            let path = entry.path();
-            if !path.is_file() || path.extension().is_none_or(|ext| ext != "json") {
-                continue;
-            }
-            let Ok(object_sheet) = ObjectSheetMeta::load_from_file(&path) else {
-                continue;
-            };
-            let Some(stem) = path.file_stem().and_then(|name| name.to_str()) else {
-                continue;
-            };
-            object_sheets.push((stem.to_string(), path, object_sheet));
-        }
-
-        if object_sheets.is_empty() {
-            return None;
-        }
-
-        object_sheets.sort_by(|left, right| left.0.cmp(&right.0));
-        let sheet_names = object_sheets
-            .iter()
-            .map(|(name, _, _)| name.clone())
-            .collect::<Vec<_>>();
-        let selected_sheet_name = crate::ui::editor_context::map_state(ui_state)
-            .selected_object_sheet
-            .clone()
-            .unwrap_or_else(|| sheet_names[0].clone());
-
-        let (_, object_sheet_path, object_sheet) = object_sheets
-            .into_iter()
-            .find(|(name, _, _)| name == &selected_sheet_name)
-            .or_else(|| {
-                let fallback = sheet_names[0].clone();
-                std::fs::read_dir(&sprites_dir)
-                    .ok()?
-                    .filter_map(Result::ok)
-                    .map(|entry| entry.path())
-                    .filter(|path| {
-                        path.is_file() && path.extension().is_some_and(|ext| ext == "json")
-                    })
-                    .filter_map(|path| {
-                        let object_sheet = ObjectSheetMeta::load_from_file(&path).ok()?;
-                        let stem = path.file_stem()?.to_str()?.to_string();
-                        Some((stem, path, object_sheet))
-                    })
-                    .find(|(name, _, _)| name == &fallback)
-            })?;
-
-        let mut object_names = object_sheet.objects.keys().cloned().collect::<Vec<_>>();
-        object_names.sort_by(|left, right| {
-            let left_info = object_sheet.objects.get(left);
-            let right_info = object_sheet.objects.get(right);
-
-            match (left_info, right_info) {
-                (Some(left_info), Some(right_info)) => left_info
-                    .position
-                    .y
-                    .cmp(&right_info.position.y)
-                    .then_with(|| left_info.position.x.cmp(&right_info.position.x))
-                    .then_with(|| left.cmp(right)),
-                _ => left.cmp(right),
-            }
-        });
-        let texture_path = object_sheet_path.parent()?.join(&object_sheet.image);
-
-        Some((sheet_names, object_names, object_sheet, texture_path))
-    }
-
     pub(super) fn render_map_editor_selected_tile_preview(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
@@ -542,131 +281,6 @@ impl InspectorSystem {
             egui::Color32::WHITE,
         );
         response.on_hover_text(tile_name);
-    }
-
-    fn render_map_editor_object_sheet_gallery(
-        ui_state: &mut EditorUI,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        object_sheet: &ObjectSheetMeta,
-        texture_path: &std::path::Path,
-        object_names: &[String],
-    ) {
-        let Some(texture) =
-            Self::ensure_map_editor_brush_preview_texture(ui_state, ctx, texture_path)
-        else {
-            ui.label("Preview texture unavailable.");
-            return;
-        };
-        let Some(texture_size) = object_sheet.image_size() else {
-            ui.label("Preview image size unavailable.");
-            return;
-        };
-
-        const COLUMNS: usize = 4;
-        const SLOT_SIZE: f32 = 64.0;
-
-        egui::ScrollArea::vertical()
-            .max_height(280.0)
-            .show(ui, |ui| {
-                egui::Grid::new("inspector_map_editor_object_gallery")
-                    .num_columns(COLUMNS)
-                    .spacing([8.0, 8.0])
-                    .show(ui, |ui| {
-                        for (index, object_name) in object_names.iter().enumerate() {
-                            ui.vertical(|ui| {
-                                let is_selected =
-                                    crate::ui::editor_context::map_state_mut(ui_state)
-                                        .selected_object_name
-                                        .as_deref()
-                                        == Some(object_name.as_str());
-                                if Self::render_map_editor_object_gallery_item(
-                                    ui,
-                                    texture.id(),
-                                    texture_size,
-                                    object_sheet,
-                                    object_name,
-                                    is_selected,
-                                    SLOT_SIZE,
-                                )
-                                .clicked()
-                                {
-                                    crate::ui::editor_context::map_state_mut(ui_state)
-                                        .selected_object_name = Some(object_name.clone());
-                                }
-                                ui.add_sized(
-                                    [SLOT_SIZE, 16.0],
-                                    egui::Label::new(
-                                        egui::RichText::new(object_name.as_str()).small(),
-                                    )
-                                    .truncate(),
-                                );
-                            });
-
-                            if (index + 1) % COLUMNS == 0 {
-                                ui.end_row();
-                            }
-                        }
-                    });
-            });
-    }
-
-    fn render_map_editor_object_gallery_item(
-        ui: &mut egui::Ui,
-        texture_id: egui::TextureId,
-        texture_size: glam::UVec2,
-        object_sheet: &ObjectSheetMeta,
-        object_name: &str,
-        selected: bool,
-        slot_size: f32,
-    ) -> egui::Response {
-        let desired_size = egui::vec2(slot_size, slot_size);
-        let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
-        let frame_stroke = if selected {
-            egui::Stroke::new(2.0, egui::Color32::LIGHT_BLUE)
-        } else {
-            egui::Stroke::new(1.0, egui::Color32::GRAY)
-        };
-        let frame_fill = if selected {
-            egui::Color32::from_rgb(35, 55, 75)
-        } else {
-            egui::Color32::from_gray(24)
-        };
-        ui.painter().rect(
-            rect,
-            4.0,
-            frame_fill,
-            frame_stroke,
-            egui::StrokeKind::Outside,
-        );
-
-        if let Some(rect_px) = object_sheet.get_object_rect(object_name) {
-            let uv_rect = egui::Rect::from_min_max(
-                egui::pos2(
-                    rect_px[0] as f32 / texture_size.x as f32,
-                    rect_px[1] as f32 / texture_size.y as f32,
-                ),
-                egui::pos2(
-                    (rect_px[0] + rect_px[2]) as f32 / texture_size.x as f32,
-                    (rect_px[1] + rect_px[3]) as f32 / texture_size.y as f32,
-                ),
-            );
-            let max_dimension = rect_px[2].max(rect_px[3]) as f32;
-            let preview_scale = if max_dimension > 0.0 {
-                (slot_size - 8.0) / max_dimension
-            } else {
-                1.0
-            };
-            let preview_size = egui::vec2(
-                rect_px[2] as f32 * preview_scale,
-                rect_px[3] as f32 * preview_scale,
-            );
-            let preview_rect = egui::Rect::from_center_size(rect.center(), preview_size);
-            ui.painter()
-                .image(texture_id, preview_rect, uv_rect, egui::Color32::WHITE);
-        }
-
-        response.on_hover_text(object_name)
     }
 
     pub(super) fn selected_map_editor_tile_metadata(

@@ -429,7 +429,6 @@ fn tilemap_to_save_for_map_editor_draft_prefers_live_viewport_tilemap() {
             tile_size: UVec2::new(8, 8),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["grass".to_string(); 4],
-            objects: vec![],
         },
     };
     let live_tilemap = TileMap {
@@ -442,7 +441,6 @@ fn tilemap_to_save_for_map_editor_draft_prefers_live_viewport_tilemap() {
             "grass".to_string(),
             "grass".to_string(),
         ],
-        objects: vec![],
     };
 
     let saved = EditorApp::tilemap_to_save_for_map_editor_draft(&draft, Some(&live_tilemap));
@@ -460,7 +458,6 @@ fn tilemap_to_save_for_map_editor_draft_falls_back_to_original_draft_when_viewpo
             tile_size: UVec2::new(8, 8),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["grass".to_string(); 4],
-            objects: vec![],
         },
     };
 
@@ -515,7 +512,6 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
             "floor".to_string(),
             "floor".to_string(),
         ],
-        objects: vec![],
     };
 
     (tilemap, atlas)
@@ -1325,7 +1321,6 @@ fn build_scene_anchor_overlay_lines_prefer_tilemap_tile_size() {
         tile_size: UVec2::new(40, 48),
         atlas: std::path::PathBuf::from("dummy.json"),
         tiles: vec![],
-        objects: vec![],
     };
 
     let mut ui_state = crate::ui::EditorUI::new();

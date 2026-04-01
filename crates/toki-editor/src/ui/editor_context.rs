@@ -1,6 +1,6 @@
 use super::editor_ui::{
     AnimationEditorState, DialogEditorState, GraphEditorState, MapEditorState, PlacementState,
-    UiEditorState, ViewportCursorState,
+    SceneToolboxState, UiEditorState, ViewportCursorState,
 };
 use super::editor_ui::{CenterPanelTab, EditorUI};
 use crate::config::EditorConfig;
@@ -45,6 +45,17 @@ pub(crate) trait EditorContext: Any {
         false
     }
 
+    fn render_toolbox(
+        &mut self,
+        _shell: &mut EditorUI,
+        _ui: &mut egui::Ui,
+        _egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        _host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        false
+    }
+
     fn on_activate(&mut self, _shell: &mut EditorUI) {}
 
     fn on_deactivate(&mut self, _shell: &mut EditorUI) {}
@@ -78,6 +89,7 @@ pub(crate) trait EditorContext: Any {
 pub(crate) struct SceneViewportContext {
     pub placement: PlacementState,
     pub viewport_cursor: ViewportCursorState,
+    pub toolbox: SceneToolboxState,
 }
 
 #[derive(Default)]
@@ -333,6 +345,26 @@ impl EditorContext for SceneViewportContext {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn render_toolbox(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        super::inspector::InspectorSystem::render_scene_viewport_toolbox(
+            shell,
+            ui,
+            egui_ctx,
+            host.project.as_deref_mut(),
+            host.project_assets.as_deref_mut(),
+            host.config.as_deref(),
+            host.scene_viewport.as_deref_mut(),
+        );
+        true
     }
 }
 
