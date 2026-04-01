@@ -152,6 +152,7 @@ impl SpriteEditorState {
             origin: super::FloatingOrigin::PastePreview {
                 selection_before_float,
             },
+            resize_size: None,
         });
         cs.selection = None;
         cs.canvas_texture_dirty = true;

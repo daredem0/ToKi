@@ -128,6 +128,29 @@ impl SelectionMask {
         result
     }
 
+    /// Scale this mask to explicit target dimensions using nearest-neighbor sampling.
+    #[allow(dead_code)]
+    pub fn scaled_to(&self, new_width: u32, new_height: u32) -> Self {
+        let new_width = new_width.max(1);
+        let new_height = new_height.max(1);
+        if new_width == self.width && new_height == self.height {
+            return self.clone();
+        }
+        let mut result = Self::new(new_width, new_height);
+        for dy in 0..new_height {
+            for dx in 0..new_width {
+                let src_x =
+                    ((dx as f32 + 0.5) * self.width as f32 / new_width as f32).floor() as u32;
+                let src_y =
+                    ((dy as f32 + 0.5) * self.height as f32 / new_height as f32).floor() as u32;
+                if self.is_selected(src_x.min(self.width - 1), src_y.min(self.height - 1)) {
+                    result.select_pixel(dx, dy);
+                }
+            }
+        }
+        result
+    }
+
     fn index(&self, x: u32, y: u32) -> Option<usize> {
         (x < self.width && y < self.height).then_some((y * self.width + x) as usize)
     }

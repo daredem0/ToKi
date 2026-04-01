@@ -274,6 +274,26 @@ impl ResizeAnchor {
     }
 }
 
+/// Which corner of a floating selection is being dragged for resize.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeCorner {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+/// Active resize-drag state while the user is dragging a corner handle.
+#[derive(Debug, Clone)]
+pub struct ResizeDrag {
+    /// Which corner the user grabbed.
+    pub corner: ResizeCorner,
+    /// The opposite (fixed) corner in canvas coordinates.
+    pub anchor_canvas: glam::IVec2,
+    /// Original width / height ratio for aspect-ratio locking.
+    pub aspect_ratio: f32,
+}
+
 /// Discovered sprite asset in the project
 #[derive(Debug, Clone)]
 pub struct DiscoveredSpriteAsset {

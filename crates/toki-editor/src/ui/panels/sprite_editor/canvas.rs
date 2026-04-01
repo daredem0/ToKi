@@ -827,12 +827,17 @@ fn draw_floating_selection(
     let pan = viewport.pan;
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
 
-    // Draw floating pixels
-    draw_floating_pixels(painter, canvas_screen_min, zoom, floating);
+    let display = floating.display_size();
+    draw_floating_pixels(painter, canvas_screen_min, zoom, floating, display);
 
-    // Draw marching-ants border around the floating mask
-    let mask_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255));
-    draw_offset_mask_border(painter, canvas_screen_min, zoom, floating, mask_stroke);
+    if floating.resize_size.is_some() {
+        draw_resize_rect_border(painter, canvas_screen_min, zoom, floating, display);
+    } else {
+        let mask_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255));
+        draw_offset_mask_border(painter, canvas_screen_min, zoom, floating, mask_stroke);
+    }
+
+    draw_resize_handles(painter, canvas_screen_min, zoom, floating, display);
 }
 
 fn draw_floating_pixels(
@@ -840,18 +845,30 @@ fn draw_floating_pixels(
     canvas_screen_min: egui::Pos2,
     zoom: f32,
     floating: &FloatingSelection,
+    display: glam::UVec2,
 ) {
-    for y in 0..floating.pixels.height {
-        for x in 0..floating.pixels.width {
-            let Some(color) = floating.pixels.get_pixel(x, y) else {
+    let src_w = floating.pixels.width;
+    let src_h = floating.pixels.height;
+    // Pixel size in screen space when showing the resized preview
+    let pixel_w = display.x as f32 / src_w as f32 * zoom;
+    let pixel_h = display.y as f32 / src_h as f32 * zoom;
+
+    for sy in 0..src_h {
+        for sx in 0..src_w {
+            let Some(color) = floating.pixels.get_pixel(sx, sy) else {
                 continue;
             };
             if color.a == 0 {
                 continue;
             }
-            let sx = canvas_screen_min.x + (floating.offset.x + x as i32) as f32 * zoom;
-            let sy = canvas_screen_min.y + (floating.offset.y + y as i32) as f32 * zoom;
-            let pixel_rect = egui::Rect::from_min_size(egui::pos2(sx, sy), egui::vec2(zoom, zoom));
+            let screen_x = canvas_screen_min.x
+                + (floating.offset.x as f32 + sx as f32 * pixel_w / zoom) * zoom;
+            let screen_y = canvas_screen_min.y
+                + (floating.offset.y as f32 + sy as f32 * pixel_h / zoom) * zoom;
+            let pixel_rect = egui::Rect::from_min_size(
+                egui::pos2(screen_x, screen_y),
+                egui::vec2(pixel_w, pixel_h),
+            );
             painter.rect_filled(
                 pixel_rect,
                 0.0,
@@ -868,6 +885,28 @@ fn floating_preview_color(color: PixelColor, origin: &FloatingOrigin) -> egui::C
 
     let alpha = ((u16::from(color.a) * 160) / 255) as u8;
     egui::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, alpha)
+}
+
+/// Draw a simple rectangle border around the floating selection at its display size.
+/// Used when the selection has been resized (per-pixel mask edges would be misleading).
+fn draw_resize_rect_border(
+    painter: &egui::Painter,
+    canvas_screen_min: egui::Pos2,
+    zoom: f32,
+    floating: &FloatingSelection,
+    display: glam::UVec2,
+) {
+    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255));
+    let tl = egui::pos2(
+        canvas_screen_min.x + floating.offset.x as f32 * zoom,
+        canvas_screen_min.y + floating.offset.y as f32 * zoom,
+    );
+    let br = egui::pos2(
+        tl.x + display.x as f32 * zoom,
+        tl.y + display.y as f32 * zoom,
+    );
+    let r = egui::Rect::from_min_max(tl, br);
+    painter.rect_stroke(r, 0.0, stroke, egui::StrokeKind::Inside);
 }
 
 fn draw_offset_mask_border(
@@ -913,6 +952,34 @@ fn draw_offset_mask_border(
                 );
             }
         }
+    }
+}
+
+/// Draw small square handles at the four corners of the floating selection.
+fn draw_resize_handles(
+    painter: &egui::Painter,
+    canvas_screen_min: egui::Pos2,
+    zoom: f32,
+    floating: &FloatingSelection,
+    display: glam::UVec2,
+) {
+    let tl = egui::pos2(
+        canvas_screen_min.x + floating.offset.x as f32 * zoom,
+        canvas_screen_min.y + floating.offset.y as f32 * zoom,
+    );
+    let br = egui::pos2(
+        tl.x + display.x as f32 * zoom,
+        tl.y + display.y as f32 * zoom,
+    );
+
+    let handle_half = 3.0_f32;
+    let fill = egui::Color32::WHITE;
+    let outline = egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40));
+
+    for pos in [tl, egui::pos2(br.x, tl.y), egui::pos2(tl.x, br.y), br] {
+        let r = egui::Rect::from_center_size(pos, egui::vec2(handle_half * 2.0, handle_half * 2.0));
+        painter.rect_filled(r, 0.0, fill);
+        painter.rect_stroke(r, 0.0, outline, egui::StrokeKind::Inside);
     }
 }
 

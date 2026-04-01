@@ -50,4 +50,14 @@ pub struct FloatingSelection {
     pub canvas_before_lift: SpriteCanvas,
     /// Source-specific behavior for cancel/render semantics.
     pub origin: FloatingOrigin,
+    /// Target size for resize preview. `None` means original size.
+    pub resize_size: Option<glam::UVec2>,
+}
+
+impl FloatingSelection {
+    /// The size at which this floating selection should be displayed and committed.
+    pub fn display_size(&self) -> glam::UVec2 {
+        self.resize_size
+            .unwrap_or(glam::UVec2::new(self.pixels.width, self.pixels.height))
+    }
 }

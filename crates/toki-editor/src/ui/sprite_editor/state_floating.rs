@@ -48,6 +48,7 @@ impl SpriteEditorState {
             origin: FloatingOrigin::SelectionLift {
                 selection_before_float,
             },
+            resize_size: None,
         });
         cs.selection = None;
         cs.canvas_texture_dirty = true;
@@ -55,16 +56,20 @@ impl SpriteEditorState {
     }
 
     /// Stamp the floating pixels onto the canvas and push one undo entry.
+    /// If `resize_size` is set, the pixels and mask are resampled before blitting.
     pub fn commit_floating(&mut self) -> bool {
         let floating = match self.active_mut().floating.take() {
             Some(f) => f,
             None => return false,
         };
 
+        let (final_pixels, final_mask) = resample_if_resized(&floating);
         let canvas_before_lift = floating.canvas_before_lift;
+
         let cs = self.active_mut();
+        cs.resize_drag = None;
         if let Some(canvas) = &mut cs.canvas {
-            canvas.blit(&floating.pixels, floating.offset.x, floating.offset.y);
+            canvas.blit(&final_pixels, floating.offset.x, floating.offset.y);
         }
 
         // Reconstruct selection mask at the new position
@@ -73,7 +78,7 @@ impl SpriteEditorState {
             .as_ref()
             .map(|c| (c.width, c.height))
             .unwrap_or((0, 0));
-        cs.selection = Some(floating.mask.translated_to_canvas(cw, ch, floating.offset));
+        cs.selection = Some(final_mask.translated_to_canvas(cw, ch, floating.offset));
         cs.dirty = true;
         cs.canvas_texture_dirty = true;
 
@@ -93,6 +98,7 @@ impl SpriteEditorState {
         let cs = self.active_mut();
         cs.canvas = Some(floating.canvas_before_lift);
         cs.selection = selection_before_float;
+        cs.resize_drag = None;
         cs.canvas_texture_dirty = true;
         true
     }
@@ -119,6 +125,34 @@ impl SpriteEditorState {
         if let Some(floating) = &mut self.active_mut().floating {
             floating.offset += delta;
         }
+    }
+
+    /// Set the display/commit size of the floating selection and update the offset
+    /// so that the given anchor point stays fixed.
+    pub fn resize_floating(&mut self, new_size: glam::UVec2, anchor: glam::IVec2) {
+        if let Some(floating) = &mut self.active_mut().floating {
+            floating.resize_size = Some(new_size);
+            // Recompute offset so the anchor corner stays in place.
+            // anchor = offset + display_size for bottom-right, etc.
+            // We always store offset as top-left, so: offset = anchor - 0 or anchor - size
+            // The caller provides the fixed anchor corner in canvas coords;
+            // we derive offset from it.
+            floating.offset = anchor;
+        }
+    }
+}
+
+/// If the floating selection has a resize target, resample pixels and mask.
+/// Otherwise return clones of the originals.
+fn resample_if_resized(
+    floating: &FloatingSelection,
+) -> (super::SpriteCanvas, super::SelectionMask) {
+    match floating.resize_size {
+        Some(size) => (
+            floating.pixels.scaled_to(size.x, size.y),
+            floating.mask.scaled_to(size.x, size.y),
+        ),
+        None => (floating.pixels.clone(), floating.mask.clone()),
     }
 }
 

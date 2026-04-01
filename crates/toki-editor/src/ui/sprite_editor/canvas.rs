@@ -182,6 +182,33 @@ impl SpriteCanvas {
         result
     }
 
+    /// Scale the canvas to explicit target dimensions using nearest-neighbor sampling.
+    /// Supports both upscale and downscale. Returns a clone if dimensions match.
+    #[allow(dead_code)]
+    pub fn scaled_to(&self, new_width: u32, new_height: u32) -> Self {
+        let new_width = new_width.max(1);
+        let new_height = new_height.max(1);
+        if new_width == self.width && new_height == self.height {
+            return self.clone();
+        }
+
+        let mut result = Self::new(new_width, new_height);
+        for dy in 0..new_height {
+            for dx in 0..new_width {
+                let src_x =
+                    ((dx as f32 + 0.5) * self.width as f32 / new_width as f32).floor() as u32;
+                let src_y =
+                    ((dy as f32 + 0.5) * self.height as f32 / new_height as f32).floor() as u32;
+                if let Some(color) =
+                    self.get_pixel(src_x.min(self.width - 1), src_y.min(self.height - 1))
+                {
+                    result.set_pixel(dx, dy, color);
+                }
+            }
+        }
+        result
+    }
+
     /// Find all non-transparent pixels connected to the given starting point.
     /// Uses 8-connectivity (includes diagonals) for better sprite selection.
     /// Returns the bounding box (x, y, width, height) of all connected pixels,

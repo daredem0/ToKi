@@ -3,7 +3,9 @@
 use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
-use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
+use crate::ui::sprite_editor::{
+    canonical_indexed_color, indexed_slot_for_authored_color, ResizeCorner, ResizeDrag,
+};
 use crate::ui::EditorUI;
 use glam::UVec2;
 use toki_core::assets::atlas::ColorMode;
@@ -24,10 +26,8 @@ pub fn handle_tool_interaction(
         return;
     };
 
-    if should_intercept_canvas_input(
-        crate::ui::editor_context::sprite_state_mut(ui_state).has_floating(),
-    ) && handle_floating_canvas_interaction(ui_state, response, ctx)
-    {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).has_floating() {
+        handle_floating_canvas_interaction(ui_state, response, ctx, rect);
         return;
     }
 
@@ -50,10 +50,6 @@ pub fn handle_tool_interaction(
             handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Ellipse)
         }
     }
-}
-
-fn should_intercept_canvas_input(has_floating: bool) -> bool {
-    has_floating
 }
 
 fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
@@ -304,7 +300,8 @@ fn handle_select_tool(
 fn handle_floating_canvas_interaction(
     ui_state: &mut EditorUI,
     response: &egui::Response,
-    _ctx: &egui::Context,
+    ctx: &egui::Context,
+    rect: egui::Rect,
 ) -> bool {
     if !crate::ui::editor_context::sprite_state_mut(ui_state).has_floating() {
         return false;
@@ -316,28 +313,36 @@ fn handle_floating_canvas_interaction(
         return true;
     }
 
+    // --- Active resize drag (already started on a previous frame) ---
+    if handle_active_resize_drag(ui_state, response, ctx, rect) {
+        return true;
+    }
+
+    // --- Drag start: decide resize vs move based on where the drag originated ---
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        try_start_resize_drag(ui_state, ctx, rect);
+        // Whether resize or move, consume the event so selection tool doesn't interfere
+        return true;
+    }
+
+    // --- Ongoing drag: resize if resize_drag is active, otherwise move ---
     if response.dragged_by(egui::PointerButton::Primary) {
-        if crate::ui::editor_context::sprite_state_mut(ui_state).tool != SpriteEditorTool::Select {
-            return true;
-        }
-        let delta = response.drag_delta();
-        let zoom = crate::ui::editor_context::sprite_state_mut(ui_state)
+        let is_resizing = crate::ui::editor_context::sprite_state_mut(ui_state)
             .active()
-            .viewport
-            .zoom;
-        // Convert screen-space drag delta to canvas-space pixel delta
-        let dx = (delta.x / zoom).round() as i32;
-        let dy = (delta.y / zoom).round() as i32;
-        if dx != 0 || dy != 0 {
-            crate::ui::editor_context::sprite_state_mut(ui_state)
-                .nudge_floating(glam::IVec2::new(dx, dy));
+            .resize_drag
+            .is_some();
+        if is_resizing {
+            apply_resize_drag(ui_state, ctx, rect);
+        } else {
+            apply_move_drag(ui_state, response);
         }
         return true;
     }
 
-    if response.drag_started_by(egui::PointerButton::Primary)
-        || response.drag_stopped_by(egui::PointerButton::Primary)
-    {
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .resize_drag = None;
         return true;
     }
 
@@ -348,6 +353,206 @@ fn handle_floating_canvas_interaction(
     }
 
     false
+}
+
+/// Screen-space tolerance (pixels) for hitting a corner handle.
+const HANDLE_HIT_RADIUS: f32 = 8.0;
+
+/// On drag start, check if the pointer is near a corner handle and begin resize if so.
+fn try_start_resize_drag(ui_state: &mut EditorUI, ctx: &egui::Context, rect: egui::Rect) {
+    let pointer_pos = match ctx.input(|i| i.pointer.interact_pos()) {
+        Some(p) if rect.contains(p) => p,
+        _ => return,
+    };
+
+    let cs = crate::ui::editor_context::sprite_state_mut(ui_state).active();
+    let floating = match &cs.floating {
+        Some(f) => f,
+        None => return,
+    };
+
+    let zoom = cs.viewport.zoom;
+    let pan = cs.viewport.pan;
+    let offset = floating.offset;
+    let size = floating.display_size();
+
+    let corners = corner_screen_positions(rect, pan, zoom, offset, size);
+    let hit = corners
+        .iter()
+        .find(|(_, pos)| pos.distance(pointer_pos) <= HANDLE_HIT_RADIUS);
+
+    let (corner, _) = match hit {
+        Some(c) => *c,
+        None => return, // Not on a corner → will be a move drag
+    };
+
+    let anchor = anchor_for_corner(corner, offset, size);
+    let aspect = size.x as f32 / size.y.max(1) as f32;
+
+    let cs_mut = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut();
+    cs_mut.resize_drag = Some(ResizeDrag {
+        corner,
+        anchor_canvas: anchor,
+        aspect_ratio: aspect,
+    });
+}
+
+/// Continue an active resize drag that was already started.
+fn handle_active_resize_drag(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    ctx: &egui::Context,
+    rect: egui::Rect,
+) -> bool {
+    let is_dragging = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .resize_drag
+        .is_some();
+    if !is_dragging {
+        return false;
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .resize_drag = None;
+        return true;
+    }
+
+    if response.dragged_by(egui::PointerButton::Primary) {
+        apply_resize_drag(ui_state, ctx, rect);
+        return true;
+    }
+
+    // Resize is active but no drag event this frame — consume to prevent fallthrough
+    true
+}
+
+/// Apply one frame of resize based on current pointer position.
+fn apply_resize_drag(ui_state: &mut EditorUI, ctx: &egui::Context, rect: egui::Rect) {
+    let pointer_pos = match ctx.input(|i| i.pointer.latest_pos()) {
+        Some(p) => p,
+        None => return,
+    };
+
+    let cs = crate::ui::editor_context::sprite_state_mut(ui_state).active();
+    let drag = cs.resize_drag.clone().unwrap();
+    let zoom = cs.viewport.zoom;
+    let pan = cs.viewport.pan;
+
+    let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+    let mouse_canvas = glam::Vec2::new(
+        (pointer_pos.x - canvas_screen_min.x) / zoom,
+        (pointer_pos.y - canvas_screen_min.y) / zoom,
+    );
+
+    let (new_size, new_offset) =
+        compute_resize(drag, mouse_canvas, ctx.input(|i| i.modifiers.shift));
+
+    crate::ui::editor_context::sprite_state_mut(ui_state).resize_floating(new_size, new_offset);
+}
+
+/// Apply one frame of move-drag (nudge floating selection).
+fn apply_move_drag(ui_state: &mut EditorUI, response: &egui::Response) {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).tool != SpriteEditorTool::Select {
+        return;
+    }
+    let delta = response.drag_delta();
+    let zoom = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .viewport
+        .zoom;
+    let dx = (delta.x / zoom).round() as i32;
+    let dy = (delta.y / zoom).round() as i32;
+    if dx != 0 || dy != 0 {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .nudge_floating(glam::IVec2::new(dx, dy));
+    }
+}
+
+/// Compute new size and top-left offset from the resize drag and current mouse position.
+fn compute_resize(
+    drag: ResizeDrag,
+    mouse_canvas: glam::Vec2,
+    freeform: bool,
+) -> (glam::UVec2, glam::IVec2) {
+    let anchor = drag.anchor_canvas.as_vec2();
+
+    let raw_w = (mouse_canvas.x - anchor.x).abs();
+    let raw_h = (mouse_canvas.y - anchor.y).abs();
+
+    let (w, h) = if freeform {
+        (raw_w.max(1.0), raw_h.max(1.0))
+    } else {
+        constrain_aspect(raw_w, raw_h, drag.aspect_ratio)
+    };
+
+    let w = (w.round() as u32).max(1);
+    let h = (h.round() as u32).max(1);
+
+    // Top-left = min of anchor and the computed far corner
+    let top_left = compute_top_left(drag.corner, drag.anchor_canvas, w, h);
+
+    (glam::UVec2::new(w, h), top_left)
+}
+
+/// Constrain width/height to the given aspect ratio, fitting whichever axis is larger.
+fn constrain_aspect(raw_w: f32, raw_h: f32, aspect: f32) -> (f32, f32) {
+    let w_from_h = raw_h * aspect;
+    let h_from_w = raw_w / aspect;
+    if raw_w >= w_from_h {
+        (raw_w.max(1.0), h_from_w.max(1.0))
+    } else {
+        (w_from_h.max(1.0), raw_h.max(1.0))
+    }
+}
+
+/// Compute the top-left canvas offset given which corner is anchored.
+fn compute_top_left(corner: ResizeCorner, anchor: glam::IVec2, w: u32, h: u32) -> glam::IVec2 {
+    match corner {
+        // User drags bottom-right → anchor is top-left
+        ResizeCorner::BottomRight => anchor,
+        // User drags bottom-left → anchor is top-right
+        ResizeCorner::BottomLeft => glam::IVec2::new(anchor.x - w as i32, anchor.y),
+        // User drags top-right → anchor is bottom-left
+        ResizeCorner::TopRight => glam::IVec2::new(anchor.x, anchor.y - h as i32),
+        // User drags top-left → anchor is bottom-right
+        ResizeCorner::TopLeft => glam::IVec2::new(anchor.x - w as i32, anchor.y - h as i32),
+    }
+}
+
+/// Get the fixed (opposite) corner in canvas coordinates for a given dragged corner.
+fn anchor_for_corner(corner: ResizeCorner, offset: glam::IVec2, size: glam::UVec2) -> glam::IVec2 {
+    match corner {
+        ResizeCorner::BottomRight => offset,
+        ResizeCorner::BottomLeft => glam::IVec2::new(offset.x + size.x as i32, offset.y),
+        ResizeCorner::TopRight => glam::IVec2::new(offset.x, offset.y + size.y as i32),
+        ResizeCorner::TopLeft => {
+            glam::IVec2::new(offset.x + size.x as i32, offset.y + size.y as i32)
+        }
+    }
+}
+
+/// Compute screen positions for the four corner handles.
+fn corner_screen_positions(
+    rect: egui::Rect,
+    pan: glam::Vec2,
+    zoom: f32,
+    offset: glam::IVec2,
+    size: glam::UVec2,
+) -> [(ResizeCorner, egui::Pos2); 4] {
+    let canvas_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+    let tl = egui::pos2(
+        canvas_min.x + offset.x as f32 * zoom,
+        canvas_min.y + offset.y as f32 * zoom,
+    );
+    let br = egui::pos2(tl.x + size.x as f32 * zoom, tl.y + size.y as f32 * zoom);
+    [
+        (ResizeCorner::TopLeft, tl),
+        (ResizeCorner::TopRight, egui::pos2(br.x, tl.y)),
+        (ResizeCorner::BottomLeft, egui::pos2(tl.x, br.y)),
+        (ResizeCorner::BottomRight, br),
+    ]
 }
 
 fn handle_selection_drag(
@@ -871,11 +1076,5 @@ mod tests {
             effective_paint_color(ColorMode::PaletteIndexed, PixelColor::rgb(1, 2, 3), None),
             canonical_indexed_color(3)
         );
-    }
-
-    #[test]
-    fn should_intercept_canvas_input_only_when_floating_exists() {
-        assert!(should_intercept_canvas_input(true));
-        assert!(!should_intercept_canvas_input(false));
     }
 }

@@ -106,6 +106,8 @@ pub struct CanvasState {
     pub swap_target_cell: u32,
     /// Floating selection (pixels lifted off the canvas for repositioning).
     pub floating: Option<FloatingSelection>,
+    /// Active corner-handle resize drag (while the user is dragging a handle).
+    pub resize_drag: Option<super::ResizeDrag>,
 }
 
 impl Default for CanvasState {
@@ -137,6 +139,7 @@ impl Default for CanvasState {
             original_cell_aliases: None,
             swap_target_cell: 0,
             floating: None,
+            resize_drag: None,
         }
     }
 }
