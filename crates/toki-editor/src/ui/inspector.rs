@@ -71,7 +71,9 @@ pub(super) struct EntityPropertyDraft {
     pub(super) solid: bool,
     pub(super) interactable: bool,
     pub(super) interaction_reach: u32,
+    pub(super) movement_component_present: bool,
     pub(super) can_move: bool,
+    pub(super) ai_component_present: bool,
     pub(super) ai_config: AiConfig,
     pub(super) movement_profile: MovementProfile,
     pub(super) movement_sound_trigger: MovementSoundTrigger,
@@ -82,6 +84,7 @@ pub(super) struct EntityPropertyDraft {
     pub(super) speed: f64,
     pub(super) render_layer: i32,
     pub(super) persistent_across_saves: bool,
+    pub(super) combat_component_present: bool,
     pub(super) health_enabled: bool,
     pub(super) health_value: i64,
     pub(super) attack_power_enabled: bool,
@@ -218,11 +221,13 @@ impl EntityPropertyDraft {
                 .as_ref()
                 .map(|interaction| interaction.interaction_reach)
                 .unwrap_or(0),
+            movement_component_present: stored.components.movement.is_some(),
             can_move: stored
                 .components
                 .movement
                 .as_ref()
                 .is_some_and(|movement| movement.can_move),
+            ai_component_present: stored.components.ai.is_some(),
             ai_config: stored
                 .components
                 .ai
@@ -248,6 +253,7 @@ impl EntityPropertyDraft {
                 .unwrap_or(0.0),
             render_layer: entity.rendering.render_layer,
             persistent_across_saves: entity.persistent_across_saves,
+            combat_component_present: stored.components.combat.is_some(),
             health_enabled,
             health_value,
             attack_power_enabled,
@@ -329,11 +335,13 @@ impl EntityPropertyDraft {
                 .as_ref()
                 .map(|interaction| interaction.interaction_reach)
                 .unwrap_or(0),
+            movement_component_present: definition.components.movement.is_some(),
             can_move: definition
                 .components
                 .movement
                 .as_ref()
                 .is_some_and(|movement| movement.can_move),
+            ai_component_present: definition.components.ai.is_some(),
             ai_config: definition
                 .components
                 .ai
@@ -359,6 +367,7 @@ impl EntityPropertyDraft {
                 .unwrap_or(0.0),
             render_layer: definition.rendering.render_layer,
             persistent_across_saves: false,
+            combat_component_present: definition.components.combat.is_some(),
             health_enabled,
             health_value,
             attack_power_enabled,

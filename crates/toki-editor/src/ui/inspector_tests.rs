@@ -136,8 +136,8 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
         .can_move);
     assert_eq!(entity.entity.control_role, ControlRole::PlayerCharacter);
     assert!(
-        entity.components.ai.is_none(),
-        "default AI config should clear the optional AI component"
+        entity.components.ai.is_some(),
+        "existing AI component should be preserved when the draft still represents that capability"
     );
     assert_eq!(
         entity

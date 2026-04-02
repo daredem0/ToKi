@@ -3,7 +3,7 @@ use crate::config::EditorConfig;
 use crate::project::{Project, ProjectAssets};
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{EditorUI, PlacementKind, ToolboxTab};
-use crate::ui::hierarchy::scan_entity_definitions_for_toolbox;
+use crate::ui::hierarchy::collect_entity_definitions_for_toolbox;
 use crate::ui::object_sheet_browser::{
     build_decoration_placement_draft, ensure_object_sheet_preview_texture,
     render_object_gallery_item, resolve_object_sheet_browser_source, sync_selected_object_name,
@@ -39,7 +39,7 @@ impl InspectorSystem {
                 render_decoration_tab(ui_state, ui, ctx, &project_path, &mut viewport);
             }
             ToolboxTab::Creatures | ToolboxTab::Humans | ToolboxTab::Items => {
-                render_entity_definition_tab(ui_state, ui, &project_path, tab, &mut viewport);
+                render_entity_definition_tab(ui_state, ui, project_assets, tab, &mut viewport);
             }
         }
     }
@@ -98,11 +98,11 @@ fn resolve_project_path(
 fn render_entity_definition_tab(
     ui_state: &mut EditorUI,
     ui: &mut egui::Ui,
-    project_path: &std::path::Path,
+    project_assets: Option<&mut ProjectAssets>,
     tab: ToolboxTab,
     viewport: &mut Option<&mut SceneViewport>,
 ) {
-    let definitions = scan_entity_definitions_for_toolbox(project_path);
+    let definitions = collect_entity_definitions_for_toolbox(ui_state, project_assets);
     let names = match definitions.get(&tab) {
         Some(names) if !names.is_empty() => names,
         _ => {
@@ -117,9 +117,14 @@ fn render_entity_definition_tab(
     egui::ScrollArea::vertical()
         .max_height(400.0)
         .show(ui, |ui| {
-            for name in names {
-                if ui.selectable_label(false, name).clicked() {
-                    enter_placement_for_tab(ui_state, tab, name);
+            for definition in names {
+                let label = if definition.display_name == definition.name {
+                    definition.name.as_str().to_string()
+                } else {
+                    format!("{} ({})", definition.display_name, definition.name)
+                };
+                if ui.selectable_label(false, label).clicked() {
+                    enter_definition_placement_mode(ui_state, &definition.name);
                     if let Some(viewport) = viewport.as_mut() {
                         viewport.mark_dirty();
                     }
@@ -131,21 +136,11 @@ fn render_entity_definition_tab(
     ui.small("Click an entity to enter placement mode. Press Enter or Escape to exit.");
 }
 
-fn enter_placement_for_tab(ui_state: &mut EditorUI, tab: ToolboxTab, name: &str) {
-    match tab {
-        ToolboxTab::Items => {
-            ui_state
-                .scene_viewport_context_mut()
-                .placement
-                .enter_item_placement_mode(name.to_string());
-        }
-        _ => {
-            ui_state
-                .scene_viewport_context_mut()
-                .placement
-                .enter_placement_mode(name.to_string());
-        }
-    }
+fn enter_definition_placement_mode(ui_state: &mut EditorUI, name: &str) {
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode(name.to_string());
 }
 
 // ---------- Decoration tab ----------

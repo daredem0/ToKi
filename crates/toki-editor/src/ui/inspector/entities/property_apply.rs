@@ -214,7 +214,8 @@ impl InspectorSystem {
         };
         changed |= set_if_changed(&mut stored.components.interaction, desired_interaction);
 
-        let desired_movement = if draft.can_move
+        let desired_movement = if draft.movement_component_present
+            || draft.can_move
             || draft.speed > 0.0
             || draft.movement_profile != toki_core::entity::MovementProfile::LegacyDefault
         {
@@ -228,7 +229,8 @@ impl InspectorSystem {
         };
         changed |= set_if_changed(&mut stored.components.movement, desired_movement);
 
-        let desired_ai = if draft.ai_config.behavior != AiBehavior::None
+        let desired_ai = if draft.ai_component_present
+            || draft.ai_config.behavior != AiBehavior::None
             || draft.ai_config.detection_radius > 0
         {
             Some(AiComponent {
@@ -252,7 +254,10 @@ impl InspectorSystem {
         };
         changed |= set_if_changed(&mut stored.components.inventory, desired_inventory);
 
-        let mut desired_combat = if draft.health_enabled || draft.attack_power_enabled {
+        let mut desired_combat = if draft.combat_component_present
+            || draft.health_enabled
+            || draft.attack_power_enabled
+        {
             stored.components.combat.clone().unwrap_or_default()
         } else {
             CombatComponent::default()
@@ -268,7 +273,10 @@ impl InspectorSystem {
             ATTACK_POWER_STAT_ID,
             new_attack_power,
         );
-        let desired_combat = if draft.health_enabled || draft.attack_power_enabled {
+        let desired_combat = if draft.combat_component_present
+            || draft.health_enabled
+            || draft.attack_power_enabled
+        {
             Some(desired_combat)
         } else {
             None
@@ -358,7 +366,8 @@ fn apply_attribute_fields(
         definition.components.interaction = desired_interaction;
         changed = true;
     }
-    let desired_movement = if draft.can_move
+    let desired_movement = if draft.movement_component_present
+        || draft.can_move
         || draft.speed > 0.0
         || draft.movement_profile != toki_core::entity::MovementProfile::LegacyDefault
     {
@@ -374,7 +383,8 @@ fn apply_attribute_fields(
         definition.components.movement = desired_movement;
         changed = true;
     }
-    let desired_ai = if draft.ai_config.behavior != AiBehavior::None
+    let desired_ai = if draft.ai_component_present
+        || draft.ai_config.behavior != AiBehavior::None
         || draft.ai_config.detection_radius > 0
     {
         Some(AiComponent {
@@ -426,7 +436,10 @@ fn apply_stat_fields(
             None
         },
     );
-    definition.components.combat = if draft.health_enabled || draft.attack_power_enabled {
+    definition.components.combat = if draft.combat_component_present
+        || draft.health_enabled
+        || draft.attack_power_enabled
+    {
         Some(combat)
     } else {
         None

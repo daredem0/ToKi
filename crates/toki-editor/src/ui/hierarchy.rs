@@ -1,8 +1,18 @@
+use crate::project::ProjectAssets;
+use crate::ui::editor_context::entity_editor_state;
 use crate::ui::editor_ui::Selection;
-use toki_core::Scene;
+use crate::ui::entity_editor::{EntityEditState, EntityEditorState, EntitySummary};
+use crate::ui::EditorUI;
+use std::collections::BTreeMap;
 
 /// Handles hierarchy and entity management for the editor
 pub struct HierarchySystem;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolboxEntityDefinitionSummary {
+    pub name: String,
+    pub display_name: String,
+}
 
 impl HierarchySystem {
     fn category_label(raw: &str) -> String {
@@ -34,13 +44,12 @@ impl HierarchySystem {
         }
     }
 
-    /// Renders the entity palette showing available entity definitions for placement
+    /// Renders the entity palette showing available entity definitions for inspection.
     pub fn render_entity_palette(
         ui: &mut egui::Ui,
         project_path: &std::path::Path,
         selection: &Option<Selection>,
-        scenes: &[Scene],
-    ) -> (Option<String>, Vec<(String, String)>, Option<String>) {
+    ) -> Option<String> {
         let entities_path = project_path.join("entities");
 
         if entities_path.exists() {
@@ -90,8 +99,6 @@ impl HierarchySystem {
 
                 if found_entities {
                     let mut selected_entity = None;
-                    let mut scene_entity_additions: Vec<(String, String)> = Vec::new(); // (scene_name, entity_name)
-                    let placement_mode_request: Option<String> = None;
 
                     // The parent left panel owns scrolling for the full container.
                     let mut sorted_categories: Vec<_> = categories.into_iter().collect();
@@ -119,49 +126,12 @@ impl HierarchySystem {
                                         );
                                         selected_entity = Some(entity_name.clone());
                                     }
-
-                                    button.context_menu(|ui| {
-                                        ui.label(format!("Entity: {}", entity_name));
-                                        ui.separator();
-                                        ui.label("Add to Scene:");
-                                        ui.separator();
-
-                                        let scene_names: Vec<String> =
-                                            scenes.iter().map(|s| s.name.clone()).collect();
-
-                                        for scene_name in scene_names {
-                                            if ui.button(&scene_name).clicked() {
-                                                tracing::debug!(
-                                                    "Adding entity '{}' to scene '{}'",
-                                                    entity_name,
-                                                    scene_name
-                                                );
-                                                scene_entity_additions
-                                                    .push((scene_name.clone(), entity_name.clone()));
-                                                ui.close();
-                                            }
-                                        }
-
-                                        ui.separator();
-                                        ui.label("Actions:");
-                                        if ui.button("View Definition").clicked() {
-                                            tracing::debug!(
-                                                "View definition for entity: {}",
-                                                entity_name
-                                            );
-                                            ui.close();
-                                        }
-                                    });
                                 }
                             });
                         ui.add_space(5.0);
                     }
 
-                    return (
-                        selected_entity,
-                        scene_entity_additions,
-                        placement_mode_request,
-                    );
+                    return selected_entity;
                 } else {
                     ui.label("No entity definition files found in entities/");
                 }
@@ -172,7 +142,7 @@ impl HierarchySystem {
             ui.label("No entities directory found, expected: entities/");
         }
 
-        (None, Vec::new(), None)
+        None
     }
 }
 
@@ -193,45 +163,114 @@ pub fn toolbox_tab_for_category(category: &str) -> Option<super::editor_ui::Tool
 /// Scans the `entities/` directory and groups entity definition names by [`ToolboxTab`].
 ///
 /// Definitions whose category does not map to a toolbox tab are omitted.
-pub fn scan_entity_definitions_for_toolbox(
-    project_path: &std::path::Path,
-) -> std::collections::BTreeMap<super::editor_ui::ToolboxTab, Vec<String>> {
-    use super::editor_ui::ToolboxTab;
-    let mut result = std::collections::BTreeMap::<ToolboxTab, Vec<String>>::new();
-    let entities_dir = project_path.join("entities");
+pub fn collect_entity_definitions_for_toolbox(
+    ui_state: &EditorUI,
+    project_assets: Option<&mut ProjectAssets>,
+) -> BTreeMap<super::editor_ui::ToolboxTab, Vec<ToolboxEntityDefinitionSummary>> {
+    let mut definitions = collect_definition_categories(entity_editor_state(ui_state), project_assets);
+    if let Some(edit_state) = entity_editor_state(ui_state).edit_state.as_ref() {
+        apply_edit_state_override(&mut definitions, edit_state);
+    }
 
-    let entries = match std::fs::read_dir(&entities_dir) {
-        Ok(e) => e,
-        Err(_) => return result,
+    let mut grouped = BTreeMap::<
+        super::editor_ui::ToolboxTab,
+        Vec<ToolboxEntityDefinitionSummary>,
+    >::new();
+    for (name, definition) in definitions {
+        let category = definition.category;
+        if let Some(tab) = toolbox_tab_for_category(&category) {
+            grouped.entry(tab).or_default().push(ToolboxEntityDefinitionSummary {
+                name,
+                display_name: definition.display_name,
+            });
+        }
+    }
+
+    for definitions in grouped.values_mut() {
+        definitions.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+
+    grouped
+}
+
+fn collect_definition_categories(
+    entity_editor: &EntityEditorState,
+    project_assets: Option<&mut ProjectAssets>,
+) -> BTreeMap<String, ToolboxDefinitionRecord> {
+    let mut result = BTreeMap::new();
+
+    if !entity_editor.entities.is_empty() {
+        for summary in &entity_editor.entities {
+            merge_summary(&mut result, summary);
+        }
+        return result;
+    }
+
+    let Some(project_assets) = project_assets else {
+        return result;
     };
 
-    for entry in entries.flatten() {
-        let Some(name) = entry.file_name().to_str().map(String::from) else {
-            continue;
-        };
-        if !name.ends_with(".json") {
-            continue;
-        }
-        let entity_name = name.trim_end_matches(".json").to_string();
-        let tab = read_category_and_map(&entry.path());
-        if let Some(tab) = tab {
-            result.entry(tab).or_default().push(entity_name);
+    let mut names = project_assets.entities.keys().cloned().collect::<Vec<_>>();
+    names.sort();
+    for name in names {
+        if let Ok(Some(definition)) = project_assets.load_entity_definition(&name) {
+            result.insert(
+                name.clone(),
+                ToolboxDefinitionRecord {
+                    category: definition.category,
+                    display_name: if definition.display_name.is_empty() {
+                        name
+                    } else {
+                        definition.display_name
+                    },
+                },
+            );
         }
     }
 
-    for names in result.values_mut() {
-        names.sort();
-    }
     result
 }
 
-fn read_category_and_map(
-    path: &std::path::Path,
-) -> Option<super::editor_ui::ToolboxTab> {
-    let content = std::fs::read_to_string(path).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let category = json.get("category")?.as_str()?;
-    toolbox_tab_for_category(category)
+#[derive(Debug, Clone)]
+struct ToolboxDefinitionRecord {
+    category: String,
+    display_name: String,
+}
+
+fn merge_summary(target: &mut BTreeMap<String, ToolboxDefinitionRecord>, summary: &EntitySummary) {
+    target.insert(
+        summary.name.clone(),
+        ToolboxDefinitionRecord {
+            category: summary.category.clone(),
+            display_name: summary.display_name.clone(),
+        },
+    );
+}
+
+fn apply_edit_state_override(
+    target: &mut BTreeMap<String, ToolboxDefinitionRecord>,
+    edit_state: &EntityEditState,
+) {
+    let current_name = edit_state.definition.name.to_string();
+    if let Some(previous_name) = edit_state
+        .file_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|name| *name != current_name)
+    {
+        target.remove(previous_name);
+    }
+    target.insert(
+        current_name.clone(),
+        ToolboxDefinitionRecord {
+            category: edit_state.definition.category.clone(),
+            display_name: if edit_state.definition.display_name.is_empty() {
+                current_name
+            } else {
+                edit_state.definition.display_name.clone()
+            },
+        },
+    );
 }
 
 #[cfg(test)]

@@ -408,44 +408,49 @@ fn can_place_entity_returns_true_without_collision_context() {
     ));
 }
 
-// --- PlacementKind::Item tests ---
+// --- Generic entity definition placement tests ---
 
 use crate::ui::editor_ui::PlacementKind;
 
 #[test]
-fn enter_item_placement_mode_sets_kind() {
+fn enter_placement_mode_sets_entity_definition_kind() {
     let mut state = crate::ui::editor_ui::PlacementState::default();
-    state.enter_item_placement_mode("coin_pickup".to_string());
-    assert!(matches!(state.kind, Some(PlacementKind::Item(_))));
+    state.enter_placement_mode("coin_pickup".to_string());
+    assert!(matches!(state.kind, Some(PlacementKind::EntityDefinition(_))));
     assert!(state.is_in_placement_mode());
 }
 
 #[test]
-fn item_definition_returns_name() {
+fn entity_definition_returns_name_for_items_too() {
     let mut state = crate::ui::editor_ui::PlacementState::default();
-    state.enter_item_placement_mode("coin_pickup".to_string());
-    assert_eq!(state.item_definition(), Some("coin_pickup"));
+    state.enter_placement_mode("coin_pickup".to_string());
+    assert_eq!(state.entity_definition(), Some("coin_pickup"));
 }
 
 #[test]
-fn item_definition_returns_none_when_not_in_item_mode() {
-    let mut state = crate::ui::editor_ui::PlacementState::default();
+fn enter_placement_mode_resets_cached_preview_state() {
+    let mut state = crate::ui::editor_ui::PlacementState {
+        preview_position: Some(Vec2::new(1.0, 2.0)),
+        preview_valid: Some(false),
+        ..Default::default()
+    };
     state.enter_placement_mode("goblin".to_string());
-    assert_eq!(state.item_definition(), None);
+    assert_eq!(state.preview_position, None);
+    assert_eq!(state.preview_valid, None);
 }
 
 #[test]
-fn mode_label_returns_item_prefix() {
+fn mode_label_uses_generic_entity_prefix_for_items() {
     let mut state = crate::ui::editor_ui::PlacementState::default();
-    state.enter_item_placement_mode("gem_pickup".to_string());
-    assert_eq!(state.mode_label(), Some("Item: gem_pickup".to_string()));
+    state.enter_placement_mode("gem_pickup".to_string());
+    assert_eq!(state.mode_label(), Some("Entity: gem_pickup".to_string()));
 }
 
 #[test]
-fn exit_clears_item_placement() {
+fn exit_clears_generic_entity_placement() {
     let mut state = crate::ui::editor_ui::PlacementState::default();
-    state.enter_item_placement_mode("coin_pickup".to_string());
+    state.enter_placement_mode("coin_pickup".to_string());
     state.exit_placement_mode();
     assert!(!state.is_in_placement_mode());
-    assert_eq!(state.item_definition(), None);
+    assert_eq!(state.entity_definition(), None);
 }

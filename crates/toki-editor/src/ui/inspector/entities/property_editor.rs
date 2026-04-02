@@ -21,19 +21,40 @@ use toki_core::entity::{
 };
 use toki_core::palette::Palette4;
 
-/// Whether the movement section (speed, can_move, movement_profile, control_role) is relevant.
-pub fn should_show_movement_section(kind: EntityKind) -> bool {
+fn kind_supports_movement(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Player | EntityKind::Npc)
+}
+
+fn kind_supports_audio(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Player | EntityKind::Npc)
+}
+
+fn kind_supports_combat(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Player | EntityKind::Npc | EntityKind::Item)
+}
+
+/// Whether the movement section (speed, can_move, movement_profile, control_role) is relevant.
+pub fn should_show_movement_section(draft: &EntityPropertyDraft) -> bool {
+    let kind = runtime_entity_kind_for_category(&draft.category);
+    draft.movement_component_present || draft.ai_component_present || kind_supports_movement(kind)
 }
 
 /// Whether the audio section (footstep sounds, hearing) is relevant.
-pub fn should_show_audio_section(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Player | EntityKind::Npc)
+pub fn should_show_audio_section(draft: &EntityPropertyDraft) -> bool {
+    let kind = runtime_entity_kind_for_category(&draft.category);
+    draft.movement_component_present
+        || draft.ai_component_present
+        || !draft.movement_sound.trim().is_empty()
+        || kind_supports_audio(kind)
 }
 
 /// Whether the combat/stats section (health, attack power) is relevant.
-pub fn should_show_combat_section(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Player | EntityKind::Npc | EntityKind::Item)
+pub fn should_show_combat_section(draft: &EntityPropertyDraft) -> bool {
+    let kind = runtime_entity_kind_for_category(&draft.category);
+    draft.combat_component_present
+        || draft.health_enabled
+        || draft.attack_power_enabled
+        || kind_supports_combat(kind)
 }
 
 impl InspectorSystem {
@@ -47,10 +68,9 @@ impl InspectorSystem {
         section_label: &str,
     ) -> bool {
         let mut changed = false;
-        let kind = runtime_entity_kind_for_category(&draft.category);
-        let show_movement = should_show_movement_section(kind);
-        let show_audio = should_show_audio_section(kind);
-        let show_combat = should_show_combat_section(kind);
+        let show_movement = should_show_movement_section(draft);
+        let show_audio = should_show_audio_section(draft);
+        let show_combat = should_show_combat_section(draft);
 
         ui.label(section_label);
         ui.separator();
@@ -725,46 +745,95 @@ fn render_collision_section(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::inspector::{CollisionDraft, EntityPropertyDraft};
+    use toki_core::entity::{AiConfig, ControlRole, MovementProfile, MovementSoundTrigger};
+
+    fn draft_with_category(category: &str) -> EntityPropertyDraft {
+        EntityPropertyDraft {
+            category: category.to_string(),
+            static_object_sheet: None,
+            static_object_name: None,
+            control_role: ControlRole::None,
+            position_x: 0,
+            position_y: 0,
+            size_x: 16,
+            size_y: 16,
+            visible: true,
+            has_shadow: true,
+            palette_override: String::new(),
+            active: true,
+            solid: false,
+            interactable: false,
+            interaction_reach: 0,
+            movement_component_present: false,
+            can_move: false,
+            ai_component_present: false,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::LegacyDefault,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
+            movement_sound: String::new(),
+            has_inventory: false,
+            speed: 0.0,
+            render_layer: 0,
+            persistent_across_saves: false,
+            combat_component_present: false,
+            health_enabled: false,
+            health_value: 0,
+            attack_power_enabled: false,
+            attack_power_value: 0,
+            collision: CollisionDraft {
+                enabled: false,
+                offset_x: 0,
+                offset_y: 0,
+                size_x: 16,
+                size_y: 16,
+                trigger: false,
+            },
+        }
+    }
 
     #[test]
     fn movement_section_visible_for_player_and_npc() {
-        assert!(should_show_movement_section(EntityKind::Player));
-        assert!(should_show_movement_section(EntityKind::Npc));
+        assert!(should_show_movement_section(&draft_with_category("player")));
+        assert!(should_show_movement_section(&draft_with_category("creature")));
     }
 
     #[test]
-    fn movement_section_hidden_for_passive_kinds() {
-        assert!(!should_show_movement_section(EntityKind::Decoration));
-        assert!(!should_show_movement_section(EntityKind::Item));
-        assert!(!should_show_movement_section(EntityKind::Trigger));
-        assert!(!should_show_movement_section(EntityKind::Projectile));
+    fn movement_section_stays_visible_for_promoted_decoration() {
+        let mut draft = draft_with_category("decoration");
+        draft.movement_component_present = true;
+        assert!(should_show_movement_section(&draft));
     }
 
     #[test]
-    fn audio_section_visible_for_player_and_npc() {
-        assert!(should_show_audio_section(EntityKind::Player));
-        assert!(should_show_audio_section(EntityKind::Npc));
+    fn movement_section_hidden_for_plain_passive_decoration() {
+        assert!(!should_show_movement_section(&draft_with_category("decoration")));
     }
 
     #[test]
-    fn audio_section_hidden_for_passive_kinds() {
-        assert!(!should_show_audio_section(EntityKind::Decoration));
-        assert!(!should_show_audio_section(EntityKind::Item));
-        assert!(!should_show_audio_section(EntityKind::Trigger));
-        assert!(!should_show_audio_section(EntityKind::Projectile));
+    fn audio_section_visible_for_promoted_decoration_with_movement() {
+        let mut draft = draft_with_category("decoration");
+        draft.movement_component_present = true;
+        assert!(should_show_audio_section(&draft));
     }
 
     #[test]
-    fn combat_section_visible_for_combat_capable_kinds() {
-        assert!(should_show_combat_section(EntityKind::Player));
-        assert!(should_show_combat_section(EntityKind::Npc));
-        assert!(should_show_combat_section(EntityKind::Item));
+    fn audio_section_hidden_for_plain_passive_decoration() {
+        assert!(!should_show_audio_section(&draft_with_category("decoration")));
     }
 
     #[test]
-    fn combat_section_hidden_for_non_combat_kinds() {
-        assert!(!should_show_combat_section(EntityKind::Decoration));
-        assert!(!should_show_combat_section(EntityKind::Trigger));
-        assert!(!should_show_combat_section(EntityKind::Projectile));
+    fn combat_section_visible_for_items_and_promoted_decorations() {
+        assert!(should_show_combat_section(&draft_with_category("item")));
+        let mut draft = draft_with_category("decoration");
+        draft.combat_component_present = true;
+        assert!(should_show_combat_section(&draft));
+    }
+
+    #[test]
+    fn combat_section_hidden_for_plain_non_combat_decoration() {
+        assert!(!should_show_combat_section(&draft_with_category("decoration")));
     }
 }

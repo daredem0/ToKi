@@ -415,7 +415,6 @@ pub struct SceneToolboxState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlacementKind {
     EntityDefinition(String),
-    Item(String),
     Decoration(DecorationPlacementDraft),
     SceneAnchor(SceneAnchorPlacementDraft),
 }
@@ -438,11 +437,6 @@ impl PlacementState {
             "Entered placement mode for entity: {:?}",
             self.entity_definition()
         );
-    }
-
-    pub fn enter_item_placement_mode(&mut self, entity_definition: String) {
-        tracing::info!("Entered placement mode for item: {}", entity_definition);
-        self.kind = Some(PlacementKind::Item(entity_definition));
         self.preview_position = None;
         self.preview_cached_frame = None;
         self.preview_valid = None;
@@ -493,13 +487,6 @@ impl PlacementState {
         }
     }
 
-    pub fn item_definition(&self) -> Option<&str> {
-        match &self.kind {
-            Some(PlacementKind::Item(name)) => Some(name.as_str()),
-            _ => None,
-        }
-    }
-
     pub fn decoration_draft(&self) -> Option<&DecorationPlacementDraft> {
         match &self.kind {
             Some(PlacementKind::Decoration(draft)) => Some(draft),
@@ -517,7 +504,6 @@ impl PlacementState {
     pub fn mode_label(&self) -> Option<String> {
         match &self.kind {
             Some(PlacementKind::EntityDefinition(name)) => Some(format!("Entity: {name}")),
-            Some(PlacementKind::Item(name)) => Some(format!("Item: {name}")),
             Some(PlacementKind::Decoration(draft)) => {
                 Some(format!("Object: {}/{}", draft.sheet, draft.object_name))
             }

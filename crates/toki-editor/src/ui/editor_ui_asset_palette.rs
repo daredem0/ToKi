@@ -1,7 +1,5 @@
 use super::EditorUI;
-use crate::editor_services::commands as editor_commands;
 use crate::ui::hierarchy::HierarchySystem;
-use crate::ui::undo_redo::EditorCommand;
 
 impl EditorUI {
     pub(super) fn render_standalone_maps_section(
@@ -126,101 +124,12 @@ impl EditorUI {
                     return;
                 };
 
-                let (selected_entity, entity_additions, _) =
-                    HierarchySystem::render_entity_palette(
-                        ui,
-                        project_path,
-                        &self.selection,
-                        &self.scenes,
-                    );
+                let selected_entity =
+                    HierarchySystem::render_entity_palette(ui, project_path, &self.selection);
 
                 if let Some(selected_entity) = selected_entity {
                     self.set_selection(super::Selection::EntityDefinition(selected_entity));
                 }
-
-                for (scene_name, entity_name) in entity_additions {
-                    self.add_entity_definition_to_scene(config, &scene_name, &entity_name);
-                }
             });
-    }
-
-    fn add_entity_definition_to_scene(
-        &mut self,
-        config: &crate::config::EditorConfig,
-        scene_name: &str,
-        entity_name: &str,
-    ) {
-        let Some(project_path) = config.current_project_path() else {
-            tracing::error!("No project path available for entity creation");
-            return;
-        };
-
-        let entity_file = project_path
-            .join("entities")
-            .join(format!("{}.json", entity_name));
-        if !entity_file.exists() {
-            tracing::error!("Entity definition file not found: {:?}", entity_file);
-            return;
-        }
-
-        let content = match std::fs::read_to_string(&entity_file) {
-            Ok(content) => content,
-            Err(error) => {
-                tracing::error!("Failed to read entity file '{}': {}", entity_name, error);
-                return;
-            }
-        };
-
-        let entity_def = match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
-        {
-            Ok(entity_def) => entity_def,
-            Err(error) => {
-                tracing::error!(
-                    "Failed to parse entity definition '{}': {}",
-                    entity_name,
-                    error
-                );
-                return;
-            }
-        };
-
-        let Some(scene_index) = self
-            .scenes
-            .iter()
-            .position(|scene| scene.name == scene_name)
-        else {
-            return;
-        };
-
-        let new_id = self.scenes[scene_index]
-            .entities()
-            .iter()
-            .map(|entity| entity.id)
-            .max()
-            .unwrap_or(0)
-            + 1;
-
-        let default_position = glam::IVec2::new(100, 100);
-
-        match entity_def.create_entity(default_position, new_id) {
-            Ok(entity) => {
-                if editor_commands::execute(
-                    self,
-                    EditorCommand::add_entity(scene_name.to_string(), entity),
-                ) {
-                    tracing::info!(
-                        "Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})",
-                        entity_name,
-                        new_id,
-                        scene_name,
-                        default_position.x,
-                        default_position.y
-                    );
-                }
-            }
-            Err(error) => {
-                tracing::error!("Failed to create entity '{}': {}", entity_name, error);
-            }
-        }
     }
 }
