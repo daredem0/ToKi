@@ -392,9 +392,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         .expect("existing entity should be stored");
 
     assert_eq!(
-        manager
-            .combat(entity_id)
-            .and_then(|combat| combat.health),
+        manager.combat(entity_id).and_then(|combat| combat.health),
         Some(25)
     );
     assert_eq!(
@@ -560,7 +558,10 @@ fn test_factory_method_differences() {
         manager.combat(npc_id).and_then(|combat| combat.health),
         Some(50)
     );
-    assert_eq!(manager.combat(item_id).and_then(|combat| combat.health), None);
+    assert_eq!(
+        manager.combat(item_id).and_then(|combat| combat.health),
+        None
+    );
     assert_eq!(
         manager
             .combat(decoration_id)
@@ -576,10 +577,20 @@ fn test_factory_method_differences() {
     assert_eq!(manager.movement(npc_id).expect("npc movement").speed, 1.0);
 
     // Check movement differences
-    assert!(manager.movement(player_id).expect("player movement").can_move);
+    assert!(
+        manager
+            .movement(player_id)
+            .expect("player movement")
+            .can_move
+    );
     assert!(!manager.movement(npc_id).expect("npc movement").can_move);
     assert!(!manager.movement(item_id).expect("item movement").can_move);
-    assert!(!manager.movement(decoration_id).expect("deco movement").can_move);
+    assert!(
+        !manager
+            .movement(decoration_id)
+            .expect("deco movement")
+            .can_move
+    );
 
     // Check solid differences
     assert!(player.solid);

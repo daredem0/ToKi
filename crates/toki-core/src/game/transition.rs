@@ -111,8 +111,7 @@ impl<'a> SceneTransitionPlanner<'a> {
             } else {
                 Self::reset_player_transient_state(&mut player.entity, None);
             }
-            let player_id =
-                Self::next_non_conflicting_entity_id(&entity_manager, player.entity.id);
+            let player_id = Self::next_non_conflicting_entity_id(&entity_manager, player.entity.id);
             player.entity.id = player_id;
             entity_manager.add_existing_stored_entity(player);
             entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
@@ -239,7 +238,11 @@ impl<'a> SceneTransitionPlanner<'a> {
         target_components: &mut OptionalEntityComponents,
         source: &StoredEntity,
     ) {
-        target_components.combat = source.components.combat.clone().or_else(|| target_components.combat.clone());
+        target_components.combat = source
+            .components
+            .combat
+            .clone()
+            .or_else(|| target_components.combat.clone());
         if source.components.inventory.is_some() {
             target_components.inventory = source.components.inventory.clone();
         }
@@ -279,9 +282,8 @@ mod tests {
     use crate::animation::AnimationState;
     use crate::entity::{
         AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
-        ControlRole, EntityDefinition, EntityStats, Inventory,
-        MovementComponent, MovementProfile, MovementSoundTrigger,
-        OptionalEntityComponents, RenderingDef, StoredEntity,
+        ControlRole, EntityDefinition, EntityStats, Inventory, MovementComponent, MovementProfile,
+        MovementSoundTrigger, OptionalEntityComponents, RenderingDef, StoredEntity,
     };
     use crate::entity::{EntityFootprint, EntityGrounding};
     use crate::scene::{Scene, SceneAnchor, SceneAnchorKind, ScenePlayerEntry};

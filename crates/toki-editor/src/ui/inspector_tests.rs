@@ -128,12 +128,14 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     assert!(!entity.entity.rendering.has_shadow);
     assert!(!entity.entity.active);
     assert!(!entity.entity.solid);
-    assert!(!entity
-        .components
-        .movement
-        .as_ref()
-        .expect("movement should still exist")
-        .can_move);
+    assert!(
+        !entity
+            .components
+            .movement
+            .as_ref()
+            .expect("movement should still exist")
+            .can_move
+    );
     assert_eq!(entity.entity.control_role, ControlRole::PlayerCharacter);
     assert!(
         entity.components.ai.is_some(),
@@ -309,7 +311,12 @@ fn apply_entity_property_draft_updates_static_object_render_for_decorations() {
     let mut entity = StoredEntity::new(
         build_decoration_entity(
             9,
-            DecorationSpec::new(IVec2::new(0, 0), UVec2::new(16, 16), "objects", "rock_small"),
+            DecorationSpec::new(
+                IVec2::new(0, 0),
+                UVec2::new(16, 16),
+                "objects",
+                "rock_small",
+            ),
         ),
         OptionalEntityComponents::default(),
     );
@@ -338,12 +345,9 @@ fn apply_entity_property_draft_updates_static_object_render_for_decorations() {
         .collision_box
         .as_ref()
         .expect("decoration should recompute collision");
-    let expected = decoration_collision_box(
-        entity.entity.size,
-        &entity.entity.rendering.grounding,
-        true,
-    )
-        .expect("expected collision");
+    let expected =
+        decoration_collision_box(entity.entity.size, &entity.entity.rendering.grounding, true)
+            .expect("expected collision");
     assert_eq!(collision.offset, expected.offset);
     assert_eq!(collision.size, expected.size);
     assert_eq!(collision.trigger, expected.trigger);
@@ -1329,7 +1333,10 @@ fn save_entity_definition_persists_audio_updates() {
                 health: Some(100),
                 stats: EntityStats {
                     base: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 14)]),
-                    current: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 14)]),
+                    current: std::collections::HashMap::from([(
+                        ATTACK_POWER_STAT_ID.to_string(),
+                        14,
+                    )]),
                 },
             }),
             ..Default::default()

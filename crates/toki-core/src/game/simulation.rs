@@ -127,13 +127,15 @@ impl GameSimulation {
             .world
             .player_id()
             .and_then(|player_id| {
-                state.world.entity_manager.get_entity(player_id).map(|entity| {
-                    state.held_keys_for_profile(
-                        entity.effective_movement_profile(
+                state
+                    .world
+                    .entity_manager
+                    .get_entity(player_id)
+                    .map(|entity| {
+                        state.held_keys_for_profile(entity.effective_movement_profile(
                             state.world.entity_manager.movement(player_id),
-                        ),
-                    )
-                })
+                        ))
+                    })
             })
             .map(|keys| GameState::movement_delta_from_keys(&keys))
             .unwrap_or(glam::IVec2::ZERO);

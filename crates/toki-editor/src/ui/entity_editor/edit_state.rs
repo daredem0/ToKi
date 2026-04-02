@@ -74,10 +74,8 @@ impl EntityEditState {
     /// Toggle inventory component on/off
     pub fn toggle_inventory(&mut self) {
         self.toggles.inventory_enabled = !self.toggles.inventory_enabled;
-        self.definition.components.inventory = self
-            .toggles
-            .inventory_enabled
-            .then(Inventory::default);
+        self.definition.components.inventory =
+            self.toggles.inventory_enabled.then(Inventory::default);
         self.mark_dirty();
     }
 

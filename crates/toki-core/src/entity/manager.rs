@@ -1,7 +1,7 @@
 //! Entity management - creating, spawning, despawning, and querying entities.
 
-use super::default_category_for_kind;
 use super::components::{AiComponent, CombatComponent, InteractionComponent, MovementComponent};
+use super::default_category_for_kind;
 use super::definition::{EntityDefinition, EntityDefinitionError};
 use super::model::{
     ControlRole, Entity, EntityAudioComponent, EntityAudioSettings, EntityId, EntityKind,
@@ -477,7 +477,9 @@ impl EntityManager {
     }
 
     pub fn set_interaction(&mut self, id: EntityId, interaction: Option<InteractionComponent>) {
-        self.storage.components_mut().set_interaction(id, interaction);
+        self.storage
+            .components_mut()
+            .set_interaction(id, interaction);
     }
 
     pub fn combat(&self, id: EntityId) -> Option<&CombatComponent> {

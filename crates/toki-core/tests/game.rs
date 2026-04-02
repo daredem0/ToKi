@@ -419,7 +419,11 @@ fn fixed_tick_collects_overlapping_pickup_and_despawns_it() {
     );
 
     assert_eq!(player_inventory_count(&state, "coin"), 3);
-    assert!(state.world().entity_manager().get_entity(pickup_id).is_none());
+    assert!(state
+        .world()
+        .entity_manager()
+        .get_entity(pickup_id)
+        .is_none());
 }
 
 #[test]
@@ -498,7 +502,11 @@ fn primary_action_spawns_projectile_when_authored() {
     );
 
     assert_eq!(
-        state.world().entity_manager().entities_of_kind(&EntityKind::Projectile).len(),
+        state
+            .world()
+            .entity_manager()
+            .entities_of_kind(&EntityKind::Projectile)
+            .len(),
         1
     );
 }
@@ -558,7 +566,11 @@ fn projectile_moves_and_expires_after_lifetime() {
         &test_tilemap(),
         &test_atlas(),
     );
-    assert!(state.world().entity_manager().get_entity(projectile_id).is_none());
+    assert!(state
+        .world()
+        .entity_manager()
+        .get_entity(projectile_id)
+        .is_none());
 }
 
 #[test]
@@ -572,7 +584,8 @@ fn primary_action_damages_adjacent_target_once_per_press() {
         health: Some(20),
         stats: EntityStats::from_legacy_health(Some(20)),
     });
-    let target_id = spawn_definition_entity(&mut state, &target, player_position + IVec2::new(16, 0));
+    let target_id =
+        spawn_definition_entity(&mut state, &target, player_position + IVec2::new(16, 0));
 
     InputSystem::handle_profile_action_press(
         state.runtime_mut(),
@@ -621,7 +634,11 @@ fn primary_action_damages_adjacent_target_once_per_press() {
         &test_tilemap(),
         &test_atlas(),
     );
-    assert!(state.world().entity_manager().get_entity(target_id).is_none());
+    assert!(state
+        .world()
+        .entity_manager()
+        .get_entity(target_id)
+        .is_none());
 }
 
 #[test]
@@ -635,7 +652,8 @@ fn primary_action_does_not_damage_out_of_range_target() {
         health: Some(20),
         stats: EntityStats::from_legacy_health(Some(20)),
     });
-    let target_id = spawn_definition_entity(&mut state, &target, player_position + IVec2::new(64, 0));
+    let target_id =
+        spawn_definition_entity(&mut state, &target, player_position + IVec2::new(64, 0));
 
     InputSystem::handle_profile_action_press(
         state.runtime_mut(),
@@ -650,7 +668,8 @@ fn primary_action_does_not_damage_out_of_range_target() {
     );
 
     assert_eq!(
-        state.world()
+        state
+            .world()
             .entity_manager()
             .combat(target_id)
             .and_then(|combat| combat.current_stat("health")),
@@ -885,7 +904,8 @@ fn profile_scoped_input_moves_only_entities_with_matching_player_wasd_profile() 
 
     assert!(player_position(&state).x > player_before.x);
     assert!(
-        state.world()
+        state
+            .world()
             .entity_manager()
             .get_entity(helper_id)
             .expect("helper should exist")
@@ -894,7 +914,8 @@ fn profile_scoped_input_moves_only_entities_with_matching_player_wasd_profile() 
             > helper_before.x
     );
     assert_eq!(
-        state.world()
+        state
+            .world()
             .entity_manager()
             .get_entity(npc_id)
             .expect("npc should exist")
@@ -916,14 +937,8 @@ fn primary_action_uses_authored_attack_power_stat_for_damage() {
             .entity_manager_mut()
             .combat_mut(player_id)
             .expect("player combat should exist");
-        combat
-            .stats
-            .base
-            .insert("attack_power".to_string(), 3);
-        combat
-            .stats
-            .current
-            .insert("attack_power".to_string(), 3);
+        combat.stats.base.insert("attack_power".to_string(), 3);
+        combat.stats.current.insert("attack_power".to_string(), 3);
     }
 
     let mut target = test_entity_definition("stat_target", "creature");
@@ -931,11 +946,7 @@ fn primary_action_uses_authored_attack_power_stat_for_damage() {
         health: Some(20),
         stats: EntityStats::from_legacy_health(Some(20)),
     });
-    let target_id = spawn_definition_entity(
-        &mut state,
-        &target,
-        target_position,
-    );
+    let target_id = spawn_definition_entity(&mut state, &target, target_position);
 
     InputSystem::handle_profile_action_press(
         state.runtime_mut(),
@@ -950,7 +961,8 @@ fn primary_action_uses_authored_attack_power_stat_for_damage() {
     );
 
     assert_eq!(
-        state.world()
+        state
+            .world()
             .entity_manager()
             .combat(target_id)
             .and_then(|combat| combat.current_stat("health")),
@@ -1002,7 +1014,12 @@ fn render_queries_use_directional_clip_tiles_and_flip_left_states() {
     let left_frame = service.current_sprite_frame(&atlas, texture_size);
     assert!(service.entity_sprite_flip_x(player_id));
     assert_ne!(
-        (right_frame.u0, right_frame.u1, right_frame.v0, right_frame.v1),
+        (
+            right_frame.u0,
+            right_frame.u1,
+            right_frame.v0,
+            right_frame.v1
+        ),
         (left_frame.u0, left_frame.u1, left_frame.v0, left_frame.v1)
     );
 }

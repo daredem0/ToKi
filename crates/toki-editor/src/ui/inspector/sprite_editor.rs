@@ -4,18 +4,106 @@ use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::validate_indexed_rgba8;
 
 impl InspectorSystem {
-    pub(crate) fn render_sprite_editor_inspector(
+    pub(crate) fn render_sprite_editor_toolbox(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         _ctx: &egui::Context,
     ) {
-        ui.heading("Sprite Tools");
+        ui.heading("Sprite Toolbox");
         ui.separator();
 
         render_tool_palette(ui, ui_state);
         ui.separator();
 
         render_tool_options(ui, ui_state);
+    }
+
+    pub(crate) fn render_sprite_editor_inspector(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        _ctx: &egui::Context,
+    ) {
+        ui.heading("Sprite Inspector");
+        ui.separator();
+
+        if !crate::ui::editor_context::sprite_state(ui_state).has_canvas() {
+            ui.label("No sprite selected.");
+            ui.label("Open or create a sprite asset to inspect it.");
+            return;
+        }
+
+        ui.horizontal(|ui| {
+            ui.label("Tool:");
+            ui.label(tool_label(
+                crate::ui::editor_context::sprite_state(ui_state).tool,
+            ));
+        });
+
+        if let Some(path) = &crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .active_sprite
+        {
+            ui.horizontal(|ui| {
+                ui.label("File:");
+                ui.label(path);
+            });
+        }
+
+        if let Some((w, h)) = crate::ui::editor_context::sprite_state(ui_state).canvas_dimensions()
+        {
+            ui.horizontal(|ui| {
+                ui.label("Canvas:");
+                ui.label(format!("{}x{}", w, h));
+            });
+        }
+
+        if let Some(pos) = crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .cursor_canvas_pos
+        {
+            ui.horizontal(|ui| {
+                ui.label("Cursor:");
+                ui.label(format!("{}, {}", pos.x, pos.y));
+            });
+        }
+
+        if let Some(cell_idx) = crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .selected_cell
+        {
+            ui.horizontal(|ui| {
+                ui.label("Selected Cell:");
+                ui.label(cell_idx.to_string());
+            });
+        }
+
+        if crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .dirty
+        {
+            ui.separator();
+            ui.label("Canvas has unsaved changes.");
+        }
+    }
+}
+
+fn tool_label(tool: crate::ui::editor_ui::SpriteEditorTool) -> &'static str {
+    use crate::ui::editor_ui::SpriteEditorTool;
+
+    match tool {
+        SpriteEditorTool::Drag => "Drag",
+        SpriteEditorTool::Brush => "Brush",
+        SpriteEditorTool::Eraser => "Eraser",
+        SpriteEditorTool::Fill => "Fill",
+        SpriteEditorTool::Eyedropper => "Eyedropper",
+        SpriteEditorTool::Select => "Select",
+        SpriteEditorTool::Line => "Line",
+        SpriteEditorTool::MagicWand => "Magic Wand",
+        SpriteEditorTool::MagicErase => "Magic Erase",
+        SpriteEditorTool::AddOutline => "Add Outline",
+        SpriteEditorTool::AddShadow => "Add Shadow",
+        SpriteEditorTool::Rectangle => "Rectangle",
+        SpriteEditorTool::Ellipse => "Ellipse",
     }
 }
 

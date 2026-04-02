@@ -30,7 +30,10 @@ fn kind_supports_audio(kind: EntityKind) -> bool {
 }
 
 fn kind_supports_combat(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Player | EntityKind::Npc | EntityKind::Item)
+    matches!(
+        kind,
+        EntityKind::Player | EntityKind::Npc | EntityKind::Item
+    )
 }
 
 /// Whether the movement section (speed, can_move, movement_profile, control_role) is relevant.
@@ -270,15 +273,15 @@ impl InspectorSystem {
                 draft.size_y = placement_draft.size_px.y as i64;
             }
 
-            let toolbox = &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state)
-                .toolbox;
+            let toolbox =
+                &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state).toolbox;
             toolbox.selected_object_sheet = Some(selected_sheet.clone());
             toolbox.selected_object_name = Some(selected_object.clone());
         }
 
         let texture = {
-            let toolbox = &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state)
-                .toolbox;
+            let toolbox =
+                &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state).toolbox;
             ensure_object_sheet_preview_texture(
                 &mut toolbox.preview_image_path,
                 &mut toolbox.preview_texture,
@@ -797,7 +800,9 @@ mod tests {
     #[test]
     fn movement_section_visible_for_player_and_npc() {
         assert!(should_show_movement_section(&draft_with_category("player")));
-        assert!(should_show_movement_section(&draft_with_category("creature")));
+        assert!(should_show_movement_section(&draft_with_category(
+            "creature"
+        )));
     }
 
     #[test]
@@ -809,7 +814,9 @@ mod tests {
 
     #[test]
     fn movement_section_hidden_for_plain_passive_decoration() {
-        assert!(!should_show_movement_section(&draft_with_category("decoration")));
+        assert!(!should_show_movement_section(&draft_with_category(
+            "decoration"
+        )));
     }
 
     #[test]
@@ -821,7 +828,9 @@ mod tests {
 
     #[test]
     fn audio_section_hidden_for_plain_passive_decoration() {
-        assert!(!should_show_audio_section(&draft_with_category("decoration")));
+        assert!(!should_show_audio_section(&draft_with_category(
+            "decoration"
+        )));
     }
 
     #[test]
@@ -834,6 +843,8 @@ mod tests {
 
     #[test]
     fn combat_section_hidden_for_plain_non_combat_decoration() {
-        assert!(!should_show_combat_section(&draft_with_category("decoration")));
+        assert!(!should_show_combat_section(&draft_with_category(
+            "decoration"
+        )));
     }
 }

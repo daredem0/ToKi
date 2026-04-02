@@ -416,7 +416,10 @@ use crate::ui::editor_ui::PlacementKind;
 fn enter_placement_mode_sets_entity_definition_kind() {
     let mut state = crate::ui::editor_ui::PlacementState::default();
     state.enter_placement_mode("coin_pickup".to_string());
-    assert!(matches!(state.kind, Some(PlacementKind::EntityDefinition(_))));
+    assert!(matches!(
+        state.kind,
+        Some(PlacementKind::EntityDefinition(_))
+    ));
     assert!(state.is_in_placement_mode());
 }
 

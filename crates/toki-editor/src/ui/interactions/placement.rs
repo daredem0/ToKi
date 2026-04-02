@@ -2,8 +2,8 @@ use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::editor_services::commands as editor_commands;
 use crate::scene::SceneViewport;
-use crate::ui::interactions::MapObjectInteraction;
 use crate::ui::editor_ui::{DecorationPlacementDraft, SceneAnchorPlacementDraft};
+use crate::ui::interactions::MapObjectInteraction;
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
@@ -82,7 +82,8 @@ impl PlacementInteraction {
                     .decoration_draft()
                     .is_some()
                 {
-                    world_pos = Self::decoration_anchor_world_position(viewport.tilemap(), world_pos);
+                    world_pos =
+                        Self::decoration_anchor_world_position(viewport.tilemap(), world_pos);
                 }
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement

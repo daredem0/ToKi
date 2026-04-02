@@ -201,12 +201,17 @@ impl IdleWanderHandler {
         ctx: &AiContext,
         ai_state: &mut AiRuntimeState,
     ) -> Option<AiUpdateResult> {
-        let can_move =
-            preview_intended_position(entity, entity_id, step.current_position, step.direction, ctx)
-                .is_some_and(|candidate| {
-                    candidate == step.current_position
-                        || ctx.is_movement_valid(entity, entity_id, candidate)
-                });
+        let can_move = preview_intended_position(
+            entity,
+            entity_id,
+            step.current_position,
+            step.direction,
+            ctx,
+        )
+        .is_some_and(|candidate| {
+            candidate == step.current_position
+                || ctx.is_movement_valid(entity, entity_id, candidate)
+        });
         let new_remaining = step.remaining_distance
             - ctx
                 .entity_manager

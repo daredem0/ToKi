@@ -148,8 +148,7 @@ impl<'a> StatEffectService<'a> {
                 continue;
             };
             let previous_value = combat.current_stat(&change.stat_id);
-            let Some(new_value) = combat.apply_stat_delta(&change.stat_id, change.delta)
-            else {
+            let Some(new_value) = combat.apply_stat_delta(&change.stat_id, change.delta) else {
                 continue;
             };
 
@@ -219,7 +218,9 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::StatEffectService;
-    use crate::entity::{CombatComponent, EntityManager, EntityRendering, EntityStats, OptionalEntityComponents};
+    use crate::entity::{
+        CombatComponent, EntityManager, EntityRendering, EntityStats, OptionalEntityComponents,
+    };
     use crate::game::rules::RuleRuntimeState;
 
     #[test]

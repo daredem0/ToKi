@@ -3,7 +3,7 @@
 use super::super::super::inspector_trait::{Inspector, InspectorContext};
 use super::scene_helpers::{
     render_background_music_editor, render_delete_scene_button, render_rules_editor_section,
-    render_scene_actions, render_scene_anchors_list, render_scene_stats,
+    render_scene_anchors_list, render_scene_stats,
 };
 use crate::editor_services::commands as editor_commands;
 use toki_core::entity::ControlRole;
@@ -291,9 +291,6 @@ impl Inspector for SceneInspector {
         if Self::render_scene_player_entry_editor(ui, &self.scene_name, &scene, ctx) {
             return true;
         }
-
-        ui.separator();
-        render_scene_actions(ui);
 
         ui.separator();
         render_scene_anchors_list(ui, ctx, &self.scene_name, &scene);

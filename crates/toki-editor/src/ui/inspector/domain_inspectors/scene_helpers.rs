@@ -7,8 +7,6 @@ use crate::editor_services::commands as editor_commands;
 use crate::scene::view_models::SceneSummaryView;
 use crate::ui::editor_ui::EditorConfirmation;
 use crate::ui::inspector::{rules::SceneRulesEditorParams, InspectorSystem};
-use toki_core::scene::SceneAnchorKind;
-
 pub fn render_scene_stats(ui: &mut egui::Ui, scene: &toki_core::Scene) {
     let summary = SceneSummaryView::from_scene(scene);
     ui.horizontal(|ui| {
@@ -104,18 +102,6 @@ pub fn render_background_music_editor(
     false
 }
 
-pub fn render_scene_actions(ui: &mut egui::Ui) {
-    ui.label("Scene Actions:");
-
-    if ui.button("Add Map").clicked() {
-        tracing::info!("Add Map clicked");
-    }
-
-    if ui.button("Add Entity").clicked() {
-        tracing::info!("Add Entity clicked");
-    }
-}
-
 pub fn render_scene_anchors_list(
     ui: &mut egui::Ui,
     ctx: &mut InspectorContext<'_>,
@@ -148,19 +134,6 @@ pub fn render_scene_anchors_list(
                     anchor_id: anchor.id.clone(),
                 });
         }
-    }
-
-    if ui.button("Place Spawn Point").clicked() {
-        let next_id = crate::ui::interactions::PlacementInteraction::next_scene_anchor_id(
-            &scene.anchors,
-            SceneAnchorKind::SpawnPoint,
-        );
-        crate::ui::editor_context::scene_viewport_context_mut(ctx.ui_state)
-            .placement
-            .enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
-                kind: SceneAnchorKind::SpawnPoint,
-                suggested_id: next_id,
-            });
     }
 }
 

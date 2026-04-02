@@ -512,6 +512,7 @@ impl InspectorSystem {
             },
             available_map_names: None,
             config: None,
+            config_readonly: config,
             log_capture: None,
             renderer: None,
         };
@@ -560,6 +561,7 @@ impl InspectorSystem {
             },
             available_map_names: None,
             config: None,
+            config_readonly: config,
             log_capture: None,
             renderer: None,
         };
@@ -571,9 +573,7 @@ impl InspectorSystem {
         }
 
         ui.label("No tools for this tab.");
-        if matches!(ui_state.active_tab(), super::editor_ui::CenterPanelTab::MapEditor) {
-            ui.small("Map editing tools stay in the map-editor inspector until Phase 6.3.");
-        } else if config.is_none() {
+        if config.is_none() {
             ui.small("Open a project to access spatial authoring tools.");
         }
     }

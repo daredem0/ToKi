@@ -83,7 +83,11 @@ fn create_save_test_state() -> GameState {
 
 fn player_definition(name: &str) -> EntityDefinition {
     let mut definition = test_definition(name, "human");
-    definition.components.movement.get_or_insert_default().can_move = true;
+    definition
+        .components
+        .movement
+        .get_or_insert_default()
+        .can_move = true;
     definition.components.inventory = Some(Inventory::default());
     definition
 }
@@ -130,8 +134,14 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.definition_name, deserialized.definition_name);
 
     assert_eq!(entity.rendering.visible, deserialized.rendering.visible);
-    assert_eq!(entity.rendering.has_shadow, deserialized.rendering.has_shadow);
-    assert_eq!(entity.rendering.render_layer, deserialized.rendering.render_layer);
+    assert_eq!(
+        entity.rendering.has_shadow,
+        deserialized.rendering.has_shadow
+    );
+    assert_eq!(
+        entity.rendering.render_layer,
+        deserialized.rendering.render_layer
+    );
     assert_eq!(entity.solid, deserialized.solid);
     assert_eq!(entity.active, deserialized.active);
 }

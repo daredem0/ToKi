@@ -2,9 +2,7 @@ use glam::{IVec2, UVec2};
 use toki_core::camera::{
     viewport_to_world, world_to_viewport, Camera, CameraController, CameraMode, RuntimeState,
 };
-use toki_core::entity::{
-    Entity, EntityAudioSettings, EntityId, EntityKind, EntityRendering,
-};
+use toki_core::entity::{Entity, EntityAudioSettings, EntityId, EntityKind, EntityRendering};
 
 fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
     Entity {

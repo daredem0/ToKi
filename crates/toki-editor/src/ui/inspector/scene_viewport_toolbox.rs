@@ -22,6 +22,7 @@ impl InspectorSystem {
     ) {
         ui.heading("Toolbox");
         render_mode_and_cancel(ui_state, ui, &mut viewport);
+        render_scene_anchor_tools(ui_state, ui, &mut viewport);
         ui.separator();
 
         render_tab_strip(ui_state, ui);
@@ -45,6 +46,42 @@ impl InspectorSystem {
     }
 }
 
+fn render_scene_anchor_tools(
+    ui_state: &mut EditorUI,
+    ui: &mut egui::Ui,
+    viewport: &mut Option<&mut SceneViewport>,
+) {
+    let Some(active_scene_name) = ui_state.active_scene.clone() else {
+        return;
+    };
+    let Some(scene) = ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == active_scene_name)
+    else {
+        return;
+    };
+    let next_spawn_point_id = crate::ui::interactions::PlacementInteraction::next_scene_anchor_id(
+        &scene.anchors,
+        toki_core::scene::SceneAnchorKind::SpawnPoint,
+    );
+
+    ui.label("Scene Tools");
+    if ui.button("Place Spawn Point").clicked() {
+        ui_state
+            .scene_viewport_context_mut()
+            .placement
+            .enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
+                kind: toki_core::scene::SceneAnchorKind::SpawnPoint,
+                suggested_id: next_spawn_point_id,
+            });
+        if let Some(viewport) = viewport.as_mut() {
+            viewport.mark_dirty();
+        }
+    }
+    ui.separator();
+}
+
 fn render_mode_and_cancel(
     ui_state: &mut EditorUI,
     ui: &mut egui::Ui,
@@ -56,7 +93,10 @@ fn render_mode_and_cancel(
         ui.label("Active Mode: Select");
     }
 
-    if ui_state.scene_viewport_context().placement.is_in_placement_mode()
+    if ui_state
+        .scene_viewport_context()
+        .placement
+        .is_in_placement_mode()
         && ui.button("Cancel Placement").clicked()
     {
         ui_state
@@ -106,7 +146,10 @@ fn render_entity_definition_tab(
     let names = match definitions.get(&tab) {
         Some(names) if !names.is_empty() => names,
         _ => {
-            ui.label(format!("No {} definitions found.", tab.label().to_lowercase()));
+            ui.label(format!(
+                "No {} definitions found.",
+                tab.label().to_lowercase()
+            ));
             return;
         }
     };
@@ -185,10 +228,21 @@ fn render_decoration_tab(
         selection_changed = true;
     }
 
-    render_object_selector(ui, &active_source, &mut selected_object, &mut selection_changed);
+    render_object_selector(
+        ui,
+        &active_source,
+        &mut selected_object,
+        &mut selection_changed,
+    );
 
     if selection_changed {
-        apply_selection_change(ui_state, &selected_sheet, &selected_object, project_path, viewport);
+        apply_selection_change(
+            ui_state,
+            &selected_sheet,
+            &selected_object,
+            project_path,
+            viewport,
+        );
     }
 
     let texture = load_preview_texture(ui_state, ctx, &active_source);
@@ -302,10 +356,8 @@ fn apply_selection_change(
         if let Some(draft) =
             build_decoration_placement_draft(project_path, selected_sheet, selected_object)
         {
-            ui_state
-                .scene_viewport_context_mut()
-                .placement
-                .kind = Some(PlacementKind::Decoration(draft));
+            ui_state.scene_viewport_context_mut().placement.kind =
+                Some(PlacementKind::Decoration(draft));
         }
     }
     if let Some(viewport) = viewport.as_mut() {

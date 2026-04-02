@@ -55,12 +55,7 @@ impl GameState {
                     .entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| {
-                        entity.active
-                            && self
-                                .world
-                                .entity_manager
-                                .interaction(entity_id)
-                                .is_some()
+                        entity.active && self.world.entity_manager.interaction(entity_id).is_some()
                     })
             })
             .collect::<Vec<_>>();

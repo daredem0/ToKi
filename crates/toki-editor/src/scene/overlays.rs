@@ -239,7 +239,8 @@ pub fn load_decoration_preview_sprite_frame(
     };
     let object_sheet_path = project_path.join("assets").join("sprites").join(sheet_file);
     let object_sheet =
-        toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(&object_sheet_path).ok()?;
+        toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(&object_sheet_path)
+            .ok()?;
     let object_info = object_sheet.objects.get(object_name)?;
     let texture_size = object_sheet
         .image_size()

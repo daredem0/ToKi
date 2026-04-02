@@ -1,7 +1,7 @@
 use super::*;
 
 impl InspectorSystem {
-    pub(crate) fn render_map_editor_command_palette(
+    pub(crate) fn render_map_editor_toolbox(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
@@ -181,6 +181,64 @@ impl InspectorSystem {
                     ui.label(format!("Current Brush Tile: {}", tile_name));
                 }
             }
+        }
+
+        if crate::ui::editor_ui::has_unsaved_map_editor_changes(ui_state) {
+            ui.separator();
+            ui.label("Map editor has unsaved changes.");
+        }
+    }
+
+    pub(crate) fn render_map_editor_inspector(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        config: Option<&EditorConfig>,
+    ) {
+        ui.heading("Map Inspector");
+        ui.separator();
+
+        let selected_tile_info = crate::ui::editor_context::map_state(ui_state)
+            .selected_tile_info
+            .clone();
+        if let Some(tile_info) = selected_tile_info {
+            ui.label("Tile Info");
+            ui.horizontal(|ui| {
+                ui.label("Tile:");
+                ui.label(&tile_info.tile_name);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Position:");
+                ui.label(format!("{}, {}", tile_info.tile_x, tile_info.tile_y));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Solid:");
+                ui.label(if tile_info.solid { "Yes" } else { "No" });
+            });
+            ui.horizontal(|ui| {
+                ui.label("Trigger:");
+                ui.label(if tile_info.trigger { "Yes" } else { "No" });
+            });
+
+            if let Some((_, atlas, texture_path)) =
+                Self::load_map_editor_brush_source(ui_state, config)
+            {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label("Preview:");
+                    Self::render_map_editor_selected_tile_preview(
+                        ui_state,
+                        ui,
+                        ctx,
+                        &atlas,
+                        &texture_path,
+                        &tile_info.tile_name,
+                    );
+                });
+            }
+        } else {
+            ui.label("No tile selected.");
+            ui.label("Click a tile in the map editor to inspect it.");
         }
 
         if crate::ui::editor_ui::has_unsaved_map_editor_changes(ui_state) {

@@ -131,10 +131,7 @@ fn set_entity_current_health(state: &mut GameState, entity_id: u32, health: i32)
         .entity_manager_mut()
         .combat_mut(entity_id)
         .expect("entity should have combat");
-    combat
-        .stats
-        .current
-        .insert("health".to_string(), health);
+    combat.stats.current.insert("health".to_string(), health);
 }
 
 fn clear_entity_stats(state: &mut GameState, entity_id: u32) {

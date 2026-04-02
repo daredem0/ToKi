@@ -12,7 +12,10 @@ fn save_and_restore_keeps_inactive_decorations_renderable() {
         5,
         DecorationSpec::new(IVec2::new(32, 48), UVec2::new(16, 16), "decor", "tree"),
     );
-    assert!(!decoration.active, "decorations are expected to be inactive");
+    assert!(
+        !decoration.active,
+        "decorations are expected to be inactive"
+    );
     scene.add_entity(decoration);
     SceneSystem::add_scene(&mut state, scene);
     SceneSystem::load(&mut state, "main").expect("scene should load");

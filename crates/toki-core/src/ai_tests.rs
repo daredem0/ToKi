@@ -4,9 +4,9 @@ use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::TileMap;
 use crate::collision::CollisionBox;
 use crate::entity::{
-    AiBehavior, AiComponent, AiConfig, CombatComponent, ControlRole, Entity, EntityId,
-    EntityKind, EntityManager, EntityRendering, EntityStats, MovementComponent,
-    OptionalEntityComponents, StoredEntity,
+    AiBehavior, AiComponent, AiConfig, CombatComponent, ControlRole, Entity, EntityId, EntityKind,
+    EntityManager, EntityRendering, EntityStats, MovementComponent, OptionalEntityComponents,
+    StoredEntity,
 };
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;

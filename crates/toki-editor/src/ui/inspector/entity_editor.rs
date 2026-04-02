@@ -4,8 +4,27 @@
 use super::InspectorSystem;
 
 impl InspectorSystem {
+    pub(crate) fn render_entity_editor_toolbox(
+        ui_state: &mut crate::ui::EditorUI,
+        ui: &mut egui::Ui,
+    ) {
+        ui.heading("Entity Toolbox");
+        ui.separator();
+
+        if !crate::ui::editor_context::entity_editor_state(ui_state).has_entity() {
+            ui.label("No entity selected.");
+            ui.label("Select an entity to access editor actions.");
+            return;
+        }
+
+        ui.label("Actions:");
+        if ui.button("Open in Animation Editor").clicked() {
+            ui_state.set_active_tab(crate::ui::editor_ui::CenterPanelTab::AnimationEditor);
+        }
+    }
+
     /// Render inspector panel when the Entity Editor tab is active.
-    /// Shows entity info, component toggles, and quick actions.
+    /// Shows entity info and browser statistics.
     pub(crate) fn render_entity_editor_inspector(
         ui_state: &mut crate::ui::EditorUI,
         ui: &mut egui::Ui,
@@ -30,16 +49,6 @@ impl InspectorSystem {
             if !summary.tags.is_empty() {
                 ui.label(format!("Tags: {}", summary.tags.join(", ")));
             }
-        }
-
-        ui.separator();
-
-        // Quick actions
-        ui.label("Quick Actions:");
-
-        if ui.button("Open in Animation Editor").clicked() {
-            // Switch to animation editor tab (entity stays selected)
-            ui_state.set_active_tab(crate::ui::editor_ui::CenterPanelTab::AnimationEditor);
         }
 
         ui.separator();

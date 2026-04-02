@@ -2,7 +2,9 @@
 //!
 //! Contains logic for spawning entities as rule actions.
 
-use crate::entity::{EntityId, EntityKind, EntityRendering, MovementComponent, OptionalEntityComponents};
+use crate::entity::{
+    EntityId, EntityKind, EntityRendering, MovementComponent, OptionalEntityComponents,
+};
 use crate::rules::RuleSpawnEntityType;
 
 use super::GameState;
@@ -33,23 +35,21 @@ impl GameState {
         position: glam::IVec2,
         can_move: bool,
     ) -> EntityId {
-        self.world
-            .entity_manager
-            .spawn_entity(
-                kind,
-                position,
-                glam::UVec2::new(16, 16),
-                EntityRendering::default(),
-                false,
-                true,
-                OptionalEntityComponents {
-                    movement: Some(MovementComponent {
-                        can_move,
-                        ..MovementComponent::default()
-                    }),
-                    ..OptionalEntityComponents::default()
-                },
-            )
+        self.world.entity_manager.spawn_entity(
+            kind,
+            position,
+            glam::UVec2::new(16, 16),
+            EntityRendering::default(),
+            false,
+            true,
+            OptionalEntityComponents {
+                movement: Some(MovementComponent {
+                    can_move,
+                    ..MovementComponent::default()
+                }),
+                ..OptionalEntityComponents::default()
+            },
+        )
     }
 
     fn spawn_trigger_entity(&mut self, position: glam::IVec2) -> EntityId {

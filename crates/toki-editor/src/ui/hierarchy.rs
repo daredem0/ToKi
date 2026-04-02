@@ -167,22 +167,24 @@ pub fn collect_entity_definitions_for_toolbox(
     ui_state: &EditorUI,
     project_assets: Option<&mut ProjectAssets>,
 ) -> BTreeMap<super::editor_ui::ToolboxTab, Vec<ToolboxEntityDefinitionSummary>> {
-    let mut definitions = collect_definition_categories(entity_editor_state(ui_state), project_assets);
+    let mut definitions =
+        collect_definition_categories(entity_editor_state(ui_state), project_assets);
     if let Some(edit_state) = entity_editor_state(ui_state).edit_state.as_ref() {
         apply_edit_state_override(&mut definitions, edit_state);
     }
 
-    let mut grouped = BTreeMap::<
-        super::editor_ui::ToolboxTab,
-        Vec<ToolboxEntityDefinitionSummary>,
-    >::new();
+    let mut grouped =
+        BTreeMap::<super::editor_ui::ToolboxTab, Vec<ToolboxEntityDefinitionSummary>>::new();
     for (name, definition) in definitions {
         let category = definition.category;
         if let Some(tab) = toolbox_tab_for_category(&category) {
-            grouped.entry(tab).or_default().push(ToolboxEntityDefinitionSummary {
-                name,
-                display_name: definition.display_name,
-            });
+            grouped
+                .entry(tab)
+                .or_default()
+                .push(ToolboxEntityDefinitionSummary {
+                    name,
+                    display_name: definition.display_name,
+                });
         }
     }
 

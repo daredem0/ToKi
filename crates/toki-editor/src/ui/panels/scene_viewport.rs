@@ -49,7 +49,10 @@ impl PanelSystem {
                 _ => false,
             };
             let mut show_tiles = ui_state.scene_viewport_context().viewport_cursor.show_tiles;
-            let cursor_world_position = ui_state.scene_viewport_context().viewport_cursor.world_position;
+            let cursor_world_position = ui_state
+                .scene_viewport_context()
+                .viewport_cursor
+                .world_position;
             ui.horizontal(|ui| {
                 toolbar_changed = Self::render_grid_toolbar_contents(ui, cfg);
                 ui.separator();
@@ -99,7 +102,10 @@ impl PanelSystem {
                 });
             });
             if show_tiles != ui_state.scene_viewport_context().viewport_cursor.show_tiles {
-                ui_state.scene_viewport_context_mut().viewport_cursor.show_tiles = show_tiles;
+                ui_state
+                    .scene_viewport_context_mut()
+                    .viewport_cursor
+                    .show_tiles = show_tiles;
                 toolbar_changed = true;
             }
             if toolbar_changed {

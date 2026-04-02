@@ -225,7 +225,10 @@ mod tests {
     use std::path::PathBuf;
 
     fn temp_project_root(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("toki-object-sheet-browser-{name}-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "toki-object-sheet-browser-{name}-{}",
+            std::process::id()
+        ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(path.join("assets").join("sprites")).expect("sprites dir");
         path
@@ -263,7 +266,10 @@ mod tests {
 
         let source = resolve_object_sheet_browser_source(&project_path, None).expect("source");
 
-        assert_eq!(source.sheet_names, vec!["alpha".to_string(), "zeta".to_string()]);
+        assert_eq!(
+            source.sheet_names,
+            vec!["alpha".to_string(), "zeta".to_string()]
+        );
         assert_eq!(source.selected_sheet_name, "alpha");
         assert_eq!(source.object_names, vec!["a".to_string(), "b".to_string()]);
     }

@@ -163,7 +163,8 @@ impl InspectorSystem {
         let mut after_entities = Vec::with_capacity(before_entities.len());
         for before_entity in &before_entities {
             let mut after_entity = before_entity.clone();
-            changed |= Self::apply_multi_entity_batch_edit_to_entity(&mut after_entity.entity, edit);
+            changed |=
+                Self::apply_multi_entity_batch_edit_to_entity(&mut after_entity.entity, edit);
             after_entities.push(after_entity);
         }
 

@@ -45,9 +45,18 @@ use toki_core::entity::{
 
 #[test]
 fn toolbox_tab_for_category_maps_creature_variants() {
-    assert_eq!(toolbox_tab_for_category("creature"), Some(ToolboxTab::Creatures));
-    assert_eq!(toolbox_tab_for_category("creatures"), Some(ToolboxTab::Creatures));
-    assert_eq!(toolbox_tab_for_category("enemy"), Some(ToolboxTab::Creatures));
+    assert_eq!(
+        toolbox_tab_for_category("creature"),
+        Some(ToolboxTab::Creatures)
+    );
+    assert_eq!(
+        toolbox_tab_for_category("creatures"),
+        Some(ToolboxTab::Creatures)
+    );
+    assert_eq!(
+        toolbox_tab_for_category("enemy"),
+        Some(ToolboxTab::Creatures)
+    );
 }
 
 #[test]
@@ -55,7 +64,10 @@ fn toolbox_tab_for_category_maps_human_variants() {
     assert_eq!(toolbox_tab_for_category("human"), Some(ToolboxTab::Humans));
     assert_eq!(toolbox_tab_for_category("humans"), Some(ToolboxTab::Humans));
     assert_eq!(toolbox_tab_for_category("player"), Some(ToolboxTab::Humans));
-    assert_eq!(toolbox_tab_for_category("players"), Some(ToolboxTab::Humans));
+    assert_eq!(
+        toolbox_tab_for_category("players"),
+        Some(ToolboxTab::Humans)
+    );
 }
 
 #[test]
@@ -142,7 +154,10 @@ fn collect_entity_definitions_for_toolbox_groups_from_entity_editor_state() {
     ];
 
     let result = collect_entity_definitions_for_toolbox(&ui_state, None);
-    assert_eq!(result.get(&ToolboxTab::Creatures).unwrap()[0].name, "goblin");
+    assert_eq!(
+        result.get(&ToolboxTab::Creatures).unwrap()[0].name,
+        "goblin"
+    );
     assert_eq!(
         result.get(&ToolboxTab::Creatures).unwrap()[0].display_name,
         "Goblin"
@@ -192,8 +207,10 @@ fn collect_entity_definitions_for_toolbox_prefers_unsaved_edit_state_category() 
         }];
         let mut definition = minimal_definition("coin", "human");
         definition.display_name = "Coin Human".to_string();
-        entity_editor.entity_editor.edit_state =
-            Some(EntityEditState::from_definition(definition, PathBuf::from("/tmp/coin.json")));
+        entity_editor.entity_editor.edit_state = Some(EntityEditState::from_definition(
+            definition,
+            PathBuf::from("/tmp/coin.json"),
+        ));
     }
 
     let result = collect_entity_definitions_for_toolbox(&ui_state, None);
@@ -227,6 +244,9 @@ fn collect_entity_definitions_for_toolbox_falls_back_to_project_assets() {
     let ui_state = EditorUI::new();
     let result = collect_entity_definitions_for_toolbox(&ui_state, Some(&mut project_assets));
 
-    assert_eq!(result.get(&ToolboxTab::Creatures).unwrap()[0].name, "goblin");
+    assert_eq!(
+        result.get(&ToolboxTab::Creatures).unwrap()[0].name,
+        "goblin"
+    );
     assert_eq!(result.get(&ToolboxTab::Items).unwrap()[0].name, "coin");
 }

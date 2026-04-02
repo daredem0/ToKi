@@ -165,12 +165,14 @@ fn entity_definition_npc_can_use_ai_without_inventory_or_movement() {
         .expect("npc bundle should build");
 
     assert_eq!(bundle.entity.entity_kind, EntityKind::Npc);
-    assert!(!bundle
-        .optional_components
-        .movement
-        .as_ref()
-        .expect("movement should exist")
-        .can_move);
+    assert!(
+        !bundle
+            .optional_components
+            .movement
+            .as_ref()
+            .expect("movement should exist")
+            .can_move
+    );
     assert_eq!(
         bundle
             .optional_components

@@ -162,7 +162,8 @@ impl InspectorSystem {
                                         .combat
                                         .as_ref()
                                         .and_then(|combat| combat.health)
-                                        .unwrap_or(0) as i64;
+                                        .unwrap_or(0)
+                                        as i64;
                                     changed |=
                                         ui.checkbox(&mut health_enabled, "Enabled").changed();
                                     if health_enabled {
@@ -797,17 +798,6 @@ impl InspectorSystem {
                                                     });
                                                 }
                                             }
-                                        }
-
-                                        ui.separator();
-                                        ui.label("Entity Actions:");
-
-                                        if ui.button("🎮 Place in Scene").clicked() {
-                                            tracing::info!(
-                                                "Place entity '{}' button clicked",
-                                                entity_name
-                                            );
-                                            // TODO: Implement entity placement functionality
                                         }
                                     }
                                 }

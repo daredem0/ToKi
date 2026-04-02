@@ -367,10 +367,7 @@ mod tests {
             .combat_mut(player_id)
             .expect("player should exist");
         player.stats.base.insert(HEALTH_STAT_ID.to_string(), 25);
-        player
-            .stats
-            .current
-            .insert(HEALTH_STAT_ID.to_string(), 12);
+        player.stats.current.insert(HEALTH_STAT_ID.to_string(), 12);
 
         let flags = GameFlags::default();
         let context = ValuePathContext {

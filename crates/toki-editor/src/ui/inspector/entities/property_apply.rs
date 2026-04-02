@@ -185,10 +185,7 @@ impl InspectorSystem {
             }
         };
         changed |= set_if_changed(&mut entity.audio.movement_sound, new_movement_sound);
-        changed |= set_if_changed(
-            &mut entity.rendering.render_layer,
-            draft.render_layer,
-        );
+        changed |= set_if_changed(&mut entity.rendering.render_layer, draft.render_layer);
         changed |= set_if_changed(
             &mut entity.persistent_across_saves,
             draft.persistent_across_saves,
@@ -242,26 +239,19 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut stored.components.ai, desired_ai);
 
         let desired_inventory = if draft.has_inventory {
-            Some(
-                stored
-                    .components
-                    .inventory
-                    .clone()
-                    .unwrap_or_default(),
-            )
+            Some(stored.components.inventory.clone().unwrap_or_default())
         } else {
             None
         };
         changed |= set_if_changed(&mut stored.components.inventory, desired_inventory);
 
-        let mut desired_combat = if draft.combat_component_present
-            || draft.health_enabled
-            || draft.attack_power_enabled
-        {
-            stored.components.combat.clone().unwrap_or_default()
-        } else {
-            CombatComponent::default()
-        };
+        let mut desired_combat =
+            if draft.combat_component_present || draft.health_enabled || draft.attack_power_enabled
+            {
+                stored.components.combat.clone().unwrap_or_default()
+            } else {
+                CombatComponent::default()
+            };
         desired_combat.health = new_health;
         changed |= Self::set_optional_runtime_stat(
             &mut desired_combat,
@@ -273,14 +263,13 @@ impl InspectorSystem {
             ATTACK_POWER_STAT_ID,
             new_attack_power,
         );
-        let desired_combat = if draft.combat_component_present
-            || draft.health_enabled
-            || draft.attack_power_enabled
-        {
-            Some(desired_combat)
-        } else {
-            None
-        };
+        let desired_combat =
+            if draft.combat_component_present || draft.health_enabled || draft.attack_power_enabled
+            {
+                Some(desired_combat)
+            } else {
+                None
+            };
         changed |= set_if_changed(&mut stored.components.combat, desired_combat);
 
         if entity.rendering.static_object_render.is_some() {
@@ -436,14 +425,12 @@ fn apply_stat_fields(
             None
         },
     );
-    definition.components.combat = if draft.combat_component_present
-        || draft.health_enabled
-        || draft.attack_power_enabled
-    {
-        Some(combat)
-    } else {
-        None
-    };
+    definition.components.combat =
+        if draft.combat_component_present || draft.health_enabled || draft.attack_power_enabled {
+            Some(combat)
+        } else {
+            None
+        };
 
     changed
 }

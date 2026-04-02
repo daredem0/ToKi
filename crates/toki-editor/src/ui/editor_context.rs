@@ -19,11 +19,10 @@ pub(crate) struct EditorContextHost<'a> {
     pub project_assets: Option<&'a mut ProjectAssets>,
     pub available_map_names: Option<Vec<String>>,
     pub config: Option<&'a mut EditorConfig>,
+    pub config_readonly: Option<&'a EditorConfig>,
     pub log_capture: Option<&'a crate::logging::LogCapture>,
     pub renderer: Option<&'a mut egui_wgpu::Renderer>,
 }
-
-impl<'a> EditorContextHost<'a> {}
 
 pub(crate) trait EditorContext: Any {
     fn render_center_panel(
@@ -330,12 +329,18 @@ impl EditorContext for SceneViewportContext {
         _egui_ctx: &egui::Context,
         host: &mut EditorContextHost<'_>,
     ) {
+        let EditorContextHost {
+            scene_viewport,
+            config,
+            renderer,
+            ..
+        } = host;
         PanelSystem::render_scene_viewport_tab(
             ui,
             shell,
-            host.scene_viewport.as_deref_mut(),
-            host.config.as_deref_mut(),
-            host.renderer.as_deref_mut(),
+            scene_viewport.as_deref_mut(),
+            config.as_deref_mut(),
+            renderer.as_deref_mut(),
         );
     }
 
@@ -355,14 +360,23 @@ impl EditorContext for SceneViewportContext {
         _game_state: Option<&toki_core::GameState>,
         host: &mut EditorContextHost<'_>,
     ) -> bool {
+        let EditorContextHost {
+            project,
+            project_assets,
+            config,
+            config_readonly,
+            scene_viewport,
+            ..
+        } = host;
+        let config = config_readonly.as_ref().copied().or(config.as_deref());
         super::inspector::InspectorSystem::render_scene_viewport_toolbox(
             shell,
             ui,
             egui_ctx,
-            host.project.as_deref_mut(),
-            host.project_assets.as_deref_mut(),
-            host.config.as_deref(),
-            host.scene_viewport.as_deref_mut(),
+            project.as_deref_mut(),
+            project_assets.as_deref_mut(),
+            config,
+            scene_viewport.as_deref_mut(),
         );
         true
     }
@@ -380,7 +394,10 @@ impl EditorContext for RuleGraphContext {
             ui,
             shell,
             shell.active_tab() == CenterPanelTab::SceneRules,
-            host.config.as_deref(),
+            host.config_readonly
+                .as_ref()
+                .copied()
+                .or(host.config.as_deref()),
         );
     }
 
@@ -401,13 +418,20 @@ impl EditorContext for MapEditorContext {
         _egui_ctx: &egui::Context,
         host: &mut EditorContextHost<'_>,
     ) {
+        let EditorContextHost {
+            map_editor_viewport,
+            available_map_names,
+            config,
+            renderer,
+            ..
+        } = host;
         PanelSystem::render_map_editor(
             ui,
             shell,
-            host.map_editor_viewport.as_deref_mut(),
-            host.available_map_names.take(),
-            host.config.as_deref_mut(),
-            host.renderer.as_deref_mut(),
+            map_editor_viewport.as_deref_mut(),
+            available_map_names.take(),
+            config.as_deref_mut(),
+            renderer.as_deref_mut(),
         );
     }
 
@@ -419,12 +443,29 @@ impl EditorContext for MapEditorContext {
         _game_state: Option<&toki_core::GameState>,
         host: &mut EditorContextHost<'_>,
     ) -> bool {
-        InspectorSystem::render_map_editor_command_palette(
-            shell,
-            ui,
-            egui_ctx,
-            host.config.as_deref(),
-        );
+        let config = host
+            .config_readonly
+            .as_ref()
+            .copied()
+            .or(host.config.as_deref());
+        InspectorSystem::render_map_editor_inspector(shell, ui, egui_ctx, config);
+        true
+    }
+
+    fn render_toolbox(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        let config = host
+            .config_readonly
+            .as_ref()
+            .copied()
+            .or(host.config.as_deref());
+        InspectorSystem::render_map_editor_toolbox(shell, ui, egui_ctx, config);
         true
     }
 
@@ -607,6 +648,18 @@ impl EditorContext for SpriteEditorContext {
         true
     }
 
+    fn render_toolbox(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        _host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        InspectorSystem::render_sprite_editor_toolbox(shell, ui, egui_ctx);
+        true
+    }
+
     fn can_undo(&self, _shell: &EditorUI) -> bool {
         self.sprite.active().history.can_undo()
     }
@@ -664,6 +717,18 @@ impl EditorContext for AnimationEditorContext {
         true
     }
 
+    fn render_toolbox(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        _egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        _host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        InspectorSystem::render_animation_editor_toolbox(shell, ui);
+        true
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -698,6 +763,18 @@ impl EditorContext for EntityEditorContext {
         _host: &mut EditorContextHost<'_>,
     ) -> bool {
         InspectorSystem::render_entity_editor_inspector(shell, ui);
+        true
+    }
+
+    fn render_toolbox(
+        &mut self,
+        shell: &mut EditorUI,
+        ui: &mut egui::Ui,
+        _egui_ctx: &egui::Context,
+        _game_state: Option<&toki_core::GameState>,
+        _host: &mut EditorContextHost<'_>,
+    ) -> bool {
+        InspectorSystem::render_entity_editor_toolbox(shell, ui);
         true
     }
 

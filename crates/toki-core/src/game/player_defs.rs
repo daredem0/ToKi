@@ -1,7 +1,7 @@
 use crate::entity::{
-    AiBehavior, AiComponent, AiConfig, AnimationClipDef, AnimationsDef, AudioDef,
-    CollisionDef, CombatComponent, ComponentsDef, EntityDefinition, Inventory,
-    MovementComponent, MovementProfile, MovementSoundTrigger, RenderingDef,
+    AiBehavior, AiComponent, AiConfig, AnimationClipDef, AnimationsDef, AudioDef, CollisionDef,
+    CombatComponent, ComponentsDef, EntityDefinition, Inventory, MovementComponent,
+    MovementProfile, MovementSoundTrigger, RenderingDef,
 };
 use crate::ids::EntityDefName;
 

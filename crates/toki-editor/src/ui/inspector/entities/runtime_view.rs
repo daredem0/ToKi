@@ -80,7 +80,10 @@ fn render_stats(
     entity_manager: &toki_core::entity::EntityManager,
     entity: &toki_core::entity::Entity,
 ) {
-    if let Some(health) = entity_manager.combat(entity.id).and_then(|combat| combat.health) {
+    if let Some(health) = entity_manager
+        .combat(entity.id)
+        .and_then(|combat| combat.health)
+    {
         ui.horizontal(|ui| {
             ui.label("Health:");
             ui.label(format!("{}", health));
@@ -115,7 +118,8 @@ fn render_behavior(
     entity_manager: &toki_core::entity::EntityManager,
     entity: &toki_core::entity::Entity,
 ) {
-    let is_static_item = entity.category == "item" && entity.rendering.static_object_render.is_some();
+    let is_static_item =
+        entity.category == "item" && entity.rendering.static_object_render.is_some();
 
     if let Some(static_render) = &entity.rendering.static_object_render {
         ui.horizontal(|ui| {

@@ -1089,6 +1089,7 @@ impl EditorUI {
             project_assets,
             available_map_names,
             config,
+            config_readonly: None,
             log_capture,
             renderer,
         };

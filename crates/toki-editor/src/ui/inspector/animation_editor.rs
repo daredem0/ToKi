@@ -4,8 +4,40 @@
 use super::InspectorSystem;
 
 impl InspectorSystem {
+    pub(crate) fn render_animation_editor_toolbox(
+        ui_state: &mut crate::ui::EditorUI,
+        ui: &mut egui::Ui,
+    ) {
+        ui.heading("Animation Toolbox");
+        ui.separator();
+
+        if !crate::ui::editor_context::animation_state(ui_state).has_entity() {
+            ui.label("No animation tools available.");
+            ui.label("Select an entity to edit its animation preview.");
+            return;
+        }
+
+        ui.label("Preview Settings:");
+        ui.horizontal(|ui| {
+            ui.label("Zoom:");
+            ui.add(
+                egui::DragValue::new(
+                    &mut crate::ui::editor_context::animation_state_mut(ui_state).preview_zoom,
+                )
+                .speed(0.1)
+                .range(0.5..=8.0)
+                .suffix("x"),
+            );
+        });
+
+        ui.checkbox(
+            &mut crate::ui::editor_context::animation_state_mut(ui_state).show_grid,
+            "Show Grid Overlay",
+        );
+    }
+
     /// Render inspector panel when the Animation Editor tab is active.
-    /// Shows clip settings, atlas info, and preview controls.
+    /// Shows clip settings and asset state when the Animation Editor tab is active.
     pub(crate) fn render_animation_editor_inspector(
         ui_state: &mut crate::ui::EditorUI,
         ui: &mut egui::Ui,
@@ -37,27 +69,6 @@ impl InspectorSystem {
         } else {
             ui.label(atlas_name);
         }
-
-        ui.separator();
-
-        // Preview settings
-        ui.label("Preview Settings:");
-        ui.horizontal(|ui| {
-            ui.label("Zoom:");
-            ui.add(
-                egui::DragValue::new(
-                    &mut crate::ui::editor_context::animation_state_mut(ui_state).preview_zoom,
-                )
-                .speed(0.1)
-                .range(0.5..=8.0)
-                .suffix("x"),
-            );
-        });
-
-        ui.checkbox(
-            &mut crate::ui::editor_context::animation_state_mut(ui_state).show_grid,
-            "Show Grid Overlay",
-        );
 
         ui.separator();
 
