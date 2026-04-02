@@ -1126,3 +1126,32 @@ fn map_editor_load_requested_uses_struct_instead_of_tuple() {
     assert_eq!(request.scene_name, "main_scene");
     assert_eq!(request.map_name, "town_map");
 }
+
+#[test]
+fn toolbox_tab_default_is_decorations() {
+    use super::ToolboxTab;
+    assert_eq!(ToolboxTab::default(), ToolboxTab::Decorations);
+}
+
+#[test]
+fn toolbox_tab_all_covers_required_kinds() {
+    use super::ToolboxTab;
+    // Exhaustive match ensures compile failure if a variant is added without updating ALL
+    for tab in ToolboxTab::ALL {
+        match tab {
+            ToolboxTab::Creatures
+            | ToolboxTab::Humans
+            | ToolboxTab::Items
+            | ToolboxTab::Decorations => {}
+        }
+    }
+    assert_eq!(ToolboxTab::ALL.len(), 4);
+}
+
+#[test]
+fn toolbox_tab_labels_are_nonempty() {
+    use super::ToolboxTab;
+    for tab in ToolboxTab::ALL {
+        assert!(!tab.label().is_empty());
+    }
+}

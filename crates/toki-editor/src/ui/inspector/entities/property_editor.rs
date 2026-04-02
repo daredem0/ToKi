@@ -15,8 +15,26 @@ use crate::ui::object_sheet_browser::{
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
+use toki_core::entity::{
+    runtime_entity_kind_for_category, AiBehavior, ControlRole, EntityKind, MovementProfile,
+    MovementSoundTrigger,
+};
 use toki_core::palette::Palette4;
+
+/// Whether the movement section (speed, can_move, movement_profile, control_role) is relevant.
+pub fn should_show_movement_section(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Player | EntityKind::Npc)
+}
+
+/// Whether the audio section (footstep sounds, hearing) is relevant.
+pub fn should_show_audio_section(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Player | EntityKind::Npc)
+}
+
+/// Whether the combat/stats section (health, attack power) is relevant.
+pub fn should_show_combat_section(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Player | EntityKind::Npc | EntityKind::Item)
+}
 
 impl InspectorSystem {
     pub(in super::super) fn render_entity_property_editor(
@@ -29,7 +47,10 @@ impl InspectorSystem {
         section_label: &str,
     ) -> bool {
         let mut changed = false;
-        let is_static_item = draft.category == "item" && draft.static_object_sheet.is_some();
+        let kind = runtime_entity_kind_for_category(&draft.category);
+        let show_movement = should_show_movement_section(kind);
+        let show_audio = should_show_audio_section(kind);
+        let show_combat = should_show_combat_section(kind);
 
         ui.label(section_label);
         ui.separator();
@@ -42,7 +63,7 @@ impl InspectorSystem {
         changed |= render_render_layer_row(ui, draft);
         render_static_render_row(ui, draft);
 
-        if !is_static_item {
+        if show_movement {
             changed |= render_speed_row(ui, draft);
         }
 
@@ -59,7 +80,7 @@ impl InspectorSystem {
             changed |= render_interaction_reach_row(ui, draft);
         }
 
-        if !is_static_item {
+        if show_movement {
             changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
             changed |= render_control_role_row(ui, draft, allow_control_role_edit);
             changed |= render_movement_profile_row(ui, draft);
@@ -82,13 +103,15 @@ impl InspectorSystem {
                 .changed();
         }
 
-        if !is_static_item {
+        if show_audio {
             ui.separator();
             changed |= render_audio_section(ui, draft, config);
         }
 
-        ui.separator();
-        changed |= render_stats_section(ui, draft);
+        if show_combat {
+            ui.separator();
+            changed |= render_stats_section(ui, draft);
+        }
 
         ui.separator();
         changed |= render_collision_section(ui, draft);
@@ -697,4 +720,51 @@ fn render_collision_section(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) 
     }
 
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn movement_section_visible_for_player_and_npc() {
+        assert!(should_show_movement_section(EntityKind::Player));
+        assert!(should_show_movement_section(EntityKind::Npc));
+    }
+
+    #[test]
+    fn movement_section_hidden_for_passive_kinds() {
+        assert!(!should_show_movement_section(EntityKind::Decoration));
+        assert!(!should_show_movement_section(EntityKind::Item));
+        assert!(!should_show_movement_section(EntityKind::Trigger));
+        assert!(!should_show_movement_section(EntityKind::Projectile));
+    }
+
+    #[test]
+    fn audio_section_visible_for_player_and_npc() {
+        assert!(should_show_audio_section(EntityKind::Player));
+        assert!(should_show_audio_section(EntityKind::Npc));
+    }
+
+    #[test]
+    fn audio_section_hidden_for_passive_kinds() {
+        assert!(!should_show_audio_section(EntityKind::Decoration));
+        assert!(!should_show_audio_section(EntityKind::Item));
+        assert!(!should_show_audio_section(EntityKind::Trigger));
+        assert!(!should_show_audio_section(EntityKind::Projectile));
+    }
+
+    #[test]
+    fn combat_section_visible_for_combat_capable_kinds() {
+        assert!(should_show_combat_section(EntityKind::Player));
+        assert!(should_show_combat_section(EntityKind::Npc));
+        assert!(should_show_combat_section(EntityKind::Item));
+    }
+
+    #[test]
+    fn combat_section_hidden_for_non_combat_kinds() {
+        assert!(!should_show_combat_section(EntityKind::Decoration));
+        assert!(!should_show_combat_section(EntityKind::Trigger));
+        assert!(!should_show_combat_section(EntityKind::Projectile));
+    }
 }

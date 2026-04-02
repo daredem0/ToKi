@@ -126,7 +126,7 @@ impl EditorUI {
                     return;
                 };
 
-                let (selected_entity, entity_additions, placement_request) =
+                let (selected_entity, entity_additions, _) =
                     HierarchySystem::render_entity_palette(
                         ui,
                         project_path,
@@ -136,12 +136,6 @@ impl EditorUI {
 
                 if let Some(selected_entity) = selected_entity {
                     self.set_selection(super::Selection::EntityDefinition(selected_entity));
-                }
-
-                if let Some(entity_definition) = placement_request {
-                    crate::ui::editor_context::scene_viewport_context_mut(self)
-                        .placement
-                        .enter_placement_mode(entity_definition);
                 }
 
                 for (scene_name, entity_name) in entity_additions {

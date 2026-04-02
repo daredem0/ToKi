@@ -153,6 +153,26 @@ impl PlacementInteraction {
             return;
         }
 
+        if let Some(item_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .item_definition()
+            .map(str::to_string)
+        {
+            tracing::info!(
+                "Placing item '{}' at world coordinates ({}, {})",
+                item_def_name,
+                world_pos.x,
+                world_pos.y
+            );
+            if Self::try_place_entity(ui_state, &item_def_name, world_pos, config, viewport) {
+                viewport.mark_dirty();
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .exit_placement_mode();
+            }
+            return;
+        }
+
         if let Some(decoration_draft) = crate::ui::editor_context::scene_viewport_context(ui_state)
             .placement
             .decoration_draft()
@@ -506,9 +526,10 @@ impl PlacementInteraction {
             };
         }
 
-        let Some(entity_def_name) = crate::ui::editor_context::scene_viewport_context(ui_state)
-            .placement
+        let placement = &crate::ui::editor_context::scene_viewport_context(ui_state).placement;
+        let Some(entity_def_name) = placement
             .entity_definition()
+            .or_else(|| placement.item_definition())
         else {
             return false;
         };

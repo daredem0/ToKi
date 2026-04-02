@@ -91,7 +91,7 @@ impl HierarchySystem {
                 if found_entities {
                     let mut selected_entity = None;
                     let mut scene_entity_additions: Vec<(String, String)> = Vec::new(); // (scene_name, entity_name)
-                    let mut placement_mode_request: Option<String> = None;
+                    let placement_mode_request: Option<String> = None;
 
                     // The parent left panel owns scrolling for the full container.
                     let mut sorted_categories: Vec<_> = categories.into_iter().collect();
@@ -114,10 +114,9 @@ impl HierarchySystem {
 
                                     if button.clicked() {
                                         tracing::debug!(
-                                            "Entity '{}' clicked - entering placement mode",
+                                            "Entity '{}' clicked - inspecting definition",
                                             entity_name
                                         );
-                                        placement_mode_request = Some(entity_name.clone());
                                         selected_entity = Some(entity_name.clone());
                                     }
 
@@ -175,6 +174,64 @@ impl HierarchySystem {
 
         (None, Vec::new(), None)
     }
+}
+
+/// Maps an entity definition category string to the corresponding [`ToolboxTab`].
+///
+/// Returns `None` for categories that are not placeable from the toolbox
+/// (e.g. decorations use the object-sheet flow, triggers/projectiles are internal).
+pub fn toolbox_tab_for_category(category: &str) -> Option<super::editor_ui::ToolboxTab> {
+    use super::editor_ui::ToolboxTab;
+    match category.trim().to_ascii_lowercase().as_str() {
+        "creature" | "creatures" | "enemy" => Some(ToolboxTab::Creatures),
+        "human" | "humans" | "player" | "players" => Some(ToolboxTab::Humans),
+        "item" | "items" => Some(ToolboxTab::Items),
+        _ => None,
+    }
+}
+
+/// Scans the `entities/` directory and groups entity definition names by [`ToolboxTab`].
+///
+/// Definitions whose category does not map to a toolbox tab are omitted.
+pub fn scan_entity_definitions_for_toolbox(
+    project_path: &std::path::Path,
+) -> std::collections::BTreeMap<super::editor_ui::ToolboxTab, Vec<String>> {
+    use super::editor_ui::ToolboxTab;
+    let mut result = std::collections::BTreeMap::<ToolboxTab, Vec<String>>::new();
+    let entities_dir = project_path.join("entities");
+
+    let entries = match std::fs::read_dir(&entities_dir) {
+        Ok(e) => e,
+        Err(_) => return result,
+    };
+
+    for entry in entries.flatten() {
+        let Some(name) = entry.file_name().to_str().map(String::from) else {
+            continue;
+        };
+        if !name.ends_with(".json") {
+            continue;
+        }
+        let entity_name = name.trim_end_matches(".json").to_string();
+        let tab = read_category_and_map(&entry.path());
+        if let Some(tab) = tab {
+            result.entry(tab).or_default().push(entity_name);
+        }
+    }
+
+    for names in result.values_mut() {
+        names.sort();
+    }
+    result
+}
+
+fn read_category_and_map(
+    path: &std::path::Path,
+) -> Option<super::editor_ui::ToolboxTab> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let category = json.get("category")?.as_str()?;
+    toolbox_tab_for_category(category)
 }
 
 #[cfg(test)]

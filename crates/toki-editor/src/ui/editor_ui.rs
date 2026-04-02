@@ -375,8 +375,37 @@ pub struct DecorationPlacementDraft {
     pub solid: bool,
 }
 
+/// Which kind-category tab is active in the Toolbox panel.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ToolboxTab {
+    Creatures,
+    Humans,
+    Items,
+    #[default]
+    Decorations,
+}
+
+impl ToolboxTab {
+    pub const ALL: &[Self] = &[
+        Self::Creatures,
+        Self::Humans,
+        Self::Items,
+        Self::Decorations,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Creatures => "Creatures",
+            Self::Humans => "Humans",
+            Self::Items => "Items",
+            Self::Decorations => "Decorations",
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct SceneToolboxState {
+    pub selected_tab: ToolboxTab,
     pub selected_object_sheet: Option<String>,
     pub selected_object_name: Option<String>,
     pub preview_image_path: Option<PathBuf>,
@@ -386,6 +415,7 @@ pub struct SceneToolboxState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlacementKind {
     EntityDefinition(String),
+    Item(String),
     Decoration(DecorationPlacementDraft),
     SceneAnchor(SceneAnchorPlacementDraft),
 }
@@ -408,6 +438,14 @@ impl PlacementState {
             "Entered placement mode for entity: {:?}",
             self.entity_definition()
         );
+    }
+
+    pub fn enter_item_placement_mode(&mut self, entity_definition: String) {
+        tracing::info!("Entered placement mode for item: {}", entity_definition);
+        self.kind = Some(PlacementKind::Item(entity_definition));
+        self.preview_position = None;
+        self.preview_cached_frame = None;
+        self.preview_valid = None;
     }
 
     pub fn enter_decoration_placement_mode(&mut self, draft: DecorationPlacementDraft) {
@@ -455,6 +493,13 @@ impl PlacementState {
         }
     }
 
+    pub fn item_definition(&self) -> Option<&str> {
+        match &self.kind {
+            Some(PlacementKind::Item(name)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
     pub fn decoration_draft(&self) -> Option<&DecorationPlacementDraft> {
         match &self.kind {
             Some(PlacementKind::Decoration(draft)) => Some(draft),
@@ -472,6 +517,7 @@ impl PlacementState {
     pub fn mode_label(&self) -> Option<String> {
         match &self.kind {
             Some(PlacementKind::EntityDefinition(name)) => Some(format!("Entity: {name}")),
+            Some(PlacementKind::Item(name)) => Some(format!("Item: {name}")),
             Some(PlacementKind::Decoration(draft)) => {
                 Some(format!("Object: {}/{}", draft.sheet, draft.object_name))
             }

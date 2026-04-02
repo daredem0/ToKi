@@ -779,11 +779,12 @@ impl EditorApp {
             return;
         }
 
-        let placement_entity_definition =
-            crate::ui::editor_context::scene_viewport_context(&self.core.ui)
-                .placement
-                .entity_definition()
-                .map(str::to_string);
+        let placement_ctx =
+            &crate::ui::editor_context::scene_viewport_context(&self.core.ui).placement;
+        let placement_entity_definition = placement_ctx
+            .entity_definition()
+            .or_else(|| placement_ctx.item_definition())
+            .map(str::to_string);
         let placement_decoration = crate::ui::editor_context::scene_viewport_context(&self.core.ui)
             .placement
             .decoration_draft()
