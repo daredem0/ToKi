@@ -5,7 +5,8 @@ use toki_core::rules::TriggerContext;
 use toki_core::text::{TextAnchor, TextSlant, TextWeight};
 use toki_core::ui_layout::{
     UiBinding, UiBindingContext, UiController, UiLayoutAsset, UiLayoutEngine, UiProgressBinding,
-    UiRequest, UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetKind, UiWidgetNode,
+    UiRequest, UiSurfaceState, UiTextSegment, UiTextTemplate, UiTheme, UiTypography,
+    UiWidgetKind, UiWidgetNode,
 };
 use toki_core::value_path::ValuePathContext;
 
@@ -372,4 +373,120 @@ fn label_text_defaults_to_center_and_honors_typography_overrides() {
         .expect("label frame should exist");
     assert_eq!(text.position.x, label_frame.rect.center_x());
     assert_eq!(text.position.y, label_frame.rect.center_y());
+}
+
+#[test]
+fn focused_button_uses_generic_selection_fill_and_prefix() {
+    let entity_manager = toki_core::entity::EntityManager::default();
+    let flags = GameFlags::default();
+    let overrides = HashMap::new();
+    let theme = UiTheme::default();
+
+    let layout = UiLayoutAsset {
+        id: "hud".into(),
+        title: "HUD".to_string(),
+        startup_visible: true,
+        z_order: 0,
+        root: UiWidgetNode {
+            children: vec![UiWidgetNode {
+                id: "confirm".into(),
+                title: "Confirm".to_string(),
+                focusable: true,
+                kind: UiWidgetKind::Button {
+                    label: UiTextTemplate {
+                        segments: vec![UiTextSegment::Literal {
+                            text: "Confirm".to_string(),
+                        }],
+                    },
+                },
+                ..UiWidgetNode::default()
+            }],
+            ..UiWidgetNode::default()
+        },
+    };
+
+    let output = UiLayoutEngine::compose(
+        &layout,
+        &theme,
+        glam::vec2(320.0, 180.0),
+        binding_context(&entity_manager, &flags, &overrides),
+        Some(&UiSurfaceState {
+            visible: true,
+            z_order: 0,
+            startup_visible: true,
+            binding_overrides: HashMap::new(),
+            focused_widget_id: Some("confirm".into()),
+            scroll_offsets: HashMap::new(),
+        }),
+    );
+
+    let button_block = output
+        .composition
+        .blocks
+        .iter()
+        .find(|block| {
+            block.text.as_ref().is_some_and(|text| text.content.starts_with("> "))
+        })
+        .expect("focused button block should exist");
+    assert_eq!(button_block.fill_color, Some([
+        theme.selection_color[0] as f32 / 255.0,
+        theme.selection_color[1] as f32 / 255.0,
+        theme.selection_color[2] as f32 / 255.0,
+        theme.selection_color[3] as f32 / 255.0,
+    ]));
+}
+
+#[test]
+fn slider_widget_quantizes_and_reports_interactive_hitbox() {
+    let entity_manager = toki_core::entity::EntityManager::default();
+    let flags = GameFlags::default();
+    let overrides = HashMap::new();
+
+    let layout = UiLayoutAsset {
+        id: "hud".into(),
+        title: "HUD".to_string(),
+        startup_visible: true,
+        z_order: 0,
+        root: UiWidgetNode {
+            children: vec![UiWidgetNode {
+                id: "volume".into(),
+                title: "Volume".to_string(),
+                kind: UiWidgetKind::Slider {
+                    value: UiProgressBinding::Percent {
+                        percent: UiBinding::Expression {
+                            expression: "53".to_string(),
+                            key: None,
+                        },
+                    },
+                    step_percent: 10,
+                    show_value: true,
+                },
+                ..UiWidgetNode::default()
+            }],
+            ..UiWidgetNode::default()
+        },
+    };
+
+    let output = UiLayoutEngine::compose(
+        &layout,
+        &UiTheme::default(),
+        glam::vec2(320.0, 180.0),
+        binding_context(&entity_manager, &flags, &overrides),
+        None,
+    );
+
+    let slider_hitbox = output
+        .hitboxes
+        .iter()
+        .find(|hitbox| hitbox.widget_id.as_str() == "volume")
+        .expect("slider hitbox should exist");
+    assert!(slider_hitbox.focusable);
+
+    let value_label = output
+        .composition
+        .blocks
+        .iter()
+        .find_map(|block| block.text.as_ref())
+        .expect("slider value label should exist");
+    assert_eq!(value_label.content, "50%");
 }

@@ -20,7 +20,12 @@ pub mod types;
 pub mod utilities;
 
 // Re-export commonly used items
-pub use composition::{compose_dialog_ui, compose_menu_ui};
+pub use composition::{
+    build_dialog_widget_tree, build_menu_widget_tree, compose_dialog_output, compose_dialog_ui,
+    compose_menu_output, compose_menu_ui, dialog_entry_index_from_widget_id,
+    menu_entry_index_from_widget_id,
+    theme_from_menu_appearance,
+};
 pub use constants::{
     DEFAULT_BACKGROUND_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_BORDER_THICKNESS_PX,
     DEFAULT_BUTTON_SPACING_PX, DEFAULT_ENTRY_BACKGROUND_COLOR, DEFAULT_FONT_FAMILY,

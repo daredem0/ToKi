@@ -38,7 +38,9 @@ const ZERO_SPACING: UiSpacing = UiSpacing {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WidgetKindChoice {
     Label,
+    Button,
     ProgressBar,
+    Slider,
     GridContainer,
 }
 
@@ -395,7 +397,12 @@ fn render_ui_toolbar(ui: &mut Ui, ui_state: &mut EditorUI, layout: &mut UiLayout
 
         ui.separator();
         ui.strong("Advanced:");
-        for kind in [WidgetKindChoice::ProgressBar, WidgetKindChoice::GridContainer] {
+        for kind in [
+            WidgetKindChoice::Button,
+            WidgetKindChoice::ProgressBar,
+            WidgetKindChoice::Slider,
+            WidgetKindChoice::GridContainer,
+        ] {
             if ui
                 .button(format!("+ {}", widget_kind_choice_label(kind)))
                 .clicked()
@@ -1082,8 +1089,27 @@ fn render_widget_kind_editor(
 ) {
     match &mut widget.kind {
         UiWidgetKind::Label { content } => render_text_template_editor(ui, content, declared_flags),
+        UiWidgetKind::Button { label } => render_text_template_editor(ui, label, declared_flags),
         UiWidgetKind::ProgressBar { value } => {
             render_progress_binding_editor(ui, value, declared_flags)
+        }
+        UiWidgetKind::Slider {
+            value,
+            step_percent,
+            show_value,
+        } => {
+            render_progress_binding_editor(ui, value, declared_flags);
+            ui.horizontal(|ui| {
+                ui.label("Step %:");
+                let mut slider_step = *step_percent as i32;
+                if ui
+                    .add(egui::DragValue::new(&mut slider_step).range(0..=100))
+                    .changed()
+                {
+                    *step_percent = slider_step.clamp(0, 100) as u8;
+                }
+            });
+            ui.checkbox(show_value, "Show Value");
         }
         UiWidgetKind::GridContainer { columns, spacing } => {
             ui.horizontal(|ui| {
@@ -1649,7 +1675,23 @@ fn validate_widget(
                 }
             }
         }
+        UiWidgetKind::Button { label } => {
+            for segment in &label.segments {
+                if let UiTextSegment::Binding { binding } = segment {
+                    validate_binding(binding, &mut issues, &widget.id);
+                }
+            }
+        }
         UiWidgetKind::ProgressBar { value } => match value {
+            UiProgressBinding::CurrentMax { current, max } => {
+                validate_binding(current, &mut issues, &widget.id);
+                validate_binding(max, &mut issues, &widget.id);
+            }
+            UiProgressBinding::Percent { percent } => {
+                validate_binding(percent, &mut issues, &widget.id);
+            }
+        },
+        UiWidgetKind::Slider { value, .. } => match value {
             UiProgressBinding::CurrentMax { current, max } => {
                 validate_binding(current, &mut issues, &widget.id);
                 validate_binding(max, &mut issues, &widget.id);
@@ -1698,7 +1740,9 @@ fn validate_binding(
 fn widget_kind_choice(widget: &UiWidgetNode) -> WidgetKindChoice {
     match widget.kind {
         UiWidgetKind::Label { .. } => WidgetKindChoice::Label,
+        UiWidgetKind::Button { .. } => WidgetKindChoice::Button,
         UiWidgetKind::ProgressBar { .. } => WidgetKindChoice::ProgressBar,
+        UiWidgetKind::Slider { .. } => WidgetKindChoice::Slider,
         UiWidgetKind::GridContainer { .. } => WidgetKindChoice::GridContainer,
     }
 }
@@ -1706,7 +1750,9 @@ fn widget_kind_choice(widget: &UiWidgetNode) -> WidgetKindChoice {
 fn widget_kind_choice_label(kind: WidgetKindChoice) -> &'static str {
     match kind {
         WidgetKindChoice::Label => "Label",
+        WidgetKindChoice::Button => "Button",
         WidgetKindChoice::ProgressBar => "ProgressBar",
+        WidgetKindChoice::Slider => "Slider",
         WidgetKindChoice::GridContainer => "GridContainer",
     }
 }
@@ -1737,6 +1783,13 @@ fn default_widget_kind(kind: WidgetKindChoice) -> UiWidgetKind {
                 }],
             },
         },
+        WidgetKindChoice::Button => UiWidgetKind::Button {
+            label: UiTextTemplate {
+                segments: vec![UiTextSegment::Literal {
+                    text: "Button".to_string(),
+                }],
+            },
+        },
         WidgetKindChoice::ProgressBar => UiWidgetKind::ProgressBar {
             value: UiProgressBinding::CurrentMax {
                 current: UiBinding::ValuePath {
@@ -1748,6 +1801,16 @@ fn default_widget_kind(kind: WidgetKindChoice) -> UiWidgetKind {
                     key: None,
                 },
             },
+        },
+        WidgetKindChoice::Slider => UiWidgetKind::Slider {
+            value: UiProgressBinding::Percent {
+                percent: UiBinding::Expression {
+                    expression: "50".to_string(),
+                    key: None,
+                },
+            },
+            step_percent: 5,
+            show_value: true,
         },
         WidgetKindChoice::GridContainer => UiWidgetKind::GridContainer {
             columns: 2,
@@ -1803,7 +1866,9 @@ fn ui_layout_spec_for_kind(kind: WidgetKindChoice) -> toki_core::ui_layout::UiLa
     toki_core::ui_layout::UiLayoutSpec {
         size: match kind {
             WidgetKindChoice::Label => [96.0, 18.0],
+            WidgetKindChoice::Button => [96.0, 22.0],
             WidgetKindChoice::ProgressBar => [80.0, 12.0],
+            WidgetKindChoice::Slider => [96.0, 18.0],
             WidgetKindChoice::GridContainer => [96.0, 48.0],
         },
         offset: [UI_EDGE_MARGIN, UI_EDGE_MARGIN],
@@ -1816,7 +1881,9 @@ fn ui_layout_spec_for_kind(kind: WidgetKindChoice) -> toki_core::ui_layout::UiLa
 fn hud_widget_style(kind: WidgetKindChoice) -> toki_core::ui_layout::UiWidgetStyle {
     let font_size_px = match kind {
         WidgetKindChoice::Label => Some(8),
+        WidgetKindChoice::Button => Some(8),
         WidgetKindChoice::ProgressBar => Some(8),
+        WidgetKindChoice::Slider => Some(8),
         WidgetKindChoice::GridContainer => None,
     };
     toki_core::ui_layout::UiWidgetStyle {
@@ -1887,7 +1954,9 @@ fn insert_new_widget_under_parent(
 fn minimum_widget_size(widget: &UiWidgetNode) -> [f32; 2] {
     match widget.kind {
         UiWidgetKind::Label { .. } => [48.0, 16.0],
+        UiWidgetKind::Button { .. } => [56.0, 18.0],
         UiWidgetKind::ProgressBar { .. } => [48.0, 12.0],
+        UiWidgetKind::Slider { .. } => [64.0, 16.0],
         UiWidgetKind::GridContainer { .. } => [56.0, 24.0],
     }
 }
@@ -1963,7 +2032,9 @@ fn can_have_children(widget: &UiWidgetNode) -> bool {
 fn unique_widget_id(root: &UiWidgetNode, kind: WidgetKindChoice) -> String {
     let prefix = match kind {
         WidgetKindChoice::Label => "label",
+        WidgetKindChoice::Button => "button",
         WidgetKindChoice::ProgressBar => "progress",
+        WidgetKindChoice::Slider => "slider",
         WidgetKindChoice::GridContainer => "grid",
     };
     let existing = collect_widget_ids(root);
@@ -2129,7 +2200,10 @@ fn paint_ui_block(painter: &egui::Painter, block: &UiBlock, available_fonts: &[S
             rgba_to_color32(text.style.color),
         );
         format.italics = matches!(text.style.slant, TextSlant::Italic);
-        let galley = painter.layout_job(LayoutJob::single_section(text.content.clone(), format));
+        let mut job = LayoutJob::default();
+        job.wrap.max_width = text.max_width.unwrap_or(f32::INFINITY);
+        job.append(&text.content, 0.0, format);
+        let galley = painter.layout_job(job);
         let anchor_position = Pos2::new(text.position.x, text.position.y);
         let galley_pos = align_galley_top_left(anchor_position, galley.size(), text.anchor);
         painter.galley(

@@ -37,13 +37,18 @@ pub struct UiTextBlock {
     pub anchor: TextAnchor,
     pub style: TextStyle,
     pub layer: i32,
+    pub max_width: Option<f32>,
 }
 
 impl UiTextBlock {
     pub fn to_text_item(&self) -> TextItem {
-        TextItem::new_screen(self.content.clone(), self.position, self.style.clone())
+        let mut item = TextItem::new_screen(self.content.clone(), self.position, self.style.clone())
             .with_anchor(self.anchor)
-            .with_layer(self.layer)
+            .with_layer(self.layer);
+        if let Some(max_width) = self.max_width {
+            item = item.with_max_width(max_width);
+        }
+        item
     }
 }
 
@@ -161,6 +166,7 @@ pub fn transform_logical_ui_composition_with_transform(
                 transform.origin.y + text.position.y * transform.geometry_scale,
             );
             text.style.size_px *= transform.text_scale;
+            text.max_width = text.max_width.map(|max_width| max_width * transform.geometry_scale);
         }
     }
     transformed

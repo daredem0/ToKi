@@ -724,6 +724,7 @@ fn render_ui_composition_dispatches_rectangles_and_text() {
             anchor: toki_core::text::TextAnchor::TopCenter,
             style: TextStyle::default(),
             layer: 10,
+            max_width: None,
         }),
     });
 

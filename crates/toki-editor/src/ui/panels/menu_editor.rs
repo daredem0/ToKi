@@ -1,9 +1,10 @@
 use super::super::editor_ui::{EditorUI, Selection};
 use crate::fonts::resolve_preview_font_family;
 use crate::project::Project;
+use egui::text::{LayoutJob, TextFormat};
 use toki_core::menu::{
-    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuItemDefinition,
-    MenuView, MenuViewEntry,
+    build_dialog_layout, build_menu_layout, compose_dialog_output, compose_menu_output,
+    MenuItemDefinition, MenuView, MenuViewEntry,
 };
 use toki_core::ui::{UiBlock, UiComposition};
 
@@ -146,7 +147,9 @@ pub(crate) fn render_menu_editor(
                 &project.metadata.runtime.menu.appearance,
                 viewport,
             );
-            let composition = compose_dialog_ui(&layout, &project.metadata.runtime.menu.appearance);
+            let composition =
+                compose_dialog_output(&layout, &project.metadata.runtime.menu.appearance)
+                    .composition;
             let origin = egui::vec2(
                 rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
                 rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
@@ -251,7 +254,9 @@ pub(crate) fn render_menu_editor(
                 &project.metadata.runtime.menu.appearance,
                 viewport,
             );
-            let composition = compose_menu_ui(&layout, &project.metadata.runtime.menu.appearance);
+            let composition =
+                compose_menu_output(&layout, &project.metadata.runtime.menu.appearance)
+                    .composition;
             let origin = egui::vec2(
                 rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
                 rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
@@ -332,13 +337,21 @@ fn paint_ui_block(
     if let Some(text) = &block.text {
         let pos = egui::pos2(text.position.x + origin.x, text.position.y + origin.y);
         let font_family = resolve_preview_font_family(&text.style.font_family, available_fonts);
-        painter.text(
-            pos,
-            text_anchor_to_align2(text.anchor),
-            &text.content,
+        let mut format = TextFormat::simple(
             egui::FontId::new(text.style.size_px, font_family),
             menu_preview_color32(text.style.color),
         );
+        format.italics = matches!(text.style.slant, toki_core::text::TextSlant::Italic);
+        let mut job = LayoutJob::default();
+        job.wrap.max_width = text.max_width.unwrap_or(f32::INFINITY);
+        job.append(&text.content, 0.0, format);
+        let galley = painter.layout_job(job);
+        let galley_pos = text_anchor_to_align2(text.anchor).anchor_rect(egui::Rect::from_min_size(
+            pos,
+            galley.size(),
+        ))
+        .min;
+        painter.galley(galley_pos, galley, menu_preview_color32(text.style.color));
     }
 }
 

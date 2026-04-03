@@ -1,8 +1,10 @@
-use toki_core::menu::{
-    build_menu_layout, compose_menu_ui, menu_hex_color_rgba, MenuAppearance, MenuEntryLayout,
-    MenuLayout, MenuView, MenuViewEntry,
+use toki_core::menu::{theme_from_menu_appearance, MenuAppearance, MenuEntryLayout, MenuLayout};
+use toki_core::ui::{UiComposition, UiRect};
+use toki_core::ui_layout::{
+    UiAnchor, UiBinding, UiBindingContext, UiLayoutAsset, UiLayoutEngine, UiLayoutOutput,
+    UiLayoutSpec, UiProgressBinding, UiSpacing, UiSurfaceState, UiTextSegment, UiTextTemplate,
+    UiTypography, UiWidgetKind, UiWidgetNode, UiWidgetStyle,
 };
-use toki_core::ui::{UiBlock, UiComposition, UiRect};
 
 use super::{App, RuntimeMenuOverlay, RuntimeOverlayEntry};
 
@@ -40,13 +42,13 @@ impl App {
             ),
         };
 
-        let view = MenuView {
+        let view = toki_core::menu::MenuView {
             screen_id: "__runtime_settings__".to_string(),
             title,
             title_border_style_override: None,
             entries: entries
                 .iter()
-                .map(|entry| MenuViewEntry {
+                .map(|entry| toki_core::menu::MenuViewEntry {
                     text: format!("{}: {}", entry.label, entry.value_text),
                     selected: entry.selected,
                     selectable: true,
@@ -56,7 +58,7 @@ impl App {
         };
 
         Some(RuntimeOverlayPresentation {
-            layout: build_menu_layout(&view, appearance, viewport),
+            layout: toki_core::menu::build_menu_layout(&view, appearance, viewport),
             entries,
         })
     }
@@ -68,71 +70,74 @@ pub(super) fn compose_runtime_settings_ui(
     layout: &MenuLayout,
     appearance: &MenuAppearance,
 ) -> UiComposition {
-    let mut composition = compose_menu_ui(layout, appearance);
-    let accent =
-        menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]);
-    let track = [0.12, 0.18, 0.12, 0.85];
+    compose_runtime_settings_output(layout_entries, overlay_entries, layout, appearance).composition
+}
 
-    for (layout_entry, overlay_entry) in layout_entries.iter().zip(overlay_entries.iter()) {
-        let Some(slider_percent) = overlay_entry.slider_percent else {
-            continue;
-        };
-        let track_x = layout_entry.rect.x + layout_entry.rect.width * 0.56;
-        let track_width = layout_entry.rect.width * 0.28;
-        let track_y = layout_entry.rect.y + layout_entry.rect.height - 7.0;
-        let track_height = 3.0;
-        composition.push(UiBlock {
-            rect: UiRect {
-                x: track_x,
-                y: track_y,
-                width: track_width,
-                height: track_height,
-            },
-            fill_color: Some(track),
-            border_color: None,
-            border_thickness: 0.0,
-            text: None,
-        });
-        composition.push(UiBlock {
-            rect: UiRect {
-                x: track_x,
-                y: track_y,
-                width: track_width * (slider_percent.min(100) as f32 / 100.0),
-                height: track_height,
-            },
-            fill_color: Some(accent),
-            border_color: None,
-            border_thickness: 0.0,
-            text: None,
-        });
-    }
-
-    composition
+pub(super) fn compose_runtime_settings_output(
+    layout_entries: &[MenuEntryLayout],
+    overlay_entries: &[RuntimeOverlayEntry],
+    layout: &MenuLayout,
+    appearance: &MenuAppearance,
+) -> UiLayoutOutput {
+    let asset = build_runtime_overlay_widget_tree(layout_entries, overlay_entries, layout, appearance);
+    let focused_widget_id = overlay_entries.iter().enumerate().find_map(|(index, entry)| {
+        if !entry.selected {
+            return None;
+        }
+        Some(if entry.slider_percent.is_some() {
+            format!("overlay_slider_{index}")
+        } else {
+            format!("overlay_entry_{index}")
+        }
+        .into())
+    });
+    UiLayoutEngine::compose(
+        &asset,
+        &theme_from_menu_appearance(appearance),
+        glam::Vec2::new(
+            (layout.panel.x + layout.panel.width + 8.0).max(1.0),
+            (layout.panel.y + layout.panel.height + 8.0).max(1.0),
+        ),
+        empty_binding_context(),
+        Some(&UiSurfaceState {
+            visible: true,
+            z_order: 0,
+            startup_visible: true,
+            binding_overrides: std::collections::HashMap::new(),
+            focused_widget_id,
+            scroll_offsets: std::collections::HashMap::new(),
+        }),
+    )
 }
 
 pub(super) fn runtime_overlay_hit_target_at_position(
     layout_entries: &[MenuEntryLayout],
     overlay_entries: &[RuntimeOverlayEntry],
+    layout: &MenuLayout,
+    appearance: &MenuAppearance,
     position: glam::Vec2,
 ) -> Option<RuntimeOverlayHitTarget> {
-    for (entry_index, (layout_entry, overlay_entry)) in layout_entries
+    compose_runtime_settings_output(layout_entries, overlay_entries, layout, appearance)
+        .hitboxes
         .iter()
-        .zip(overlay_entries.iter())
-        .enumerate()
-    {
-        if let Some(slider_rect) = runtime_overlay_slider_rect(layout_entry, overlay_entry) {
-            if rect_contains(slider_rect, position) {
-                return Some(RuntimeOverlayHitTarget::Slider {
-                    entry_index,
-                    percent: slider_percent_from_position(slider_rect, position.x),
-                });
+        .find(|hitbox| rect_contains(hitbox.rect, position))
+        .and_then(|hitbox| {
+            let widget_id = hitbox.widget_id.as_str();
+            if let Some(index) = widget_id
+                .strip_prefix("overlay_slider_")
+                .and_then(|value| value.parse().ok())
+            {
+                Some(RuntimeOverlayHitTarget::Slider {
+                    entry_index: index,
+                    percent: slider_percent_from_position(hitbox.rect, position.x),
+                })
+            } else {
+                widget_id
+                    .strip_prefix("overlay_entry_")
+                    .and_then(|value| value.parse().ok())
+                    .map(RuntimeOverlayHitTarget::Entry)
             }
-        }
-        if rect_contains(layout_entry.rect, position) {
-            return Some(RuntimeOverlayHitTarget::Entry(entry_index));
-        }
-    }
-    None
+        })
 }
 
 pub(super) fn runtime_overlay_slider_rect(
@@ -141,10 +146,10 @@ pub(super) fn runtime_overlay_slider_rect(
 ) -> Option<UiRect> {
     overlay_entry.slider_percent?;
     Some(UiRect {
-        x: layout_entry.rect.x + layout_entry.rect.width * 0.56,
-        y: layout_entry.rect.y + layout_entry.rect.height - 10.0,
-        width: layout_entry.rect.width * 0.28,
-        height: 8.0,
+        x: layout_entry.rect.x + layout_entry.rect.width * 0.48,
+        y: layout_entry.rect.y + 4.0,
+        width: layout_entry.rect.width * 0.34,
+        height: (layout_entry.rect.height - 8.0).max(8.0),
     })
 }
 
@@ -157,4 +162,317 @@ pub(super) fn rect_contains(rect: UiRect, position: glam::Vec2) -> bool {
 
 pub(super) fn slider_percent_from_position(rect: UiRect, x: f32) -> u8 {
     (((x - rect.x) / rect.width.max(1.0)).clamp(0.0, 1.0) * 100.0).round() as u8
+}
+
+fn build_runtime_overlay_widget_tree(
+    layout_entries: &[MenuEntryLayout],
+    overlay_entries: &[RuntimeOverlayEntry],
+    layout: &MenuLayout,
+    appearance: &MenuAppearance,
+) -> UiLayoutAsset {
+    let mut root = UiWidgetNode {
+        layout: UiLayoutSpec {
+            anchor: UiAnchor::Stretch,
+            offset: [0.0, 0.0],
+            size: [160.0, 144.0],
+            margin: UiSpacing {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            padding: UiSpacing {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+        },
+        ..UiWidgetNode::default()
+    };
+    root.children.push(UiWidgetNode {
+        id: "overlay_panel".into(),
+        title: "Overlay Panel".to_string(),
+        layout: absolute_layout(layout.panel),
+        style: panel_style(appearance),
+        event_id: None,
+        focusable: false,
+        visible_if: None,
+        enabled_if: None,
+        kind: UiWidgetKind::Label {
+            content: literal_text(""),
+        },
+        children: Vec::new(),
+    });
+    root.children.push(UiWidgetNode {
+        id: "overlay_title".into(),
+        title: "Overlay Title".to_string(),
+        layout: absolute_layout(layout.title.rect),
+        style: title_style(appearance),
+        event_id: None,
+        focusable: false,
+        visible_if: None,
+        enabled_if: None,
+        kind: UiWidgetKind::Label {
+            content: literal_text(&layout.title.text),
+        },
+        children: Vec::new(),
+    });
+
+    for (index, (layout_entry, overlay_entry)) in layout_entries.iter().zip(overlay_entries.iter()).enumerate() {
+        if let Some(slider_percent) = overlay_entry.slider_percent {
+            let slider_rect = runtime_overlay_slider_rect(layout_entry, overlay_entry)
+                .expect("checked above");
+            let label_rect = UiRect {
+                x: layout_entry.rect.x,
+                y: layout_entry.rect.y,
+                width: layout_entry.rect.width * 0.42,
+                height: layout_entry.rect.height,
+            };
+            let value_rect = UiRect {
+                x: slider_rect.x + slider_rect.width + 4.0,
+                y: layout_entry.rect.y,
+                width: (layout_entry.rect.x + layout_entry.rect.width)
+                    - (slider_rect.x + slider_rect.width + 4.0),
+                height: layout_entry.rect.height,
+            };
+            root.children.push(UiWidgetNode {
+                id: format!("overlay_label_{index}").into(),
+                title: format!("Overlay Label {index}"),
+                layout: absolute_layout(label_rect),
+                style: overlay_label_style(appearance, toki_core::text::TextAnchor::CenterLeft),
+                event_id: None,
+                focusable: false,
+                visible_if: None,
+                enabled_if: None,
+                kind: UiWidgetKind::Label {
+                    content: literal_text(&overlay_entry.label),
+                },
+                children: Vec::new(),
+            });
+            root.children.push(UiWidgetNode {
+                id: format!("overlay_slider_{index}").into(),
+                title: format!("Overlay Slider {index}"),
+                layout: absolute_layout(slider_rect),
+                style: slider_style(appearance),
+                event_id: None,
+                focusable: true,
+                visible_if: None,
+                enabled_if: None,
+                kind: UiWidgetKind::Slider {
+                    value: UiProgressBinding::Percent {
+                        percent: UiBinding::Expression {
+                            expression: slider_percent.to_string(),
+                            key: None,
+                        },
+                    },
+                    step_percent: 5,
+                    show_value: false,
+                },
+                children: Vec::new(),
+            });
+            root.children.push(UiWidgetNode {
+                id: format!("overlay_value_{index}").into(),
+                title: format!("Overlay Value {index}"),
+                layout: absolute_layout(value_rect),
+                style: overlay_label_style(appearance, toki_core::text::TextAnchor::CenterRight),
+                event_id: None,
+                focusable: false,
+                visible_if: None,
+                enabled_if: None,
+                kind: UiWidgetKind::Label {
+                    content: literal_text(&overlay_entry.value_text),
+                },
+                children: Vec::new(),
+            });
+        } else {
+            root.children.push(UiWidgetNode {
+                id: format!("overlay_entry_{index}").into(),
+                title: format!("Overlay Entry {index}"),
+                layout: absolute_layout(layout_entry.rect),
+                style: entry_button_style(appearance),
+                event_id: None,
+                focusable: true,
+                visible_if: None,
+                enabled_if: None,
+                kind: UiWidgetKind::Button {
+                    label: literal_text(&format!("{}: {}", overlay_entry.label, overlay_entry.value_text)),
+                },
+                children: Vec::new(),
+            });
+        }
+    }
+
+    UiLayoutAsset {
+        id: "__runtime_overlay__".into(),
+        title: "Runtime Overlay".to_string(),
+        startup_visible: true,
+        z_order: 0,
+        root,
+    }
+}
+
+fn literal_text(text: &str) -> UiTextTemplate {
+    UiTextTemplate {
+        segments: vec![UiTextSegment::Literal {
+            text: text.to_string(),
+        }],
+    }
+}
+
+fn absolute_layout(rect: UiRect) -> UiLayoutSpec {
+    UiLayoutSpec {
+        anchor: UiAnchor::TopLeft,
+        offset: [rect.x, rect.y],
+        size: [rect.width, rect.height],
+        margin: UiSpacing {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        },
+        padding: UiSpacing {
+            left: 4,
+            top: 4,
+            right: 4,
+            bottom: 4,
+        },
+    }
+}
+
+fn panel_style(appearance: &MenuAppearance) -> UiWidgetStyle {
+    UiWidgetStyle {
+        fill_color: toki_core::menu::menu_fill_color_rgba(
+            &appearance.menu_background_color_hex,
+            appearance.menu_background_transparent,
+            appearance.opacity_percent,
+        )
+        .map(rgba_to_u8),
+        border_color: toki_core::menu::menu_border_color(
+            appearance.border_style,
+            toki_core::menu::menu_hex_color_rgba(&appearance.border_color_hex)
+                .unwrap_or([0.49, 1.0, 0.49, 1.0]),
+            appearance.opacity_percent.clamp(0, 100) as f32 / 100.0,
+        )
+        .map(rgba_to_u8),
+        text_color: None,
+        accent_color: None,
+        text_wrap: false,
+        typography: UiTypography::default(),
+    }
+}
+
+fn title_style(appearance: &MenuAppearance) -> UiWidgetStyle {
+    UiWidgetStyle {
+        fill_color: toki_core::menu::menu_fill_color_rgba(
+            &appearance.title_background_color_hex,
+            appearance.title_background_transparent,
+            appearance.opacity_percent,
+        )
+        .map(rgba_to_u8),
+        border_color: panel_style(appearance).border_color,
+        text_color: Some(theme_from_menu_appearance(appearance).foreground_color),
+        accent_color: None,
+        text_wrap: false,
+        typography: UiTypography {
+            font_family: Some(appearance.font_family.clone()),
+            font_size_px: Some(appearance.font_size_px.saturating_add(4)),
+            weight: Some(toki_core::text::TextWeight::Bold),
+            slant: Some(toki_core::text::TextSlant::Normal),
+            anchor: Some(toki_core::text::TextAnchor::TopCenter),
+        },
+    }
+}
+
+fn entry_button_style(appearance: &MenuAppearance) -> UiWidgetStyle {
+    UiWidgetStyle {
+        fill_color: toki_core::menu::menu_fill_color_rgba(
+            &appearance.entry_background_color_hex,
+            appearance.entry_background_transparent,
+            appearance.opacity_percent,
+        )
+        .map(rgba_to_u8),
+        border_color: panel_style(appearance).border_color,
+        text_color: Some(theme_from_menu_appearance(appearance).foreground_color),
+        accent_color: Some(theme_from_menu_appearance(appearance).accent_color),
+        text_wrap: false,
+        typography: UiTypography {
+            font_family: Some(appearance.font_family.clone()),
+            font_size_px: Some(appearance.font_size_px),
+            weight: Some(toki_core::text::TextWeight::Normal),
+            slant: Some(toki_core::text::TextSlant::Normal),
+            anchor: Some(toki_core::text::TextAnchor::CenterLeft),
+        },
+    }
+}
+
+fn overlay_label_style(
+    appearance: &MenuAppearance,
+    anchor: toki_core::text::TextAnchor,
+) -> UiWidgetStyle {
+    UiWidgetStyle {
+        fill_color: None,
+        border_color: None,
+        text_color: Some(theme_from_menu_appearance(appearance).foreground_color),
+        accent_color: None,
+        text_wrap: false,
+        typography: UiTypography {
+            font_family: Some(appearance.font_family.clone()),
+            font_size_px: Some(appearance.font_size_px),
+            weight: Some(toki_core::text::TextWeight::Normal),
+            slant: Some(toki_core::text::TextSlant::Normal),
+            anchor: Some(anchor),
+        },
+    }
+}
+
+fn slider_style(appearance: &MenuAppearance) -> UiWidgetStyle {
+    UiWidgetStyle {
+        fill_color: Some(theme_from_menu_appearance(appearance).background_color),
+        border_color: Some(theme_from_menu_appearance(appearance).border_color),
+        text_color: Some(theme_from_menu_appearance(appearance).foreground_color),
+        accent_color: Some(theme_from_menu_appearance(appearance).accent_color),
+        text_wrap: false,
+        typography: UiTypography {
+            font_family: Some(appearance.font_family.clone()),
+            font_size_px: Some(appearance.font_size_px),
+            weight: Some(toki_core::text::TextWeight::Normal),
+            slant: Some(toki_core::text::TextSlant::Normal),
+            anchor: Some(toki_core::text::TextAnchor::Center),
+        },
+    }
+}
+
+fn rgba_to_u8(rgba: [f32; 4]) -> [u8; 4] {
+    [
+        (rgba[0].clamp(0.0, 1.0) * 255.0).round() as u8,
+        (rgba[1].clamp(0.0, 1.0) * 255.0).round() as u8,
+        (rgba[2].clamp(0.0, 1.0) * 255.0).round() as u8,
+        (rgba[3].clamp(0.0, 1.0) * 255.0).round() as u8,
+    ]
+}
+
+fn empty_binding_context() -> UiBindingContext<'static, 'static, 'static> {
+    use std::sync::OnceLock;
+    static ENTITY_MANAGER: OnceLock<toki_core::entity::EntityManager> = OnceLock::new();
+    static FLAGS: OnceLock<toki_core::flags::GameFlags> = OnceLock::new();
+    static OVERRIDES: OnceLock<std::collections::HashMap<String, toki_core::FlagValue>> =
+        OnceLock::new();
+    static DECLARED_FLAGS: OnceLock<Vec<toki_core::project_runtime::ProjectFlagDefinition>> =
+        OnceLock::new();
+    static EMPTY_TRIGGER_CONTEXT: toki_core::rules::TriggerContext = toki_core::rules::TriggerContext {
+        trigger_self: None,
+        trigger_other: None,
+    };
+
+    UiBindingContext {
+        value_paths: toki_core::value_path::ValuePathContext {
+            entity_manager: ENTITY_MANAGER.get_or_init(toki_core::entity::EntityManager::default),
+            game_flags: FLAGS.get_or_init(toki_core::flags::GameFlags::default),
+            player_id: None,
+            trigger_context: &EMPTY_TRIGGER_CONTEXT,
+        },
+        binding_overrides: OVERRIDES.get_or_init(std::collections::HashMap::new),
+        declared_flags: DECLARED_FLAGS.get_or_init(Vec::new),
+    }
 }

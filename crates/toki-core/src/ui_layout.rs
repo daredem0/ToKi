@@ -77,8 +77,16 @@ pub enum UiWidgetKind {
     Label {
         content: UiTextTemplate,
     },
+    Button {
+        label: UiTextTemplate,
+    },
     ProgressBar {
         value: UiProgressBinding,
+    },
+    Slider {
+        value: UiProgressBinding,
+        step_percent: u8,
+        show_value: bool,
     },
     GridContainer {
         columns: u16,
@@ -237,6 +245,8 @@ pub struct UiWidgetStyle {
     pub text_color: Option<[u8; 4]>,
     #[serde(default)]
     pub accent_color: Option<[u8; 4]>,
+    #[serde(default)]
+    pub text_wrap: bool,
     #[serde(default)]
     pub typography: UiTypography,
 }
@@ -465,15 +475,26 @@ impl UiLayoutEngine {
         match &widget.kind {
             UiWidgetKind::Label { content } => {
                 let text = render_text_template(content, *context);
-                let anchor = effective_text_anchor(widget, TextAnchor::Center);
                 let mut block = make_panel_block(widget, rect, theme, highlighted);
-                block.text = Some(UiTextBlock {
-                    content: text,
-                    position: text_anchor_position(content_rect, anchor, 0.0),
-                    anchor,
-                    style: text_style_for_widget(widget, theme),
-                    layer: 20,
-                });
+                block.text = Some(text_block_for_widget(widget, theme, content_rect, text));
+                output.composition.push(block);
+            }
+            UiWidgetKind::Button { label } => {
+                let text = render_text_template(label, *context);
+                let mut block = make_panel_block(widget, rect, theme, highlighted);
+                if highlighted {
+                    block.fill_color = Some(color_to_f32(theme.selection_color));
+                }
+                block.text = Some(text_block_for_widget(
+                    widget,
+                    theme,
+                    content_rect,
+                    if highlighted {
+                        format!("> {text}")
+                    } else {
+                        text
+                    },
+                ));
                 output.composition.push(block);
             }
             UiWidgetKind::ProgressBar { value } => {
@@ -498,6 +519,65 @@ impl UiLayoutEngine {
                     border_thickness: 0.0,
                     text: None,
                 });
+            }
+            UiWidgetKind::Slider {
+                value,
+                step_percent,
+                show_value,
+            } => {
+                let fraction = quantize_fraction(resolve_progress_fraction(value, *context), *step_percent);
+                let panel = make_panel_block(widget, rect, theme, highlighted);
+                output.composition.push(panel);
+                let track_rect = content_rect.inset(2.0);
+                output.composition.push(UiBlock {
+                    rect: track_rect,
+                    fill_color: Some(color_to_f32(
+                        widget
+                            .style
+                            .fill_color
+                            .unwrap_or(theme.progress_empty_color),
+                    )),
+                    border_color: Some(color_to_f32(widget.style.border_color.unwrap_or(theme.border_color))),
+                    border_thickness: theme.border_thickness_px.max(1) as f32,
+                    text: None,
+                });
+                output.composition.push(UiBlock {
+                    rect: UiRect {
+                        x: track_rect.x,
+                        y: track_rect.y,
+                        width: track_rect.width * fraction,
+                        height: track_rect.height,
+                    },
+                    fill_color: Some(color_to_f32(
+                        widget
+                            .style
+                            .accent_color
+                            .unwrap_or(theme.progress_fill_color),
+                    )),
+                    border_color: None,
+                    border_thickness: 0.0,
+                    text: None,
+                });
+                if *show_value {
+                    let percent = (fraction * 100.0).round() as i32;
+                    let mut label_block = UiBlock {
+                        rect,
+                        fill_color: None,
+                        border_color: None,
+                        border_thickness: 0.0,
+                        text: Some(text_block_for_widget(
+                            widget,
+                            theme,
+                            content_rect,
+                            format!("{percent}%"),
+                        )),
+                    };
+                    if let Some(text) = label_block.text.as_mut() {
+                        text.anchor = effective_text_anchor(widget, TextAnchor::Center);
+                        text.position = text_anchor_position(content_rect, text.anchor, 0.0);
+                    }
+                    output.composition.push(label_block);
+                }
             }
             UiWidgetKind::GridContainer { columns, spacing } => {
                 if widget.id.as_str() == "root" {
@@ -547,15 +627,15 @@ impl UiLayoutEngine {
         }
 
         if !matches!(widget.kind, UiWidgetKind::GridContainer { .. }) {
-            if widget.focusable || widget.event_id.is_some() {
+            if widget.focusable || widget.event_id.is_some() || widget_is_interactive(&widget.kind) {
                 output.hitboxes.push(UiWidgetHitbox {
                     widget_id: widget.id.clone(),
                     rect,
                     enabled,
-                    focusable: widget.focusable,
+                    focusable: widget.focusable || widget_is_interactive(&widget.kind),
                     event_id: widget.event_id.clone(),
                 });
-                if widget.focusable {
+                if widget.focusable || widget_is_interactive(&widget.kind) {
                     output.focus_order.push(widget.id.clone());
                 }
             }
@@ -564,6 +644,10 @@ impl UiLayoutEngine {
             }
         }
     }
+}
+
+fn widget_is_interactive(kind: &UiWidgetKind) -> bool {
+    matches!(kind, UiWidgetKind::Button { .. } | UiWidgetKind::Slider { .. })
 }
 
 #[derive(Debug, Default)]
@@ -885,6 +969,26 @@ fn text_style_for_widget(widget: &UiWidgetNode, theme: &UiTheme) -> TextStyle {
     }
 }
 
+fn text_block_for_widget(
+    widget: &UiWidgetNode,
+    theme: &UiTheme,
+    content_rect: UiRect,
+    content: String,
+) -> UiTextBlock {
+    let anchor = effective_text_anchor(widget, TextAnchor::Center);
+    UiTextBlock {
+        content,
+        position: text_anchor_position(content_rect, anchor, 0.0),
+        anchor,
+        style: text_style_for_widget(widget, theme),
+        layer: 20,
+        max_width: widget
+            .style
+            .text_wrap
+            .then_some(content_rect.width.max(1.0)),
+    }
+}
+
 fn effective_text_anchor(widget: &UiWidgetNode, default_anchor: TextAnchor) -> TextAnchor {
     widget.style.typography.anchor.unwrap_or(default_anchor)
 }
@@ -956,6 +1060,15 @@ fn resolve_progress_fraction(
             .map(|value| (value as f32 / 100.0).clamp(0.0, 1.0))
             .unwrap_or_default(),
     }
+}
+
+fn quantize_fraction(fraction: f32, step_percent: u8) -> f32 {
+    let clamped = fraction.clamp(0.0, 1.0);
+    if step_percent == 0 {
+        return clamped;
+    }
+    let step = (step_percent as f32 / 100.0).max(0.01);
+    (clamped / step).round() * step
 }
 
 fn evaluate_widget_gate(

@@ -87,6 +87,8 @@ impl App {
         let Some(target) = runtime_overlay_hit_target_at_position(
             &presentation.layout.entries,
             &presentation.entries,
+            &presentation.layout,
+            &appearance,
             position,
         ) else {
             return false;
@@ -111,6 +113,8 @@ impl App {
         let Some(target) = runtime_overlay_hit_target_at_position(
             &presentation.layout.entries,
             &presentation.entries,
+            &presentation.layout,
+            &appearance,
             position,
         ) else {
             return false;
@@ -197,7 +201,7 @@ mod tests {
         runtime_overlay_slider_rect, slider_percent_from_position, slider_to_target_fps,
         target_fps_to_slider, RuntimeMenuOverlay, RuntimeOverlayEntry, RuntimeOverlayHitTarget,
     };
-    use toki_core::menu::{MenuBorderStyle, MenuEntryLayout};
+    use toki_core::menu::{MenuAppearance, MenuBorderStyle, MenuEntryLayout};
     use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
     use toki_core::ui::UiRect;
 
@@ -348,6 +352,35 @@ mod tests {
             slider_percent: Some(50),
             selected: true,
         };
+        let layout = toki_core::menu::MenuLayout {
+            panel: UiRect {
+                x: 0.0,
+                y: 0.0,
+                width: 140.0,
+                height: 80.0,
+            },
+            title: toki_core::menu::MenuLayoutBlock {
+                rect: UiRect {
+                    x: 10.0,
+                    y: 4.0,
+                    width: 100.0,
+                    height: 12.0,
+                },
+                text: "Audio".to_string(),
+                border_style: MenuBorderStyle::Square,
+            },
+            entries: vec![layout_entry.clone()],
+            hint: toki_core::menu::MenuLayoutBlock {
+                rect: UiRect {
+                    x: 10.0,
+                    y: 60.0,
+                    width: 100.0,
+                    height: 12.0,
+                },
+                text: String::new(),
+                border_style: MenuBorderStyle::None,
+            },
+        };
         let slider_rect =
             runtime_overlay_slider_rect(&layout_entry, &overlay_entry).expect("slider");
         assert!(rect_contains(
@@ -358,6 +391,8 @@ mod tests {
             runtime_overlay_hit_target_at_position(
                 &[layout_entry],
                 &[overlay_entry],
+                &layout,
+                &MenuAppearance::default(),
                 glam::Vec2::new(
                     slider_rect.x + slider_rect.width * 0.75,
                     slider_rect.y + 2.0

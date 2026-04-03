@@ -1,7 +1,7 @@
 use toki_core::game::RuleSystem;
 use toki_core::menu::{
-    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuAppearance,
-    MenuDialogLayout, MenuInput, MenuLayout,
+    build_dialog_layout, build_menu_layout, compose_dialog_output, compose_menu_output,
+    dialog_entry_index_from_widget_id, menu_entry_index_from_widget_id, MenuAppearance, MenuInput,
 };
 use toki_core::ui::UiCommand;
 use toki_core::ui_layout::UiBindingContext;
@@ -250,7 +250,7 @@ impl App {
             let appearance = self
                 .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+            if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 let result = self
                     .dialog_system
                     .activate_entry(entry_index, &self.game_system.game_state);
@@ -268,7 +268,7 @@ impl App {
             let appearance =
                 self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+            if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 if let Some(command) = self.menu_system.activate_dialog_entry(entry_index) {
                     self.apply_menu_command(command);
                 }
@@ -284,7 +284,7 @@ impl App {
         let appearance =
             self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
-        if let Some(entry_index) = menu_entry_at_position(&layout, position) {
+        if let Some(entry_index) = menu_entry_at_position(&layout, &appearance, position) {
             if self
                 .menu_system
                 .select_screen_view_entry(&inventory, entry_index)
@@ -315,7 +315,7 @@ impl App {
             let appearance = self
                 .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+            if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 self.dialog_system.select_entry(entry_index);
                 return true;
             }
@@ -330,7 +330,7 @@ impl App {
             let appearance =
                 self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+            if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 self.menu_system.select_dialog_entry(entry_index);
                 return true;
             }
@@ -344,7 +344,7 @@ impl App {
         let appearance =
             self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
-        menu_entry_at_position(&layout, position).is_some_and(|entry_index| {
+        menu_entry_at_position(&layout, &appearance, position).is_some_and(|entry_index| {
             self.menu_system
                 .select_screen_view_entry(&inventory, entry_index)
         })
@@ -415,7 +415,7 @@ impl App {
             let appearance = self
                 .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-            let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
+            let dialog_composition = compose_dialog_output(&dialog_layout, &appearance).composition;
             self.rendering
                 .render_viewport_ui_composition(&dialog_composition);
             return;
@@ -443,13 +443,13 @@ impl App {
 
         if !should_hide_main_menu {
             let layout = build_menu_layout(&view, &appearance, viewport);
-            let composition = compose_menu_ui(&layout, &appearance);
+            let composition = compose_menu_output(&layout, &appearance).composition;
             self.rendering.render_viewport_ui_composition(&composition);
         }
 
         if let Some(dialog_view) = dialog_view {
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-            let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
+            let dialog_composition = compose_dialog_output(&dialog_layout, &appearance).composition;
             self.rendering
                 .render_viewport_ui_composition(&dialog_composition);
         }
@@ -522,29 +522,48 @@ fn should_gate_gameplay(
     (dialog_open && dialog_gate_gameplay) || (menu_open && menu_gate_gameplay)
 }
 
-fn dialog_entry_at_position(layout: &MenuDialogLayout, position: glam::Vec2) -> Option<usize> {
-    layout.entries.iter().position(|entry| {
-        position.x >= entry.rect.x
-            && position.x <= entry.rect.x + entry.rect.width
-            && position.y >= entry.rect.y
-            && position.y <= entry.rect.y + entry.rect.height
-    })
+fn dialog_entry_at_position(
+    layout: &toki_core::menu::MenuDialogLayout,
+    appearance: &MenuAppearance,
+    position: glam::Vec2,
+) -> Option<usize> {
+    compose_dialog_output(layout, appearance)
+        .hitboxes
+        .iter()
+        .find(|hitbox| {
+            hitbox.enabled
+                && position.x >= hitbox.rect.x
+                && position.x <= hitbox.rect.x + hitbox.rect.width
+                && position.y >= hitbox.rect.y
+                && position.y <= hitbox.rect.y + hitbox.rect.height
+        })
+        .and_then(|hitbox| dialog_entry_index_from_widget_id(&hitbox.widget_id))
 }
 
-fn menu_entry_at_position(layout: &MenuLayout, position: glam::Vec2) -> Option<usize> {
-    layout.entries.iter().position(|entry| {
-        position.x >= entry.rect.x
-            && position.x <= entry.rect.x + entry.rect.width
-            && position.y >= entry.rect.y
-            && position.y <= entry.rect.y + entry.rect.height
-    })
+fn menu_entry_at_position(
+    layout: &toki_core::menu::MenuLayout,
+    appearance: &MenuAppearance,
+    position: glam::Vec2,
+) -> Option<usize> {
+    compose_menu_output(layout, appearance)
+        .hitboxes
+        .iter()
+        .find(|hitbox| {
+            hitbox.enabled
+                && position.x >= hitbox.rect.x
+                && position.x <= hitbox.rect.x + hitbox.rect.width
+                && position.y >= hitbox.rect.y
+                && position.y <= hitbox.rect.y + hitbox.rect.height
+        })
+        .and_then(|hitbox| menu_entry_index_from_widget_id(&hitbox.widget_id))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use toki_core::menu::{
-        menu_fill_color_rgba, menu_hex_color_rgba, MenuAppearance, MenuView, MenuViewEntry,
+        menu_fill_color_rgba, menu_hex_color_rgba, MenuAppearance, MenuDialogLayout, MenuLayout,
+        MenuView, MenuViewEntry,
     };
     use toki_core::ui::UiCommand;
 
@@ -763,11 +782,11 @@ mod tests {
         };
 
         assert_eq!(
-            dialog_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)),
+            dialog_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(20.0, 35.0)),
             Some(0)
         );
         assert_eq!(
-            dialog_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)),
+            dialog_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(5.0, 5.0)),
             None
         );
     }
@@ -816,11 +835,11 @@ mod tests {
         };
 
         assert_eq!(
-            menu_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)),
+            menu_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(20.0, 35.0)),
             Some(0)
         );
         assert_eq!(
-            menu_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)),
+            menu_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(5.0, 5.0)),
             None
         );
     }

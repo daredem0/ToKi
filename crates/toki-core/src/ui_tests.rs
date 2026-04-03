@@ -18,6 +18,7 @@ fn ui_text_block_converts_to_screen_text_item() {
             ..TextStyle::default()
         },
         layer: 10,
+        max_width: None,
     };
 
     let item = block.to_text_item();
@@ -62,6 +63,7 @@ fn ui_composition_preserves_block_order() {
             anchor: TextAnchor::TopCenter,
             style: TextStyle::default(),
             layer: 10,
+            max_width: None,
         }),
     });
 
@@ -114,6 +116,7 @@ fn logical_ui_transform_scales_rects_borders_and_text() {
                 ..TextStyle::default()
             },
             layer: 1,
+            max_width: Some(24.0),
         }),
     });
 
@@ -127,6 +130,7 @@ fn logical_ui_transform_scales_rects_borders_and_text() {
     let text = block.text.as_ref().expect("text should exist");
     assert_eq!(text.position, glam::vec2(160.0, 96.0));
     assert!((text.style.size_px - 32.0).abs() < 0.01);
+    assert_eq!(text.max_width, Some(96.0));
 }
 
 #[test]
@@ -180,6 +184,7 @@ fn ui_presentation_transform_matches_runtime_text_scale_and_rect_transform() {
             anchor: TextAnchor::TopLeft,
             style: TextStyle::default(),
             layer: 1,
+            max_width: None,
         }),
     });
 

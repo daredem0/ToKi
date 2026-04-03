@@ -221,6 +221,7 @@ mod tests {
                     ..TextStyle::default()
                 },
                 layer: 1,
+                max_width: None,
             }),
         });
         let transformed = presentation.offset_surface_ui_composition(&composition);
@@ -280,6 +281,7 @@ mod tests {
                     ..TextStyle::default()
                 },
                 layer: 1,
+                max_width: None,
             }),
         });
         let transformed = presentation.transform_logical_ui_composition(&composition);
