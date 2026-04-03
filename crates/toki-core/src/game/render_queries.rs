@@ -695,6 +695,8 @@ mod tests {
                     remaining_ticks: 10,
                     damage: 1,
                     owner_id: None,
+                    position_accumulator: [0.0, 0.0],
+                    tick_accumulator: 0.0,
                 }),
             );
 

@@ -62,6 +62,8 @@ fn create_test_entity_manager() -> EntityManager {
             remaining_ticks: 9,
             damage: 2,
             owner_id: Some(player_id),
+            position_accumulator: [0.0, 0.0],
+            tick_accumulator: 0.0,
         }),
     );
     manager.storage_mut().components_mut().set_pickup(

@@ -49,7 +49,7 @@ impl GameSimulation {
         let mut phases = Self::begin_tick(state, ctx.time_scale, world);
 
         Self::tick_input_and_movement(state, world, ctx.time_scale, &mut phases);
-        Self::tick_combat_and_interactions(state, world, &mut phases);
+        Self::tick_combat_and_interactions(state, world, ctx.time_scale, &mut phases);
         Self::tick_ai_and_tile_transitions(state, world, &mut phases);
         Self::tick_rules_and_reactions(state, world, &mut phases);
 
@@ -150,10 +150,11 @@ impl GameSimulation {
     fn tick_combat_and_interactions(
         state: &mut GameState,
         world: WorldContext<'_>,
+        time_scale: f32,
         _phases: &mut TickPhaseState,
     ) {
         CombatSystem::process_profile_actions(state);
-        CombatSystem::update_projectiles(state, world);
+        CombatSystem::update_projectiles(state, world, time_scale);
         InteractionSystem::collect_overlapping_pickups(state);
         InteractionSystem::collect_interaction_events(state);
         state.resolve_pending_stat_changes();

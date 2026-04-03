@@ -49,7 +49,7 @@ pub struct PrimaryProjectileDef {
     pub spawn_offset: [i32; 2],
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProjectileState {
     pub sheet: String,
     pub object_name: String,
@@ -59,6 +59,12 @@ pub struct ProjectileState {
     pub damage: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner_id: Option<EntityId>,
+    /// Sub-pixel position remainder accumulated across frames for FPS-independent movement.
+    #[serde(skip, default)]
+    pub position_accumulator: [f32; 2],
+    /// Fractional tick remainder accumulated across frames for FPS-independent lifetime.
+    #[serde(skip, default)]
+    pub tick_accumulator: f32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]

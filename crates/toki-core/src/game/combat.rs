@@ -12,6 +12,29 @@ use super::{GameState, InputAction, RuntimeState, WorldContext, WorldState};
 
 pub struct CombatSystem;
 
+/// Compute FPS-independent projectile step using sub-pixel accumulators.
+///
+/// Returns `(delta_pixels, new_pos_accumulator, new_tick_accumulator, consumed_ticks)`.
+fn scaled_projectile_move(
+    velocity: glam::IVec2,
+    pos_acc: [f32; 2],
+    tick_acc: f32,
+    time_scale: f32,
+) -> (glam::IVec2, [f32; 2], f32, u32) {
+    let new_x = pos_acc[0] + velocity.x as f32 * time_scale;
+    let new_y = pos_acc[1] + velocity.y as f32 * time_scale;
+    let dx = new_x.trunc() as i32;
+    let dy = new_y.trunc() as i32;
+    let new_tick = tick_acc + time_scale;
+    let consumed = new_tick.floor() as u32;
+    (
+        glam::IVec2::new(dx, dy),
+        [new_x - dx as f32, new_y - dy as f32],
+        new_tick - consumed as f32,
+        consumed,
+    )
+}
+
 pub struct CombatService<'a> {
     world: &'a mut WorldState,
     runtime: &'a mut RuntimeState,
@@ -22,10 +45,10 @@ impl CombatSystem {
         state.combat_service().process_profile_actions();
     }
 
-    pub(crate) fn update_projectiles(state: &mut GameState, world: WorldContext<'_>) {
+    pub(crate) fn update_projectiles(state: &mut GameState, world: WorldContext<'_>, time_scale: f32) {
         state
             .combat_service()
-            .update_projectiles(world.tilemap, world.atlas);
+            .update_projectiles(world.tilemap, world.atlas, time_scale);
     }
 }
 
@@ -222,6 +245,8 @@ impl<'a> CombatService<'a> {
                     remaining_ticks: spec.lifetime_ticks,
                     damage: spec.damage.max(0),
                     owner_id: Some(attacker_id),
+                    position_accumulator: [0.0, 0.0],
+                    tick_accumulator: 0.0,
                 }),
             );
         if let Some(projectile) = self.world.entity_manager.get_entity_mut(projectile_id) {
@@ -293,6 +318,7 @@ impl<'a> CombatService<'a> {
         &mut self,
         tilemap: &crate::assets::tilemap::TileMap,
         atlas: &crate::assets::atlas::AtlasMeta,
+        time_scale: f32,
     ) {
         let projectile_ids = self
             .world
@@ -311,7 +337,7 @@ impl<'a> CombatService<'a> {
         let mut despawn_ids = Vec::new();
 
         for projectile_id in projectile_ids {
-            let Some((current_position, velocity, remaining_ticks, damage, owner_id)) = self
+            let Some((current_position, velocity, remaining_ticks, damage, owner_id, pos_acc, tick_acc)) = self
                 .world
                 .entity_manager
                 .get_entity(projectile_id)
@@ -328,6 +354,8 @@ impl<'a> CombatService<'a> {
                                 projectile.remaining_ticks,
                                 projectile.damage.max(0),
                                 projectile.owner_id,
+                                projectile.position_accumulator,
+                                projectile.tick_accumulator,
                             )
                         })
                 })
@@ -345,7 +373,9 @@ impl<'a> CombatService<'a> {
                 continue;
             }
 
-            let new_position = current_position + velocity;
+            let (delta, new_pos_acc, new_tick_acc, consumed_ticks) =
+                scaled_projectile_move(velocity, pos_acc, tick_acc, time_scale);
+            let new_position = current_position + delta;
             if !self.can_entity_move_to_position(projectile_id, new_position, tilemap, atlas) {
                 tracing::debug!(
                     "Projectile {} blocked moving from {:?} to {:?} and will despawn",
@@ -367,7 +397,9 @@ impl<'a> CombatService<'a> {
                     .components_mut()
                     .projectile_mut(projectile_id)
                 {
-                    projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(1);
+                    projectile.position_accumulator = new_pos_acc;
+                    projectile.tick_accumulator = new_tick_acc;
+                    projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(consumed_ticks);
                     tracing::trace!(
                         "Projectile {} moved from {:?} to {:?} remaining_ticks={}",
                         projectile_id,
