@@ -394,7 +394,6 @@ impl EditorContext for RuleGraphContext {
         PanelSystem::render_scene_graph(
             ui,
             shell,
-            shell.active_tab() == CenterPanelTab::SceneRules,
             host.config_readonly
                 .as_ref()
                 .copied()
@@ -787,9 +786,7 @@ impl EditorContext for EntityEditorContext {
 pub(crate) fn default_active_context(tab: CenterPanelTab) -> Box<dyn EditorContext> {
     match tab {
         CenterPanelTab::SceneViewport => Box::new(SceneViewportContext::default()),
-        CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => {
-            Box::new(RuleGraphContext::default())
-        }
+        CenterPanelTab::SceneGraph => Box::new(RuleGraphContext::default()),
         CenterPanelTab::MapEditor => Box::new(MapEditorContext::default()),
         CenterPanelTab::MenuEditor => Box::new(MenuEditorContext),
         CenterPanelTab::DialogEditor => Box::new(DialogEditorContext::default()),
@@ -818,12 +815,6 @@ pub(crate) fn default_parked_contexts(
         if tab != active_tab {
             contexts.insert(tab, default_active_context(tab));
         }
-    }
-    if active_tab != CenterPanelTab::SceneRules {
-        let scene_rules_context = contexts
-            .remove(&CenterPanelTab::SceneGraph)
-            .unwrap_or_else(|| default_active_context(CenterPanelTab::SceneGraph));
-        contexts.insert(CenterPanelTab::SceneRules, scene_rules_context);
     }
     contexts
 }

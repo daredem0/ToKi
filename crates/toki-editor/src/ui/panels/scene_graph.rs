@@ -1,4 +1,6 @@
 use super::*;
+use crate::ui::editor_ui::SceneEditorSubView;
+use crate::ui::graph_canvas::GraphCanvasAction;
 use crate::ui::EditorUI;
 
 #[derive(Default)]
@@ -13,14 +15,16 @@ impl PanelSystem {
     pub(crate) fn render_scene_graph(
         ui: &mut egui::Ui,
         ui_state: &mut EditorUI,
-        show_scene_rules: bool,
-        config: Option<&EditorConfig>,
+        _config: Option<&EditorConfig>,
     ) {
-        if show_scene_rules {
-            ui.heading("Active Scene Rules");
-        } else {
-            ui.heading("Active Scene Graph");
-        }
+        let show_scene_rules = {
+            let sub_view = &mut crate::ui::editor_context::graph_state_mut(ui_state).sub_view;
+            ui.horizontal(|ui| {
+                ui.selectable_value(sub_view, SceneEditorSubView::Graph, "Graph");
+                ui.selectable_value(sub_view, SceneEditorSubView::Rules, "Rules");
+            });
+            *sub_view == SceneEditorSubView::Rules
+        };
         ui.separator();
 
         let Some(active_scene_name) = ui_state.active_scene.clone() else {
@@ -43,8 +47,12 @@ impl PanelSystem {
         let mut connect_from =
             crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node;
         let mut connect_to = crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node;
-        let (mut graph_zoom, mut graph_pan) =
+        let mut canvas_state =
+            crate::ui::editor_context::graph_state_mut(ui_state).canvas_state.clone();
+        let (persisted_zoom, persisted_pan) =
             crate::ui::editor_ui::graph_view_for_scene(ui_state, &active_scene_name);
+        canvas_state.zoom = persisted_zoom;
+        canvas_state.pan = persisted_pan;
         let before_rule_set = ui_state.scenes[scene_index].rules.clone();
         let before_graph_snapshot =
             crate::ui::editor_ui::rule_graph_for_scene(ui_state, &active_scene_name).cloned();
@@ -97,57 +105,22 @@ impl PanelSystem {
             }
             let node_badges = Self::rule_graph_node_badges(&graph);
 
-            if !show_scene_rules {
-                ui.horizontal(|ui| {
-                    if !ui.ctx().wants_keyboard_input() {
-                        if ui.input(|input| {
-                            input.key_pressed(egui::Key::Plus)
-                                || input.key_pressed(egui::Key::Equals)
-                        }) {
-                            graph_zoom = (graph_zoom * 1.1).clamp(0.4, 4.0);
-                        }
-                        if ui.input(|input| input.key_pressed(egui::Key::Minus)) {
-                            graph_zoom = (graph_zoom / 1.1).clamp(0.4, 4.0);
-                        }
-                    }
-                    let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
-                    if scroll_delta != 0.0 {
-                        let sensitivity = config
-                            .map(|c| c.editor_settings.camera.scroll_zoom_sensitivity)
-                            .unwrap_or(0.02);
-                        // Zoom is more aggressive here, hence we factor it down.
-                        // TODO: This should be cleaned up
-                        let zoom_factor = 1.0 + scroll_delta * sensitivity * 0.1;
-                        graph_zoom = (graph_zoom * zoom_factor).clamp(0.4, 4.0);
-                    }
-                    ui.label(format!("Zoom: {:.0}%", graph_zoom * 100.0));
-                    ui.label("Tip: Drag Empty Space To Pan");
-                    if ui.button("➕ Add Trigger").clicked() {
-                        pending_command = Some(GraphCommand::AddTrigger);
-                    }
-                    if ui.button("➕ Add Condition").clicked() {
-                        pending_command = Some(GraphCommand::AddConditionNode);
-                    }
-                    if ui.button("➕ Add Action").clicked() {
-                        pending_command = Some(GraphCommand::AddActionNode);
-                    }
+            ui.horizontal(|ui| {
+                if ui.button("➕ Add Trigger").clicked() {
+                    pending_command = Some(GraphCommand::AddTrigger);
+                }
+                if ui.button("➕ Add Condition").clicked() {
+                    pending_command = Some(GraphCommand::AddConditionNode);
+                }
+                if ui.button("➕ Add Action").clicked() {
+                    pending_command = Some(GraphCommand::AddActionNode);
+                }
+                if !show_scene_rules {
                     if ui.button("↺ Reset Auto Layout").clicked() {
                         pending_command = Some(GraphCommand::ResetLayout);
                     }
-                });
-            } else {
-                ui.horizontal(|ui| {
-                    if ui.button("➕ Add Trigger").clicked() {
-                        pending_command = Some(GraphCommand::AddTrigger);
-                    }
-                    if ui.button("➕ Add Condition").clicked() {
-                        pending_command = Some(GraphCommand::AddConditionNode);
-                    }
-                    if ui.button("➕ Add Action").clicked() {
-                        pending_command = Some(GraphCommand::AddActionNode);
-                    }
-                });
-            }
+                }
+            });
 
             if connect_from.is_some_and(|id| !graph.nodes.iter().any(|node| node.id == id)) {
                 connect_from = None;
@@ -231,18 +204,41 @@ impl PanelSystem {
             }
             if !show_scene_rules {
                 if pending_command.is_none() {
-                    let (moved_node, clicked_node) = Self::render_graph_canvas(
+                    let actions = Self::render_graph_canvas(
                         ui,
                         &graph,
                         &node_badges,
-                        graph_zoom,
-                        &mut graph_pan,
+                        &mut canvas_state,
+                        selected_graph_node,
                     );
-                    if let Some((node_id, position)) = moved_node {
-                        pending_command = Some(GraphCommand::SetNodePosition(node_id, position));
-                    }
-                    if let Some(node_id) = clicked_node {
-                        selected_graph_node = Some(node_id);
+                    for action in actions {
+                        match action {
+                            GraphCanvasAction::SelectNode(id) => {
+                                selected_graph_node =
+                                    id.as_deref().and_then(|s| s.parse().ok());
+                            }
+                            GraphCanvasAction::MoveNode { node_id, position } => {
+                                if let Ok(id) = node_id.parse::<u64>() {
+                                    pending_command =
+                                        Some(GraphCommand::SetNodePosition(id, position));
+                                }
+                            }
+                            GraphCanvasAction::CreateNodeAt(_) => {
+                                pending_command = Some(GraphCommand::AddTrigger);
+                            }
+                            GraphCanvasAction::Connect {
+                                from_node_id,
+                                to_node_id,
+                                ..
+                            } => {
+                                if let (Ok(from), Ok(to)) = (
+                                    from_node_id.parse::<u64>(),
+                                    to_node_id.parse::<u64>(),
+                                ) {
+                                    pending_command = Some(GraphCommand::Connect(from, to));
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -297,8 +293,8 @@ impl PanelSystem {
                     &mut graph,
                     &node_badges,
                     command,
-                    graph_zoom,
-                    &mut graph_pan,
+                    canvas_state.zoom,
+                    &mut canvas_state.pan,
                 );
                 scene_changed |= flags.scene_changed;
                 graph_changed |= flags.graph_changed;
@@ -340,8 +336,8 @@ impl PanelSystem {
                         before_graph: before_graph_snapshot.clone(),
                         after_graph: graph.clone(),
                         before_layout: before_layout_snapshot.clone(),
-                        zoom: graph_zoom,
-                        pan: graph_pan,
+                        zoom: canvas_state.zoom,
+                        pan: canvas_state.pan,
                     },
                 ) {
                     operation_error =
@@ -369,13 +365,12 @@ impl PanelSystem {
 
         crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node = connect_from;
         crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node = connect_to;
-        crate::ui::editor_context::graph_state_mut(ui_state).canvas_zoom = graph_zoom;
-        crate::ui::editor_context::graph_state_mut(ui_state).canvas_pan = graph_pan;
+        crate::ui::editor_context::graph_state_mut(ui_state).canvas_state = canvas_state.clone();
         crate::ui::editor_ui::set_graph_view_for_scene(
             ui_state,
             &active_scene_name,
-            graph_zoom,
-            graph_pan,
+            canvas_state.zoom,
+            canvas_state.pan,
         );
         if scene_changed {
             ui_state.scene_content_changed = true;

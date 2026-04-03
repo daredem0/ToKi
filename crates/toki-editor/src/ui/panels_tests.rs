@@ -198,13 +198,6 @@ fn graph_zoom_scales_node_visuals() {
         "node size should increase with zoom"
     );
 
-    let font_out = PanelSystem::graph_node_font_size(0.5);
-    let font_in = PanelSystem::graph_node_font_size(2.0);
-    assert!(font_out < font_in, "font size should increase with zoom");
-
-    let edge_out = PanelSystem::graph_edge_stroke_width(0.5);
-    let edge_in = PanelSystem::graph_edge_stroke_width(2.0);
-    assert!(edge_out < edge_in, "edge stroke should increase with zoom");
 }
 
 #[test]

@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/Main Scene.json"
 "Scene 2" = "scenes/Scene 2.json"
 main = "scenes/main.json"
+"Main Scene" = "scenes/Main Scene.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -272,6 +272,103 @@ recent_files = []
 
 [editor.camera_settings]
 
+[editor.graph_layouts."Main Scene"]
+zoom = 0.6417899131774902
+pan = [
+    48.50739288330078,
+    16.0,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:20" = [
+    60.0,
+    849.0,
+]
+"node:21" = [
+    660.0,
+    849.0,
+]
+"node:5" = [
+    987.9375,
+    93.0,
+]
+"node:13" = [
+    360.0,
+    471.0,
+]
+"node:8" = [
+    60.0,
+    345.0,
+]
+"node:16" = [
+    360.0,
+    597.0,
+]
+"node:22" = [
+    360.0,
+    849.0,
+]
+"node:14" = [
+    60.0,
+    597.0,
+]
+"node:17" = [
+    60.0,
+    723.0,
+]
+"node:10" = [
+    360.0,
+    345.0,
+]
+"node:4" = [
+    60.0,
+    219.0,
+]
+"node:19" = [
+    360.0,
+    723.0,
+]
+"node:15" = [
+    695.96875,
+    597.0,
+]
+"node:12" = [
+    663.96875,
+    471.0,
+]
+"node:9" = [
+    684.296875,
+    345.0,
+]
+"node:2" = [
+    660.0,
+    93.0,
+]
+"node:6" = [
+    673.96875,
+    219.0,
+]
+"node:11" = [
+    60.0,
+    471.0,
+]
+"node:3" = [
+    360.0,
+    93.0,
+]
+"node:7" = [
+    360.0,
+    219.0,
+]
+"node:1" = [
+    60.0,
+    93.0,
+]
+"node:18" = [
+    660.0,
+    723.0,
+]
+
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8239601850509644
 pan = [
@@ -280,10 +377,6 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:2" = [
-    1170.0,
-    50.0,
-]
 "node:1" = [
     60.0,
     50.0,
@@ -296,102 +389,9 @@ pan = [
     800.0,
     50.0,
 ]
-
-[editor.graph_layouts."Main Scene"]
-zoom = 0.7765658497810364
-pan = [
-    50.0,
-    16.0,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:5" = [
-    758.296875,
-    64.328125,
-]
-"node:16" = [
-    262.625,
-    258.953125,
-]
-"node:15" = [
-    522.25,
-    258.953125,
-]
 "node:2" = [
-    469.625,
-    64.328125,
-]
-"node:12" = [
-    584.375,
-    210.296875,
-]
-"node:21" = [
-    452.296875,
-    356.265625,
-]
-"node:7" = [
-    244.359375,
-    112.984375,
-]
-"node:6" = [
-    488.640625,
-    112.984375,
-]
-"node:13" = [
-    293.71875,
-    210.296875,
-]
-"node:22" = [
-    240.34375,
-    356.265625,
-]
-"node:4" = [
-    60.0,
-    112.984375,
-]
-"node:19" = [
-    259.625,
-    307.609375,
-]
-"node:9" = [
-    615.984375,
-    161.640625,
-]
-"node:3" = [
-    246.0,
-    64.328125,
-]
-"node:20" = [
-    60.0,
-    356.265625,
-]
-"node:14" = [
-    60.0,
-    258.953125,
-]
-"node:8" = [
-    60.0,
-    161.640625,
-]
-"node:18" = [
-    483.578125,
-    307.609375,
-]
-"node:10" = [
-    318.65625,
-    161.640625,
-]
-"node:17" = [
-    60.0,
-    307.609375,
-]
-"node:11" = [
-    60.0,
-    210.296875,
-]
-"node:1" = [
-    60.0,
-    64.328125,
+    1170.0,
+    50.0,
 ]
 
 [[editor.rule_graph_drafts."Scene 2".nodes]]
@@ -463,7 +463,7 @@ trigger_node_id = 1
 id = 1
 position = [
     60.0,
-    50.0,
+    93.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnCollision]
@@ -471,8 +471,8 @@ position = [
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 2
 position = [
-    800.0,
-    50.0,
+    660.0,
+    93.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -482,8 +482,8 @@ sound_id = "sfx_hit"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 3
 position = [
-    430.0,
-    50.0,
+    360.0,
+    93.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -493,7 +493,7 @@ Condition = "Always"
 id = 4
 position = [
     60.0,
-    106.0,
+    219.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnInteract]
@@ -502,8 +502,8 @@ mode = "InFront"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 5
 position = [
-    1170.0,
-    106.0,
+    987.9375,
+    93.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.StartDialog]
@@ -512,8 +512,8 @@ dialog_id = "dialog_1"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 6
 position = [
-    800.0,
-    106.0,
+    673.96875,
+    219.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -523,8 +523,8 @@ sound_id = "sfx_powerup"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 7
 position = [
-    430.0,
-    106.0,
+    360.0,
+    219.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -534,7 +534,7 @@ Condition = "Always"
 id = 8
 position = [
     60.0,
-    162.0,
+    345.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDamaged.entity]
@@ -543,8 +543,8 @@ Entity = 9
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 9
 position = [
-    800.0,
-    162.0,
+    684.296875,
+    345.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
@@ -554,8 +554,8 @@ spawn_point_id = "spawn_point_1"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 10
 position = [
-    430.0,
-    162.0,
+    360.0,
+    345.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.HealthBelow]
@@ -568,7 +568,7 @@ Entity = 9
 id = 11
 position = [
     60.0,
-    218.0,
+    471.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDeath]
@@ -576,8 +576,8 @@ position = [
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 12
 position = [
-    800.0,
-    218.0,
+    663.96875,
+    471.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -587,8 +587,8 @@ sound_id = "sfx_select"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 13
 position = [
-    430.0,
-    218.0,
+    360.0,
+    471.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.EntityIsKind]
@@ -599,7 +599,7 @@ kind = "Npc"
 id = 14
 position = [
     60.0,
-    274.0,
+    597.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnTileEnter]
@@ -609,8 +609,8 @@ y = 23
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 15
 position = [
-    800.0,
-    274.0,
+    695.96875,
+    597.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
@@ -620,8 +620,8 @@ spawn_point_id = "spawn_point_2"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 16
 position = [
-    430.0,
-    274.0,
+    360.0,
+    597.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -631,7 +631,7 @@ Condition = "Always"
 id = 17
 position = [
     60.0,
-    330.0,
+    723.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnTileEnter]
@@ -641,8 +641,8 @@ y = 1
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 18
 position = [
-    800.0,
-    330.0,
+    660.0,
+    723.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.TeleportEntity]
@@ -653,8 +653,8 @@ tile_y = 11
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 19
 position = [
-    430.0,
-    330.0,
+    360.0,
+    723.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -664,7 +664,7 @@ Condition = "Always"
 id = 20
 position = [
     60.0,
-    386.0,
+    849.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDeath]
@@ -672,8 +672,8 @@ position = [
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 21
 position = [
-    800.0,
-    386.0,
+    660.0,
+    849.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.IncrementFlag]
@@ -683,8 +683,8 @@ amount = 1
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 22
 position = [
-    430.0,
-    386.0,
+    360.0,
+    849.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -814,6 +814,10 @@ pan = [
 ]
 
 [editor.dialog_graph_layouts.dialog_1.node_positions]
+line = [
+    400.0,
+    80.0,
+]
 end = [
     720.0,
     80.0,
@@ -822,18 +826,6 @@ start = [
     80.0,
     80.0,
 ]
-line = [
-    400.0,
-    80.0,
-]
-
-[editor.ui_layout_views.ui_1]
-zoom = 2.68601393699646
-pan = [
-    123.58984375,
-    34.6328125,
-]
-selected_widget_id = "progress_1"
 
 [editor.ui_layout_views.ui_2]
 zoom = 1.0
@@ -842,3 +834,11 @@ pan = [
     12.0,
 ]
 selected_widget_id = "label_1"
+
+[editor.ui_layout_views.ui_1]
+zoom = 2.68601393699646
+pan = [
+    123.58984375,
+    34.6328125,
+]
+selected_widget_id = "progress_1"

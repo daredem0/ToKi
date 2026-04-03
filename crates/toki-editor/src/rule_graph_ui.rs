@@ -1,9 +1,27 @@
 use std::collections::HashMap;
 
+use egui::Color32;
+
 use crate::ui::editor_domain::{rule_key_label, rule_sound_channel_label, rule_target_label};
 use crate::ui::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
 use toki_core::rules::{RuleAction, RuleCondition, RuleTrigger};
 use toki_core::FlagValue;
+
+pub fn rule_graph_node_kind_type(kind: &RuleGraphNodeKind) -> &'static str {
+    match kind {
+        RuleGraphNodeKind::Trigger(_) => "Trigger",
+        RuleGraphNodeKind::Condition(_) => "Condition",
+        RuleGraphNodeKind::Action(_) => "Action",
+    }
+}
+
+pub fn rule_graph_node_badge_color(kind: &RuleGraphNodeKind) -> Color32 {
+    match kind {
+        RuleGraphNodeKind::Trigger(_) => Color32::from_rgb(200, 180, 80),
+        RuleGraphNodeKind::Condition(_) => Color32::from_rgb(210, 160, 80),
+        RuleGraphNodeKind::Action(_) => Color32::from_rgb(120, 200, 140),
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleGraphSummaryStyle {

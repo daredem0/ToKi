@@ -1,24 +1,27 @@
 use super::*;
+use crate::rule_graph_ui::{
+    rule_graph_action_summary, rule_graph_condition_summary, rule_graph_trigger_summary,
+    RuleGraphSummaryStyle,
+};
+use crate::ui::graph_canvas::{graph_canvas_node_size, measured_title_width};
 
 impl PanelSystem {
     pub(super) fn compute_auto_layout_positions(
         ui: &egui::Ui,
         graph: &RuleGraph,
-        node_badges: &HashMap<u64, String>,
+        _node_badges: &HashMap<u64, String>,
     ) -> HashMap<u64, [f32; 2]> {
-        let mut node_sizes = HashMap::<u64, egui::Vec2>::new();
-        for node in &graph.nodes {
-            let badge = node_badges
-                .get(&node.id)
-                .cloned()
-                .unwrap_or_else(|| "?".to_string());
-            let label = format!(
-                "{}: {}",
-                badge,
-                Self::rule_graph_node_kind_compact_label(&node.kind)
-            );
-            node_sizes.insert(node.id, Self::graph_node_size_for_label(ui, &label, 1.0));
-        }
+        let default_size = graph_canvas_node_size(1, 1.0);
+        let painter = ui.painter();
+        let node_sizes = graph
+            .nodes
+            .iter()
+            .map(|node| {
+                let title = node_title(&node.kind);
+                let width = measured_title_width(painter, &title, 1.0);
+                (node.id, egui::vec2(width, default_size.y))
+            })
+            .collect::<HashMap<_, _>>();
         Self::compute_auto_layout_positions_from_sizes(graph, &node_sizes)
     }
 
@@ -231,40 +234,6 @@ impl PanelSystem {
         }
     }
 
-    pub(super) fn graph_edge_points(
-        from_rect: egui::Rect,
-        to_rect: egui::Rect,
-    ) -> Option<(egui::Pos2, egui::Pos2, egui::Vec2)> {
-        let from_center = from_rect.center();
-        let to_center = to_rect.center();
-        let center_delta = to_center - from_center;
-        if center_delta.length_sq() <= f32::EPSILON {
-            return None;
-        }
-        let start = Self::rect_border_point_toward(from_rect, to_center);
-        let end = Self::rect_border_point_toward(to_rect, from_center);
-        let line_delta = end - start;
-        let line_length = line_delta.length();
-        if line_length <= f32::EPSILON {
-            return None;
-        }
-        Some((start, end, line_delta / line_length))
-    }
-
-    pub(super) fn rect_border_point_toward(rect: egui::Rect, toward: egui::Pos2) -> egui::Pos2 {
-        let center = rect.center();
-        let delta = toward - center;
-        let half_size = rect.size() * 0.5;
-        if half_size.x <= f32::EPSILON || half_size.y <= f32::EPSILON {
-            return center;
-        }
-        let scale = (delta.x.abs() / half_size.x).max(delta.y.abs() / half_size.y);
-        if scale <= f32::EPSILON {
-            return center;
-        }
-        center + delta / scale
-    }
-
     pub(super) fn enforce_graph_border_gap(
         graph: &RuleGraph,
         graph_zoom: f32,
@@ -304,43 +273,7 @@ impl PanelSystem {
     }
 
     pub(super) fn graph_node_max_size(scale: f32) -> egui::Vec2 {
-        egui::vec2(
-            (320.0 * scale).clamp(120.0, 860.0),
-            (36.0 * scale).clamp(18.0, 96.0),
-        )
-    }
-
-    pub(super) fn graph_node_min_size(scale: f32) -> egui::Vec2 {
-        egui::vec2(
-            (120.0 * scale).clamp(80.0, 300.0),
-            (20.0 * scale).clamp(14.0, 48.0),
-        )
-    }
-
-    pub(super) fn graph_node_size_for_label(ui: &egui::Ui, label: &str, scale: f32) -> egui::Vec2 {
-        let font_size = Self::graph_node_font_size(scale);
-        let font_id = egui::FontId::proportional(font_size);
-        let text_size = ui
-            .painter()
-            .layout_no_wrap(label.to_string(), font_id, egui::Color32::WHITE)
-            .size();
-        let padding_x = (16.0 * scale).clamp(8.0, 36.0);
-        let padding_y = (8.0 * scale).clamp(4.0, 24.0);
-        let desired = egui::vec2(text_size.x + padding_x * 2.0, text_size.y + padding_y * 2.0);
-        let min_size = Self::graph_node_min_size(scale);
-        let max_size = Self::graph_node_max_size(scale);
-        egui::vec2(
-            desired.x.clamp(min_size.x, max_size.x),
-            desired.y.clamp(min_size.y, max_size.y),
-        )
-    }
-
-    pub(super) fn graph_node_font_size(scale: f32) -> f32 {
-        (11.0 * scale).clamp(7.0, 24.0)
-    }
-
-    pub(super) fn graph_edge_stroke_width(scale: f32) -> f32 {
-        (1.5 * scale).clamp(0.7, 4.0)
+        graph_canvas_node_size(1, scale)
     }
 
     pub(super) fn remember_graph_layout(graph: &RuleGraph) -> HashMap<String, [f32; 2]> {
@@ -367,18 +300,16 @@ impl PanelSystem {
             let _ = graph.set_node_position(node_id, position);
         }
     }
+}
 
-    pub(super) fn rule_graph_node_kind_compact_label(kind: &RuleGraphNodeKind) -> String {
-        match kind {
-            RuleGraphNodeKind::Trigger(trigger) => {
-                format!("Trigger {}", Self::trigger_summary(trigger.clone()))
-            }
-            RuleGraphNodeKind::Condition(condition) => {
-                format!("Condition {}", Self::condition_summary(condition))
-            }
-            RuleGraphNodeKind::Action(action) => {
-                format!("Action {}", Self::action_summary(action))
-            }
+fn node_title(kind: &RuleGraphNodeKind) -> String {
+    match kind {
+        RuleGraphNodeKind::Trigger(t) => {
+            rule_graph_trigger_summary(t.clone(), RuleGraphSummaryStyle::Compact)
         }
+        RuleGraphNodeKind::Condition(c) => {
+            rule_graph_condition_summary(c, RuleGraphSummaryStyle::Compact)
+        }
+        RuleGraphNodeKind::Action(a) => rule_graph_action_summary(a, RuleGraphSummaryStyle::Compact),
     }
 }

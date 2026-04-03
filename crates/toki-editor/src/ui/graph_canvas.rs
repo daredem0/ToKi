@@ -169,7 +169,7 @@ pub(crate) fn render_graph_canvas(
 
     for node in nodes {
         let center = to_canvas(node.position);
-        let node_size = node_canvas_size(node, scale);
+        let node_size = node_canvas_size(&painter, node, scale);
         let node_rect = Rect::from_center_size(center, node_size);
         node_rects.insert(node.id.clone(), node_rect);
         input_handles.insert(
@@ -369,9 +369,25 @@ pub(crate) fn render_graph_canvas(
     actions
 }
 
-fn node_canvas_size(node: &GraphCanvasNode, scale: f32) -> Vec2 {
+fn node_canvas_size(painter: &egui::Painter, node: &GraphCanvasNode, scale: f32) -> Vec2 {
     let height =
         BASE_NODE_HEIGHT + node.output_ports.len().saturating_sub(1) as f32 * PORT_ROW_HEIGHT;
+    Vec2::new(measured_title_width(painter, &node.title, scale), height * scale)
+}
+
+pub(crate) fn measured_title_width(painter: &egui::Painter, title: &str, scale: f32) -> f32 {
+    let font_id = FontId::proportional((15.0 * scale).clamp(12.0, 19.0));
+    let text_w = painter
+        .layout_no_wrap(title.to_string(), font_id, Color32::WHITE)
+        .size()
+        .x;
+    (NODE_WIDTH * scale).max(text_w + 24.0 * scale)
+}
+
+/// Returns the unscaled (scale=1) canvas size for a node with the given number of output ports.
+pub(crate) fn graph_canvas_node_size(num_output_ports: usize, scale: f32) -> Vec2 {
+    let height =
+        BASE_NODE_HEIGHT + num_output_ports.saturating_sub(1) as f32 * PORT_ROW_HEIGHT;
     Vec2::new(NODE_WIDTH * scale, height * scale)
 }
 
@@ -439,7 +455,7 @@ fn draw_graph_node(
     for badge in node.badges.iter().rev() {
         let badge_width = ((badge.label.len() as f32 * 7.0) + 18.0) * scale;
         let badge_rect = Rect::from_min_size(
-            Pos2::new(badge_x - badge_width, node_rect.top() + 10.0 * scale),
+            Pos2::new(badge_x - badge_width, node_rect.top() + 30.0 * scale),
             Vec2::new(badge_width, 16.0 * scale),
         );
         painter.rect_filled(badge_rect, 8.0, badge.color);

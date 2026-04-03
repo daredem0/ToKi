@@ -95,7 +95,7 @@ enum GraphCommand {
 }
 
 impl PanelSystem {
-    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 10] {
+    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 9] {
         [
             EditorTabSpec {
                 value: CenterPanelTab::SceneViewport,
@@ -103,11 +103,7 @@ impl PanelSystem {
             },
             EditorTabSpec {
                 value: CenterPanelTab::SceneGraph,
-                label: "Scene Graph",
-            },
-            EditorTabSpec {
-                value: CenterPanelTab::SceneRules,
-                label: "Scene Rules",
+                label: "Scene Editor",
             },
             EditorTabSpec {
                 value: CenterPanelTab::MapEditor,

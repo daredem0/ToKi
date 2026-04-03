@@ -460,7 +460,6 @@ impl ApplicationHandler for EditorApp {
                         CenterPanelTab::SceneViewport => self.viewport_manager.scene.as_mut(),
                         CenterPanelTab::MapEditor => self.viewport_manager.map_editor.as_mut(),
                         CenterPanelTab::SceneGraph
-                        | CenterPanelTab::SceneRules
                         | CenterPanelTab::MenuEditor
                         | CenterPanelTab::DialogEditor
                         | CenterPanelTab::UiEditor
@@ -905,7 +904,6 @@ impl EditorApp {
                 }
             }
             CenterPanelTab::SceneGraph
-            | CenterPanelTab::SceneRules
             | CenterPanelTab::MenuEditor
             | CenterPanelTab::DialogEditor
             | CenterPanelTab::UiEditor

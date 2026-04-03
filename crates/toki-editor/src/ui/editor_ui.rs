@@ -1,3 +1,4 @@
+use super::graph_canvas::GraphCanvasState;
 use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
@@ -118,7 +119,6 @@ pub enum Selection {
 pub(crate) enum CenterPanelTab {
     SceneViewport,
     SceneGraph,
-    SceneRules,
     MapEditor,
     MenuEditor,
     DialogEditor,
@@ -552,13 +552,21 @@ impl PlacementState {
     }
 }
 
+/// Which sub-view is active inside the Scene Editor tab
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum SceneEditorSubView {
+    #[default]
+    Graph,
+    Rules,
+}
+
 /// Scene graph editor state: connection mode, view state, and persistent layouts
 #[derive(Debug, Clone)]
 pub struct GraphEditorState {
     pub connect_from_node: Option<u64>,
     pub connect_to_node: Option<u64>,
-    pub canvas_zoom: f32,
-    pub canvas_pan: [f32; 2],
+    pub canvas_state: GraphCanvasState,
+    pub sub_view: SceneEditorSubView,
     pub layouts_by_scene: HashMap<String, SceneGraphLayout>,
     pub layout_dirty: bool,
     pub rule_graphs_by_scene: HashMap<String, RuleGraph>,
@@ -569,8 +577,8 @@ impl Default for GraphEditorState {
         Self {
             connect_from_node: None,
             connect_to_node: None,
-            canvas_zoom: 1.0,
-            canvas_pan: [16.0, 16.0],
+            canvas_state: GraphCanvasState::default(),
+            sub_view: SceneEditorSubView::default(),
             layouts_by_scene: HashMap::new(),
             layout_dirty: false,
             rule_graphs_by_scene: HashMap::new(),
@@ -683,14 +691,6 @@ pub struct EditorRenderContext<'a> {
 }
 
 impl EditorUI {
-    fn paired_rule_graph_tab(tab: CenterPanelTab) -> Option<CenterPanelTab> {
-        match tab {
-            CenterPanelTab::SceneGraph => Some(CenterPanelTab::SceneRules),
-            CenterPanelTab::SceneRules => Some(CenterPanelTab::SceneGraph),
-            _ => None,
-        }
-    }
-
     pub fn active_tab(&self) -> CenterPanelTab {
         self.active_tab
     }
@@ -702,18 +702,11 @@ impl EditorUI {
 
         let mut old_context = std::mem::replace(&mut self.active_context, null_context());
         old_context.on_deactivate(self);
-        if let Some(paired_tab) = Self::paired_rule_graph_tab(self.active_tab) {
-            self.parked_contexts.remove(&paired_tab);
-        }
         self.parked_contexts.insert(self.active_tab, old_context);
 
         let mut new_context = self
             .parked_contexts
             .remove(&tab)
-            .or_else(|| {
-                Self::paired_rule_graph_tab(tab)
-                    .and_then(|paired_tab| self.parked_contexts.remove(&paired_tab))
-            })
             .unwrap_or_else(|| default_active_context(tab));
         self.active_tab = tab;
         self.workspace.center_panel_tab = tab;
@@ -809,31 +802,19 @@ impl EditorUI {
             && self.active_context.as_any().is::<RuleGraphContext>()
         {
             Some(CenterPanelTab::SceneGraph)
-        } else if self.active_tab == CenterPanelTab::SceneRules
-            && self.active_context.as_any().is::<RuleGraphContext>()
-        {
-            Some(CenterPanelTab::SceneRules)
         } else if self
             .context::<RuleGraphContext>(CenterPanelTab::SceneGraph)
             .is_some()
         {
             Some(CenterPanelTab::SceneGraph)
-        } else if self
-            .context::<RuleGraphContext>(CenterPanelTab::SceneRules)
-            .is_some()
-        {
-            Some(CenterPanelTab::SceneRules)
         } else {
             None
         }
     }
 
     fn preferred_rule_graph_context_tab(&self) -> CenterPanelTab {
-        if matches!(
-            self.active_tab,
-            CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules
-        ) {
-            self.active_tab
+        if self.active_tab == CenterPanelTab::SceneGraph {
+            CenterPanelTab::SceneGraph
         } else {
             self.existing_rule_graph_context_tab()
                 .unwrap_or(CenterPanelTab::SceneGraph)
@@ -846,17 +827,14 @@ impl EditorUI {
 
     fn ensure_rule_graph_context(&mut self) -> CenterPanelTab {
         if let Some(tab) = self.existing_rule_graph_context_tab() {
-            return if matches!(
-                self.active_tab,
-                CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules
-            ) {
+            return if self.active_tab == CenterPanelTab::SceneGraph {
                 self.active_tab
             } else {
                 tab
             };
         }
 
-        let tab = self.preferred_rule_graph_context_tab();
+        let tab = CenterPanelTab::SceneGraph;
         self.parked_contexts
             .entry(tab)
             .or_insert_with(|| default_active_context(tab));

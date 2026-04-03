@@ -76,11 +76,11 @@ pub enum RuleGraphEditError {
 
 impl RuleGraph {
     // Auto-layout spacing between node edges.
-    const H_SPACING: f32 = 50.0;
-    const V_SPACING: f32 = 20.0;
-    // Keep in sync with graph canvas max node size at 100% zoom.
-    const AUTO_LAYOUT_NODE_WIDTH: f32 = 320.0;
-    const AUTO_LAYOUT_NODE_HEIGHT: f32 = 36.0;
+    const H_SPACING: f32 = 60.0;
+    const V_SPACING: f32 = 40.0;
+    // Keep in sync with graph_canvas::NODE_WIDTH and BASE_NODE_HEIGHT.
+    const AUTO_LAYOUT_NODE_WIDTH: f32 = 240.0;
+    const AUTO_LAYOUT_NODE_HEIGHT: f32 = 86.0;
     const AUTO_LAYOUT_START_X: f32 = 60.0;
     const AUTO_LAYOUT_START_Y: f32 = 50.0;
 
