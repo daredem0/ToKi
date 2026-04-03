@@ -503,6 +503,9 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
             id: "quest_done".to_string(),
             default_value: toki_core::FlagValue::Bool(false),
         }],
+        ui_event_declarations: vec![toki_core::project_runtime::ProjectUiEventDefinition {
+            id: "open_inventory".to_string(),
+        }],
         transition_default_duration_ms: 420,
     };
 
@@ -522,6 +525,10 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
     assert_eq!(
         project.metadata.runtime.flags.declarations,
         draft.flag_declarations
+    );
+    assert_eq!(
+        project.metadata.runtime.ui.event_declarations,
+        draft.ui_event_declarations
     );
     assert_eq!(
         project

@@ -36,6 +36,7 @@ impl InspectorSystem {
             .chain(available_dialog_ids.iter())
             .cloned()
             .collect::<Vec<_>>();
+        let declared_ui_events = project.metadata.runtime.ui.event_declarations.clone();
         let mut changed = false;
         let mut renamed_to = None;
         let mut duplicate_dialog = false;
@@ -82,6 +83,7 @@ impl InspectorSystem {
                     changed |= Self::render_menu_action_editor(
                         ui,
                         &available_surface_ids,
+                        &declared_ui_events,
                         &mut dialog.confirm_action,
                     );
                 });
@@ -95,6 +97,7 @@ impl InspectorSystem {
                     changed |= Self::render_menu_action_editor(
                         ui,
                         &available_surface_ids,
+                        &declared_ui_events,
                         &mut dialog.cancel_action,
                     );
                 });

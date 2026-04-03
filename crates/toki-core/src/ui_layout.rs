@@ -77,21 +77,12 @@ pub enum UiWidgetKind {
     Label {
         content: UiTextTemplate,
     },
-    Image {
-        image_id: String,
-    },
     ProgressBar {
         value: UiProgressBinding,
     },
     GridContainer {
         columns: u16,
         spacing: UiSpacing,
-    },
-    ScrollList {
-        collection: UiCollectionBinding,
-        row_height: u16,
-        row_spacing: u16,
-        row_template: UiCollectionRowTemplate,
     },
 }
 
@@ -162,28 +153,6 @@ impl UiBinding {
             }
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum UiCollectionBinding {
-    PlayerInventory,
-    DeclaredFlags,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct UiCollectionRowTemplate {
-    #[serde(default)]
-    pub segments: Vec<UiCollectionTextSegment>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum UiCollectionTextSegment {
-    Literal { text: String },
-    ItemId,
-    ItemCount,
-    ItemValue,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -507,18 +476,6 @@ impl UiLayoutEngine {
                 });
                 output.composition.push(block);
             }
-            UiWidgetKind::Image { image_id } => {
-                let anchor = effective_text_anchor(widget, TextAnchor::Center);
-                let mut block = make_panel_block(widget, rect, theme, highlighted);
-                block.text = Some(UiTextBlock {
-                    content: image_id.clone(),
-                    position: text_anchor_position(content_rect, anchor, 0.0),
-                    anchor,
-                    style: text_style_for_widget(widget, theme),
-                    layer: 20,
-                });
-                output.composition.push(block);
-            }
             UiWidgetKind::ProgressBar { value } => {
                 let fraction = resolve_progress_fraction(value, *context);
                 let panel = make_panel_block(widget, rect, theme, highlighted);
@@ -587,79 +544,9 @@ impl UiLayoutEngine {
                     );
                 }
             }
-            UiWidgetKind::ScrollList {
-                collection,
-                row_height,
-                row_spacing,
-                row_template,
-            } => {
-                let rows = resolve_collection_items(collection, *context);
-                let scroll_offset = surface_state
-                    .and_then(|state| state.scroll_offsets.get(&widget.id).copied())
-                    .unwrap_or_default();
-                let mut list_panel = make_panel_block(widget, rect, theme, highlighted);
-                list_panel.text = None;
-                output.composition.push(list_panel);
-
-                for (index, item) in rows.iter().enumerate() {
-                    let row_top = content_rect.y
-                        + index as f32 * (*row_height as f32 + *row_spacing as f32)
-                        - scroll_offset;
-                    if row_top + *row_height as f32 <= content_rect.y
-                        || row_top >= content_rect.y + content_rect.height
-                    {
-                        continue;
-                    }
-                    let row_rect = UiRect {
-                        x: content_rect.x,
-                        y: row_top,
-                        width: content_rect.width,
-                        height: *row_height as f32,
-                    };
-                    let text = render_collection_row(row_template, item);
-                    let row_text_rect = UiRect {
-                        x: row_rect.x + 4.0,
-                        y: row_rect.y,
-                        width: (row_rect.width - 8.0).max(1.0),
-                        height: row_rect.height,
-                    };
-                    let anchor = effective_text_anchor(widget, TextAnchor::CenterLeft);
-                    output.composition.push(UiBlock {
-                        rect: row_rect,
-                        fill_color: Some(color_to_f32(theme.progress_empty_color)),
-                        border_color: Some(color_to_f32(theme.border_color)),
-                        border_thickness: theme.border_thickness_px as f32,
-                        text: Some(UiTextBlock {
-                            content: text,
-                            position: text_anchor_position(row_text_rect, anchor, 0.0),
-                            anchor,
-                            style: text_style_for_widget(widget, theme),
-                            layer: 20,
-                        }),
-                    });
-                    let row_widget_id = UiWidgetId::new(format!("{}::{}", widget.id, item.key));
-                    let row_event_id = widget
-                        .event_id
-                        .as_ref()
-                        .map(|event_id| format!("{event_id}:{}", item.key));
-                    output.hitboxes.push(UiWidgetHitbox {
-                        widget_id: row_widget_id.clone(),
-                        rect: row_rect,
-                        enabled,
-                        focusable: widget.focusable,
-                        event_id: row_event_id,
-                    });
-                    if widget.focusable {
-                        output.focus_order.push(row_widget_id);
-                    }
-                }
-            }
         }
 
-        if !matches!(
-            widget.kind,
-            UiWidgetKind::GridContainer { .. } | UiWidgetKind::ScrollList { .. }
-        ) {
+        if !matches!(widget.kind, UiWidgetKind::GridContainer { .. }) {
             if widget.focusable || widget.event_id.is_some() {
                 output.hitboxes.push(UiWidgetHitbox {
                     widget_id: widget.id.clone(),
@@ -1040,20 +927,6 @@ fn render_text_template(
         .join("")
 }
 
-fn render_collection_row(template: &UiCollectionRowTemplate, item: &UiCollectionItem) -> String {
-    template
-        .segments
-        .iter()
-        .map(|segment| match segment {
-            UiCollectionTextSegment::Literal { text } => text.clone(),
-            UiCollectionTextSegment::ItemId => item.key.clone(),
-            UiCollectionTextSegment::ItemCount => item.count.to_string(),
-            UiCollectionTextSegment::ItemValue => item.value.clone(),
-        })
-        .collect::<Vec<_>>()
-        .join("")
-}
-
 fn resolve_progress_fraction(
     binding: &UiProgressBinding,
     context: UiBindingContext<'_, '_, '_>,
@@ -1082,60 +955,6 @@ fn resolve_progress_fraction(
             .and_then(value_as_int)
             .map(|value| (value as f32 / 100.0).clamp(0.0, 1.0))
             .unwrap_or_default(),
-    }
-}
-
-fn resolve_collection_items(
-    binding: &UiCollectionBinding,
-    context: UiBindingContext<'_, '_, '_>,
-) -> Vec<UiCollectionItem> {
-    match binding {
-        UiCollectionBinding::PlayerInventory => context
-            .value_paths
-            .player_id
-            .and_then(|player_id| {
-                context
-                    .value_paths
-                    .entity_manager
-                    .storage()
-                    .components()
-                    .inventory(player_id)
-            })
-            .map(|inventory| {
-                let mut items = inventory
-                    .items
-                    .iter()
-                    .map(|(item_id, count)| UiCollectionItem {
-                        key: item_id.clone(),
-                        count: *count as i32,
-                        value: count.to_string(),
-                    })
-                    .collect::<Vec<_>>();
-                items.sort_by(|left, right| left.key.cmp(&right.key));
-                items
-            })
-            .unwrap_or_default(),
-        UiCollectionBinding::DeclaredFlags => context
-            .declared_flags
-            .iter()
-            .map(|flag| {
-                let value = context
-                    .value_paths
-                    .game_flags
-                    .get(&flag.id)
-                    .cloned()
-                    .unwrap_or_else(|| flag.default_value.clone());
-                UiCollectionItem {
-                    key: flag.id.clone(),
-                    count: value.as_int().unwrap_or_default(),
-                    value: match value {
-                        FlagValue::Bool(value) => value.to_string(),
-                        FlagValue::Int(value) => value.to_string(),
-                        FlagValue::String(value) => value,
-                    },
-                }
-            })
-            .collect(),
     }
 }
 
@@ -1205,10 +1024,9 @@ impl UiSpacing {
 #[cfg(test)]
 mod tests {
     use super::{
-        UiAnchor, UiBinding, UiBindingContext, UiCollectionBinding, UiCollectionRowTemplate,
-        UiCollectionTextSegment, UiController, UiLayoutAsset, UiLayoutEngine, UiLayoutSpec,
-        UiProgressBinding, UiRequest, UiTextSegment, UiTextTemplate, UiTheme, UiWidgetKind,
-        UiWidgetNode, UiWidgetStyle,
+        UiAnchor, UiBinding, UiBindingContext, UiController, UiLayoutAsset, UiLayoutEngine,
+        UiLayoutSpec, UiProgressBinding, UiRequest, UiTextSegment, UiTextTemplate, UiTheme,
+        UiWidgetKind, UiWidgetNode, UiWidgetStyle,
     };
     use crate::entity::EntityManager;
     use crate::flags::{FlagValue, GameFlags};
@@ -1363,86 +1181,6 @@ mod tests {
     }
 
     #[test]
-    fn layout_engine_renders_inventory_scroll_list_rows() {
-        let mut entity_manager = EntityManager::new();
-        let player_id = entity_manager.spawn_entity(
-            crate::entity::EntityKind::Player,
-            glam::IVec2::new(0, 0),
-            glam::UVec2::new(16, 16),
-            crate::entity::EntityRendering::default(),
-            true,
-            true,
-            crate::entity::OptionalEntityComponents {
-                inventory: Some(Default::default()),
-                ..Default::default()
-            },
-        );
-        entity_manager
-            .storage_mut()
-            .components_mut()
-            .ensure_inventory(player_id)
-            .add_item("potion", 3);
-        entity_manager
-            .storage_mut()
-            .components_mut()
-            .ensure_inventory(player_id)
-            .add_item("rope", 1);
-        let flags = GameFlags::default();
-        let layout = UiLayoutAsset {
-            id: UiLayoutId::new("inventory"),
-            root: UiWidgetNode {
-                id: UiWidgetId::new("root"),
-                kind: UiWidgetKind::ScrollList {
-                    collection: UiCollectionBinding::PlayerInventory,
-                    row_height: 14,
-                    row_spacing: 2,
-                    row_template: UiCollectionRowTemplate {
-                        segments: vec![
-                            UiCollectionTextSegment::ItemId,
-                            UiCollectionTextSegment::Literal {
-                                text: " x".to_string(),
-                            },
-                            UiCollectionTextSegment::ItemCount,
-                        ],
-                    },
-                },
-                event_id: Some("inventory_pick".to_string()),
-                focusable: true,
-                layout: UiLayoutSpec {
-                    anchor: UiAnchor::TopLeft,
-                    size: [120.0, 40.0],
-                    ..UiLayoutSpec::default()
-                },
-                ..UiWidgetNode::default()
-            },
-            ..UiLayoutAsset::default()
-        };
-
-        let output = UiLayoutEngine::compose(
-            &layout,
-            &UiTheme::default(),
-            glam::Vec2::new(160.0, 144.0),
-            binding_context(
-                &entity_manager,
-                &flags,
-                Some(player_id),
-                &HashMap::new(),
-                &[],
-            ),
-            None,
-        );
-
-        assert!(output.composition.blocks.iter().any(|block| block
-            .text
-            .as_ref()
-            .is_some_and(|text| text.content == "potion x3")));
-        assert!(output
-            .hitboxes
-            .iter()
-            .any(|hitbox| hitbox.event_id.as_deref() == Some("inventory_pick:potion")));
-    }
-
-    #[test]
     fn widget_visibility_and_binding_overrides_are_applied() {
         let entity_manager = EntityManager::new();
         let mut flags = GameFlags::default();
@@ -1549,52 +1287,4 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn declared_flags_collection_uses_default_values() {
-        let entity_manager = EntityManager::new();
-        let flags = GameFlags::default();
-        let declared_flags = vec![ProjectFlagDefinition {
-            id: "quest_state".to_string(),
-            default_value: FlagValue::String("new".to_string()),
-        }];
-        let layout = UiLayoutAsset {
-            id: UiLayoutId::new("debug"),
-            root: UiWidgetNode {
-                id: UiWidgetId::new("flags"),
-                kind: UiWidgetKind::ScrollList {
-                    collection: UiCollectionBinding::DeclaredFlags,
-                    row_height: 14,
-                    row_spacing: 0,
-                    row_template: UiCollectionRowTemplate {
-                        segments: vec![
-                            UiCollectionTextSegment::ItemId,
-                            UiCollectionTextSegment::Literal {
-                                text: "=".to_string(),
-                            },
-                            UiCollectionTextSegment::ItemValue,
-                        ],
-                    },
-                },
-                ..UiWidgetNode::default()
-            },
-            ..UiLayoutAsset::default()
-        };
-        let output = UiLayoutEngine::compose(
-            &layout,
-            &UiTheme::default(),
-            glam::Vec2::new(160.0, 144.0),
-            binding_context(
-                &entity_manager,
-                &flags,
-                None,
-                &HashMap::new(),
-                &declared_flags,
-            ),
-            None,
-        );
-        assert!(output.composition.blocks.iter().any(|block| block
-            .text
-            .as_ref()
-            .is_some_and(|text| text.content == "quest_state=new")));
-    }
 }

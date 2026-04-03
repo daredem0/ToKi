@@ -1,7 +1,7 @@
 use crate::menu::{MenuAppearance, MenuTextAppearance};
 use crate::project_runtime::{
     default_runtime_viewport_mode, IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition,
-    ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
+    ProjectPreset, ProjectRuntimeMetadata, ProjectUiEventDefinition, QuantizeStrategy, RuntimeConfigFile,
     RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings, RuntimeViewportMode,
     SceneTransitionEffect,
 };
@@ -331,6 +331,32 @@ fn runtime_metadata_supports_project_flag_declarations() {
             ProjectFlagDefinition {
                 id: "coins".to_string(),
                 default_value: FlagValue::Int(3),
+            }
+        ]
+    );
+}
+
+#[test]
+fn runtime_metadata_supports_project_ui_event_declarations() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r#"
+        [[runtime.ui.event_declarations]]
+        id = "open_inventory"
+
+        [[runtime.ui.event_declarations]]
+        id = "show_pause"
+        "#,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(
+        metadata.runtime.ui.event_declarations,
+        vec![
+            ProjectUiEventDefinition {
+                id: "open_inventory".to_string(),
+            },
+            ProjectUiEventDefinition {
+                id: "show_pause".to_string(),
             }
         ]
     );

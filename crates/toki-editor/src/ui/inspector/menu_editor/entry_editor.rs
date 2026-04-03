@@ -1,6 +1,9 @@
 //! Entry editing UI.
 
 use super::*;
+use crate::ui::ui_event_registry::{
+    render_required_ui_event_id_editor, validate_ui_event_reference,
+};
 
 impl InspectorSystem {
     pub(super) fn render_menu_entry_editor(
@@ -29,9 +32,11 @@ impl InspectorSystem {
             MenuEditorItemKind::from_item(item)
         };
         let available_surface_ids = Self::collect_available_surface_ids(project);
+        let declared_ui_events = project.metadata.runtime.ui.event_declarations.clone();
         let mut changed = false;
         let mut has_missing_target_validation = false;
         let mut missing_target_id = String::new();
+        let mut invalid_event_issue = None::<String>;
 
         egui::CollapsingHeader::new("Entry")
             .default_open(false)
@@ -60,12 +65,14 @@ impl InspectorSystem {
                     screen_index,
                     item_index,
                     &available_surface_ids,
+                    &declared_ui_events,
                 );
                 changed |= ch;
-                if let Some(target_id) = validation {
+                if let Some(target_id) = validation.0 {
                     has_missing_target_validation = true;
                     missing_target_id = target_id;
                 }
+                invalid_event_issue = validation.1;
             });
 
         if changed {
@@ -77,6 +84,9 @@ impl InspectorSystem {
                 egui::Color32::from_rgb(215, 120, 120),
                 format!("Target surface '{missing_target_id}' does not exist."),
             );
+        }
+        if let Some(issue) = invalid_event_issue {
+            ui.colored_label(egui::Color32::from_rgb(215, 120, 120), issue);
         }
     }
 
@@ -166,9 +176,11 @@ impl InspectorSystem {
         screen_index: usize,
         item_index: usize,
         available_surface_ids: &[String],
-    ) -> (bool, Option<String>) {
+        declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
+    ) -> (bool, (Option<String>, Option<String>)) {
         let mut changed = false;
         let mut missing_target = None;
+        let mut invalid_event_issue = None;
 
         match &mut project.metadata.runtime.menu.screens[screen_index].items[item_index] {
             MenuItemDefinition::Label {
@@ -199,11 +211,16 @@ impl InspectorSystem {
                     "Entry Border Style",
                     border_style_override,
                 );
-                changed |= Self::render_menu_action_editor(ui, available_surface_ids, action);
+                changed |=
+                    Self::render_menu_action_editor(ui, available_surface_ids, declared_ui_events, action);
                 if let UiAction::OpenSurface { surface_id } = action {
                     if !available_surface_ids.iter().any(|id| id == surface_id) {
                         missing_target = Some(surface_id.clone());
                     }
+                }
+                if let UiAction::EmitEvent { event_id } = action {
+                    invalid_event_issue =
+                        validate_ui_event_reference(event_id, declared_ui_events, "Menu action");
                 }
             }
             MenuItemDefinition::DynamicList {
@@ -222,7 +239,7 @@ impl InspectorSystem {
             }
         }
 
-        (changed, missing_target)
+        (changed, (missing_target, invalid_event_issue))
     }
 
     fn render_dynamic_list_fields(
@@ -281,6 +298,7 @@ impl InspectorSystem {
     pub(super) fn render_menu_action_editor(
         ui: &mut egui::Ui,
         available_surface_ids: &[String],
+        declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
         action: &mut UiAction,
     ) -> bool {
         let mut changed = false;
@@ -302,7 +320,13 @@ impl InspectorSystem {
                 ui.selectable_value(&mut action_kind, 10, "Emit Event");
             });
 
-        changed |= Self::apply_action_kind_change(ui, action, action_kind, available_surface_ids);
+        changed |= Self::apply_action_kind_change(
+            ui,
+            action,
+            action_kind,
+            available_surface_ids,
+            declared_ui_events,
+        );
         changed
     }
 
@@ -343,6 +367,7 @@ impl InspectorSystem {
         action: &mut UiAction,
         kind: u8,
         available_surface_ids: &[String],
+        declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
     ) -> bool {
         let mut changed = false;
         match kind {
@@ -421,8 +446,13 @@ impl InspectorSystem {
                     UiAction::EmitEvent { event_id } => event_id.clone(),
                     _ => String::new(),
                 };
-                ui.label("Event ID");
-                if ui.text_edit_singleline(&mut event_id).changed() {
+                if render_required_ui_event_id_editor(
+                    ui,
+                    "menu_emit_event",
+                    "Event ID",
+                    &mut event_id,
+                    declared_ui_events,
+                ) {
                     *action = UiAction::EmitEvent {
                         event_id: event_id.trim().to_string(),
                     };

@@ -1,6 +1,9 @@
 use crate::fonts::resolve_preview_font_family;
 use crate::project::{Project, ProjectAssets};
 use crate::ui::editor_ui::{sync_ui_layout_registry, EditorUI, UiCanvasInteraction};
+use crate::ui::ui_event_registry::{
+    render_optional_ui_event_id_editor, validate_ui_event_reference,
+};
 use egui::{
     text::{LayoutJob, TextFormat},
     Color32, CursorIcon, FontId, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2,
@@ -11,14 +14,13 @@ use toki_core::flags::{FlagValue, GameFlags};
 use toki_core::rules::TriggerContext;
 use toki_core::text::{TextAnchor, TextSlant, TextWeight};
 use toki_core::ui::{
-    runtime_ui_text_scale, transform_logical_ui_composition_with_scales, transform_logical_ui_rect,
-    UiBlock, UiComposition, UiRect,
+    transform_logical_ui_composition_with_transform, transform_logical_ui_rect_with_transform,
+    ui_presentation_transform, UiBlock, UiComposition, UiRect,
 };
 use toki_core::ui_layout::{
-    UiAnchor, UiBinding, UiBindingContext, UiCollectionBinding, UiCollectionRowTemplate,
-    UiCollectionTextSegment, UiLayoutAsset, UiLayoutEngine, UiProgressBinding, UiSpacing,
-    UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetFrame, UiWidgetKind,
-    UiWidgetNode,
+    UiAnchor, UiBinding, UiBindingContext, UiLayoutAsset, UiLayoutEngine, UiProgressBinding,
+    UiSpacing, UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetFrame,
+    UiWidgetKind, UiWidgetNode,
 };
 use toki_core::value_path::{ValuePath, ValuePathContext};
 
@@ -26,21 +28,24 @@ const PREVIEW_MIN_HEIGHT: f32 = 320.0;
 const UI_SNAP_GRID: f32 = 4.0;
 const UI_EDGE_MARGIN: f32 = 8.0;
 
+const ZERO_SPACING: UiSpacing = UiSpacing {
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WidgetKindChoice {
     Label,
-    Image,
     ProgressBar,
     GridContainer,
-    ScrollList,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WidgetPreset {
     Label,
     HealthBar,
-    InventoryList,
-    StatusPanel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,11 +73,16 @@ pub(crate) fn render_ui_editor(
         .as_ref()
         .map(|project| project.metadata.runtime.flags.declarations.as_slice())
         .unwrap_or(&[]);
+    let declared_ui_events = project
+        .as_ref()
+        .map(|project| project.metadata.runtime.ui.event_declarations.as_slice())
+        .unwrap_or(&[]);
     render_ui_editor_main(
         ui,
         ui_state,
         project_assets,
         declared_flags,
+        declared_ui_events,
         ui_preview_viewport_size(project.as_deref()),
     );
 }
@@ -92,6 +102,9 @@ pub(crate) fn render_ui_editor_inspector_panel(
 
     let declared_flags = project
         .map(|project| project.metadata.runtime.flags.declarations.as_slice())
+        .unwrap_or(&[]);
+    let declared_ui_events = project
+        .map(|project| project.metadata.runtime.ui.event_declarations.as_slice())
         .unwrap_or(&[]);
     let preview_viewport_size = ui_preview_viewport_size(project);
     let selected_widget_id = ui_state.ui_editor_context().ui.selected_widget_id.clone();
@@ -136,13 +149,16 @@ pub(crate) fn render_ui_editor_inspector_panel(
             ui,
             layout,
             inspector_selected_widget_id.as_deref(),
-            declared_flags,
-            &font_choices,
-            preview_viewport_size,
+            &UiEditorAuthoringContext {
+                declared_flags,
+                declared_ui_events,
+                font_choices: &font_choices,
+                preview_viewport_size,
+            },
             &mut next_selected_widget_id,
         );
         ui.separator();
-        let issues = validate_ui_layout(layout, declared_flags);
+        let issues = validate_ui_layout(layout, declared_flags, declared_ui_events);
         ui.collapsing("Validation", |ui| {
             for issue in &issues {
                 ui.colored_label(Color32::from_rgb(255, 210, 80), issue);
@@ -177,6 +193,7 @@ fn render_ui_editor_main(
     ui_state: &mut EditorUI,
     project_assets: &mut ProjectAssets,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+    declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
     preview_viewport_size: glam::Vec2,
 ) {
     let Some(mut layout) = ui_state.ui_editor_context_mut().ui.draft.take() else {
@@ -193,7 +210,7 @@ fn render_ui_editor_main(
             )
             .clicked()
         {
-            let issues = validate_ui_layout(&layout, declared_flags);
+            let issues = validate_ui_layout(&layout, declared_flags, declared_ui_events);
             if !issues.is_empty() {
                 ui_state.ui_editor_context_mut().ui.status_message = Some(format!(
                     "Cannot save UI layout with {} validation issue(s)",
@@ -361,19 +378,15 @@ fn render_ui_toolbar(ui: &mut Ui, ui_state: &mut EditorUI, layout: &mut UiLayout
     let mut changed = false;
     ui.horizontal_wrapped(|ui| {
         ui.strong("Quick Add:");
-        for preset in [
-            WidgetPreset::Label,
-            WidgetPreset::HealthBar,
-            WidgetPreset::InventoryList,
-            WidgetPreset::StatusPanel,
-        ] {
+        for preset in [WidgetPreset::Label, WidgetPreset::HealthBar] {
             if ui
                 .button(format!("+ {}", widget_preset_label(preset)))
                 .clicked()
             {
-                changed |= insert_new_widget_under_selection(
+                changed |= insert_new_widget_under_parent(
                     ui_state,
                     layout,
+                    "root",
                     create_widget_preset(preset, layout),
                     &format!("Added {} preset.", widget_preset_label(preset)),
                 );
@@ -382,19 +395,22 @@ fn render_ui_toolbar(ui: &mut Ui, ui_state: &mut EditorUI, layout: &mut UiLayout
 
         ui.separator();
         ui.strong("Advanced:");
-        for kind in [
-            WidgetKindChoice::Image,
-            WidgetKindChoice::ProgressBar,
-            WidgetKindChoice::GridContainer,
-            WidgetKindChoice::ScrollList,
-        ] {
+        for kind in [WidgetKindChoice::ProgressBar, WidgetKindChoice::GridContainer] {
             if ui
                 .button(format!("+ {}", widget_kind_choice_label(kind)))
                 .clicked()
             {
-                changed |= insert_new_widget_under_selection(
+                changed |= insert_new_widget_under_parent(
                     ui_state,
                     layout,
+                    &preferred_parent_id(
+                        layout,
+                        ui_state
+                            .ui_editor_context()
+                            .ui
+                            .selected_widget_id
+                            .as_deref(),
+                    ),
                     create_widget(kind, layout),
                     &format!("Added {} widget.", widget_kind_choice_label(kind)),
                 );
@@ -488,11 +504,24 @@ fn render_ui_layout_canvas(
         .input(|input| input.pointer.press_origin())
         .or(pointer_pos);
     let hovered_widget_id = pointer_pos.and_then(|pointer_pos| {
-        topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
+        topmost_widget_id_at_point(
+            &preview.frames,
+            origin,
+            zoom,
+            preview_viewport_size,
+            pointer_pos,
+        )
     });
     let hovered_resize_widget_id = drag_start_pos.and_then(|pointer_pos| {
         hovered_widget_id.as_deref().and_then(|widget_id| {
-            resize_handle_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos, widget_id)
+            resize_handle_widget_id_at_point(
+                &preview.frames,
+                origin,
+                zoom,
+                preview_viewport_size,
+                pointer_pos,
+                widget_id,
+            )
         })
     });
     let mut next_canvas_interaction = canvas_interaction;
@@ -503,7 +532,7 @@ fn render_ui_layout_canvas(
         ui.output_mut(|output| output.cursor_icon = CursorIcon::Grab);
     }
     for frame in preview.frames.iter().rev() {
-        let screen_rect = scaled_rect(frame.rect, origin, zoom);
+        let screen_rect = scaled_rect_for_viewport(frame.rect, origin, zoom, preview_viewport_size);
         let is_selected = selected_widget_id.as_deref() == Some(frame.widget_id.as_str());
         let is_hovered = hovered_widget_id.as_deref() == Some(frame.widget_id.as_str());
         let stroke_color = if is_selected {
@@ -545,18 +574,26 @@ fn render_ui_layout_canvas(
                     &preview.frames,
                     origin,
                     zoom,
+                    preview_viewport_size,
                     pointer_pos,
                     widget_id,
                 )
             })
             .or_else(|| {
-                topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
+                topmost_widget_id_at_point(
+                    &preview.frames,
+                    origin,
+                    zoom,
+                    preview_viewport_size,
+                    pointer_pos,
+                )
                     .as_deref()
                     .and_then(|widget_id| {
                         resize_handle_widget_id_at_point(
                             &preview.frames,
                             origin,
                             zoom,
+                            preview_viewport_size,
                             pointer_pos,
                             widget_id,
                         )
@@ -582,7 +619,13 @@ fn render_ui_layout_canvas(
             });
         } else if let Some(widget_id) = drag_start_pos
             .and_then(|pointer_pos| {
-                topmost_widget_id_at_point(&preview.frames, origin, zoom, pointer_pos)
+                topmost_widget_id_at_point(
+                    &preview.frames,
+                    origin,
+                    zoom,
+                    preview_viewport_size,
+                    pointer_pos,
+                )
             })
             .or(hovered_widget_id)
         {
@@ -615,6 +658,7 @@ fn render_ui_layout_canvas(
             press_origin,
             start_offset,
         }) if pointer_down => {
+            let root_level_widget = is_root_level_widget(layout, widget_id);
             if let (Some(widget), Some(pointer_pos)) = (
                 find_widget_mut(&mut layout.root, widget_id),
                 current_pointer_pos,
@@ -625,6 +669,9 @@ fn render_ui_layout_canvas(
                 ];
                 widget.layout.offset[0] = snap_to_grid(start_offset[0] + total_delta[0]);
                 widget.layout.offset[1] = snap_to_grid(start_offset[1] + total_delta[1]);
+                if root_level_widget {
+                    clamp_widget_layout_to_viewport(widget, preview_viewport_size);
+                }
                 changed = true;
             }
         }
@@ -633,6 +680,7 @@ fn render_ui_layout_canvas(
             press_origin,
             start_size,
         }) if pointer_down => {
+            let root_level_widget = is_root_level_widget(layout, widget_id);
             if let (Some(widget), Some(pointer_pos)) = (
                 find_widget_mut(&mut layout.root, widget_id),
                 current_pointer_pos,
@@ -641,8 +689,14 @@ fn render_ui_layout_canvas(
                     (pointer_pos.x - press_origin[0]) / zoom,
                     (pointer_pos.y - press_origin[1]) / zoom,
                 ];
-                widget.layout.size[0] = snap_to_grid((start_size[0] + total_delta[0]).max(16.0));
-                widget.layout.size[1] = snap_to_grid((start_size[1] + total_delta[1]).max(16.0));
+                let min_size = minimum_widget_size(widget);
+                widget.layout.size[0] =
+                    snap_to_grid((start_size[0] + total_delta[0]).max(min_size[0]));
+                widget.layout.size[1] =
+                    snap_to_grid((start_size[1] + total_delta[1]).max(min_size[1]));
+                if root_level_widget {
+                    clamp_widget_layout_to_viewport(widget, preview_viewport_size);
+                }
                 changed = true;
             }
         }
@@ -727,9 +781,7 @@ fn render_selected_widget_inspector(
     ui: &mut Ui,
     layout: &mut UiLayoutAsset,
     selected_widget_id: Option<&str>,
-    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
-    font_choices: &[String],
-    preview_viewport_size: glam::Vec2,
+    authoring: &UiEditorAuthoringContext<'_>,
     next_selected_widget_id: &mut Option<String>,
 ) -> bool {
     let Some(selected_widget_id) = selected_widget_id else {
@@ -777,10 +829,8 @@ fn render_selected_widget_inspector(
                 .show_ui(ui, |ui| {
                     for candidate in [
                         WidgetKindChoice::Label,
-                        WidgetKindChoice::Image,
                         WidgetKindChoice::ProgressBar,
                         WidgetKindChoice::GridContainer,
-                        WidgetKindChoice::ScrollList,
                     ] {
                         ui.selectable_value(
                             &mut selected_kind,
@@ -795,16 +845,13 @@ fn render_selected_widget_inspector(
             }
         });
         ui.horizontal(|ui| {
-            ui.label("Event Id:");
-            let mut event_id = widget.event_id.clone().unwrap_or_default();
-            if ui.text_edit_singleline(&mut event_id).changed() {
-                widget.event_id = if event_id.trim().is_empty() {
-                    None
-                } else {
-                    Some(event_id)
-                };
-                changed = true;
-            }
+            changed |= render_optional_ui_event_id_editor(
+                ui,
+                ("ui_widget_event", widget.id.as_str()),
+                "Event Id:",
+                &mut widget.event_id,
+                authoring.declared_ui_events,
+            );
         });
         ui.horizontal(|ui| {
             ui.label("Visible If:");
@@ -812,7 +859,7 @@ fn render_selected_widget_inspector(
                 ui,
                 ("ui_widget_visible_if", widget.id.as_str()),
                 &mut widget.visible_if,
-                &bool_expression_choices(declared_flags),
+                &bool_expression_choices(authoring.declared_flags),
                 "None",
                 "Custom",
             );
@@ -823,7 +870,7 @@ fn render_selected_widget_inspector(
                 ui,
                 ("ui_widget_enabled_if", widget.id.as_str()),
                 &mut widget.enabled_if,
-                &bool_expression_choices(declared_flags),
+                &bool_expression_choices(authoring.declared_flags),
                 "None",
                 "Custom",
             );
@@ -841,7 +888,7 @@ fn render_selected_widget_inspector(
                 WidgetPositionPreset::Center,
             ] {
                 if ui.button(widget_position_label(preset)).clicked() {
-                    apply_widget_position_preset(widget, preset, preview_viewport_size);
+                    apply_widget_position_preset(widget, preset, authoring.preview_viewport_size);
                     changed = true;
                 }
             }
@@ -850,14 +897,19 @@ fn render_selected_widget_inspector(
     ui.separator();
     render_layout_spec_editor(ui, &mut widget.layout);
     ui.separator();
-    render_typography_editor(ui, &mut widget.style.typography, font_choices);
+    render_typography_editor(ui, &mut widget.style.typography, authoring.font_choices);
     ui.separator();
     if is_root {
         ui.small(
             "Root has no per-widget content. Add or select a child widget to author HUD content.",
         );
     } else {
-        render_widget_kind_editor(ui, widget, declared_flags);
+        render_widget_kind_editor(
+            ui,
+            widget,
+            authoring.declared_flags,
+            authoring.declared_ui_events,
+        );
     }
     changed |= *widget != widget_before;
     changed
@@ -1026,15 +1078,10 @@ fn render_widget_kind_editor(
     ui: &mut Ui,
     widget: &mut UiWidgetNode,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+    declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
 ) {
     match &mut widget.kind {
         UiWidgetKind::Label { content } => render_text_template_editor(ui, content, declared_flags),
-        UiWidgetKind::Image { image_id } => {
-            ui.horizontal(|ui| {
-                ui.label("Image Id:");
-                ui.text_edit_singleline(image_id);
-            });
-        }
         UiWidgetKind::ProgressBar { value } => {
             render_progress_binding_editor(ui, value, declared_flags)
         }
@@ -1069,57 +1116,9 @@ fn render_widget_kind_editor(
                 }
             });
         }
-        UiWidgetKind::ScrollList {
-            collection,
-            row_height,
-            row_spacing,
-            row_template,
-        } => {
-            ui.horizontal(|ui| {
-                ui.label("Collection:");
-                egui::ComboBox::from_id_salt(("ui_scroll_collection", widget.id.as_str()))
-                    .selected_text(match collection {
-                        UiCollectionBinding::PlayerInventory => "PlayerInventory",
-                        UiCollectionBinding::DeclaredFlags => "DeclaredFlags",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(
-                            collection,
-                            UiCollectionBinding::PlayerInventory,
-                            "PlayerInventory",
-                        );
-                        ui.selectable_value(
-                            collection,
-                            UiCollectionBinding::DeclaredFlags,
-                            "DeclaredFlags",
-                        );
-                    });
-            });
-            ui.horizontal(|ui| {
-                ui.label("Row Height:");
-                let mut value = *row_height as i32;
-                if ui
-                    .add(egui::DragValue::new(&mut value).range(12..=256))
-                    .changed()
-                {
-                    *row_height = value.max(12) as u16;
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.label("Row Spacing:");
-                let mut value = *row_spacing as i32;
-                if ui
-                    .add(egui::DragValue::new(&mut value).range(0..=64))
-                    .changed()
-                {
-                    *row_spacing = value.max(0) as u16;
-                }
-            });
-            render_collection_row_template_editor(ui, row_template);
-        }
     }
 
-    let issues = validate_widget(widget, declared_flags);
+    let issues = validate_widget(widget, declared_flags, declared_ui_events);
     for issue in issues {
         ui.colored_label(Color32::from_rgb(255, 210, 80), issue);
     }
@@ -1241,67 +1240,6 @@ fn render_progress_binding_editor(
                 ui.label("Percent");
                 render_binding_editor(ui, percent, ("ui_progress_percent", 0), declared_flags);
             }
-        }
-    });
-}
-
-fn render_collection_row_template_editor(ui: &mut Ui, template: &mut UiCollectionRowTemplate) {
-    if template.segments.is_empty() {
-        template.segments = vec![
-            UiCollectionTextSegment::ItemId,
-            UiCollectionTextSegment::Literal {
-                text: " x".to_string(),
-            },
-            UiCollectionTextSegment::ItemCount,
-        ];
-    }
-    ui.collapsing("Row Template", |ui| {
-        for (index, segment) in template.segments.iter_mut().enumerate() {
-            ui.horizontal(|ui| {
-                ui.label(format!("Row Segment {}", index + 1));
-                let mut kind = match segment {
-                    UiCollectionTextSegment::Literal { .. } => 0,
-                    UiCollectionTextSegment::ItemId => 1,
-                    UiCollectionTextSegment::ItemCount => 2,
-                    UiCollectionTextSegment::ItemValue => 3,
-                };
-                egui::ComboBox::from_id_salt(("ui_row_segment_kind", index))
-                    .selected_text(match kind {
-                        0 => "Literal",
-                        1 => "ItemId",
-                        2 => "ItemCount",
-                        _ => "ItemValue",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut kind, 0, "Literal");
-                        ui.selectable_value(&mut kind, 1, "ItemId");
-                        ui.selectable_value(&mut kind, 2, "ItemCount");
-                        ui.selectable_value(&mut kind, 3, "ItemValue");
-                    });
-                if kind == 0 {
-                    match segment {
-                        UiCollectionTextSegment::Literal { text } => {
-                            ui.text_edit_singleline(text);
-                        }
-                        _ => {
-                            *segment = UiCollectionTextSegment::Literal {
-                                text: String::new(),
-                            }
-                        }
-                    }
-                } else {
-                    *segment = match kind {
-                        1 => UiCollectionTextSegment::ItemId,
-                        2 => UiCollectionTextSegment::ItemCount,
-                        _ => UiCollectionTextSegment::ItemValue,
-                    };
-                }
-            });
-        }
-        if ui.button("+ Add Row Segment").clicked() {
-            template.segments.push(UiCollectionTextSegment::Literal {
-                text: String::new(),
-            });
         }
     });
 }
@@ -1595,6 +1533,13 @@ struct PreviewOutput {
     frames: Vec<UiWidgetFrame>,
 }
 
+struct UiEditorAuthoringContext<'a> {
+    declared_flags: &'a [toki_core::project_runtime::ProjectFlagDefinition],
+    declared_ui_events: &'a [toki_core::project_runtime::ProjectUiEventDefinition],
+    font_choices: &'a [String],
+    preview_viewport_size: glam::Vec2,
+}
+
 fn compute_preview(
     root: &UiWidgetNode,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
@@ -1636,19 +1581,27 @@ fn compute_preview(
 fn validate_ui_layout(
     layout: &UiLayoutAsset,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+    declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
 ) -> Vec<String> {
     let mut issues = Vec::new();
     if layout.id.as_str().trim().is_empty() {
         issues.push("Layout id must not be empty".to_string());
     }
     let mut seen = BTreeSet::<String>::new();
-    validate_widget_recursive(&layout.root, declared_flags, &mut seen, &mut issues);
+    validate_widget_recursive(
+        &layout.root,
+        declared_flags,
+        declared_ui_events,
+        &mut seen,
+        &mut issues,
+    );
     issues
 }
 
 fn validate_widget_recursive(
     widget: &UiWidgetNode,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+    declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
     seen: &mut BTreeSet<String>,
     issues: &mut Vec<String>,
 ) {
@@ -1657,17 +1610,24 @@ fn validate_widget_recursive(
     } else if !seen.insert(widget.id.to_string()) {
         issues.push(format!("Duplicate widget id '{}'", widget.id));
     }
-    issues.extend(validate_widget(widget, declared_flags));
+    issues.extend(validate_widget(widget, declared_flags, declared_ui_events));
     for child in &widget.children {
-        validate_widget_recursive(child, declared_flags, seen, issues);
+        validate_widget_recursive(child, declared_flags, declared_ui_events, seen, issues);
     }
 }
 
 fn validate_widget(
     widget: &UiWidgetNode,
     _declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+    declared_ui_events: &[toki_core::project_runtime::ProjectUiEventDefinition],
 ) -> Vec<String> {
     let mut issues = Vec::new();
+    if let Some(event_id) = widget.event_id.as_deref() {
+        if let Some(issue) = validate_ui_event_reference(event_id, declared_ui_events, "Widget event")
+        {
+            issues.push(issue);
+        }
+    }
     for (label, gate) in [
         ("visible_if", widget.visible_if.as_deref()),
         ("enabled_if", widget.enabled_if.as_deref()),
@@ -1689,14 +1649,6 @@ fn validate_widget(
                 }
             }
         }
-        UiWidgetKind::Image { image_id } => {
-            if image_id.trim().is_empty() {
-                issues.push(format!(
-                    "Image widget '{}' requires a non-empty image id",
-                    widget.id
-                ));
-            }
-        }
         UiWidgetKind::ProgressBar { value } => match value {
             UiProgressBinding::CurrentMax { current, max } => {
                 validate_binding(current, &mut issues, &widget.id);
@@ -1710,14 +1662,6 @@ fn validate_widget(
             if *columns == 0 {
                 issues.push(format!(
                     "GridContainer '{}' must have at least one column",
-                    widget.id
-                ));
-            }
-        }
-        UiWidgetKind::ScrollList { row_height, .. } => {
-            if *row_height == 0 {
-                issues.push(format!(
-                    "ScrollList '{}' row height must be positive",
                     widget.id
                 ));
             }
@@ -1754,20 +1698,16 @@ fn validate_binding(
 fn widget_kind_choice(widget: &UiWidgetNode) -> WidgetKindChoice {
     match widget.kind {
         UiWidgetKind::Label { .. } => WidgetKindChoice::Label,
-        UiWidgetKind::Image { .. } => WidgetKindChoice::Image,
         UiWidgetKind::ProgressBar { .. } => WidgetKindChoice::ProgressBar,
         UiWidgetKind::GridContainer { .. } => WidgetKindChoice::GridContainer,
-        UiWidgetKind::ScrollList { .. } => WidgetKindChoice::ScrollList,
     }
 }
 
 fn widget_kind_choice_label(kind: WidgetKindChoice) -> &'static str {
     match kind {
         WidgetKindChoice::Label => "Label",
-        WidgetKindChoice::Image => "Image",
         WidgetKindChoice::ProgressBar => "ProgressBar",
         WidgetKindChoice::GridContainer => "GridContainer",
-        WidgetKindChoice::ScrollList => "ScrollList",
     }
 }
 
@@ -1775,8 +1715,6 @@ fn widget_preset_label(preset: WidgetPreset) -> &'static str {
     match preset {
         WidgetPreset::Label => "Label",
         WidgetPreset::HealthBar => "Health Bar",
-        WidgetPreset::InventoryList => "Inventory List",
-        WidgetPreset::StatusPanel => "Status Panel",
     }
 }
 
@@ -1799,9 +1737,6 @@ fn default_widget_kind(kind: WidgetKindChoice) -> UiWidgetKind {
                 }],
             },
         },
-        WidgetKindChoice::Image => UiWidgetKind::Image {
-            image_id: "image_id".to_string(),
-        },
         WidgetKindChoice::ProgressBar => UiWidgetKind::ProgressBar {
             value: UiProgressBinding::CurrentMax {
                 current: UiBinding::ValuePath {
@@ -1817,20 +1752,6 @@ fn default_widget_kind(kind: WidgetKindChoice) -> UiWidgetKind {
         WidgetKindChoice::GridContainer => UiWidgetKind::GridContainer {
             columns: 2,
             spacing: UiSpacing::default(),
-        },
-        WidgetKindChoice::ScrollList => UiWidgetKind::ScrollList {
-            collection: UiCollectionBinding::PlayerInventory,
-            row_height: 24,
-            row_spacing: 4,
-            row_template: UiCollectionRowTemplate {
-                segments: vec![
-                    UiCollectionTextSegment::ItemId,
-                    UiCollectionTextSegment::Literal {
-                        text: " x".to_string(),
-                    },
-                    UiCollectionTextSegment::ItemCount,
-                ],
-            },
         },
     }
 }
@@ -1859,6 +1780,8 @@ fn create_widget_preset(preset: WidgetPreset, layout: &UiLayoutAsset) -> UiWidge
             widget.title = "Health Bar".to_string();
             widget.layout.size = [72.0, 12.0];
             widget.layout.offset = [8.0, 28.0];
+            widget.layout.margin = ZERO_SPACING;
+            widget.layout.padding = ZERO_SPACING;
             widget.kind = UiWidgetKind::ProgressBar {
                 value: UiProgressBinding::CurrentMax {
                     current: UiBinding::ValuePath {
@@ -1873,67 +1796,6 @@ fn create_widget_preset(preset: WidgetPreset, layout: &UiLayoutAsset) -> UiWidge
             };
             widget
         }
-        WidgetPreset::InventoryList => {
-            let mut widget = create_widget(WidgetKindChoice::ScrollList, layout);
-            widget.title = "Inventory List".to_string();
-            widget.layout.anchor = UiAnchor::TopRight;
-            widget.layout.offset = [-UI_EDGE_MARGIN, UI_EDGE_MARGIN];
-            widget.layout.size = [64.0, 80.0];
-            widget.kind = UiWidgetKind::ScrollList {
-                collection: UiCollectionBinding::PlayerInventory,
-                row_height: 12,
-                row_spacing: 2,
-                row_template: UiCollectionRowTemplate {
-                    segments: vec![
-                        UiCollectionTextSegment::ItemId,
-                        UiCollectionTextSegment::Literal {
-                            text: " x".to_string(),
-                        },
-                        UiCollectionTextSegment::ItemCount,
-                    ],
-                },
-            };
-            widget.style.typography.font_size_px = Some(8);
-            widget
-        }
-        WidgetPreset::StatusPanel => {
-            let mut widget = create_widget(WidgetKindChoice::GridContainer, layout);
-            widget.title = "Status Panel".to_string();
-            widget.layout.anchor = UiAnchor::BottomLeft;
-            widget.layout.offset = [UI_EDGE_MARGIN, -UI_EDGE_MARGIN];
-            widget.layout.size = [84.0, 44.0];
-            widget.kind = UiWidgetKind::GridContainer {
-                columns: 1,
-                spacing: UiSpacing {
-                    left: 2,
-                    top: 2,
-                    right: 0,
-                    bottom: 0,
-                },
-            };
-            widget.children.push(UiWidgetNode {
-                id: unique_widget_id(&layout.root, WidgetKindChoice::Label).into(),
-                title: "Status".to_string(),
-                layout: toki_core::ui_layout::UiLayoutSpec {
-                    size: [72.0, 14.0],
-                    ..Default::default()
-                },
-                style: hud_widget_style(WidgetKindChoice::Label),
-                event_id: None,
-                focusable: false,
-                visible_if: None,
-                enabled_if: None,
-                kind: UiWidgetKind::Label {
-                    content: UiTextTemplate {
-                        segments: vec![UiTextSegment::Literal {
-                            text: "Status".to_string(),
-                        }],
-                    },
-                },
-                children: Vec::new(),
-            });
-            widget
-        }
     }
 }
 
@@ -1941,21 +1803,21 @@ fn ui_layout_spec_for_kind(kind: WidgetKindChoice) -> toki_core::ui_layout::UiLa
     toki_core::ui_layout::UiLayoutSpec {
         size: match kind {
             WidgetKindChoice::Label => [96.0, 18.0],
-            WidgetKindChoice::Image => [48.0, 48.0],
             WidgetKindChoice::ProgressBar => [80.0, 12.0],
             WidgetKindChoice::GridContainer => [96.0, 48.0],
-            WidgetKindChoice::ScrollList => [72.0, 84.0],
         },
         offset: [UI_EDGE_MARGIN, UI_EDGE_MARGIN],
+        margin: ZERO_SPACING,
+        padding: ZERO_SPACING,
         ..Default::default()
     }
 }
 
 fn hud_widget_style(kind: WidgetKindChoice) -> toki_core::ui_layout::UiWidgetStyle {
     let font_size_px = match kind {
-        WidgetKindChoice::Label | WidgetKindChoice::ScrollList => Some(8),
+        WidgetKindChoice::Label => Some(8),
         WidgetKindChoice::ProgressBar => Some(8),
-        WidgetKindChoice::Image | WidgetKindChoice::GridContainer => None,
+        WidgetKindChoice::GridContainer => None,
     };
     toki_core::ui_layout::UiWidgetStyle {
         typography: UiTypography {
@@ -1998,26 +1860,21 @@ fn apply_widget_position_preset(
     }
     widget.layout.offset[0] = snap_to_grid(widget.layout.offset[0]);
     widget.layout.offset[1] = snap_to_grid(widget.layout.offset[1]);
-    widget.layout.size[0] = snap_to_grid(size[0]).max(16.0);
-    widget.layout.size[1] = snap_to_grid(size[1]).max(16.0);
+    let min_size = minimum_widget_size(widget);
+    widget.layout.size[0] = snap_to_grid(size[0]).max(min_size[0]);
+    widget.layout.size[1] = snap_to_grid(size[1]).max(min_size[1]);
+    clamp_widget_layout_to_viewport(widget, preview_viewport_size);
 }
 
-fn insert_new_widget_under_selection(
+fn insert_new_widget_under_parent(
     ui_state: &mut EditorUI,
     layout: &mut UiLayoutAsset,
+    parent_id: &str,
     widget: UiWidgetNode,
     status_message: &str,
 ) -> bool {
-    let parent_id = preferred_parent_id(
-        layout,
-        ui_state
-            .ui_editor_context()
-            .ui
-            .selected_widget_id
-            .as_deref(),
-    );
     let widget_id = widget.id.to_string();
-    if insert_child_widget(&mut layout.root, &parent_id, widget) {
+    if insert_child_widget(&mut layout.root, parent_id, widget) {
         let editor_state = &mut ui_state.ui_editor_context_mut().ui;
         editor_state.select_widget(widget_id);
         editor_state.status_message = Some(status_message.to_string());
@@ -2025,6 +1882,60 @@ fn insert_new_widget_under_selection(
     } else {
         false
     }
+}
+
+fn minimum_widget_size(widget: &UiWidgetNode) -> [f32; 2] {
+    match widget.kind {
+        UiWidgetKind::Label { .. } => [48.0, 16.0],
+        UiWidgetKind::ProgressBar { .. } => [48.0, 12.0],
+        UiWidgetKind::GridContainer { .. } => [56.0, 24.0],
+    }
+}
+
+fn is_root_level_widget(layout: &UiLayoutAsset, widget_id: &str) -> bool {
+    find_parent_id(&layout.root, widget_id).as_deref() == Some("root")
+}
+
+fn clamp_widget_layout_to_viewport(widget: &mut UiWidgetNode, viewport_size: glam::Vec2) {
+    let min_size = minimum_widget_size(widget);
+    let max_width = viewport_size.x.max(min_size[0]);
+    let max_height = viewport_size.y.max(min_size[1]);
+    widget.layout.size[0] = widget.layout.size[0].clamp(min_size[0], max_width);
+    widget.layout.size[1] = widget.layout.size[1].clamp(min_size[1], max_height);
+
+    let max_x = (viewport_size.x - widget.layout.size[0]).max(0.0);
+    let max_y = (viewport_size.y - widget.layout.size[1]).max(0.0);
+    match widget.layout.anchor {
+        UiAnchor::TopLeft => {
+            widget.layout.offset[0] = widget.layout.offset[0].clamp(0.0, max_x);
+            widget.layout.offset[1] = widget.layout.offset[1].clamp(0.0, max_y);
+        }
+        UiAnchor::TopRight => {
+            widget.layout.offset[0] = widget.layout.offset[0].clamp(-max_x, 0.0);
+            widget.layout.offset[1] = widget.layout.offset[1].clamp(0.0, max_y);
+        }
+        UiAnchor::BottomLeft => {
+            widget.layout.offset[0] = widget.layout.offset[0].clamp(0.0, max_x);
+            widget.layout.offset[1] = widget.layout.offset[1].clamp(-max_y, 0.0);
+        }
+        UiAnchor::BottomRight => {
+            widget.layout.offset[0] = widget.layout.offset[0].clamp(-max_x, 0.0);
+            widget.layout.offset[1] = widget.layout.offset[1].clamp(-max_y, 0.0);
+        }
+        UiAnchor::Center => {
+            widget.layout.offset[0] = widget.layout.offset[0].clamp(-max_x * 0.5, max_x * 0.5);
+            widget.layout.offset[1] = widget.layout.offset[1].clamp(-max_y * 0.5, max_y * 0.5);
+        }
+        UiAnchor::Stretch => {
+            widget.layout.offset[0] = widget.layout.offset[0].clamp(0.0, viewport_size.x * 0.5);
+            widget.layout.offset[1] = widget.layout.offset[1].clamp(0.0, viewport_size.y * 0.5);
+        }
+    }
+
+    widget.layout.offset[0] = snap_to_grid(widget.layout.offset[0]);
+    widget.layout.offset[1] = snap_to_grid(widget.layout.offset[1]);
+    widget.layout.size[0] = snap_to_grid(widget.layout.size[0]).max(min_size[0]);
+    widget.layout.size[1] = snap_to_grid(widget.layout.size[1]).max(min_size[1]);
 }
 
 fn preferred_parent_id(layout: &UiLayoutAsset, selected_widget_id: Option<&str>) -> String {
@@ -2052,10 +1963,8 @@ fn can_have_children(widget: &UiWidgetNode) -> bool {
 fn unique_widget_id(root: &UiWidgetNode, kind: WidgetKindChoice) -> String {
     let prefix = match kind {
         WidgetKindChoice::Label => "label",
-        WidgetKindChoice::Image => "image",
         WidgetKindChoice::ProgressBar => "progress",
         WidgetKindChoice::GridContainer => "grid",
-        WidgetKindChoice::ScrollList => "list",
     };
     let existing = collect_widget_ids(root);
     let mut index = 1usize;
@@ -2188,11 +2097,9 @@ fn paint_ui_composition(
     logical_viewport_size: glam::Vec2,
     available_fonts: &[String],
 ) {
-    let transformed = transform_logical_ui_composition_with_scales(
+    let transformed = transform_logical_ui_composition_with_transform(
         composition,
-        origin,
-        scale,
-        runtime_ui_text_scale(logical_viewport_size, logical_viewport_size * scale),
+        ui_presentation_transform(origin, scale, logical_viewport_size, logical_viewport_size * scale),
     );
     for block in &transformed.blocks {
         paint_ui_block(painter, block, available_fonts);
@@ -2294,8 +2201,21 @@ fn ui_preview_viewport_size(project: Option<&Project>) -> glam::Vec2 {
         })
 }
 
-fn scaled_rect(rect: UiRect, origin: Vec2, scale: f32) -> Rect {
-    let rect = transform_logical_ui_rect(rect, glam::vec2(origin.x, origin.y), scale);
+fn scaled_rect_for_viewport(
+    rect: UiRect,
+    origin: Vec2,
+    scale: f32,
+    logical_viewport_size: glam::Vec2,
+) -> Rect {
+    let rect = transform_logical_ui_rect_with_transform(
+        rect,
+        ui_presentation_transform(
+            glam::vec2(origin.x, origin.y),
+            scale,
+            logical_viewport_size,
+            logical_viewport_size * scale,
+        ),
+    );
     Rect::from_min_size(
         Pos2::new(rect.x, rect.y),
         Vec2::new(rect.width, rect.height),
@@ -2313,13 +2233,17 @@ fn topmost_widget_id_at_point(
     frames: &[UiWidgetFrame],
     origin: Vec2,
     scale: f32,
+    logical_viewport_size: glam::Vec2,
     pointer_pos: Pos2,
 ) -> Option<String> {
     frames
         .iter()
         .rev()
         .filter(|frame| frame.widget_id.as_str() != "root")
-        .find(|frame| scaled_rect(frame.rect, origin, scale).contains(pointer_pos))
+        .find(|frame| {
+            scaled_rect_for_viewport(frame.rect, origin, scale, logical_viewport_size)
+                .contains(pointer_pos)
+        })
         .map(|frame| frame.widget_id.to_string())
 }
 
@@ -2327,6 +2251,7 @@ fn resize_handle_widget_id_at_point(
     frames: &[UiWidgetFrame],
     origin: Vec2,
     scale: f32,
+    logical_viewport_size: glam::Vec2,
     pointer_pos: Pos2,
     widget_id: &str,
 ) -> Option<String> {
@@ -2334,7 +2259,8 @@ fn resize_handle_widget_id_at_point(
         .iter()
         .find(|frame| frame.widget_id.as_str() == widget_id)
         .and_then(|frame| {
-            let screen_rect = scaled_rect(frame.rect, origin, scale);
+            let screen_rect =
+                scaled_rect_for_viewport(frame.rect, origin, scale, logical_viewport_size);
             resize_handle_rect(screen_rect)
                 .contains(pointer_pos)
                 .then(|| frame.widget_id.to_string())
@@ -2357,18 +2283,17 @@ fn declared_flags_stub() -> &'static [toki_core::project_runtime::ProjectFlagDef
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_widget_position_preset, bool_expression_choices, create_widget_preset,
-        resize_handle_rect, resize_handle_widget_id_at_point, scaled_rect, snap_to_grid,
-        topmost_widget_id_at_point, value_path_choices, WidgetPositionPreset, WidgetPreset,
+        apply_widget_position_preset, bool_expression_choices, clamp_widget_layout_to_viewport,
+        create_widget_preset,
+        resize_handle_rect, resize_handle_widget_id_at_point, scaled_rect_for_viewport,
+        snap_to_grid, topmost_widget_id_at_point, validate_widget, value_path_choices,
+        WidgetPositionPreset, WidgetPreset,
     };
     use egui::{pos2, vec2};
     use toki_core::flags::FlagValue;
     use toki_core::project_runtime::ProjectFlagDefinition;
     use toki_core::ui::UiRect;
-    use toki_core::ui_layout::{
-        UiBinding, UiCollectionBinding, UiProgressBinding, UiWidgetFrame, UiWidgetKind,
-        UiWidgetNode,
-    };
+    use toki_core::ui_layout::{UiBinding, UiProgressBinding, UiWidgetFrame, UiWidgetKind, UiWidgetNode};
 
     #[test]
     fn child_widget_wins_hit_test_over_root() {
@@ -2396,11 +2321,24 @@ mod tests {
         ];
 
         assert_eq!(
-            topmost_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, pos2(30.0, 30.0)).as_deref(),
+            topmost_widget_id_at_point(
+                &frames,
+                vec2(0.0, 0.0),
+                1.0,
+                glam::vec2(160.0, 144.0),
+                pos2(30.0, 30.0),
+            )
+            .as_deref(),
             Some("child")
         );
         assert_eq!(
-            topmost_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, pos2(4.0, 4.0)),
+            topmost_widget_id_at_point(
+                &frames,
+                vec2(0.0, 0.0),
+                1.0,
+                glam::vec2(160.0, 144.0),
+                pos2(4.0, 4.0),
+            ),
             None
         );
     }
@@ -2417,13 +2355,21 @@ mod tests {
             },
             enabled: true,
         }];
-        let screen_rect = scaled_rect(frames[0].rect, vec2(0.0, 0.0), 1.0);
+        let screen_rect =
+            scaled_rect_for_viewport(frames[0].rect, vec2(0.0, 0.0), 1.0, glam::vec2(160.0, 144.0));
         let handle_rect = resize_handle_rect(screen_rect);
         let inside = handle_rect.center();
 
         assert_eq!(
-            resize_handle_widget_id_at_point(&frames, vec2(0.0, 0.0), 1.0, inside, "child")
-                .as_deref(),
+            resize_handle_widget_id_at_point(
+                &frames,
+                vec2(0.0, 0.0),
+                1.0,
+                glam::vec2(160.0, 144.0),
+                inside,
+                "child",
+            )
+            .as_deref(),
             Some("child")
         );
         assert_eq!(
@@ -2431,6 +2377,7 @@ mod tests {
                 &frames,
                 vec2(0.0, 0.0),
                 1.0,
+                glam::vec2(160.0, 144.0),
                 pos2(25.0, 25.0),
                 "child"
             ),
@@ -2469,27 +2416,16 @@ mod tests {
     }
 
     #[test]
-    fn inventory_list_preset_uses_player_inventory_collection() {
+    fn label_preset_creates_label_widget() {
         let layout = toki_core::ui_layout::UiLayoutAsset {
             root: UiWidgetNode::default(),
             ..Default::default()
         };
-        let widget = create_widget_preset(WidgetPreset::InventoryList, &layout);
+        let widget = create_widget_preset(WidgetPreset::Label, &layout);
         match widget.kind {
-            UiWidgetKind::ScrollList {
-                collection,
-                row_template,
-                ..
-            } => {
-                assert_eq!(collection, UiCollectionBinding::PlayerInventory);
-                assert!(matches!(
-                    row_template.segments.as_slice(),
-                    [
-                        toki_core::ui_layout::UiCollectionTextSegment::ItemId,
-                        toki_core::ui_layout::UiCollectionTextSegment::Literal { .. },
-                        toki_core::ui_layout::UiCollectionTextSegment::ItemCount
-                    ]
-                ));
+            UiWidgetKind::Label { content } => {
+                assert_eq!(widget.title, "label_1");
+                assert_eq!(content.segments.len(), 1);
             }
             other => panic!("unexpected widget kind: {other:?}"),
         }
@@ -2551,5 +2487,70 @@ mod tests {
         assert!(choices.contains(&"!flags.door_open".to_string()));
         assert!(choices.contains(&"player.active".to_string()));
         assert!(!choices.contains(&"flags.coins".to_string()));
+    }
+
+    #[test]
+    fn validate_widget_flags_undeclared_ui_events() {
+        let widget = UiWidgetNode {
+            id: "button".into(),
+            event_id: Some("missing_event".to_string()),
+            ..Default::default()
+        };
+
+        let issues = validate_widget(
+            &widget,
+            &[],
+            &[toki_core::project_runtime::ProjectUiEventDefinition {
+                id: "open_inventory".to_string(),
+            }],
+        );
+
+        assert!(issues
+            .iter()
+            .any(|issue| issue.contains("undeclared UI event 'missing_event'")));
+    }
+
+    #[test]
+    fn clamp_widget_layout_to_viewport_keeps_top_left_widget_visible() {
+        let mut widget = UiWidgetNode {
+            id: "label".into(),
+            kind: UiWidgetKind::Label {
+                content: Default::default(),
+            },
+            layout: toki_core::ui_layout::UiLayoutSpec {
+                anchor: toki_core::ui_layout::UiAnchor::TopLeft,
+                offset: [200.0, 180.0],
+                size: [120.0, 40.0],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        clamp_widget_layout_to_viewport(&mut widget, glam::vec2(160.0, 144.0));
+
+        assert_eq!(widget.layout.offset, [40.0, 104.0]);
+        assert_eq!(widget.layout.size, [120.0, 40.0]);
+    }
+
+    #[test]
+    fn clamp_widget_layout_to_viewport_keeps_bottom_right_widget_visible() {
+        let mut widget = UiWidgetNode {
+            id: "grid".into(),
+            kind: UiWidgetKind::GridContainer {
+                columns: 2,
+                spacing: Default::default(),
+            },
+            layout: toki_core::ui_layout::UiLayoutSpec {
+                anchor: toki_core::ui_layout::UiAnchor::BottomRight,
+                offset: [-120.0, -120.0],
+                size: [72.0, 48.0],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        clamp_widget_layout_to_viewport(&mut widget, glam::vec2(160.0, 144.0));
+
+        assert_eq!(widget.layout.offset, [-88.0, -96.0]);
     }
 }

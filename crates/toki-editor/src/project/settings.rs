@@ -1,6 +1,7 @@
 use chrono::Utc;
 use toki_core::project_runtime::{
-    IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition, QuantizeStrategy,
+    IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition, ProjectUiEventDefinition,
+    QuantizeStrategy,
     RuntimeViewportMode,
 };
 
@@ -40,6 +41,7 @@ pub struct ProjectSettingsDraft {
     pub post_process_gb_contrast_percent: i16,
     pub post_process_vignette_strength_percent: u8,
     pub flag_declarations: Vec<ProjectFlagDefinition>,
+    pub ui_event_declarations: Vec<ProjectUiEventDefinition>,
     pub transition_default_duration_ms: u32,
 }
 
@@ -163,6 +165,7 @@ impl ProjectSettingsDraft {
                 .post_process
                 .vignette_strength_percent,
             flag_declarations: project.metadata.runtime.flags.declarations.clone(),
+            ui_event_declarations: project.metadata.runtime.ui.event_declarations.clone(),
             transition_default_duration_ms: project
                 .metadata
                 .runtime
@@ -380,6 +383,10 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
         project.metadata.runtime.flags.declarations = draft.flag_declarations.clone();
         changed = true;
     }
+    if project.metadata.runtime.ui.event_declarations != draft.ui_event_declarations {
+        project.metadata.runtime.ui.event_declarations = draft.ui_event_declarations.clone();
+        changed = true;
+    }
     if project
         .metadata
         .runtime
@@ -493,6 +500,9 @@ mod tests {
                 id: "quest_done".to_string(),
                 default_value: toki_core::FlagValue::Bool(false),
             }],
+            ui_event_declarations: vec![ProjectUiEventDefinition {
+                id: "open_inventory".to_string(),
+            }],
             transition_default_duration_ms: 420,
         };
 
@@ -593,6 +603,10 @@ mod tests {
         assert_eq!(
             project.metadata.runtime.flags.declarations,
             draft.flag_declarations
+        );
+        assert_eq!(
+            project.metadata.runtime.ui.event_declarations,
+            draft.ui_event_declarations
         );
         assert_eq!(
             project

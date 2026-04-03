@@ -36,8 +36,7 @@ pub mod text;
 pub mod ui;
 pub mod ui_layout;
 pub use ui_layout::{
-    UiBinding, UiCollectionBinding, UiController, UiLayoutAsset, UiLayoutEngine, UiRequest,
-    UiTheme, UiWidgetNode,
+    UiBinding, UiController, UiLayoutAsset, UiLayoutEngine, UiRequest, UiTheme, UiWidgetNode,
 };
 
 pub mod animation;

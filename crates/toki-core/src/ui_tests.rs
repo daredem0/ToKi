@@ -1,6 +1,7 @@
 use super::{
-    runtime_ui_text_scale, transform_logical_ui_composition, transform_logical_ui_rect, UiBlock,
-    UiComposition, UiRect, UiTextBlock,
+    runtime_ui_text_scale, transform_logical_ui_composition, transform_logical_ui_composition_with_transform,
+    transform_logical_ui_rect, transform_logical_ui_rect_with_transform, ui_presentation_transform,
+    UiBlock, UiComposition, UiRect, UiTextBlock,
 };
 use crate::text::{TextAnchor, TextStyle, TextWeight};
 
@@ -136,4 +137,52 @@ fn runtime_ui_text_scale_stays_consistent_for_common_hud_viewports() {
     assert!(gb_like > 0.3 && gb_like <= 1.0);
     assert!(widescreen > 0.3 && widescreen <= 1.0);
     assert!((gb_like - widescreen).abs() < 0.3);
+}
+
+#[test]
+fn ui_presentation_transform_matches_runtime_text_scale_and_rect_transform() {
+    let transform = ui_presentation_transform(
+        glam::vec2(20.0, 30.0),
+        3.0,
+        glam::vec2(160.0, 144.0),
+        glam::vec2(480.0, 432.0),
+    );
+    let rect = transform_logical_ui_rect_with_transform(
+        UiRect {
+            x: 8.0,
+            y: 12.0,
+            width: 16.0,
+            height: 10.0,
+        },
+        transform,
+    );
+
+    assert_eq!(rect.x, 44.0);
+    assert_eq!(rect.y, 66.0);
+    assert_eq!(rect.width, 48.0);
+    assert_eq!(rect.height, 30.0);
+    assert!((transform.text_scale - runtime_ui_text_scale(glam::vec2(160.0, 144.0), glam::vec2(480.0, 432.0))).abs() < 0.0001);
+
+    let mut composition = UiComposition::default();
+    composition.push(UiBlock {
+        rect: UiRect {
+            x: 8.0,
+            y: 12.0,
+            width: 16.0,
+            height: 10.0,
+        },
+        fill_color: None,
+        border_color: None,
+        border_thickness: 1.0,
+        text: Some(UiTextBlock {
+            content: "HP".to_string(),
+            position: glam::vec2(16.0, 18.0),
+            anchor: TextAnchor::TopLeft,
+            style: TextStyle::default(),
+            layer: 1,
+        }),
+    });
+
+    let transformed = transform_logical_ui_composition_with_transform(&composition, transform);
+    assert_eq!(transformed.blocks[0].rect, rect);
 }

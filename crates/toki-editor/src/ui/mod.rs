@@ -14,6 +14,7 @@ pub(crate) mod object_sheet_browser;
 pub mod panel_layout;
 pub mod panels;
 pub mod sprite_editor;
+pub(crate) mod ui_event_registry;
 pub mod undo_redo;
 pub mod widgets;
 

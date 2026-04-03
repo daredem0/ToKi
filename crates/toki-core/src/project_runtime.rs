@@ -85,6 +85,8 @@ pub struct RuntimeSettings {
 pub struct RuntimeUiSettings {
     #[serde(default)]
     pub theme: UiTheme,
+    #[serde(default)]
+    pub event_declarations: Vec<ProjectUiEventDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -107,6 +109,11 @@ impl Default for ProjectFlagDefinition {
             default_value: default_project_flag_value(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct ProjectUiEventDefinition {
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]

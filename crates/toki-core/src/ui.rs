@@ -67,6 +67,26 @@ impl UiComposition {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct UiPresentationTransform {
+    pub origin: glam::Vec2,
+    pub geometry_scale: f32,
+    pub text_scale: f32,
+}
+
+pub fn ui_presentation_transform(
+    origin: glam::Vec2,
+    geometry_scale: f32,
+    logical_viewport_size: glam::Vec2,
+    presented_viewport_size: glam::Vec2,
+) -> UiPresentationTransform {
+    UiPresentationTransform {
+        origin,
+        geometry_scale,
+        text_scale: runtime_ui_text_scale(logical_viewport_size, presented_viewport_size),
+    }
+}
+
 pub fn transform_logical_ui_rect(rect: UiRect, origin: glam::Vec2, scale: f32) -> UiRect {
     UiRect {
         x: origin.x + rect.x * scale,
@@ -74,6 +94,13 @@ pub fn transform_logical_ui_rect(rect: UiRect, origin: glam::Vec2, scale: f32) -
         width: rect.width * scale,
         height: rect.height * scale,
     }
+}
+
+pub fn transform_logical_ui_rect_with_transform(
+    rect: UiRect,
+    transform: UiPresentationTransform,
+) -> UiRect {
+    transform_logical_ui_rect(rect, transform.origin, transform.geometry_scale)
 }
 
 pub fn runtime_ui_text_scale(
@@ -94,7 +121,14 @@ pub fn transform_logical_ui_composition(
     origin: glam::Vec2,
     scale: f32,
 ) -> UiComposition {
-    transform_logical_ui_composition_with_scales(composition, origin, scale, scale)
+    transform_logical_ui_composition_with_transform(
+        composition,
+        UiPresentationTransform {
+            origin,
+            geometry_scale: scale,
+            text_scale: scale,
+        },
+    )
 }
 
 pub fn transform_logical_ui_composition_with_scales(
@@ -103,16 +137,30 @@ pub fn transform_logical_ui_composition_with_scales(
     geometry_scale: f32,
     text_scale: f32,
 ) -> UiComposition {
+    transform_logical_ui_composition_with_transform(
+        composition,
+        UiPresentationTransform {
+            origin,
+            geometry_scale,
+            text_scale,
+        },
+    )
+}
+
+pub fn transform_logical_ui_composition_with_transform(
+    composition: &UiComposition,
+    transform: UiPresentationTransform,
+) -> UiComposition {
     let mut transformed = composition.clone();
     for block in &mut transformed.blocks {
-        block.rect = transform_logical_ui_rect(block.rect, origin, geometry_scale);
-        block.border_thickness *= geometry_scale;
+        block.rect = transform_logical_ui_rect_with_transform(block.rect, transform);
+        block.border_thickness *= transform.geometry_scale;
         if let Some(text) = block.text.as_mut() {
             text.position = glam::Vec2::new(
-                origin.x + text.position.x * geometry_scale,
-                origin.y + text.position.y * geometry_scale,
+                transform.origin.x + text.position.x * transform.geometry_scale,
+                transform.origin.y + text.position.y * transform.geometry_scale,
             );
-            text.style.size_px *= text_scale;
+            text.style.size_px *= transform.text_scale;
         }
     }
     transformed

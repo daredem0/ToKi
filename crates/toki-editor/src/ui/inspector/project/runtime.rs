@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::ui_event_registry::validate_ui_event_registry;
 
 pub(super) fn render_runtime_section(
     ui: &mut egui::Ui,
@@ -13,6 +14,41 @@ pub(super) fn render_runtime_section(
                 "Persist Scene State Across Scene Changes",
             )
             .changed();
+
+        ui.separator();
+        ui.collapsing("Authored UI Events", |ui| {
+            for issue in validate_ui_event_registry(&draft.ui_event_declarations) {
+                ui.colored_label(egui::Color32::from_rgb(255, 120, 120), issue);
+            }
+
+            let mut remove_index = None;
+            for (index, declaration) in draft.ui_event_declarations.iter_mut().enumerate() {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("UI Event {}", index + 1));
+                        if ui.small_button("Delete").clicked() {
+                            remove_index = Some(index);
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Id:");
+                        changed |= ui.text_edit_singleline(&mut declaration.id).changed();
+                    });
+                });
+            }
+            if let Some(index) = remove_index {
+                draft.ui_event_declarations.remove(index);
+                changed = true;
+            }
+            if ui.button("+ Add UI Event").clicked() {
+                draft
+                    .ui_event_declarations
+                    .push(toki_core::project_runtime::ProjectUiEventDefinition {
+                        id: String::new(),
+                    });
+                changed = true;
+            }
+        });
     });
 
     ui.collapsing("Audio", |ui| {

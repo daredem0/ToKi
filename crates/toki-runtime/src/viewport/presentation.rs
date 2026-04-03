@@ -2,7 +2,8 @@ use toki_core::math::projection::screen_space_projection;
 use toki_core::project_runtime::RuntimeViewportMode;
 use toki_core::text::TextItem;
 use toki_core::ui::{
-    runtime_ui_text_scale, transform_logical_ui_composition_with_scales, UiComposition, UiRect,
+    runtime_ui_text_scale, transform_logical_ui_composition_with_transform, ui_presentation_transform,
+    UiComposition, UiRect,
 };
 
 use super::layout::{compute_layout_for_mode, ViewportLayout};
@@ -96,11 +97,14 @@ impl ViewportPresentation {
     }
 
     pub fn transform_logical_ui_composition(&self, composition: &UiComposition) -> UiComposition {
-        transform_logical_ui_composition_with_scales(
+        transform_logical_ui_composition_with_transform(
             composition,
-            self.surface_viewport_origin(),
-            self.layout.resolved_scale,
-            self.runtime_ui_scale_factor(),
+            ui_presentation_transform(
+                self.surface_viewport_origin(),
+                self.layout.resolved_scale,
+                self.logical_viewport_size(),
+                self.surface_viewport_size(),
+            ),
         )
     }
 }
