@@ -1,12 +1,12 @@
 //! Default entity definitions and component values.
 
 use toki_core::entity::{
-    AnimationsDef, ComponentsDef, EntityDefinition, EntityGrounding, PickupDef,
-    PrimaryProjectileDef, RenderingDef,
+    AnimationsDef, ComponentsDef, EntityDefinition, PickupDef, PrimaryProjectileDef, RenderingDef,
 };
 
 use crate::ui::entity_kind_policy::{
-    default_audio_for_kind, default_collision_for_kind, default_movement_for_kind,
+    default_audio_for_kind, default_collision_for_kind, default_grounding_for_kind,
+    default_movement_for_kind,
     effective_kind_for_category,
 };
 
@@ -50,7 +50,7 @@ pub fn create_default_definition(
             has_shadow: true,
             palette_override: None,
             static_object: None,
-            grounding: EntityGrounding::default(),
+            grounding: default_grounding_for_kind(kind, size),
         },
         solid: kind != toki_core::entity::EntityKind::Item,
         active: true,

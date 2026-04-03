@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use crate::ui::editor_ui::DecorationPlacementDraft;
+use crate::ui::entity_kind_policy::default_grounding_for_kind;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
+use toki_core::entity::EntityKind;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ObjectSheetBrowserSource {
@@ -205,14 +207,15 @@ pub(crate) fn build_decoration_placement_draft(
 ) -> Option<DecorationPlacementDraft> {
     let source = resolve_object_sheet_browser_source(project_path, Some(selected_sheet))?;
     let object_info = source.object_sheet.objects.get(selected_object)?;
+    let size_px = [
+        object_info.size_tiles.x * source.object_sheet.tile_size.x,
+        object_info.size_tiles.y * source.object_sheet.tile_size.y,
+    ];
     Some(DecorationPlacementDraft {
         sheet: selected_sheet.to_string(),
         object_name: selected_object.to_string(),
-        size_px: glam::UVec2::new(
-            object_info.size_tiles.x * source.object_sheet.tile_size.x,
-            object_info.size_tiles.y * source.object_sheet.tile_size.y,
-        ),
-        grounding: Default::default(),
+        size_px: glam::UVec2::new(size_px[0], size_px[1]),
+        grounding: default_grounding_for_kind(EntityKind::Decoration, size_px),
         visible: true,
         solid: true,
     })
@@ -272,5 +275,40 @@ mod tests {
         );
         assert_eq!(source.selected_sheet_name, "alpha");
         assert_eq!(source.object_names, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn build_decoration_placement_draft_uses_size_based_grounding_defaults() {
+        let project_path = temp_project_root("decoration-defaults");
+        fs::write(
+            project_path.join("assets/sprites/decor.json"),
+            r#"{
+              "sheet_type": "objects",
+              "image": "decor.png",
+              "tile_size": [16, 16],
+              "objects": {
+                "flower": {"position": [0, 0], "size_tiles": [1, 1]},
+                "house": {"position": [16, 0], "size_tiles": [2, 2]}
+              }
+            }"#,
+        )
+        .expect("decor sheet");
+
+        let flower = build_decoration_placement_draft(&project_path, "decor", "flower")
+            .expect("flower draft");
+        let house =
+            build_decoration_placement_draft(&project_path, "decor", "house").expect("house draft");
+
+        assert_eq!(flower.size_px, glam::UVec2::new(16, 16));
+        assert_eq!(
+            flower.grounding.footprint,
+            Some(toki_core::entity::EntityFootprint::new([2, 12], [12, 4]))
+        );
+
+        assert_eq!(house.size_px, glam::UVec2::new(32, 32));
+        assert_eq!(
+            house.grounding.footprint,
+            Some(toki_core::entity::EntityFootprint::new([4, 24], [24, 8]))
+        );
     }
 }

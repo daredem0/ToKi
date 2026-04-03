@@ -514,7 +514,10 @@ fn edit_state_from_definition() {
     assert_eq!(state.definition.name, "test_entity");
     assert!(!state.dirty);
     assert!(state.validation_errors.is_empty());
-    assert!(state.definition.rendering.grounding.is_empty());
+    assert_eq!(
+        state.definition.rendering.grounding.footprint,
+        Some(toki_core::entity::EntityFootprint::new([8, 24], [16, 8]))
+    );
 }
 
 #[test]
@@ -830,7 +833,12 @@ fn default_definition_has_sensible_defaults() {
         .is_some_and(|movement| movement.can_move));
     assert!(def.components.interaction.is_none());
     assert!(def.collision.enabled);
-    assert_eq!(def.collision.size, [32, 32]);
+    assert_eq!(
+        def.rendering.grounding.footprint,
+        Some(toki_core::entity::EntityFootprint::new([8, 24], [16, 8]))
+    );
+    assert_eq!(def.collision.offset, [8, 24]);
+    assert_eq!(def.collision.size, [16, 8]);
     assert!(!def.collision.trigger);
 }
 
@@ -843,6 +851,12 @@ fn default_item_definition_is_minimal_and_non_moving() {
     assert!(def.components.movement.is_none());
     assert!(!def.collision.enabled);
     assert!(!def.collision.trigger);
+    assert_eq!(
+        def.rendering.grounding.footprint,
+        Some(toki_core::entity::EntityFootprint::new([8, 24], [16, 8]))
+    );
+    assert_eq!(def.collision.offset, [8, 24]);
+    assert_eq!(def.collision.size, [16, 8]);
     assert_eq!(def.audio.footstep_trigger_distance, 0.0);
     assert_eq!(def.audio.hearing_radius, 0);
 }
@@ -858,6 +872,12 @@ fn default_decoration_definition_omits_behavior_components() {
     assert!(def.solid);
     assert!(def.collision.enabled);
     assert!(!def.collision.trigger);
+    assert_eq!(
+        def.rendering.grounding.footprint,
+        Some(toki_core::entity::EntityFootprint::new([4, 24], [24, 8]))
+    );
+    assert_eq!(def.collision.offset, [4, 24]);
+    assert_eq!(def.collision.size, [24, 8]);
 }
 
 #[test]
@@ -872,4 +892,6 @@ fn toggle_pickup_on_item_definition_enables_trigger_collision() {
     assert!(state.definition.components.pickup.is_some());
     assert!(state.definition.collision.enabled);
     assert!(state.definition.collision.trigger);
+    assert_eq!(state.definition.collision.offset, [8, 24]);
+    assert_eq!(state.definition.collision.size, [16, 8]);
 }
