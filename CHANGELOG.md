@@ -7,6 +7,39 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-04-03
+
+### Added
+- Added animated decoration support end-to-end: animated decorations with idle-state animation clips, object-sheet-backed animated preview rendering, decoration toolbox placement, and validation enforcing a single idle clip per decoration.
+- Added kind-aware default grounding footprints for new entities and decorations, with bottom-centered, kind-scaled footprints driving default collision offset and shadow sizing.
+- Added project-level UI event declarations with editor validation so authored UI interaction identifiers are checked against the declared event list.
+- Added per-frame LRU pipeline cache for textured sprites to reduce GPU state churn, with GPU integration test coverage for per-frame eviction behavior.
+- Added kind-aware entity validation, a pickup component editor, and policy-driven defaults for entity property initialization.
+- Added kind-first toolbox placement surface and kind-aware inspector (Phase 7.2) with component-aware inspector gating and a refined asset-palette layout.
+- Added a barebone UI editor for authoring runtime UI layouts with resize, drag, and a shared editor/runtime scaling policy.
+
+### Changed
+- Refactored menu and dialog composition through the generic widget engine, deriving all appearance from `UiTheme` with layout-only local overrides.
+- Refactored `EditorApp` internal ownership into focused manager structs and split `EditorContextHost` into per-panel hosts with propagated draw errors.
+- Refactored `GameState` to extract domain services and categorize rule commands into focused submodules; extracted tick-phase builders and split tick phases across editor and runtime.
+- Refactored the render backend by splitting the monolithic `RenderBackend` trait into focused sub-traits and reducing allocations in expression evaluation, text caching, and texture pipeline paths.
+- Refactored entity data model by decomposing flat `EntityAttributes` into optional capability components, migrating the full test suite to the new structure, and streamlining render query test helpers.
+- Moved map objects to entity-based decorations and streamlined the map editor to align with the new decoration workflow.
+- Changed Sprite Editor to support floating selection resize, improved interaction, a symmetry cross drawing aid, and smoother zoom behavior.
+- Updated example project with house sprites, expanded scene layouts, grounding footprints on all entities, and UI event configuration.
+
+### Fixed
+- Fixed player entity ID remapping on scene transition when the preserved player ID conflicts with an entity already present in the destination scene.
+- Fixed tab strip resize tracking and menu editor click targets that were incorrectly registering off-screen.
+- Fixed UI editor resize and drag interaction and unified runtime/editor scaling with a shared scaling policy.
+- Fixed decoration placement UX in the scene viewport.
+- Migrated example project data to the updated entity scheme.
+- Fixed clippy warnings and code formatting across affected modules.
+
+### Tests
+- Restored and expanded integration tests across movement, combat, rendering, audio, scene transitions, game simulation, and entity definition components.
+- Added serialization round-trip tests for pickup items.
+
 ## [0.2.3] - 2026-03-29
 
 ### Added
@@ -479,7 +512,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/daredem0/ToKi/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/daredem0/ToKi/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/daredem0/ToKi/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/daredem0/ToKi/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/daredem0/ToKi/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daredem0/ToKi/compare/v0.1.0...v0.1.1

@@ -1,5 +1,6 @@
 # Software Design and Architecture Description (SDD/SAD)
 ## Project: `ToKi`
+> Last updated: 2026-04-03 — reflects completed refactoring (DA1–DA5, ME9–ME17, QW8–QW15).
 
 ## 1. Purpose
 
@@ -184,6 +185,7 @@ Responsibilities:
   - `map`
   - `object_sheet`
   - `palette`
+  - `ui_layout`
 
 It intentionally does not:
 
@@ -240,26 +242,28 @@ The `src/game/` module is decomposed into focused submodules:
 
 | Submodule | Responsibility |
 |---|---|
-| `mod.rs` | `GameState` struct, `WorldState`, `SceneState`, `ProgressState`, `RuntimeState`, `EffectRuntimeState`, `AudioEvent`, `AudioChannel`, core update loop, input routing, audio dispatch |
-| `movement.rs` | accumulated movement, axis alignment, collision gating, movement audio |
-| `combat.rs` | stat changes, damage, primary action, hitbox collision detection, projectile updates |
-| `interaction.rs` | entity interaction collection, spatial detection (overlap, adjacent, in-front) |
+| `mod.rs` | `GameState` thin holder of `WorldState`, `SceneState`, `ProgressState`, `RuntimeState`, `EffectRuntimeState`; `AudioEvent`, `AudioChannel`; core update loop and audio dispatch |
+| `movement.rs` | `MovementService<'a>`: accumulated movement, axis alignment, collision gating, movement audio; borrows entity and scene state directly |
+| `combat.rs` | `CombatService<'a>`: stat changes, damage, primary action, hitbox collision detection, projectile updates; borrows world and scene state |
+| `interaction.rs` | `InteractionService<'a>`: entity interaction collection, spatial detection (overlap, adjacent, in-front) |
 | `scene.rs` | scene loading, entity instantiation, rule initialization |
-| `transition.rs` | scene transition planning, player state preservation across scene switches |
+| `transition.rs` | `SceneTransitionPlanner`: scene transition planning, takes `Scene` by value (no clone); player state preservation across scene switches |
 | `animation.rs` | animation state selection, facing direction, locomotion state, directional helpers |
 | `input.rs` | input mapping, movement input conversion, `InputSystem` |
 | `input_state.rs` | `InputRuntimeState`: key tracking, profile-based input routing, pending action management |
-| `ai_runtime.rs` | AI behavior update dispatch into `GameState` |
-| `stat_effects.rs` | `StatEffectService`: stat change requests, capped healing, inventory mutations, entity activation, teleportation, pending despawns |
+| `ai_runtime.rs` | AI behavior update dispatch |
+| `stat_effects.rs` | `StatEffectService<'a>`: stat change requests, capped healing, inventory mutations, entity activation, teleportation, pending despawns |
 | `inventory.rs` | pickup collection, item management |
-| `render_queries.rs` | `RenderQueryService`: health bar queries, ground shadows, visible entity collection, sprite render requests, debug data |
+| `render_queries.rs` | `RenderQueryService<'a>`: health bar queries, ground shadows, visible entity collection, sprite render requests, debug data |
 | `player_defs.rs` | `PlayerDefinitionConfig` and default player entity definition builder |
+
+Service decomposition (DA1): domain logic is implemented as short-lived services that borrow specific fields from `GameState` rather than as `impl GameState` methods. Each service is constructed per-call by borrowing the fields it needs (`&mut WorldState`, `&mut SceneState`, etc.) and dropped immediately after. This keeps `GameState` as a thin data holder and removes the single-coupling point that previously spanned 200+ methods.
 
 The `src/game/rules/` submodule is decomposed further:
 
 | Submodule | Responsibility |
 |---|---|
-| `mod.rs` | `RuleRuntimeState`, `RuleSystem`, `RuleCommand`, rule update orchestration, fired-once tracking |
+| `mod.rs` | `RuleRuntimeState`, `RuleSystem`, grouped `RuleCommand` enum, rule update orchestration, fired-once tracking |
 | `engine.rs` | rule engine execution pipeline |
 | `events.rs` | event types: `CollisionEvent`, `DamageEvent`, `DeathEvent`, `InteractionEvent`, `DialogCompletionEvent`, `TileTransitionEvent` |
 | `evaluation.rs` | condition evaluation against runtime state |
@@ -288,32 +292,44 @@ Key areas:
 
 | File/module | Responsibility |
 |---|---|
-| `src/backend.rs` | `RenderBackend` trait plus sub-traits (`TextureLoader`, `SpriteRenderer`, `ShapeRenderer`, `TextRenderer`, `FrameLifecycle`) |
-| `src/scene.rs` | `SceneData`, `SpriteInstance`, `DebugShape`, `OverlayShape`, scene submission |
-| `src/gpu.rs` | `GpuState` orchestration: WGPU device/queue/surface, multi-pipeline management, sprite batching, post-processing |
+| `src/backend.rs` | Five focused backend traits: `RenderFrameControl`, `TextureBackend`, `SpriteBackend`, `TextBackend`, `ShapeBackend`; plus `Rect` and `SceneClipRect` |
+| `src/scene.rs` | `SceneData`, `SpriteInstance`, `DebugShape`, `OverlayShape`, scene submission; `SceneSpriteBatchKey` uses `PathBuf` for texture keys |
+| `src/gpu/mod.rs` | `GpuState` orchestration: WGPU device/queue/surface, multi-pipeline management, sprite batching, post-processing; implements all backend traits |
 | `src/sprite_batch_order.rs` | `OrderedDrawBatch` for texture-keyed sprite batch ordering |
 | `src/targets.rs` | `RenderTarget`, `OffscreenTarget`, `SurfaceProvider` |
 | `src/pipelines/sprite.rs` | `SpritePipeline` for 2D sprite rendering with per-texture batching |
 | `src/pipelines/tilemap.rs` | `TilemapPipeline` for tile-based map rendering |
 | `src/pipelines/post_process.rs` | `PostProcessPipeline` with effects: tint, brightness/saturation, quantize, ordered dither, Game Boy palette, vignette |
 | `src/pipelines/debug.rs` | `DebugPipeline` for debug geometry (used by world underlay, debug overlay, UI shapes) |
-| `src/text.rs` | `GlyphonTextRenderer` for glyph-based text layout and anchoring, `TextBackgroundRect` |
+| `src/text/mod.rs` | `GlyphonTextRenderer` for glyph-based text layout and anchoring, `TextBackgroundRect`; text buffer keys use `Arc<str>` for clone-free cache sharing |
+| `src/per_frame_lru.rs` | `PerFrameLruCache<K, V>` — generic per-frame LRU cache with capacity-bounded eviction; used for texture pipeline cache to prevent unbounded growth |
 | `src/texture.rs` | `GpuTexture` loading and management |
 | `src/draw.rs` | low-level sprite draw helpers including flip handling |
 | `src/vertex.rs` | vertex layout types |
 | `src/errors.rs` | `RenderError` error type |
 | `src/wgpu_utils.rs` | WGPU helper functions: device/surface creation, texture bindgroups, present mode selection |
 
-`RenderBackend` trait surface:
+Render backend trait surface (split into five focused traits, DA2):
 
-- texture loading: `load_tilemap_texture`, `load_sprite_texture`, `load_font_file`, plus RGBA8 raw-data variants
-- sprite management: `clear_sprites`, `add_sprite`, `add_sprite_with_texture`
-- text management: `clear_text_items`, `add_text_item`
-- shape layers: world underlay shapes, debug shapes, and UI shapes (each with clear/add/finalize lifecycle)
-- state: `update_projection`, `set_post_process_settings`, `set_scene_clip_rect`, `set_vsync`, `set_tilemap_render_enabled`
-- lifecycle: `resize`, `draw`
+`RenderFrameControl` — frame lifecycle:
+- `set_scene_clip_rect`, `update_projection`, `set_post_process_settings`, `set_vsync`, `set_tilemap_render_enabled`, `resize`, `draw`, `update_tilemap_vertices`
 
-`GpuState` manages multiple `SpritePipeline` instances keyed by texture path (`sprite_pipelines_by_texture`) to support multi-atlas entity rendering. It also maintains separate `DebugPipeline` instances for world underlay, debug overlay, UI rectangles, and UI debug layers.
+`TextureBackend` — asset loading:
+- `load_tilemap_texture`, `load_tilemap_texture_rgba8`, `load_sprite_texture`, `load_sprite_texture_rgba8`, `load_font_file`
+
+`SpriteBackend` — sprite submission:
+- `clear_sprites`, `add_sprite`, `add_sprite_with_texture`, `add_sprite_with_texture_rgba8`
+
+`TextBackend` — text submission:
+- `clear_text_items`, `add_text_item`
+
+`ShapeBackend` — shape submission per render lane (world underlay, debug, UI):
+- each lane: `clear_*_shapes`, `add_*_rect`, `add_filled_*_rect`, `finalize_*_shapes`
+- all shape methods take `Rect` and `[f32; 4]` color
+
+`GpuState` implements all five traits. Consumers may depend only on the subset of traits they require, following the Interface Segregation Principle.
+
+`GpuState` manages multiple `SpritePipeline` instances keyed by `PathBuf` (`sprite_pipelines_by_texture`) to support multi-atlas entity rendering. `PerFrameLruCache` bounds growth by evicting pipelines for textures not referenced in a recent frame. It also maintains separate `DebugPipeline` instances for world underlay, debug overlay, UI rectangles, and UI debug layers.
 
 Render orchestration:
 
@@ -330,7 +346,7 @@ Key areas:
 | File/module | Responsibility |
 |---|---|
 | `src/main.rs` | CLI parsing (`--project`, `--scene`, `--map`, `--pack`, `--splash-duration-ms`, `--splash-hide-branding`), runtime config loading, derived-version startup log |
-| `src/app.rs` | runtime shell wiring, `RuntimeLaunchOptions`, `RuntimeDisplayOptions`, `RuntimeAudioMixOptions`, `RuntimeTransitionOptions`, `RuntimeFlagSettings`, top-level `App` state |
+| `src/app.rs` | runtime shell wiring, `RuntimeLaunchOptions`, `RuntimeDisplayOptions`, `RuntimeAudioMixOptions`, `RuntimeTransitionOptions`, `RuntimeFlagSettings`, top-level `App` state; `AppBuilder` builder pattern for staged initialization |
 | `src/app_bootstrap.rs` | startup-state construction from project or pack |
 | `src/app_lifecycle.rs` | winit lifecycle, resize/input/redraw handling |
 | `src/app_splash.rs` | splash policy, layout, and splash rendering helpers |
@@ -422,7 +438,7 @@ Key areas:
 | `src/ui/editor_ui.rs` | editor UI state, tab management, selection model |
 | `src/ui/editor_ui_*.rs` | UI sub-modules: `animation_authoring`, `animation_editor`, `asset_palette`, `dialog_editor`, `entity_editor`, `graph`, `hierarchy_panel`, `map_editor`, `menu_editor`, `scene_tree`, `sprite_editor` |
 | `src/ui/editor_domain.rs` | shared editor-domain helpers and vocabulary |
-| `src/ui/editor_context.rs` | editor context for UI rendering |
+| `src/ui/editor_context.rs` | `EditorContext` trait with domain-focused implementations (DA3/ME14); each context implementation exposes only the references the consumer needs — replacing the former `EditorContextHost` god-object |
 | `src/ui/inspector_trait.rs` | `Inspector` trait, `InspectorContext` for domain-specific panels |
 | `src/ui/undo_redo.rs` | editor command history for scene, map, and menu mutations |
 | `src/ui/inspector/` | inspector routing across domain-specific inspectors |
@@ -958,6 +974,38 @@ This decomposition ensures:
 - progress state persists across scenes and save slots
 - runtime state is transient and never serialized
 
+### 5.14 Service decomposition model
+
+Domain logic is implemented as short-lived services that borrow fields from `GameState` by reference rather than as `impl GameState` methods. Services are constructed per-call, do their work, and are dropped immediately. This keeps `GameState` as a pure data holder and avoids the single large coupling point.
+
+| Service | Fields borrowed | Responsibility |
+|---|---|---|
+| `MovementService<'a>` | `&mut WorldState`, `&mut SceneState` | Entity movement, collision gating, axis alignment |
+| `CombatService<'a>` | `&mut WorldState`, `&mut SceneState`, `&mut EffectRuntimeState` | Damage, heal, projectile updates, death events |
+| `InteractionService<'a>` | `&WorldState`, `&SceneState` | Interaction collection, spatial detection |
+| `StatEffectService<'a>` | `&mut WorldState`, `&mut EffectRuntimeState` | Stat mutations, entity activation, teleportation, despawn queue |
+| `RenderQueryService<'a>` | `&WorldState`, `&SceneState`, `&RuntimeState` | Visible entity collection, health bars, shadows, sprite requests |
+| `RuleEvaluationService<'a>` | `&WorldState`, `&SceneState`, `&ProgressState`, `&RuntimeState` | Condition evaluation against runtime state for rule firing |
+
+The service pattern resolves borrow conflicts: multiple services may borrow disjoint fields simultaneously without requiring `RefCell` or `unsafe`.
+
+### 5.15 RuleCommand group model
+
+`RuleCommand` is structured as a grouped outer enum with eight sub-enums (DA4). Each sub-enum owns one domain of effect. This replaces a flat ~78-variant enum that was dispatched via if-chains.
+
+| Outer variant | Sub-enum | Actions |
+|---|---|---|
+| `Audio(AudioCommand)` | `AudioCommand` | `PlaySound`, `PlayMusic` |
+| `Animation(AnimationCommand)` | `AnimationCommand` | `PlayAnimation` |
+| `Motion(MotionCommand)` | `MotionCommand` | `SetVelocity` |
+| `Entity(EntityCommand)` | `EntityCommand` | `Spawn`, `DestroySelf`, `DamageEntity`, `HealEntity`, `SetEntityActive`, `TeleportEntity` |
+| `Inventory(InventoryCommand)` | `InventoryCommand` | `AddInventoryItem`, `RemoveInventoryItem` |
+| `Ui(UiCommand)` | `UiCommand` | `ShowUi`, `HideUi`, `UpdateUiBinding` |
+| `Scene(SceneCommand)` | `SceneCommand` | `SwitchScene`, `StartDialog` |
+| `Progress(ProgressCommand)` | `ProgressCommand` | `SetFlag`, `IncrementFlag`, `ClearFlag`, `SaveGame`, `LoadGame` |
+
+Each group has its own application logic module in `src/game/rules/`. Adding a new command in a domain requires only adding a variant to the relevant sub-enum and extending its apply function, without touching other domains.
+
 ## 6. Dynamic View
 
 ### 6.1 Runtime startup
@@ -1347,7 +1395,10 @@ Key architectural decisions:
 - tile atlases and object sheets are distinct asset types
 - project-level configuration (audio, display, menu) is separate from scene/entity settings
 - runtime accepts both project directories and packed bundles
-- `GameState` is modularized into focused submodules (movement, combat, rules, scene, input, interaction, stat effects, transitions)
+- `GameState` is a thin data holder decomposed into `WorldState`, `SceneState`, `ProgressState`, `RuntimeState`, `EffectRuntimeState`; domain logic lives in short-lived services (`MovementService`, `CombatService`, `InteractionService`, `StatEffectService`, `RenderQueryService`, `RuleEvaluationService`) that borrow fields directly
+- `RuleCommand` is a grouped outer enum with eight sub-enums (`AudioCommand`, `AnimationCommand`, `MotionCommand`, `EntityCommand`, `InventoryCommand`, `UiCommand`, `SceneCommand`, `ProgressCommand`), each with its own apply module
+- render backend is split into five focused traits (`RenderFrameControl`, `TextureBackend`, `SpriteBackend`, `TextBackend`, `ShapeBackend`) implemented by `GpuState`; consumers depend only on what they need
+- sprite pipeline cache is bounded by `PerFrameLruCache` to prevent unbounded texture growth
 - `EntityAttributes` is decomposed into `EntityGameplay`, `EntityRendering`, and `EntityBehavior` sub-structs
 - entity storage uses a hybrid mandatory/sparse pattern: core data in `Entity`, optional components in `SparseComponentMap`
 - the rules engine is a full submodule tree with event collection, condition evaluation, action buffering, and command application
