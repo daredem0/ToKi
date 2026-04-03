@@ -5,7 +5,8 @@ use super::{
 };
 use std::path::PathBuf;
 use toki_core::menu::{
-    MenuAppearance, MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction,
+    DialogThemeOverride, MenuDialogPosition, MenuItemDefinition, MenuScreenDefinition,
+    MenuSettings, UiAction,
 };
 use toki_core::project_runtime::{
     IntegerScaleFactor, PostProcessMode, QuantizeStrategy, RuntimeConfigAudio,
@@ -108,7 +109,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     let configured_menu = MenuSettings {
         pause_root_screen_id: "custom_pause".to_string(),
         gate_gameplay_when_open: false,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "custom_pause".to_string(),
             title: "Custom Pause".to_string(),
@@ -242,7 +243,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
             menu: Some(MenuSettings {
                 pause_root_screen_id: "override".to_string(),
                 gate_gameplay_when_open: false,
-                appearance: Default::default(),
+                theme_override: Default::default(),
                 screens: vec![],
                 dialogs: vec![],
             }),
@@ -344,7 +345,7 @@ fn load_runtime_config_skips_invalid_candidate_and_uses_next() {
         Some(MenuSettings {
             pause_root_screen_id: "pause_menu".to_string(),
             gate_gameplay_when_open: true,
-            appearance: Default::default(),
+            theme_override: Default::default(),
             screens: vec![],
             dialogs: vec![],
         })
@@ -487,7 +488,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
         menu: MenuSettings {
             pause_root_screen_id: "cli_pause".to_string(),
             gate_gameplay_when_open: false,
-            appearance: Default::default(),
+            theme_override: Default::default(),
             screens: vec![],
             dialogs: vec![],
         },
@@ -631,14 +632,15 @@ fn apply_runtime_config_updates_display_window_fill_viewport_mode() {
 }
 
 #[test]
-fn apply_project_runtime_settings_loads_dedicated_dialog_appearance() {
+fn apply_project_runtime_settings_loads_dialog_theme_override() {
     let dir = tempfile::tempdir().expect("temp dir");
     std::fs::write(
         dir.path().join("project.toml"),
         r##"
-        [runtime.dialog_appearance]
-        font_family = "Mono"
-        border_color_hex = "#112233"
+        [runtime.dialog_theme_override]
+        position = "right"
+        width_percent = 72
+        button_spacing_px = 14
         "##,
     )
     .expect("project");
@@ -650,11 +652,12 @@ fn apply_project_runtime_settings_loads_dedicated_dialog_appearance() {
         });
 
     assert_eq!(
-        updated.dialog_appearance,
-        MenuAppearance {
-            font_family: "Mono".to_string(),
-            border_color_hex: "#112233".to_string(),
-            ..MenuAppearance::default()
+        updated.dialog_theme_override,
+        DialogThemeOverride {
+            position: MenuDialogPosition::Right,
+            width_percent: 72,
+            button_spacing_px: 14,
+            ..DialogThemeOverride::default()
         }
     );
 }

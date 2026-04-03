@@ -429,6 +429,12 @@ fn focused_button_uses_generic_selection_fill_and_prefix() {
         })
         .expect("focused button block should exist");
     assert_eq!(button_block.fill_color, Some([
+        theme.background_color[0] as f32 / 255.0,
+        theme.background_color[1] as f32 / 255.0,
+        theme.background_color[2] as f32 / 255.0,
+        theme.background_color[3] as f32 / 255.0,
+    ]));
+    assert_eq!(button_block.border_color, Some([
         theme.selection_color[0] as f32 / 255.0,
         theme.selection_color[1] as f32 / 255.0,
         theme.selection_color[2] as f32 / 255.0,
@@ -489,4 +495,62 @@ fn slider_widget_quantizes_and_reports_interactive_hitbox() {
         .find_map(|block| block.text.as_ref())
         .expect("slider value label should exist");
     assert_eq!(value_label.content, "50%");
+}
+
+#[test]
+fn progress_bar_falls_back_to_contrasting_fill_when_fill_and_track_match() {
+    let entity_manager = toki_core::entity::EntityManager::default();
+    let flags = GameFlags::default();
+    let overrides = HashMap::new();
+    let theme = UiTheme {
+        progress_fill_color: [40, 40, 40, 255],
+        progress_empty_color: [40, 40, 40, 255],
+        border_color: [124, 255, 124, 255],
+        ..UiTheme::default()
+    };
+
+    let layout = UiLayoutAsset {
+        id: "hud".into(),
+        title: "HUD".to_string(),
+        startup_visible: true,
+        z_order: 0,
+        root: UiWidgetNode {
+            children: vec![UiWidgetNode {
+                id: "hp".into(),
+                title: "HP".to_string(),
+                kind: UiWidgetKind::ProgressBar {
+                    value: UiProgressBinding::Percent {
+                        percent: UiBinding::Expression {
+                            expression: "50".to_string(),
+                            key: None,
+                        },
+                    },
+                },
+                ..UiWidgetNode::default()
+            }],
+            ..UiWidgetNode::default()
+        },
+    };
+
+    let output = UiLayoutEngine::compose(
+        &layout,
+        &theme,
+        glam::vec2(320.0, 180.0),
+        binding_context(&entity_manager, &flags, &overrides),
+        None,
+    );
+
+    let fill_block = output
+        .composition
+        .blocks
+        .iter()
+        .find(|block| block.border_color.is_none() && block.fill_color.is_some())
+        .expect("fill block should exist");
+
+    assert_eq!(fill_block.fill_color, Some([
+        theme.border_color[0] as f32 / 255.0,
+        theme.border_color[1] as f32 / 255.0,
+        theme.border_color[2] as f32 / 255.0,
+        theme.border_color[3] as f32 / 255.0,
+    ]));
 }

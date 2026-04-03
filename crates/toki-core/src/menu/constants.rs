@@ -10,22 +10,22 @@ pub const DEFAULT_FONT_FAMILY: &str = "Sans";
 pub const DEFAULT_FONT_SIZE_PX: u16 = 14;
 
 /// Default menu width as percentage of screen width.
-pub const DEFAULT_WIDTH_PERCENT: u16 = 88;
+pub const DEFAULT_WIDTH_PERCENT: u16 = 65;
 
 /// Default menu height as percentage of screen height.
-pub const DEFAULT_HEIGHT_PERCENT: u16 = 70;
+pub const DEFAULT_HEIGHT_PERCENT: u16 = 85;
 
 /// Default spacing between title and content in pixels.
-pub const DEFAULT_TITLE_SPACING_PX: u16 = 8;
+pub const DEFAULT_TITLE_SPACING_PX: u16 = 32;
 
 /// Default spacing between buttons in pixels.
-pub const DEFAULT_BUTTON_SPACING_PX: u16 = 8;
+pub const DEFAULT_BUTTON_SPACING_PX: u16 = 12;
 
 /// Default spacing for footer section in pixels.
-pub const DEFAULT_FOOTER_SPACING_PX: u16 = 16;
+pub const DEFAULT_FOOTER_SPACING_PX: u16 = 128;
 
 /// Default menu opacity (100 = fully opaque).
-pub const DEFAULT_OPACITY_PERCENT: u16 = 100;
+pub const DEFAULT_OPACITY_PERCENT: u16 = 50;
 
 /// Default border thickness in pixels.
 pub const DEFAULT_BORDER_THICKNESS_PX: u16 = 2;
@@ -46,7 +46,22 @@ pub const DEFAULT_TITLE_BACKGROUND_COLOR: &str = "#143614";
 pub const DEFAULT_ENTRY_BACKGROUND_COLOR: &str = "#0F1F0F";
 
 /// Default footer text.
-pub const DEFAULT_FOOTER_TEXT: &str = "Esc: Back   Enter/Space: Select";
+pub const DEFAULT_FOOTER_TEXT: &str = "          Esc: Back   \nEnter/Space: Select";
+
+/// Default dialog width as percentage of screen width.
+pub const DEFAULT_DIALOG_WIDTH_PERCENT: u16 = 60;
+
+/// Default spacing between dialog title and body in pixels.
+pub const DEFAULT_DIALOG_TITLE_SPACING_PX: u16 = 6;
+
+/// Default spacing for dialog body section in pixels.
+pub const DEFAULT_DIALOG_BODY_SPACING_PX: u16 = 6;
+
+/// Default spacing between dialog buttons in pixels.
+pub const DEFAULT_DIALOG_BUTTON_SPACING_PX: u16 = 6;
+
+/// Default dialog opacity (100 = fully opaque).
+pub const DEFAULT_DIALOG_OPACITY_PERCENT: u16 = 70;
 
 pub fn default_pause_root_screen_id() -> String {
     "pause_menu".to_string()
@@ -86,6 +101,26 @@ pub fn default_menu_footer_spacing_px() -> u16 {
 
 pub fn default_menu_opacity_percent() -> u16 {
     DEFAULT_OPACITY_PERCENT
+}
+
+pub fn default_dialog_width_percent() -> u16 {
+    DEFAULT_DIALOG_WIDTH_PERCENT
+}
+
+pub fn default_dialog_title_spacing_px() -> u16 {
+    DEFAULT_DIALOG_TITLE_SPACING_PX
+}
+
+pub fn default_dialog_body_spacing_px() -> u16 {
+    DEFAULT_DIALOG_BODY_SPACING_PX
+}
+
+pub fn default_dialog_button_spacing_px() -> u16 {
+    DEFAULT_DIALOG_BUTTON_SPACING_PX
+}
+
+pub fn default_dialog_opacity_percent() -> u16 {
+    DEFAULT_DIALOG_OPACITY_PERCENT
 }
 
 pub fn default_menu_border_thickness_px() -> u16 {

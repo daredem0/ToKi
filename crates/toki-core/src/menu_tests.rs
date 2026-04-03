@@ -1,11 +1,13 @@
 use super::{
     apply_menu_opacity, build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui,
     menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba, menu_visual_metrics,
-    InventoryEntry, MenuAppearance, MenuBorderStyle, MenuController, MenuDialogDefinition,
-    MenuDialogPosition, MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
-    MenuSettings, MenuTextAppearance, MenuView, MenuViewEntry, UiAction, UiCommand,
+    resolve_menu_appearance, InventoryEntry, MenuAppearance, MenuBorderStyle, MenuController,
+    MenuDialogDefinition, MenuDialogPosition, MenuInput, MenuItemDefinition, MenuListSource,
+    MenuScreenDefinition, MenuSettings, MenuTextAppearance, MenuView, MenuViewEntry, UiAction,
+    UiCommand,
 };
 use crate::text::{TextSlant, TextWeight};
+use crate::ui_layout::UiTheme;
 
 #[test]
 fn menu_controller_opens_pause_root_and_renders_default_selection() {
@@ -98,7 +100,7 @@ fn navigation_skips_non_selectable_items() {
     let settings = MenuSettings {
         pause_root_screen_id: "custom".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "custom".to_string(),
             title: "Custom".to_string(),
@@ -146,7 +148,7 @@ fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -178,7 +180,7 @@ fn menu_controller_returns_emit_event_command_for_generic_ui_event_action() {
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -211,7 +213,7 @@ fn menu_controller_returns_runtime_settings_commands_for_builtin_settings_action
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -261,7 +263,7 @@ fn menu_controller_returns_save_and_load_commands_for_slot_actions() {
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -299,29 +301,30 @@ fn menu_controller_returns_save_and_load_commands_for_slot_actions() {
 #[test]
 fn menu_settings_default_includes_appearance_defaults() {
     let settings = MenuSettings::default();
+    let appearance = resolve_menu_appearance(&UiTheme::default(), &settings.theme_override);
 
-    assert_eq!(settings.appearance.font_family, "Sans");
-    assert_eq!(settings.appearance.font_size_px, 14);
-    assert_eq!(settings.appearance.menu_width_percent, 88);
-    assert_eq!(settings.appearance.menu_height_percent, 70);
-    assert_eq!(settings.appearance.title_spacing_px, 8);
-    assert_eq!(settings.appearance.button_spacing_px, 8);
-    assert_eq!(settings.appearance.footer_spacing_px, 16);
-    assert_eq!(settings.appearance.opacity_percent, 100);
-    assert_eq!(settings.appearance.border_color_hex, "#7CFF7C");
-    assert_eq!(settings.appearance.text_color_hex, "#FFFFFF");
-    assert_eq!(settings.appearance.menu_background_color_hex, "#142914");
-    assert_eq!(settings.appearance.title_background_color_hex, "#143614");
-    assert_eq!(settings.appearance.entry_background_color_hex, "#0F1F0F");
+    assert_eq!(appearance.font_family, "Sans");
+    assert_eq!(appearance.font_size_px, 30);
+    assert_eq!(settings.theme_override.menu_width_percent, 65);
+    assert_eq!(settings.theme_override.menu_height_percent, 85);
+    assert_eq!(settings.theme_override.title_spacing_px, 32);
+    assert_eq!(settings.theme_override.button_spacing_px, 12);
+    assert_eq!(settings.theme_override.footer_spacing_px, 128);
+    assert_eq!(settings.theme_override.opacity_percent, 50);
+    assert_eq!(appearance.border_color_hex, "#7CFF7C");
+    assert_eq!(appearance.text_color_hex, "#FFFFFF");
+    assert_eq!(appearance.menu_background_color_hex, "#142914");
+    assert_eq!(appearance.title_background_color_hex, "#143614");
+    assert_eq!(appearance.entry_background_color_hex, "#142914");
     assert_eq!(
-        settings.appearance.footer_text,
-        "Esc: Back   Enter/Space: Select"
+        settings.theme_override.footer_text,
+        "          Esc: Back   \nEnter/Space: Select"
     );
-    assert!(!settings.appearance.menu_background_transparent);
-    assert!(!settings.appearance.title_background_transparent);
-    assert!(!settings.appearance.entry_background_transparent);
+    assert!(!appearance.menu_background_transparent);
+    assert!(!appearance.title_background_transparent);
+    assert!(!appearance.entry_background_transparent);
     assert_eq!(
-        settings.appearance.dialog_speaker_text,
+        appearance.dialog_speaker_text,
         MenuTextAppearance {
             font_family: "Sans".to_string(),
             font_size_px: 18,
@@ -330,15 +333,31 @@ fn menu_settings_default_includes_appearance_defaults() {
         }
     );
     assert_eq!(
-        settings.appearance.dialog_body_text,
+        appearance.dialog_body_text,
         MenuTextAppearance {
             font_family: "Sans".to_string(),
-            font_size_px: 14,
+            font_size_px: 16,
             bold: false,
             cursive: false,
         }
     );
     assert!(settings.dialogs.is_empty());
+}
+
+#[test]
+fn dialog_appearance_keeps_smaller_dialog_scale_than_menu() {
+    let theme = UiTheme::default();
+    let appearance = super::resolve_dialog_appearance(&theme, &Default::default());
+
+    assert_eq!(appearance.font_size_px, theme.base_font_size_px);
+    assert_eq!(appearance.dialog_speaker_text.font_size_px, theme.dialog_speaker_font_size_px);
+    assert_eq!(appearance.dialog_body_text.font_size_px, theme.dialog_body_font_size_px);
+    assert_eq!(appearance.menu_width_percent, 60);
+    assert_eq!(appearance.title_spacing_px, 6);
+    assert_eq!(appearance.button_spacing_px, 6);
+    assert_eq!(appearance.footer_spacing_px, 6);
+    assert_eq!(appearance.opacity_percent, 70);
+    assert_eq!(appearance.dialog_position, MenuDialogPosition::Bottom);
 }
 
 #[test]
@@ -497,7 +516,7 @@ fn menu_controller_opens_dialog_and_back_dismisses_it() {
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -539,7 +558,7 @@ fn menu_controller_dialog_confirm_returns_runtime_command() {
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -724,7 +743,7 @@ fn menu_controller_select_screen_view_entry_maps_rendered_entries_to_buttons() {
     let settings = MenuSettings {
         pause_root_screen_id: "custom".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "custom".to_string(),
             title: "Custom".to_string(),
@@ -765,7 +784,7 @@ fn menu_dialog_activation_by_entry_index_triggers_matching_action() {
     let settings = MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: MenuAppearance::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -799,6 +818,7 @@ fn menu_dialog_activation_by_entry_index_triggers_matching_action() {
 
 #[test]
 fn build_dialog_layout_places_bottom_dialogs_near_bottom_edge() {
+    let dialog_defaults = super::resolve_dialog_appearance(&UiTheme::default(), &Default::default());
     let top_layout = build_dialog_layout(
         &super::MenuDialogView {
             dialog_id: "exit_confirm".to_string(),
@@ -812,14 +832,13 @@ fn build_dialog_layout_places_bottom_dialogs_near_bottom_edge() {
             }],
             hide_main_menu: false,
         },
-        &MenuAppearance::default(),
+        &MenuAppearance {
+            dialog_position: MenuDialogPosition::Top,
+            ..dialog_defaults.clone()
+        },
         glam::Vec2::new(640.0, 360.0),
     );
 
-    let appearance = MenuAppearance {
-        dialog_position: MenuDialogPosition::Bottom,
-        ..MenuAppearance::default()
-    };
     let layout = build_dialog_layout(
         &super::MenuDialogView {
             dialog_id: "exit_confirm".to_string(),
@@ -833,7 +852,7 @@ fn build_dialog_layout_places_bottom_dialogs_near_bottom_edge() {
             }],
             hide_main_menu: false,
         },
-        &appearance,
+        &dialog_defaults,
         glam::Vec2::new(640.0, 360.0),
     );
 

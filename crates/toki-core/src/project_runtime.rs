@@ -1,4 +1,4 @@
-use crate::menu::{MenuAppearance, MenuSettings};
+use crate::menu::{DialogThemeOverride, MenuSettings};
 use crate::palette::{resolve_palette, Palette4};
 use crate::ui_layout::UiTheme;
 use crate::FlagValue;
@@ -72,7 +72,7 @@ pub struct RuntimeSettings {
     #[serde(default)]
     pub menu: MenuSettings,
     #[serde(default)]
-    pub dialog_appearance: MenuAppearance,
+    pub dialog_theme_override: DialogThemeOverride,
     #[serde(default)]
     pub ui: RuntimeUiSettings,
     #[serde(default)]

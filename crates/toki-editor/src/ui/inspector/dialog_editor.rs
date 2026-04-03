@@ -21,11 +21,9 @@ impl InspectorSystem {
         let mut project_ref = None::<&Project>;
         if let Some(project) = project {
             ui.heading("Dialog Style");
-            let changed = Self::render_menu_appearance_editor(
-                ui_state,
+            let changed = Self::render_dialog_theme_override_editor(
                 ui,
-                &mut project.metadata.runtime.dialog_appearance,
-                true,
+                &mut project.metadata.runtime.dialog_theme_override,
             );
 
             if changed {

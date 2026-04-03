@@ -4,7 +4,8 @@ use crate::project::Project;
 use egui::text::{LayoutJob, TextFormat};
 use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_output, compose_menu_output,
-    MenuItemDefinition, MenuView, MenuViewEntry,
+    resolve_dialog_appearance, resolve_menu_appearance, MenuItemDefinition, MenuView,
+    MenuViewEntry,
 };
 use toki_core::ui::{UiBlock, UiComposition};
 
@@ -123,6 +124,10 @@ pub(crate) fn render_menu_editor(
                 ui.label("Selected dialog no longer exists.");
                 return;
             };
+            let appearance = resolve_dialog_appearance(
+                &project.metadata.runtime.ui.theme,
+                &project.metadata.runtime.dialog_theme_override,
+            );
             let layout = build_dialog_layout(
                 &toki_core::menu::MenuDialogView {
                     dialog_id: dialog.id.clone(),
@@ -144,12 +149,10 @@ pub(crate) fn render_menu_editor(
                     ],
                     hide_main_menu: dialog.hide_main_menu,
                 },
-                &project.metadata.runtime.menu.appearance,
+                &appearance,
                 viewport,
             );
-            let composition =
-                compose_dialog_output(&layout, &project.metadata.runtime.menu.appearance)
-                    .composition;
+            let composition = compose_dialog_output(&layout, &appearance).composition;
             let origin = egui::vec2(
                 rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
                 rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
@@ -244,6 +247,10 @@ pub(crate) fn render_menu_editor(
                     }
                 }
             }
+            let appearance = resolve_menu_appearance(
+                &project.metadata.runtime.ui.theme,
+                &project.metadata.runtime.menu.theme_override,
+            );
             let layout = build_menu_layout(
                 &MenuView {
                     screen_id: screen.id.clone(),
@@ -251,12 +258,10 @@ pub(crate) fn render_menu_editor(
                     title_border_style_override: screen.title_border_style_override,
                     entries,
                 },
-                &project.metadata.runtime.menu.appearance,
+                &appearance,
                 viewport,
             );
-            let composition =
-                compose_menu_output(&layout, &project.metadata.runtime.menu.appearance)
-                    .composition;
+            let composition = compose_menu_output(&layout, &appearance).composition;
             let origin = egui::vec2(
                 rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
                 rect.center().y - layout.panel.height * 0.5 - layout.panel.y,

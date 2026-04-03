@@ -40,6 +40,42 @@ impl InspectorSystem {
                         project.is_dirty = true;
                     }
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Menu Font:");
+                    let mut font_size = theme.menu_font_size_px as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut font_size).range(8..=96))
+                        .changed()
+                    {
+                        theme.menu_font_size_px = font_size.max(8) as u16;
+                        project.metadata.project.modified = Utc::now();
+                        project.is_dirty = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Dialog Speaker:");
+                    let mut font_size = theme.dialog_speaker_font_size_px as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut font_size).range(8..=96))
+                        .changed()
+                    {
+                        theme.dialog_speaker_font_size_px = font_size.max(8) as u16;
+                        project.metadata.project.modified = Utc::now();
+                        project.is_dirty = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Dialog Body:");
+                    let mut font_size = theme.dialog_body_font_size_px as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut font_size).range(8..=96))
+                        .changed()
+                    {
+                        theme.dialog_body_font_size_px = font_size.max(8) as u16;
+                        project.metadata.project.modified = Utc::now();
+                        project.is_dirty = true;
+                    }
+                });
             });
             ui.separator();
             crate::ui::panels::ui_editor::render_ui_editor_inspector_panel(

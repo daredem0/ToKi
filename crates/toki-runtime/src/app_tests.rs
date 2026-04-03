@@ -387,7 +387,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         transition: Default::default(),
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
 
@@ -426,7 +426,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_pat
         transition: Default::default(),
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
 
@@ -495,7 +495,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         transition: Default::default(),
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
 
@@ -609,7 +609,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         transition: Default::default(),
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
 
@@ -718,7 +718,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         transition: Default::default(),
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
 
@@ -871,7 +871,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         },
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
     let (resources, mut game_state, _dialogs, _ui_layouts, _mount, _asset_load_plan, _) =
@@ -971,7 +971,7 @@ fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing(
         transition: Default::default(),
         flags: Default::default(),
         menu: MenuSettings::default(),
-        dialog_appearance: Default::default(),
+        dialog_theme_override: Default::default(),
         ui: Default::default(),
     };
 

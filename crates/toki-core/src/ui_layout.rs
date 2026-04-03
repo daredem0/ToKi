@@ -271,6 +271,12 @@ pub struct UiTheme {
     pub font_family: String,
     #[serde(default = "default_ui_font_size_px")]
     pub base_font_size_px: u16,
+    #[serde(default = "default_ui_menu_font_size_px")]
+    pub menu_font_size_px: u16,
+    #[serde(default = "default_ui_dialog_speaker_font_size_px")]
+    pub dialog_speaker_font_size_px: u16,
+    #[serde(default = "default_ui_dialog_body_font_size_px")]
+    pub dialog_body_font_size_px: u16,
     #[serde(default = "default_ui_text_color")]
     pub foreground_color: [u8; 4],
     #[serde(default = "default_ui_background_color")]
@@ -296,6 +302,9 @@ impl Default for UiTheme {
         Self {
             font_family: default_ui_font_family(),
             base_font_size_px: default_ui_font_size_px(),
+            menu_font_size_px: default_ui_menu_font_size_px(),
+            dialog_speaker_font_size_px: default_ui_dialog_speaker_font_size_px(),
+            dialog_body_font_size_px: default_ui_dialog_body_font_size_px(),
             foreground_color: default_ui_text_color(),
             background_color: default_ui_background_color(),
             accent_color: default_ui_accent_color(),
@@ -314,39 +323,51 @@ fn default_ui_font_family() -> String {
 }
 
 const fn default_ui_font_size_px() -> u16 {
-    8
+    14
+}
+
+const fn default_ui_menu_font_size_px() -> u16 {
+    30
+}
+
+const fn default_ui_dialog_speaker_font_size_px() -> u16 {
+    18
+}
+
+const fn default_ui_dialog_body_font_size_px() -> u16 {
+    16
 }
 
 const fn default_ui_text_color() -> [u8; 4] {
-    [240, 240, 240, 255]
-}
-
-const fn default_ui_background_color() -> [u8; 4] {
-    [12, 18, 28, 224]
-}
-
-const fn default_ui_accent_color() -> [u8; 4] {
-    [100, 220, 180, 255]
-}
-
-const fn default_ui_border_color() -> [u8; 4] {
     [255, 255, 255, 255]
 }
 
+const fn default_ui_background_color() -> [u8; 4] {
+    [20, 41, 20, 255]
+}
+
+const fn default_ui_accent_color() -> [u8; 4] {
+    [20, 54, 20, 255]
+}
+
+const fn default_ui_border_color() -> [u8; 4] {
+    [124, 255, 124, 255]
+}
+
 const fn default_ui_border_thickness_px() -> u16 {
-    1
+    2
 }
 
 const fn default_ui_progress_fill_color() -> [u8; 4] {
-    [80, 220, 120, 255]
+    [124, 255, 124, 255]
 }
 
 const fn default_ui_progress_empty_color() -> [u8; 4] {
-    [32, 48, 56, 255]
+    [15, 31, 15, 255]
 }
 
 const fn default_ui_selection_color() -> [u8; 4] {
-    [255, 210, 90, 255]
+    [20, 54, 20, 255]
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -482,10 +503,7 @@ impl UiLayoutEngine {
             UiWidgetKind::Button { label } => {
                 let text = render_text_template(label, *context);
                 let mut block = make_panel_block(widget, rect, theme, highlighted);
-                if highlighted {
-                    block.fill_color = Some(color_to_f32(theme.selection_color));
-                }
-                block.text = Some(text_block_for_widget(
+                let mut text_block = text_block_for_widget(
                     widget,
                     theme,
                     content_rect,
@@ -494,13 +512,23 @@ impl UiLayoutEngine {
                     } else {
                         text
                     },
-                ));
+                );
+                if highlighted {
+                    text_block.style.weight = TextWeight::Bold;
+                }
+                block.text = Some(text_block);
                 output.composition.push(block);
             }
             UiWidgetKind::ProgressBar { value } => {
                 let fraction = resolve_progress_fraction(value, *context);
                 let panel = make_panel_block(widget, rect, theme, highlighted);
                 output.composition.push(panel);
+                let track_color = widget.style.fill_color.unwrap_or(theme.progress_empty_color);
+                let fill_color = contrasted_progress_fill_color(
+                    widget.style.accent_color.unwrap_or(theme.progress_fill_color),
+                    track_color,
+                    theme.border_color,
+                );
                 let fill_rect = UiRect {
                     x: content_rect.x,
                     y: content_rect.y,
@@ -509,12 +537,7 @@ impl UiLayoutEngine {
                 };
                 output.composition.push(UiBlock {
                     rect: fill_rect,
-                    fill_color: Some(color_to_f32(
-                        widget
-                            .style
-                            .accent_color
-                            .unwrap_or(theme.progress_fill_color),
-                    )),
+                    fill_color: Some(color_to_f32(fill_color)),
                     border_color: None,
                     border_thickness: 0.0,
                     text: None,
@@ -529,14 +552,15 @@ impl UiLayoutEngine {
                 let panel = make_panel_block(widget, rect, theme, highlighted);
                 output.composition.push(panel);
                 let track_rect = content_rect.inset(2.0);
+                let track_color = widget.style.fill_color.unwrap_or(theme.progress_empty_color);
+                let fill_color = contrasted_progress_fill_color(
+                    widget.style.accent_color.unwrap_or(theme.progress_fill_color),
+                    track_color,
+                    theme.border_color,
+                );
                 output.composition.push(UiBlock {
                     rect: track_rect,
-                    fill_color: Some(color_to_f32(
-                        widget
-                            .style
-                            .fill_color
-                            .unwrap_or(theme.progress_empty_color),
-                    )),
+                    fill_color: Some(color_to_f32(track_color)),
                     border_color: Some(color_to_f32(widget.style.border_color.unwrap_or(theme.border_color))),
                     border_thickness: theme.border_thickness_px.max(1) as f32,
                     text: None,
@@ -548,12 +572,7 @@ impl UiLayoutEngine {
                         width: track_rect.width * fraction,
                         height: track_rect.height,
                     },
-                    fill_color: Some(color_to_f32(
-                        widget
-                            .style
-                            .accent_color
-                            .unwrap_or(theme.progress_fill_color),
-                    )),
+                    fill_color: Some(color_to_f32(fill_color)),
                     border_color: None,
                     border_thickness: 0.0,
                     text: None,
@@ -1010,6 +1029,38 @@ fn text_anchor_position(rect: UiRect, anchor: TextAnchor, inset: f32) -> glam::V
         TextAnchor::BottomLeft => glam::vec2(left, bottom),
         TextAnchor::BottomCenter => glam::vec2(center_x, bottom),
         TextAnchor::BottomRight => glam::vec2(right, bottom),
+    }
+}
+
+fn contrasted_progress_fill_color(
+    fill_color: [u8; 4],
+    track_color: [u8; 4],
+    fallback_color: [u8; 4],
+) -> [u8; 4] {
+    if color_contrast_distance(fill_color, track_color) >= 48.0 {
+        return fill_color;
+    }
+    if color_contrast_distance(fallback_color, track_color)
+        > color_contrast_distance(fill_color, track_color)
+    {
+        return fallback_color;
+    }
+    high_contrast_color(track_color)
+}
+
+fn color_contrast_distance(left: [u8; 4], right: [u8; 4]) -> f32 {
+    (relative_luminance(left) - relative_luminance(right)).abs()
+}
+
+fn relative_luminance(color: [u8; 4]) -> f32 {
+    0.2126 * color[0] as f32 + 0.7152 * color[1] as f32 + 0.0722 * color[2] as f32
+}
+
+fn high_contrast_color(background: [u8; 4]) -> [u8; 4] {
+    if relative_luminance(background) > 140.0 {
+        [0, 0, 0, 255]
+    } else {
+        [255, 255, 255, 255]
     }
 }
 

@@ -164,11 +164,6 @@ impl InspectorSystem {
         );
     }
 
-    pub(super) fn is_valid_menu_hex_color(hex: &str) -> bool {
-        let trimmed = hex.trim().trim_start_matches('#');
-        trimmed.len() == 6 && trimmed.chars().all(|ch| ch.is_ascii_hexdigit())
-    }
-
     pub(super) fn render_menu_border_override_editor(
         ui: &mut egui::Ui,
         label: &str,

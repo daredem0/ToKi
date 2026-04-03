@@ -303,6 +303,9 @@ pub fn theme_from_menu_appearance(appearance: &MenuAppearance) -> UiTheme {
     UiTheme {
         font_family: appearance.font_family.clone(),
         base_font_size_px: appearance.font_size_px,
+        menu_font_size_px: appearance.font_size_px,
+        dialog_speaker_font_size_px: appearance.dialog_speaker_text.font_size_px,
+        dialog_body_font_size_px: appearance.dialog_body_text.font_size_px,
         foreground_color: rgba_to_u8(
             menu_hex_color_rgba(&appearance.text_color_hex).unwrap_or([1.0, 1.0, 1.0, 1.0]),
         ),
@@ -315,7 +318,12 @@ pub fn theme_from_menu_appearance(appearance: &MenuAppearance) -> UiTheme {
             .unwrap_or([0.08, 0.16, 0.08, 1.0]),
         ),
         accent_color: rgba_to_u8(
-            menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]),
+            menu_fill_color_rgba(
+                &appearance.title_background_color_hex,
+                appearance.title_background_transparent,
+                appearance.opacity_percent,
+            )
+            .unwrap_or([0.08, 0.21, 0.08, 1.0]),
         ),
         border_color: rgba_to_u8(
             menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]),

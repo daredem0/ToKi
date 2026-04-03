@@ -22,24 +22,10 @@ use super::{EditorUI, InspectorSystem, Selection};
 use crate::project::Project;
 use crate::ui::undo_redo::EditorCommand;
 use toki_core::menu::{
-    MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogPosition, MenuItemDefinition,
-    MenuListSource, MenuScreenDefinition, MenuSettings, MenuTextAppearance, UiAction,
+    DialogThemeOverride, MenuBorderStyle, MenuDialogDefinition, MenuDialogPosition,
+    MenuItemDefinition, MenuListSource, MenuScreenDefinition, MenuSettings, MenuThemeOverride,
+    UiAction,
 };
-
-/// Context for editing menu appearance settings
-pub(super) struct AppearanceEditContext {
-    pub appearance: MenuAppearance,
-    pub changed: bool,
-}
-
-impl AppearanceEditContext {
-    pub fn new(appearance: &MenuAppearance) -> Self {
-        Self {
-            appearance: appearance.clone(),
-            changed: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum MenuEditorItemKind {
@@ -67,24 +53,18 @@ impl MenuEditorItemKind {
 }
 
 impl InspectorSystem {
-    pub(super) fn render_menu_appearance_editor(
-        ui_state: &EditorUI,
+    pub(super) fn render_menu_theme_override_editor(
         ui: &mut egui::Ui,
-        appearance: &mut MenuAppearance,
-        include_dialog_text_controls: bool,
+        theme_override: &mut MenuThemeOverride,
     ) -> bool {
-        let mut ctx = AppearanceEditContext::new(appearance);
-        Self::render_typography_header(ui, ui_state, &mut ctx, include_dialog_text_controls);
-        Self::render_layout_header(ui, &mut ctx);
-        Self::render_style_header(ui, &mut ctx);
-        Self::render_backgrounds_header(ui, &mut ctx);
-        Self::render_footer_header(ui, &mut ctx);
+        Self::render_menu_theme_override_layout(ui, theme_override)
+    }
 
-        if ctx.changed {
-            *appearance = ctx.appearance;
-        }
-
-        ctx.changed
+    pub(super) fn render_dialog_theme_override_editor(
+        ui: &mut egui::Ui,
+        theme_override: &mut DialogThemeOverride,
+    ) -> bool {
+        Self::render_dialog_theme_override_layout(ui, theme_override)
     }
 
     pub(crate) fn render_menu_editor_inspector(
@@ -142,12 +122,7 @@ impl InspectorSystem {
 
         Self::render_runtime_menu_header(ui, project, &available_screen_ids);
 
-        Self::render_menu_appearance_editor(
-            ui_state,
-            ui,
-            &mut project.metadata.runtime.menu.appearance,
-            false,
-        );
+        Self::render_menu_theme_override_editor(ui, &mut project.metadata.runtime.menu.theme_override);
         Self::commit_menu_settings_change(ui_state, project, before_settings);
 
         Self::render_screens_dialogs_headers(ui, ui_state, project);

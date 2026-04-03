@@ -623,7 +623,7 @@ fn rewrite_ui_action_surface_targets_updates_open_surface_actions_for_screens() 
     let mut settings = toki_core::menu::MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
@@ -662,7 +662,7 @@ fn rewrite_ui_action_surface_targets_updates_open_surface_actions_for_dialogs() 
     let mut settings = toki_core::menu::MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
-        appearance: Default::default(),
+        theme_override: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),

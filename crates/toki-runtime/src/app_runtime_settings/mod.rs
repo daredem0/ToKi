@@ -80,7 +80,7 @@ impl App {
         viewport: glam::Vec2,
     ) -> bool {
         let appearance =
-            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+            self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
         let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
             return false;
         };
@@ -106,7 +106,7 @@ impl App {
         viewport: glam::Vec2,
     ) -> bool {
         let appearance =
-            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+            self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
         let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
             return false;
         };
@@ -161,7 +161,7 @@ impl App {
             return false;
         };
         let appearance =
-            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+            self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
         let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
             self.menu_coordinator.runtime_overlay_slider_drag = None;
             return false;

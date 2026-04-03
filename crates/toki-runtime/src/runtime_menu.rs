@@ -1,7 +1,9 @@
 use toki_core::game::RuleSystem;
 use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_output, compose_menu_output,
-    dialog_entry_index_from_widget_id, menu_entry_index_from_widget_id, MenuAppearance, MenuInput,
+    dialog_entry_index_from_widget_id, menu_entry_index_from_widget_id,
+    resolve_dialog_appearance, resolve_menu_appearance, DialogThemeOverride, MenuAppearance,
+    MenuInput, MenuThemeOverride,
 };
 use toki_core::ui::UiCommand;
 use toki_core::ui_layout::UiBindingContext;
@@ -157,6 +159,22 @@ impl App {
         scaled
     }
 
+    pub(super) fn resolved_runtime_menu_appearance(
+        &self,
+        theme_override: &MenuThemeOverride,
+    ) -> MenuAppearance {
+        let appearance = resolve_menu_appearance(&self.launch_options.ui.theme, theme_override);
+        self.scaled_runtime_menu_appearance(&appearance)
+    }
+
+    fn resolved_runtime_dialog_appearance(
+        &self,
+        theme_override: &DialogThemeOverride,
+    ) -> MenuAppearance {
+        let appearance = resolve_dialog_appearance(&self.launch_options.ui.theme, theme_override);
+        self.scaled_runtime_menu_appearance(&appearance)
+    }
+
     fn runtime_menu_viewport(&self) -> glam::Vec2 {
         if self.rendering.has_gpu() {
             self.rendering.viewport_surface_size()
@@ -247,8 +265,8 @@ impl App {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return false;
             };
-            let appearance = self
-                .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
+            let appearance =
+                self.resolved_runtime_dialog_appearance(&self.launch_options.dialog_theme_override);
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 let result = self
@@ -266,7 +284,7 @@ impl App {
 
         if let Some(dialog_view) = self.menu_system.current_dialog_view() {
             let appearance =
-                self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+                self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 if let Some(command) = self.menu_system.activate_dialog_entry(entry_index) {
@@ -282,7 +300,7 @@ impl App {
             return false;
         };
         let appearance =
-            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+            self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
         if let Some(entry_index) = menu_entry_at_position(&layout, &appearance, position) {
             if self
@@ -312,8 +330,8 @@ impl App {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return false;
             };
-            let appearance = self
-                .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
+            let appearance =
+                self.resolved_runtime_dialog_appearance(&self.launch_options.dialog_theme_override);
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 self.dialog_system.select_entry(entry_index);
@@ -328,7 +346,7 @@ impl App {
 
         if let Some(dialog_view) = self.menu_system.current_dialog_view() {
             let appearance =
-                self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+                self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
             let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             if let Some(entry_index) = dialog_entry_at_position(&layout, &appearance, position) {
                 self.menu_system.select_dialog_entry(entry_index);
@@ -342,7 +360,7 @@ impl App {
             return false;
         };
         let appearance =
-            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+            self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
         menu_entry_at_position(&layout, &appearance, position).is_some_and(|entry_index| {
             self.menu_system
@@ -412,8 +430,8 @@ impl App {
                 return;
             };
             let viewport = self.runtime_menu_viewport();
-            let appearance = self
-                .scaled_runtime_menu_appearance(narrative_dialog_appearance(&self.launch_options));
+            let appearance =
+                self.resolved_runtime_dialog_appearance(&self.launch_options.dialog_theme_override);
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_output(&dialog_layout, &appearance).composition;
             self.rendering
@@ -432,7 +450,7 @@ impl App {
 
         let viewport = self.runtime_menu_viewport();
         let appearance =
-            self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
+            self.resolved_runtime_menu_appearance(&self.menu_system.settings().theme_override);
 
         if self.render_runtime_settings_overlay(&appearance, viewport) {
             return;
@@ -505,12 +523,6 @@ fn apply_menu_command(
         UiCommand::SaveGame { .. } | UiCommand::LoadGame { .. } => {}
         UiCommand::EmitEvent { event_id } => pending_ui_events.push(event_id),
     }
-}
-
-fn narrative_dialog_appearance(
-    launch_options: &super::RuntimeLaunchOptions,
-) -> &toki_core::menu::MenuAppearance {
-    &launch_options.dialog_appearance
 }
 
 fn should_gate_gameplay(
@@ -705,9 +717,9 @@ mod tests {
             glam::Vec2::new(320.0, 180.0),
         );
 
-        assert_eq!(layout.panel.width, 281.6);
+        assert_eq!(layout.panel.width, 208.0);
         assert_eq!(layout.entries.len(), 2);
-        assert!(layout.entries[0].rect.width > 200.0);
+        assert_eq!(layout.entries[0].rect.width, 176.0);
     }
 
     #[test]
@@ -729,13 +741,18 @@ mod tests {
     #[test]
     fn narrative_dialogs_use_dedicated_dialog_appearance() {
         let mut launch_options = super::super::RuntimeLaunchOptions::default();
-        launch_options.menu.appearance.border_color_hex = "#AABBCC".to_string();
-        launch_options.dialog_appearance.border_color_hex = "#112233".to_string();
+        launch_options.menu.theme_override.menu_width_percent = 55;
+        launch_options.dialog_theme_override.width_percent = 72;
 
-        assert_eq!(
-            narrative_dialog_appearance(&launch_options).border_color_hex,
-            "#112233"
+        let dialog_appearance = resolve_dialog_appearance(
+            &launch_options.ui.theme,
+            &launch_options.dialog_theme_override,
         );
+        let menu_appearance =
+            resolve_menu_appearance(&launch_options.ui.theme, &launch_options.menu.theme_override);
+
+        assert_eq!(menu_appearance.menu_width_percent, 55);
+        assert_eq!(dialog_appearance.menu_width_percent, 72);
     }
 
     #[test]

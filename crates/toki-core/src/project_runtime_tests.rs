@@ -1,4 +1,4 @@
-use crate::menu::{MenuAppearance, MenuTextAppearance};
+use crate::menu::{DialogThemeOverride, MenuDialogPosition};
 use crate::project_runtime::{
     default_runtime_viewport_mode, IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition,
     ProjectPreset, ProjectRuntimeMetadata, ProjectUiEventDefinition, QuantizeStrategy, RuntimeConfigFile,
@@ -140,7 +140,7 @@ fn runtime_settings_defaults_match_engine_baseline() {
         }
     );
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
-    assert_eq!(settings.dialog_appearance, MenuAppearance::default());
+    assert_eq!(settings.dialog_theme_override, DialogThemeOverride::default());
     assert!(settings.flags.declarations.is_empty());
     assert_eq!(
         settings.scene_transitions.default_effect,
@@ -278,30 +278,29 @@ fn runtime_metadata_supports_post_process_settings() {
 }
 
 #[test]
-fn runtime_metadata_supports_dedicated_dialog_appearance() {
+fn runtime_metadata_supports_dialog_theme_override() {
     let metadata: ProjectRuntimeMetadata = toml::from_str(
         r##"
-        [runtime.dialog_appearance]
-        font_family = "Mono"
-        border_color_hex = "#112233"
-        menu_width_percent = 72
+        [runtime.dialog_theme_override]
+        position = "bottom"
+        width_percent = 72
+        title_spacing_px = 18
+        body_spacing_px = 24
+        button_spacing_px = 12
+        opacity_percent = 85
         "##,
     )
     .expect("runtime metadata should deserialize");
 
-    assert_eq!(metadata.runtime.dialog_appearance.font_family, "Mono");
     assert_eq!(
-        metadata.runtime.dialog_appearance.border_color_hex,
-        "#112233"
-    );
-    assert_eq!(metadata.runtime.dialog_appearance.menu_width_percent, 72);
-    assert_eq!(
-        metadata.runtime.dialog_appearance.dialog_speaker_text,
-        MenuTextAppearance {
-            font_family: "Sans".to_string(),
-            font_size_px: 18,
-            bold: true,
-            cursive: false,
+        metadata.runtime.dialog_theme_override,
+        DialogThemeOverride {
+            position: MenuDialogPosition::Bottom,
+            width_percent: 72,
+            title_spacing_px: 18,
+            body_spacing_px: 24,
+            button_spacing_px: 12,
+            opacity_percent: 85,
         }
     );
 }
@@ -381,41 +380,23 @@ fn runtime_metadata_supports_transition_defaults() {
 }
 
 #[test]
-fn runtime_metadata_supports_dialog_speaker_and_body_text_styles() {
+fn runtime_metadata_supports_dialog_theme_override_defaults() {
     let metadata: ProjectRuntimeMetadata = toml::from_str(
         r##"
-        [runtime.dialog_appearance.dialog_speaker_text]
-        font_family = "Mono"
-        font_size_px = 20
-        bold = true
-        cursive = true
-
-        [runtime.dialog_appearance.dialog_body_text]
-        font_family = "Serif"
-        font_size_px = 12
-        bold = false
-        cursive = true
+        [runtime.dialog_theme_override]
+        width_percent = 66
         "##,
     )
     .expect("runtime metadata should deserialize");
 
+    assert_eq!(metadata.runtime.dialog_theme_override.width_percent, 66);
     assert_eq!(
-        metadata.runtime.dialog_appearance.dialog_speaker_text,
-        MenuTextAppearance {
-            font_family: "Mono".to_string(),
-            font_size_px: 20,
-            bold: true,
-            cursive: true,
-        }
+        metadata.runtime.dialog_theme_override.position,
+        MenuDialogPosition::Bottom
     );
     assert_eq!(
-        metadata.runtime.dialog_appearance.dialog_body_text,
-        MenuTextAppearance {
-            font_family: "Serif".to_string(),
-            font_size_px: 12,
-            bold: false,
-            cursive: true,
-        }
+        metadata.runtime.dialog_theme_override.button_spacing_px,
+        DialogThemeOverride::default().button_spacing_px
     );
 }
 

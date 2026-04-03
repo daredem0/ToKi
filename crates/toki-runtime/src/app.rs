@@ -8,7 +8,7 @@ use std::time::Instant;
 use toki_core::camera::{Camera, CameraController, CameraMode};
 use toki_core::dialog_runtime::DialogController;
 use toki_core::game::SceneSystem;
-use toki_core::menu::{MenuAppearance, MenuController, MenuSettings};
+use toki_core::menu::{DialogThemeOverride, MenuController, MenuSettings};
 use toki_core::project_runtime::{
     RuntimeFlagSettings, RuntimePostProcessSettings, RuntimeUiSettings, RuntimeViewportMode,
 };
@@ -171,7 +171,7 @@ pub struct RuntimeLaunchOptions {
     pub transition: RuntimeTransitionOptions,
     pub flags: RuntimeFlagSettings,
     pub menu: MenuSettings,
-    pub dialog_appearance: MenuAppearance,
+    pub dialog_theme_override: DialogThemeOverride,
     pub ui: RuntimeUiSettings,
 }
 

@@ -3,15 +3,16 @@
 use serde::{Deserialize, Serialize};
 
 use crate::ui::{UiAction, UiRect};
+use crate::ui_layout::UiTheme;
 
 use super::constants::{
-    default_gate_gameplay_when_open, default_menu_background_color_hex,
-    default_menu_border_color_hex, default_menu_border_thickness_px,
-    default_menu_button_spacing_px, default_menu_entry_background_color_hex,
-    default_menu_font_family, default_menu_font_size_px, default_menu_footer_spacing_px,
-    default_menu_footer_text, default_menu_height_percent, default_menu_opacity_percent,
-    default_menu_screens, default_menu_text_color_hex, default_menu_title_background_color_hex,
-    default_menu_title_spacing_px, default_menu_width_percent, default_pause_root_screen_id,
+    default_dialog_body_spacing_px, default_dialog_button_spacing_px,
+    default_dialog_opacity_percent, default_dialog_title_spacing_px,
+    default_dialog_width_percent, default_gate_gameplay_when_open,
+    default_menu_button_spacing_px, default_menu_font_family, default_menu_font_size_px,
+    default_menu_footer_spacing_px, default_menu_footer_text, default_menu_height_percent,
+    default_menu_opacity_percent, default_menu_screens, default_menu_title_spacing_px,
+    default_menu_width_percent, default_pause_root_screen_id,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -21,7 +22,7 @@ pub struct MenuSettings {
     #[serde(default = "default_gate_gameplay_when_open")]
     pub gate_gameplay_when_open: bool,
     #[serde(default)]
-    pub appearance: MenuAppearance,
+    pub theme_override: MenuThemeOverride,
     #[serde(default = "default_menu_screens")]
     pub screens: Vec<MenuScreenDefinition>,
     #[serde(default)]
@@ -33,7 +34,7 @@ impl Default for MenuSettings {
         Self {
             pause_root_screen_id: default_pause_root_screen_id(),
             gate_gameplay_when_open: default_gate_gameplay_when_open(),
-            appearance: MenuAppearance::default(),
+            theme_override: MenuThemeOverride::default(),
             screens: default_menu_screens(),
             dialogs: Vec::new(),
         }
@@ -41,11 +42,7 @@ impl Default for MenuSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct MenuAppearance {
-    #[serde(default = "default_menu_font_family")]
-    pub font_family: String,
-    #[serde(default = "default_menu_font_size_px")]
-    pub font_size_px: u16,
+pub struct MenuThemeOverride {
     #[serde(default = "default_menu_width_percent")]
     pub menu_width_percent: u16,
     #[serde(default = "default_menu_height_percent")]
@@ -58,74 +55,94 @@ pub struct MenuAppearance {
     pub footer_spacing_px: u16,
     #[serde(default = "default_menu_opacity_percent")]
     pub opacity_percent: u16,
-    #[serde(default = "default_menu_border_thickness_px")]
-    pub border_thickness_px: u16,
-    #[serde(default = "default_menu_border_color_hex", alias = "color_hex")]
-    pub border_color_hex: String,
-    #[serde(default = "default_menu_text_color_hex")]
-    pub text_color_hex: String,
-    #[serde(default = "default_menu_background_color_hex")]
-    pub menu_background_color_hex: String,
-    #[serde(default)]
-    pub menu_background_transparent: bool,
-    #[serde(default = "default_menu_title_background_color_hex")]
-    pub title_background_color_hex: String,
-    #[serde(default)]
-    pub title_background_transparent: bool,
-    #[serde(default = "default_menu_entry_background_color_hex")]
-    pub entry_background_color_hex: String,
-    #[serde(default)]
-    pub entry_background_transparent: bool,
     #[serde(default = "default_menu_footer_text")]
     pub footer_text: String,
-    #[serde(default)]
-    pub border_style: MenuBorderStyle,
-    #[serde(default)]
-    pub dialog_position: MenuDialogPosition,
-    #[serde(default = "default_dialog_speaker_text_appearance")]
-    pub dialog_speaker_text: MenuTextAppearance,
-    #[serde(default = "default_dialog_body_text_appearance")]
-    pub dialog_body_text: MenuTextAppearance,
 }
 
-impl Default for MenuAppearance {
+impl Default for MenuThemeOverride {
     fn default() -> Self {
         Self {
-            font_family: default_menu_font_family(),
-            font_size_px: default_menu_font_size_px(),
             menu_width_percent: default_menu_width_percent(),
             menu_height_percent: default_menu_height_percent(),
             title_spacing_px: default_menu_title_spacing_px(),
             button_spacing_px: default_menu_button_spacing_px(),
             footer_spacing_px: default_menu_footer_spacing_px(),
             opacity_percent: default_menu_opacity_percent(),
-            border_thickness_px: default_menu_border_thickness_px(),
-            border_color_hex: default_menu_border_color_hex(),
-            text_color_hex: default_menu_text_color_hex(),
-            menu_background_color_hex: default_menu_background_color_hex(),
-            menu_background_transparent: false,
-            title_background_color_hex: default_menu_title_background_color_hex(),
-            title_background_transparent: false,
-            entry_background_color_hex: default_menu_entry_background_color_hex(),
-            entry_background_transparent: false,
             footer_text: default_menu_footer_text(),
-            border_style: MenuBorderStyle::default(),
-            dialog_position: MenuDialogPosition::default(),
-            dialog_speaker_text: default_dialog_speaker_text_appearance(),
-            dialog_body_text: default_dialog_body_text_appearance(),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct MenuTextAppearance {
-    #[serde(default = "default_menu_font_family")]
+pub struct DialogThemeOverride {
+    #[serde(default = "default_dialog_position")]
+    pub position: MenuDialogPosition,
+    #[serde(default = "default_dialog_width_percent")]
+    pub width_percent: u16,
+    #[serde(default = "default_dialog_title_spacing_px")]
+    pub title_spacing_px: u16,
+    #[serde(default = "default_dialog_body_spacing_px")]
+    pub body_spacing_px: u16,
+    #[serde(default = "default_dialog_button_spacing_px")]
+    pub button_spacing_px: u16,
+    #[serde(default = "default_dialog_opacity_percent")]
+    pub opacity_percent: u16,
+}
+
+impl Default for DialogThemeOverride {
+    fn default() -> Self {
+        Self {
+            position: default_dialog_position(),
+            width_percent: default_dialog_width_percent(),
+            title_spacing_px: default_dialog_title_spacing_px(),
+            body_spacing_px: default_dialog_body_spacing_px(),
+            button_spacing_px: default_dialog_button_spacing_px(),
+            opacity_percent: default_dialog_opacity_percent(),
+        }
+    }
+}
+
+fn default_dialog_position() -> MenuDialogPosition {
+    MenuDialogPosition::Bottom
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MenuAppearance {
     pub font_family: String,
-    #[serde(default = "default_menu_font_size_px")]
     pub font_size_px: u16,
-    #[serde(default)]
+    pub menu_width_percent: u16,
+    pub menu_height_percent: u16,
+    pub title_spacing_px: u16,
+    pub button_spacing_px: u16,
+    pub footer_spacing_px: u16,
+    pub opacity_percent: u16,
+    pub border_thickness_px: u16,
+    pub border_color_hex: String,
+    pub text_color_hex: String,
+    pub menu_background_color_hex: String,
+    pub menu_background_transparent: bool,
+    pub title_background_color_hex: String,
+    pub title_background_transparent: bool,
+    pub entry_background_color_hex: String,
+    pub entry_background_transparent: bool,
+    pub footer_text: String,
+    pub border_style: MenuBorderStyle,
+    pub dialog_position: MenuDialogPosition,
+    pub dialog_speaker_text: MenuTextAppearance,
+    pub dialog_body_text: MenuTextAppearance,
+}
+
+impl Default for MenuAppearance {
+    fn default() -> Self {
+        resolve_menu_appearance(&UiTheme::default(), &MenuThemeOverride::default())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MenuTextAppearance {
+    pub font_family: String,
+    pub font_size_px: u16,
     pub bold: bool,
-    #[serde(default)]
     pub cursive: bool,
 }
 
@@ -140,17 +157,77 @@ impl Default for MenuTextAppearance {
     }
 }
 
-fn default_dialog_speaker_text_appearance() -> MenuTextAppearance {
+pub fn resolve_menu_appearance(theme: &UiTheme, theme_override: &MenuThemeOverride) -> MenuAppearance {
+    let border_color = color_hex(theme.border_color);
+    let text_color = color_hex(theme.foreground_color);
+    let background_color = color_hex(theme.background_color);
+    let title_background_color = color_hex(theme.accent_color);
+    let entry_background_color = color_hex(theme.background_color);
+
+    MenuAppearance {
+        font_family: theme.font_family.clone(),
+        font_size_px: theme.menu_font_size_px,
+        menu_width_percent: theme_override.menu_width_percent,
+        menu_height_percent: theme_override.menu_height_percent,
+        title_spacing_px: theme_override.title_spacing_px,
+        button_spacing_px: theme_override.button_spacing_px,
+        footer_spacing_px: theme_override.footer_spacing_px,
+        opacity_percent: theme_override.opacity_percent,
+        border_thickness_px: theme.border_thickness_px,
+        border_color_hex: border_color,
+        text_color_hex: text_color,
+        menu_background_color_hex: background_color.clone(),
+        menu_background_transparent: theme.background_color[3] == 0,
+        title_background_color_hex: title_background_color,
+        title_background_transparent: theme.accent_color[3] == 0,
+        entry_background_color_hex: entry_background_color,
+        entry_background_transparent: theme.background_color[3] == 0,
+        footer_text: theme_override.footer_text.clone(),
+        border_style: MenuBorderStyle::Square,
+        dialog_position: MenuDialogPosition::Top,
+        dialog_speaker_text: default_dialog_speaker_text_appearance_for_theme(theme),
+        dialog_body_text: default_dialog_body_text_appearance_for_theme(theme),
+    }
+}
+
+pub fn resolve_dialog_appearance(
+    theme: &UiTheme,
+    theme_override: &DialogThemeOverride,
+) -> MenuAppearance {
+    let mut appearance = resolve_menu_appearance(theme, &MenuThemeOverride::default());
+    appearance.font_size_px = theme.base_font_size_px;
+    appearance.menu_width_percent = theme_override.width_percent;
+    appearance.title_spacing_px = theme_override.title_spacing_px;
+    appearance.footer_spacing_px = theme_override.body_spacing_px;
+    appearance.button_spacing_px = theme_override.button_spacing_px;
+    appearance.opacity_percent = theme_override.opacity_percent;
+    appearance.dialog_position = theme_override.position;
+    appearance.footer_text.clear();
+    appearance.dialog_speaker_text = default_dialog_speaker_text_appearance_for_theme(theme);
+    appearance.dialog_body_text = default_dialog_body_text_appearance_for_theme(theme);
+    appearance
+}
+
+fn default_dialog_speaker_text_appearance_for_theme(theme: &UiTheme) -> MenuTextAppearance {
     MenuTextAppearance {
-        font_family: default_menu_font_family(),
-        font_size_px: default_menu_font_size_px().saturating_add(4),
+        font_family: theme.font_family.clone(),
+        font_size_px: theme.dialog_speaker_font_size_px,
         bold: true,
         cursive: false,
     }
 }
 
-fn default_dialog_body_text_appearance() -> MenuTextAppearance {
-    MenuTextAppearance::default()
+fn default_dialog_body_text_appearance_for_theme(theme: &UiTheme) -> MenuTextAppearance {
+    MenuTextAppearance {
+        font_family: theme.font_family.clone(),
+        font_size_px: theme.dialog_body_font_size_px,
+        bold: false,
+        cursive: false,
+    }
+}
+
+fn color_hex(color: [u8; 4]) -> String {
+    format!("#{:02X}{:02X}{:02X}", color[0], color[1], color[2])
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

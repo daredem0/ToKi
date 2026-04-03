@@ -6,7 +6,7 @@
 //! # Module Structure
 //!
 //! - `constants`: Default values and constants
-//! - `types`: Core types (MenuSettings, MenuAppearance, etc.)
+//! - `types`: Core types (MenuSettings, theme overrides, resolved appearance)
 //! - `utilities`: Color parsing and utility functions
 //! - `layout`: Layout building functions
 //! - `composition`: UI composition functions
@@ -36,10 +36,11 @@ pub use constants::{
 pub use controller::MenuController;
 pub use layout::{build_dialog_layout, build_menu_layout};
 pub use types::{
-    InventoryEntry, MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogLayout,
-    MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition, MenuLayout,
-    MenuLayoutBlock, MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings,
-    MenuTextAppearance, MenuView, MenuViewEntry, MenuVisualMetrics,
+    DialogThemeOverride, InventoryEntry, MenuAppearance, MenuBorderStyle, MenuDialogDefinition,
+    MenuDialogLayout, MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput,
+    MenuItemDefinition, MenuLayout, MenuLayoutBlock, MenuListSource, MenuRect,
+    MenuScreenDefinition, MenuSettings, MenuTextAppearance, MenuThemeOverride, MenuView,
+    MenuViewEntry, MenuVisualMetrics, resolve_dialog_appearance, resolve_menu_appearance,
 };
 pub use utilities::{
     apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
