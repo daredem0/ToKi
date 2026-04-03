@@ -29,18 +29,9 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -52,6 +43,16 @@
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
             }
           },
           "current_clip_state": "Walk",
@@ -59,16 +60,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -123,18 +136,9 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -146,6 +150,16 @@
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
             }
           },
           "current_clip_state": "Walk",
@@ -153,16 +167,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -216,8 +242,19 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -229,16 +266,6 @@
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
             }
           },
           "current_clip_state": "Walk",
@@ -246,16 +273,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -309,6 +348,7 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
             "Walk": {
@@ -339,16 +379,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -402,6 +454,7 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
             "Idle": {
@@ -432,16 +485,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -495,6 +560,7 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
             "Idle": {
@@ -525,16 +591,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -740,13 +818,24 @@
         "has_shadow": true,
         "animation_controller": {
           "clips": {
-            "IdleDown": {
-              "state": "IdleDown",
+            "AttackUp": {
+              "state": "AttackUp",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a"
+                "player/attack_up_a",
+                "player/attack_up_b"
               ],
-              "frame_duration_ms": 300.0,
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
             "WalkUp": {
@@ -759,25 +848,14 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "WalkRight": {
-              "state": "WalkRight",
+            "IdleDown": {
+              "state": "IdleDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
+                "player/walk_down_a"
               ],
-              "frame_duration_ms": 180.0,
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
-            },
-            "AttackUp": {
-              "state": "AttackUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_up_a",
-                "player/attack_up_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
             },
             "WalkDown": {
               "state": "WalkDown",
@@ -789,8 +867,56 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_up_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "AttackDown": {
+              "state": "AttackDown",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/attack_down_a",
+                "player/attack_down_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
+            },
+            "AttackLeft": {
+              "state": "AttackLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/attack_right_a",
+                "player/attack_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
+            },
             "IdleLeft": {
               "state": "IdleLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleRight": {
+              "state": "IdleRight",
               "atlas_name": "players.json",
               "frame_tile_names": [
                 "player/walk_right_a"
@@ -807,54 +933,6 @@
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Once"
-            },
-            "AttackDown": {
-              "state": "AttackDown",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_down_a",
-                "player/attack_down_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
-            "IdleRight": {
-              "state": "IdleRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "AttackLeft": {
-              "state": "AttackLeft",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_right_a",
-                "player/attack_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
             }
           },
           "current_clip_state": "IdleDown",
@@ -940,20 +1018,9 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
-            "Walk": {
-              "state": "Walk",
-              "atlas_name": "soldier.json",
-              "frame_tile_names": [
-                "soldier/walk_a",
-                "soldier/walk_b",
-                "soldier/walk_c",
-                "soldier/walk_d"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
             "WalkUp": {
               "state": "WalkUp",
               "atlas_name": "soldier.json",
@@ -966,35 +1033,26 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "WalkRight": {
-              "state": "WalkRight",
+            "Walk": {
+              "state": "Walk",
               "atlas_name": "soldier.json",
               "frame_tile_names": [
-                "soldier/walk_right_a",
-                "soldier/walk_right_b",
-                "soldier/walk_right_c",
-                "soldier/walk_right_d"
+                "soldier/walk_a",
+                "soldier/walk_b",
+                "soldier/walk_c",
+                "soldier/walk_d"
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "soldier.json",
               "frame_tile_names": [
-                "soldier/idle_left_a"
+                "soldier/idle_up_a"
               ],
               "frame_duration_ms": 100.0,
               "loop_mode": "Loop"
-            },
-            "IdleDown": {
-              "state": "IdleDown",
-              "atlas_name": "soldier.json",
-              "frame_tile_names": [
-                "soldier/idle_down_a"
-              ],
-              "frame_duration_ms": 100.0,
-              "loop_mode": "Once"
             },
             "WalkDown": {
               "state": "WalkDown",
@@ -1017,6 +1075,36 @@
               "frame_duration_ms": 100.0,
               "loop_mode": "Loop"
             },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "soldier.json",
+              "frame_tile_names": [
+                "soldier/idle_left_a"
+              ],
+              "frame_duration_ms": 100.0,
+              "loop_mode": "Loop"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "soldier.json",
+              "frame_tile_names": [
+                "soldier/walk_right_a",
+                "soldier/walk_right_b",
+                "soldier/walk_right_c",
+                "soldier/walk_right_d"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "soldier.json",
+              "frame_tile_names": [
+                "soldier/idle_down_a"
+              ],
+              "frame_duration_ms": 100.0,
+              "loop_mode": "Once"
+            },
             "WalkLeft": {
               "state": "WalkLeft",
               "atlas_name": "soldier.json",
@@ -1027,15 +1115,6 @@
                 "soldier/walk_left_d"
               ],
               "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "soldier.json",
-              "frame_tile_names": [
-                "soldier/idle_up_a"
-              ],
-              "frame_duration_ms": 100.0,
               "loop_mode": "Loop"
             },
             "Idle": {
@@ -1054,16 +1133,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -1127,30 +1218,6 @@
         "palette_override": "sunset",
         "animation_controller": {
           "clips": {
-            "WalkDown": {
-              "state": "WalkDown",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_down_a",
-                "slime/walk_down_b",
-                "slime/walk_down_c",
-                "slime/walk_down_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_right_a",
-                "slime/walk_right_b",
-                "slime/walk_right_c",
-                "slime/walk_right_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "IdleLeft": {
               "state": "IdleLeft",
               "atlas_name": "creatures_palette4.json",
@@ -1161,18 +1228,6 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_left_a",
-                "slime/walk_left_b",
-                "slime/walk_left_c",
-                "slime/walk_left_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "IdleRight": {
               "state": "IdleRight",
               "atlas_name": "creatures_palette4.json",
@@ -1181,6 +1236,18 @@
                 "slime/idle_right_b"
               ],
               "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_down_a",
+                "slime/walk_down_b",
+                "slime/walk_down_c",
+                "slime/walk_down_d"
+              ],
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
             "IdleUp": {
@@ -1205,16 +1272,6 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/idle_down_a",
-                "slime/idle_down_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Idle": {
               "state": "Idle",
               "atlas_name": "creatures_palette4.json",
@@ -1236,6 +1293,40 @@
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_left_a",
+                "slime/walk_left_b",
+                "slime/walk_left_c",
+                "slime/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/idle_down_a",
+                "slime/idle_down_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_right_a",
+                "slime/walk_right_b",
+                "slime/walk_right_c",
+                "slime/walk_right_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
             }
           },
           "current_clip_state": "Walk",
@@ -1243,16 +1334,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -1311,8 +1414,43 @@
       "rendering": {
         "visible": true,
         "has_shadow": true,
+        "palette_override": "",
         "animation_controller": {
           "clips": {
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_left_a",
+                "slime/walk_left_b",
+                "slime/walk_left_c",
+                "slime/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/idle_a",
+                "slime/idle_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "Walk": {
+              "state": "Walk",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_a",
+                "slime/walk_b",
+                "slime/walk_c",
+                "slime/walk_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "IdleDown": {
               "state": "IdleDown",
               "atlas_name": "creatures_palette4.json",
@@ -1323,14 +1461,14 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkDown": {
-              "state": "WalkDown",
+            "WalkUp": {
+              "state": "WalkUp",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/walk_down_a",
-                "slime/walk_down_b",
-                "slime/walk_down_c",
-                "slime/walk_down_d"
+                "slime/walk_up_a",
+                "slime/walk_up_b",
+                "slime/walk_up_c",
+                "slime/walk_up_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -1343,6 +1481,18 @@
                 "slime/walk_right_b",
                 "slime/walk_right_c",
                 "slime/walk_right_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/walk_down_a",
+                "slime/walk_down_b",
+                "slime/walk_down_c",
+                "slime/walk_down_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -1367,52 +1517,6 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_up_a",
-                "slime/walk_up_b",
-                "slime/walk_up_c",
-                "slime/walk_up_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Walk": {
-              "state": "Walk",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_a",
-                "slime/walk_b",
-                "slime/walk_c",
-                "slime/walk_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/idle_a",
-                "slime/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_left_a",
-                "slime/walk_left_b",
-                "slime/walk_left_c",
-                "slime/walk_left_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "IdleRight": {
               "state": "IdleRight",
               "atlas_name": "creatures_palette4.json",
@@ -1429,16 +1533,28 @@
           "frame_timer": 0.0,
           "is_finished": false
         },
-        "render_layer": 0
+        "render_layer": 0,
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              12
+            ],
+            "size": [
+              8,
+              4
+            ]
+          }
+        }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          4,
+          12
         ],
         "size": [
-          16,
-          16
+          8,
+          4
         ],
         "trigger": false
       },
@@ -1494,16 +1610,28 @@
         "static_object_render": {
           "sheet": "fauna",
           "object_name": "rock"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              3,
+              10
+            ],
+            "size": [
+              10,
+              6
+            ]
+          }
         }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          3,
+          10
         ],
         "size": [
-          16,
-          16
+          10,
+          6
         ],
         "trigger": false
       },
@@ -1524,26 +1652,28 @@
       "category": "decoration",
       "rendering": {
         "visible": true,
-        "has_shadow": true,
+        "has_shadow": false,
         "animation_controller": null,
         "render_layer": 0,
         "static_object_render": {
           "sheet": "fauna",
           "object_name": "flower"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              6,
+              12
+            ],
+            "size": [
+              4,
+              3
+            ]
+          }
         }
       },
-      "collision_box": {
-        "offset": [
-          0,
-          0
-        ],
-        "size": [
-          16,
-          16
-        ],
-        "trigger": false
-      },
-      "solid": true,
+      "collision_box": null,
+      "solid": false,
       "active": false
     },
     {
@@ -1560,26 +1690,28 @@
       "category": "decoration",
       "rendering": {
         "visible": true,
-        "has_shadow": true,
+        "has_shadow": false,
         "animation_controller": null,
         "render_layer": 0,
         "static_object_render": {
           "sheet": "fauna",
           "object_name": "flower"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              6,
+              12
+            ],
+            "size": [
+              4,
+              3
+            ]
+          }
         }
       },
-      "collision_box": {
-        "offset": [
-          0,
-          0
-        ],
-        "size": [
-          16,
-          16
-        ],
-        "trigger": false
-      },
-      "solid": true,
+      "collision_box": null,
+      "solid": false,
       "active": false
     },
     {
@@ -1596,12 +1728,24 @@
       "category": "decoration",
       "rendering": {
         "visible": true,
-        "has_shadow": true,
+        "has_shadow": false,
         "animation_controller": null,
         "render_layer": 0,
         "static_object_render": {
           "sheet": "fauna",
           "object_name": "flower"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              6,
+              12
+            ],
+            "size": [
+              4,
+              3
+            ]
+          }
         }
       },
       "collision_box": null,
@@ -1628,16 +1772,28 @@
         "static_object_render": {
           "sheet": "fauna",
           "object_name": "rock"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              3,
+              10
+            ],
+            "size": [
+              10,
+              6
+            ]
+          }
         }
       },
       "collision_box": {
         "offset": [
-          0,
-          0
+          3,
+          10
         ],
         "size": [
-          16,
-          16
+          10,
+          6
         ],
         "trigger": false
       },
@@ -1658,26 +1814,28 @@
       "category": "decoration",
       "rendering": {
         "visible": true,
-        "has_shadow": true,
+        "has_shadow": false,
         "animation_controller": null,
         "render_layer": 0,
         "static_object_render": {
           "sheet": "fauna",
           "object_name": "flower"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              6,
+              12
+            ],
+            "size": [
+              4,
+              3
+            ]
+          }
         }
       },
-      "collision_box": {
-        "offset": [
-          0,
-          0
-        ],
-        "size": [
-          16,
-          16
-        ],
-        "trigger": false
-      },
-      "solid": true,
+      "collision_box": null,
+      "solid": false,
       "active": false
     },
     {
@@ -1767,6 +1925,54 @@
         "static_object_render": {
           "sheet": "House",
           "object_name": "object_0"
+        },
+        "grounding": {
+          "footprint": {
+            "offset": [
+              4,
+              20
+            ],
+            "size": [
+              24,
+              12
+            ]
+          }
+        }
+      },
+      "collision_box": {
+        "offset": [
+          4,
+          20
+        ],
+        "size": [
+          24,
+          12
+        ],
+        "trigger": false
+      },
+      "solid": true,
+      "active": false
+    },
+    {
+      "id": 26,
+      "position": [
+        72,
+        0
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "rendering": {
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "fauna",
+          "object_name": "rock"
         }
       },
       "collision_box": {
@@ -1775,12 +1981,110 @@
           0
         ],
         "size": [
-          32,
-          32
+          16,
+          16
         ],
         "trigger": false
       },
       "solid": true,
+      "active": false
+    },
+    {
+      "id": 27,
+      "position": [
+        72,
+        24
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "rendering": {
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "fauna",
+          "object_name": "flower"
+        }
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      },
+      "solid": true,
+      "active": false
+    },
+    {
+      "id": 28,
+      "position": [
+        72,
+        40
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "rendering": {
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "fauna",
+          "object_name": "flower"
+        }
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      },
+      "solid": true,
+      "active": false
+    },
+    {
+      "id": 29,
+      "position": [
+        72,
+        56
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "decoration",
+      "rendering": {
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "static_object_render": {
+          "sheet": "fauna",
+          "object_name": "flower"
+        }
+      },
+      "collision_box": null,
+      "solid": false,
       "active": false
     }
   ],

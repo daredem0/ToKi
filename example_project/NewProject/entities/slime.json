@@ -10,17 +10,29 @@
     "render_layer": 0,
     "visible": true,
     "has_shadow": true,
-    "palette_override": ""
+    "palette_override": "",
+    "grounding": {
+      "footprint": {
+        "offset": [
+          4,
+          12
+        ],
+        "size": [
+          8,
+          4
+        ]
+      }
+    }
   },
   "collision": {
     "enabled": true,
     "offset": [
-      0,
-      0
+      4,
+      12
     ],
     "size": [
-      16,
-      16
+      8,
+      4
     ],
     "trigger": false
   },
