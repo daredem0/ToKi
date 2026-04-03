@@ -34,6 +34,7 @@
       "border_color": null,
       "text_color": null,
       "accent_color": null,
+      "text_wrap": false,
       "typography": {
         "font_family": null,
         "font_size_px": null,
@@ -88,6 +89,7 @@
           "border_color": null,
           "text_color": null,
           "accent_color": null,
+          "text_wrap": false,
           "typography": {
             "font_family": "Sans",
             "font_size_px": 33,
@@ -144,6 +146,7 @@
           "border_color": null,
           "text_color": null,
           "accent_color": null,
+          "text_wrap": false,
           "typography": {
             "font_family": null,
             "font_size_px": null,
