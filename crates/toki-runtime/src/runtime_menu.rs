@@ -1,9 +1,8 @@
 use toki_core::game::RuleSystem;
 use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_output, compose_menu_output,
-    dialog_entry_index_from_widget_id, menu_entry_index_from_widget_id,
-    resolve_dialog_appearance, resolve_menu_appearance, DialogThemeOverride, MenuAppearance,
-    MenuInput, MenuThemeOverride,
+    dialog_entry_index_from_widget_id, menu_entry_index_from_widget_id, resolve_dialog_appearance,
+    resolve_menu_appearance, DialogThemeOverride, MenuAppearance, MenuInput, MenuThemeOverride,
 };
 use toki_core::ui::UiCommand;
 use toki_core::ui_layout::UiBindingContext;
@@ -70,7 +69,8 @@ impl App {
                 declared_flags: &declared_flags,
             },
         );
-        self.menu_coordinator.pending_ui_events
+        self.menu_coordinator
+            .pending_ui_events
             .extend(self.ui_controller.take_emitted_events());
         handled
     }
@@ -94,7 +94,8 @@ impl App {
                 declared_flags: &declared_flags,
             },
         );
-        self.menu_coordinator.pending_ui_events
+        self.menu_coordinator
+            .pending_ui_events
             .extend(self.ui_controller.take_emitted_events());
         handled
     }
@@ -118,7 +119,8 @@ impl App {
                 declared_flags: &declared_flags,
             },
         );
-        self.menu_coordinator.pending_ui_events
+        self.menu_coordinator
+            .pending_ui_events
             .extend(self.ui_controller.take_emitted_events());
         handled
     }
@@ -748,8 +750,10 @@ mod tests {
             &launch_options.ui.theme,
             &launch_options.dialog_theme_override,
         );
-        let menu_appearance =
-            resolve_menu_appearance(&launch_options.ui.theme, &launch_options.menu.theme_override);
+        let menu_appearance = resolve_menu_appearance(
+            &launch_options.ui.theme,
+            &launch_options.menu.theme_override,
+        );
 
         assert_eq!(menu_appearance.menu_width_percent, 55);
         assert_eq!(dialog_appearance.menu_width_percent, 72);
@@ -799,11 +803,19 @@ mod tests {
         };
 
         assert_eq!(
-            dialog_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(20.0, 35.0)),
+            dialog_entry_at_position(
+                &layout,
+                &MenuAppearance::default(),
+                glam::Vec2::new(20.0, 35.0)
+            ),
             Some(0)
         );
         assert_eq!(
-            dialog_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(5.0, 5.0)),
+            dialog_entry_at_position(
+                &layout,
+                &MenuAppearance::default(),
+                glam::Vec2::new(5.0, 5.0)
+            ),
             None
         );
     }
@@ -852,11 +864,19 @@ mod tests {
         };
 
         assert_eq!(
-            menu_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(20.0, 35.0)),
+            menu_entry_at_position(
+                &layout,
+                &MenuAppearance::default(),
+                glam::Vec2::new(20.0, 35.0)
+            ),
             Some(0)
         );
         assert_eq!(
-            menu_entry_at_position(&layout, &MenuAppearance::default(), glam::Vec2::new(5.0, 5.0)),
+            menu_entry_at_position(
+                &layout,
+                &MenuAppearance::default(),
+                glam::Vec2::new(5.0, 5.0)
+            ),
             None
         );
     }

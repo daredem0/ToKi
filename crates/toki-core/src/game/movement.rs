@@ -81,9 +81,11 @@ impl MovementSystem {
         completed_loops: u32,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
-        state
-            .movement_service()
-            .emit_animation_loop_movement_audio(entity_id, completed_loops, result);
+        state.movement_service().emit_animation_loop_movement_audio(
+            entity_id,
+            completed_loops,
+            result,
+        );
     }
 }
 
@@ -101,7 +103,8 @@ impl<'a> MovementService<'a> {
             .filter_map(|&entity_id| {
                 let entity = self.world.entity_manager.get_entity(entity_id)?;
                 if matches!(
-                    entity.effective_movement_profile(self.world.entity_manager.movement(entity_id)),
+                    entity
+                        .effective_movement_profile(self.world.entity_manager.movement(entity_id)),
                     crate::entity::MovementProfile::PlayerWasd
                 ) {
                     Some(entity_id)
@@ -607,8 +610,11 @@ impl<'a> MovementService<'a> {
             actual_player_delta
         };
         let is_trying_to_move = intended_player_delta != glam::IVec2::ZERO;
-        let desired_player_animation =
-            GameState::resolve_animation_state(animation_controller, is_trying_to_move, player_delta);
+        let desired_player_animation = GameState::resolve_animation_state(
+            animation_controller,
+            is_trying_to_move,
+            player_delta,
+        );
         if animation_controller.current_clip_state != desired_player_animation {
             tracing::debug!(
                 "Changing clip from  {:?} to {:?}",

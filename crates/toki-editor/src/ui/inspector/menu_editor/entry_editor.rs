@@ -211,8 +211,12 @@ impl InspectorSystem {
                     "Entry Border Style",
                     border_style_override,
                 );
-                changed |=
-                    Self::render_menu_action_editor(ui, available_surface_ids, declared_ui_events, action);
+                changed |= Self::render_menu_action_editor(
+                    ui,
+                    available_surface_ids,
+                    declared_ui_events,
+                    action,
+                );
                 if let UiAction::OpenSurface { surface_id } = action {
                     if !available_surface_ids.iter().any(|id| id == surface_id) {
                         missing_target = Some(surface_id.clone());

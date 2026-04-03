@@ -7,12 +7,11 @@ use crate::ui_layout::UiTheme;
 
 use super::constants::{
     default_dialog_body_spacing_px, default_dialog_button_spacing_px,
-    default_dialog_opacity_percent, default_dialog_title_spacing_px,
-    default_dialog_width_percent, default_gate_gameplay_when_open,
-    default_menu_button_spacing_px, default_menu_font_family, default_menu_font_size_px,
-    default_menu_footer_spacing_px, default_menu_footer_text, default_menu_height_percent,
-    default_menu_opacity_percent, default_menu_screens, default_menu_title_spacing_px,
-    default_menu_width_percent, default_pause_root_screen_id,
+    default_dialog_opacity_percent, default_dialog_title_spacing_px, default_dialog_width_percent,
+    default_gate_gameplay_when_open, default_menu_button_spacing_px, default_menu_font_family,
+    default_menu_font_size_px, default_menu_footer_spacing_px, default_menu_footer_text,
+    default_menu_height_percent, default_menu_opacity_percent, default_menu_screens,
+    default_menu_title_spacing_px, default_menu_width_percent, default_pause_root_screen_id,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -157,7 +156,10 @@ impl Default for MenuTextAppearance {
     }
 }
 
-pub fn resolve_menu_appearance(theme: &UiTheme, theme_override: &MenuThemeOverride) -> MenuAppearance {
+pub fn resolve_menu_appearance(
+    theme: &UiTheme,
+    theme_override: &MenuThemeOverride,
+) -> MenuAppearance {
     let border_color = color_hex(theme.border_color);
     let text_color = color_hex(theme.foreground_color);
     let background_color = color_hex(theme.background_color);

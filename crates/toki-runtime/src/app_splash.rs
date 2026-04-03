@@ -238,8 +238,10 @@ impl App {
     }
 
     pub(super) fn initialize_splash_resources(&mut self) {
-        self.render_coordinator.splash_config =
-            self.startup.splash_policy.resolve(&self.launch_options.splash);
+        self.render_coordinator.splash_config = self
+            .startup
+            .splash_policy
+            .resolve(&self.launch_options.splash);
         if let Ok(decoded_logo) = load_image_rgba8_from_bytes(COMMUNITY_SPLASH_LOGO_PNG) {
             if let Err(error) = self.rendering.load_sprite_texture_rgba8(&decoded_logo) {
                 tracing::warn!(

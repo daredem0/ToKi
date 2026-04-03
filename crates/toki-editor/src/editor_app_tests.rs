@@ -817,16 +817,15 @@ fn load_preview_sprite_frame_static_prefers_animation_for_decorations_with_both_
         .scan_assets()
         .expect("project assets should scan");
 
-    let preview = EditorApp::load_preview_sprite_frame_static("torch", &project_path, &project_assets)
-        .expect("animated decoration should produce a preview visual");
+    let preview =
+        EditorApp::load_preview_sprite_frame_static("torch", &project_path, &project_assets)
+            .expect("animated decoration should produce a preview visual");
 
     assert_eq!(preview.size, UVec2::new(16, 32));
-    assert!(
-        preview
-            .texture_path
-            .as_ref()
-            .is_some_and(|path| path.ends_with("decor.png"))
-    );
+    assert!(preview
+        .texture_path
+        .as_ref()
+        .is_some_and(|path| path.ends_with("decor.png")));
 }
 
 #[test]
@@ -906,20 +905,15 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_decoration_anim
         .scan_assets()
         .expect("project assets should scan");
 
-    let preview = EditorApp::load_preview_sprite_frame_static(
-        "house_anim",
-        &project_path,
-        &project_assets,
-    )
-    .expect("object-sheet-backed animated decoration should produce a preview visual");
+    let preview =
+        EditorApp::load_preview_sprite_frame_static("house_anim", &project_path, &project_assets)
+            .expect("object-sheet-backed animated decoration should produce a preview visual");
 
     assert_eq!(preview.size, UVec2::new(64, 64));
-    assert!(
-        preview
-            .texture_path
-            .as_ref()
-            .is_some_and(|path| path.ends_with("HouseM.png"))
-    );
+    assert!(preview
+        .texture_path
+        .as_ref()
+        .is_some_and(|path| path.ends_with("HouseM.png")));
 }
 
 #[test]

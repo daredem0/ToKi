@@ -48,7 +48,9 @@ pub use events::{
     InteractionSpatial, TileTransitionEvent,
 };
 
-use super::{AudioChannel, AudioEvent, GameState, ProgressState, RuntimeState, SceneState, WorldState};
+use super::{
+    AudioChannel, AudioEvent, GameState, ProgressState, RuntimeState, SceneState, WorldState,
+};
 
 pub(super) struct AppliedRuleCommandResult {
     pub(super) pending_animations: Vec<(EntityId, AnimationState)>,
@@ -82,7 +84,10 @@ impl RuleSystem {
         if !state.runtime.rules.started {
             state
                 .rule_evaluation_service()
-                .collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnStart, command_buffer);
+                .collect_rule_commands_for_trigger(
+                    crate::rules::RuleTrigger::OnStart,
+                    command_buffer,
+                );
             state.runtime.rules.started = true;
         }
         state
@@ -296,23 +301,11 @@ pub(super) enum SceneCommand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ProgressCommand {
-    SetFlag {
-        flag: String,
-        value: FlagValue,
-    },
-    IncrementFlag {
-        flag: String,
-        amount: i32,
-    },
-    ClearFlag {
-        flag: String,
-    },
-    SaveGame {
-        slot: u8,
-    },
-    LoadGame {
-        slot: u8,
-    },
+    SetFlag { flag: String, value: FlagValue },
+    IncrementFlag { flag: String, amount: i32 },
+    ClearFlag { flag: String },
+    SaveGame { slot: u8 },
+    LoadGame { slot: u8 },
 }
 
 /// A pending scene switch.
@@ -321,7 +314,10 @@ pub(super) type PendingSceneSwitch = crate::events::SceneSwitchRequest;
 pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 
 impl RuleEvaluationService<'_> {
-    pub(super) fn with_rule_engine<R>(&mut self, build: impl FnOnce(&mut RuleEngine<'_>) -> R) -> R {
+    pub(super) fn with_rule_engine<R>(
+        &mut self,
+        build: impl FnOnce(&mut RuleEngine<'_>) -> R,
+    ) -> R {
         let held_keys = self.runtime.input.all_held_keys();
         let mut engine = RuleEngine::new(
             RuleEngineContext {

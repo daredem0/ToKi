@@ -79,18 +79,24 @@ pub(super) fn compose_runtime_settings_output(
     layout: &MenuLayout,
     appearance: &MenuAppearance,
 ) -> UiLayoutOutput {
-    let asset = build_runtime_overlay_widget_tree(layout_entries, overlay_entries, layout, appearance);
-    let focused_widget_id = overlay_entries.iter().enumerate().find_map(|(index, entry)| {
-        if !entry.selected {
-            return None;
-        }
-        Some(if entry.slider_percent.is_some() {
-            format!("overlay_slider_{index}")
-        } else {
-            format!("overlay_entry_{index}")
-        }
-        .into())
-    });
+    let asset =
+        build_runtime_overlay_widget_tree(layout_entries, overlay_entries, layout, appearance);
+    let focused_widget_id = overlay_entries
+        .iter()
+        .enumerate()
+        .find_map(|(index, entry)| {
+            if !entry.selected {
+                return None;
+            }
+            Some(
+                if entry.slider_percent.is_some() {
+                    format!("overlay_slider_{index}")
+                } else {
+                    format!("overlay_entry_{index}")
+                }
+                .into(),
+            )
+        });
     UiLayoutEngine::compose(
         &asset,
         &theme_from_menu_appearance(appearance),
@@ -219,10 +225,14 @@ fn build_runtime_overlay_widget_tree(
         children: Vec::new(),
     });
 
-    for (index, (layout_entry, overlay_entry)) in layout_entries.iter().zip(overlay_entries.iter()).enumerate() {
+    for (index, (layout_entry, overlay_entry)) in layout_entries
+        .iter()
+        .zip(overlay_entries.iter())
+        .enumerate()
+    {
         if let Some(slider_percent) = overlay_entry.slider_percent {
-            let slider_rect = runtime_overlay_slider_rect(layout_entry, overlay_entry)
-                .expect("checked above");
+            let slider_rect =
+                runtime_overlay_slider_rect(layout_entry, overlay_entry).expect("checked above");
             let label_rect = UiRect {
                 x: layout_entry.rect.x,
                 y: layout_entry.rect.y,
@@ -296,7 +306,10 @@ fn build_runtime_overlay_widget_tree(
                 visible_if: None,
                 enabled_if: None,
                 kind: UiWidgetKind::Button {
-                    label: literal_text(&format!("{}: {}", overlay_entry.label, overlay_entry.value_text)),
+                    label: literal_text(&format!(
+                        "{}: {}",
+                        overlay_entry.label, overlay_entry.value_text
+                    )),
                 },
                 children: Vec::new(),
             });
@@ -460,10 +473,11 @@ fn empty_binding_context() -> UiBindingContext<'static, 'static, 'static> {
         OnceLock::new();
     static DECLARED_FLAGS: OnceLock<Vec<toki_core::project_runtime::ProjectFlagDefinition>> =
         OnceLock::new();
-    static EMPTY_TRIGGER_CONTEXT: toki_core::rules::TriggerContext = toki_core::rules::TriggerContext {
-        trigger_self: None,
-        trigger_other: None,
-    };
+    static EMPTY_TRIGGER_CONTEXT: toki_core::rules::TriggerContext =
+        toki_core::rules::TriggerContext {
+            trigger_self: None,
+            trigger_other: None,
+        };
 
     UiBindingContext {
         value_paths: toki_core::value_path::ValuePathContext {

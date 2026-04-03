@@ -84,15 +84,15 @@ pub(crate) fn create_texture_bindgroup_for_source(
     texture_source: TextureSource<'_>,
     texture_label: Option<&str>,
 ) -> Result<wgpu::BindGroup, RenderError> {
-        match texture_source {
-            TextureSource::Path(texture_path) => create_texture_bindgroup(
-                device,
-                queue,
-                bind_group_layout,
-                uniform_buffer,
-                texture_path,
-                texture_label,
-            ),
+    match texture_source {
+        TextureSource::Path(texture_path) => create_texture_bindgroup(
+            device,
+            queue,
+            bind_group_layout,
+            uniform_buffer,
+            texture_path,
+            texture_label,
+        ),
         TextureSource::Rgba8(image) => create_texture_bindgroup_from_rgba8(
             device,
             queue,

@@ -11,8 +11,8 @@ use crate::text::{TextAnchor, TextSlant, TextWeight};
 use crate::ui::UiComposition;
 use crate::ui_layout::{
     UiAnchor, UiBindingContext, UiLayoutAsset, UiLayoutEngine, UiLayoutOutput, UiLayoutSpec,
-    UiSpacing, UiSurfaceState, UiTextSegment, UiTextTemplate, UiTheme, UiTypography,
-    UiWidgetKind, UiWidgetNode, UiWidgetStyle,
+    UiSpacing, UiSurfaceState, UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetKind,
+    UiWidgetNode, UiWidgetStyle,
 };
 use crate::value_path::ValuePathContext;
 
@@ -51,7 +51,10 @@ pub fn compose_menu_output(layout: &MenuLayout, appearance: &MenuAppearance) -> 
         empty_binding_context(),
         Some(&surface_state_for_selected_entry(
             MENU_LAYOUT_ID,
-            layout.entries.iter().position(|entry| entry.selected && entry.selectable),
+            layout
+                .entries
+                .iter()
+                .position(|entry| entry.selected && entry.selectable),
             "menu_entry_",
         )),
     )
@@ -73,7 +76,10 @@ pub fn compose_dialog_output(
         empty_binding_context(),
         Some(&surface_state_for_selected_entry(
             DIALOG_LAYOUT_ID,
-            layout.entries.iter().position(|entry| entry.selected && entry.selectable),
+            layout
+                .entries
+                .iter()
+                .position(|entry| entry.selected && entry.selectable),
             "dialog_entry_",
         )),
     )
@@ -93,23 +99,24 @@ pub fn build_menu_widget_tree(layout: &MenuLayout, appearance: &MenuAppearance) 
         ],
         ..UiWidgetNode::default()
     };
-    root.children.extend(layout.entries.iter().enumerate().map(|(index, entry)| {
-        if entry.selectable {
-            button_widget(
-                &format!("menu_entry_{index}"),
-                entry.rect,
-                &entry.text,
-                entry_style(appearance),
-            )
-        } else {
-            text_label_widget(
-                &format!("menu_entry_{index}"),
-                entry.rect,
-                &entry.text,
-                entry_style(appearance),
-            )
-        }
-    }));
+    root.children
+        .extend(layout.entries.iter().enumerate().map(|(index, entry)| {
+            if entry.selectable {
+                button_widget(
+                    &format!("menu_entry_{index}"),
+                    entry.rect,
+                    &entry.text,
+                    entry_style(appearance),
+                )
+            } else {
+                text_label_widget(
+                    &format!("menu_entry_{index}"),
+                    entry.rect,
+                    &entry.text,
+                    entry_style(appearance),
+                )
+            }
+        }));
     root.children.push(text_label_widget(
         MENU_HINT_ID,
         layout.hint.rect,
@@ -149,23 +156,24 @@ pub fn build_dialog_widget_tree(
         ],
         ..UiWidgetNode::default()
     };
-    root.children.extend(layout.entries.iter().enumerate().map(|(index, entry)| {
-        if entry.selectable {
-            button_widget(
-                &format!("dialog_entry_{index}"),
-                entry.rect,
-                &entry.text,
-                entry_style(appearance),
-            )
-        } else {
-            text_label_widget(
-                &format!("dialog_entry_{index}"),
-                entry.rect,
-                &entry.text,
-                entry_style(appearance),
-            )
-        }
-    }));
+    root.children
+        .extend(layout.entries.iter().enumerate().map(|(index, entry)| {
+            if entry.selectable {
+                button_widget(
+                    &format!("dialog_entry_{index}"),
+                    entry.rect,
+                    &entry.text,
+                    entry_style(appearance),
+                )
+            } else {
+                text_label_widget(
+                    &format!("dialog_entry_{index}"),
+                    entry.rect,
+                    &entry.text,
+                    entry_style(appearance),
+                )
+            }
+        }));
 
     UiLayoutAsset {
         id: UiLayoutId::new(DIALOG_LAYOUT_ID),
@@ -190,7 +198,11 @@ pub fn dialog_entry_index_from_widget_id(widget_id: &UiWidgetId) -> Option<usize
         .and_then(|value| value.parse().ok())
 }
 
-fn background_panel_widget(id: &str, rect: crate::ui::UiRect, appearance: &MenuAppearance) -> UiWidgetNode {
+fn background_panel_widget(
+    id: &str,
+    rect: crate::ui::UiRect,
+    appearance: &MenuAppearance,
+) -> UiWidgetNode {
     UiWidgetNode {
         id: id.into(),
         title: id.to_string(),
@@ -489,8 +501,12 @@ fn rgba_fill(hex: &str, transparent: bool, opacity_percent: u16) -> Option<[u8; 
     menu_fill_color_rgba(hex, transparent, opacity_percent).map(rgba_to_u8)
 }
 
-fn rgba_border(style: super::types::MenuBorderStyle, appearance: &MenuAppearance) -> Option<[u8; 4]> {
-    let border = menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]);
+fn rgba_border(
+    style: super::types::MenuBorderStyle,
+    appearance: &MenuAppearance,
+) -> Option<[u8; 4]> {
+    let border =
+        menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]);
     let opacity_alpha = appearance.opacity_percent.clamp(0, 100) as f32 / 100.0;
     menu_border_color(style, border, opacity_alpha).map(rgba_to_u8)
 }

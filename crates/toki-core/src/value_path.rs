@@ -131,7 +131,8 @@ impl ValuePath {
         &self,
         context: ValuePathContext<'_, '_>,
     ) -> Result<ResolvedValue, ValuePathError> {
-        self.resolve_borrowed(context).map(ResolvedValueRef::into_owned)
+        self.resolve_borrowed(context)
+            .map(ResolvedValueRef::into_owned)
     }
 
     pub(crate) fn resolve_borrowed<'a>(
@@ -197,9 +198,9 @@ impl ValuePath {
                         .storage()
                         .components()
                         .inventory(entity_id)
-                        .map(|inventory| {
-                            ResolvedValueRef::Int(inventory.item_count(item_id) as i32)
-                        })
+                        .map(
+                            |inventory| ResolvedValueRef::Int(inventory.item_count(item_id) as i32),
+                        )
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
                     ValuePathAccessor::Flag(_) => {
                         unreachable!("flag access only valid on flags root")

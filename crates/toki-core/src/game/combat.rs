@@ -432,7 +432,8 @@ impl<'a> CombatService<'a> {
                 return false;
             };
 
-            let facing = GameState::facing_from_animation_state(animation_controller.current_clip_state);
+            let facing =
+                GameState::facing_from_animation_state(animation_controller.current_clip_state);
             let directional_attack = GameState::directional_attack_state(facing);
             let next_state = if animation_controller.has_clip(directional_attack) {
                 directional_attack
@@ -481,7 +482,8 @@ impl<'a> CombatService<'a> {
             .filter_map(|&entity_id| {
                 let entity = self.world.entity_manager.get_entity(entity_id)?;
                 if matches!(
-                    entity.effective_movement_profile(self.world.entity_manager.movement(entity_id)),
+                    entity
+                        .effective_movement_profile(self.world.entity_manager.movement(entity_id)),
                     crate::entity::MovementProfile::PlayerWasd
                 ) {
                     Some(entity_id)

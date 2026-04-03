@@ -7,8 +7,8 @@ use crate::rules::{RuleAction, RuleSoundChannel, TriggerContext};
 use tracing::info;
 
 use super::{
-    AnimationCommand, AudioChannel, AudioCommand, EntityCommand, InventoryCommand,
-    MotionCommand, ProgressCommand, RuleCommand, RuleEngine, SceneCommand, UiCommand,
+    AnimationCommand, AudioChannel, AudioCommand, EntityCommand, InventoryCommand, MotionCommand,
+    ProgressCommand, RuleCommand, RuleEngine, SceneCommand, UiCommand,
 };
 
 impl RuleEngine<'_> {
@@ -152,11 +152,13 @@ impl RuleEngine<'_> {
                 let binding_key = binding_key.trim();
                 if !ui_id.as_str().trim().is_empty() && !binding_key.is_empty() {
                     match value.resolve(self.value_path_context(context)) {
-                        Ok(value) => command_buffer.push(RuleCommand::Ui(UiCommand::UpdateUiBinding {
-                            ui_id: ui_id.clone(),
-                            binding_key: binding_key.to_string(),
-                            value,
-                        })),
+                        Ok(value) => {
+                            command_buffer.push(RuleCommand::Ui(UiCommand::UpdateUiBinding {
+                                ui_id: ui_id.clone(),
+                                binding_key: binding_key.to_string(),
+                                value,
+                            }))
+                        }
                         Err(error) => tracing::warn!(
                             error = %error,
                             action = ?action,
@@ -166,10 +168,14 @@ impl RuleEngine<'_> {
                 }
             }
             RuleAction::SaveGame { slot } => {
-                command_buffer.push(RuleCommand::Progress(ProgressCommand::SaveGame { slot: *slot }));
+                command_buffer.push(RuleCommand::Progress(ProgressCommand::SaveGame {
+                    slot: *slot,
+                }));
             }
             RuleAction::LoadGame { slot } => {
-                command_buffer.push(RuleCommand::Progress(ProgressCommand::LoadGame { slot: *slot }));
+                command_buffer.push(RuleCommand::Progress(ProgressCommand::LoadGame {
+                    slot: *slot,
+                }));
             }
             _ => unreachable!("scene, dialog, or persistence helper only handles matching actions"),
         }
@@ -306,10 +312,12 @@ impl RuleEngine<'_> {
                 let flag = flag.trim();
                 if !flag.is_empty() {
                     match value.resolve(self.value_path_context(context)) {
-                        Ok(value) => command_buffer.push(RuleCommand::Progress(ProgressCommand::SetFlag {
-                            flag: flag.to_string(),
-                            value,
-                        })),
+                        Ok(value) => {
+                            command_buffer.push(RuleCommand::Progress(ProgressCommand::SetFlag {
+                                flag: flag.to_string(),
+                                value,
+                            }))
+                        }
                         Err(error) => tracing::warn!(
                             error = %error,
                             action = ?action,
@@ -322,10 +330,12 @@ impl RuleEngine<'_> {
                 let flag = flag.trim();
                 if !flag.is_empty() {
                     match amount.resolve(self.value_path_context(context)) {
-                        Ok(amount) => command_buffer.push(RuleCommand::Progress(ProgressCommand::IncrementFlag {
-                            flag: flag.to_string(),
-                            amount,
-                        })),
+                        Ok(amount) => command_buffer.push(RuleCommand::Progress(
+                            ProgressCommand::IncrementFlag {
+                                flag: flag.to_string(),
+                                amount,
+                            },
+                        )),
                         Err(error) => tracing::warn!(
                             error = %error,
                             action = ?action,

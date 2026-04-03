@@ -42,11 +42,11 @@ pub use interaction::{InteractionService, InteractionSystem};
 pub use movement::{MovementService, MovementSystem};
 pub use render_queries::GroundShadow;
 pub use render_queries::RenderQueryService;
-pub use rules::{RuleEvaluationService, RuleSystem};
 pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,
 };
+pub use rules::{RuleEvaluationService, RuleSystem};
 pub use scene::{RestoreError, SceneLoadError, SceneSystem};
 pub(crate) use world_context::WorldContext;
 

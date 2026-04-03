@@ -33,10 +33,7 @@ impl RuleEvaluationService<'_> {
 
         for command in &commands {
             match command {
-                RuleCommand::Audio(command) => self.apply_audio_command(
-                    command,
-                    result,
-                ),
+                RuleCommand::Audio(command) => self.apply_audio_command(command, result),
                 RuleCommand::Animation(command) => {
                     self.apply_animation_command(command, &mut buffered_animations)
                 }
@@ -48,7 +45,9 @@ impl RuleEvaluationService<'_> {
                     &mut pending_scene_switch,
                     &mut pending_dialog_start,
                 ),
-                RuleCommand::Ui(command) => self.apply_ui_command(command, &mut pending_ui_requests),
+                RuleCommand::Ui(command) => {
+                    self.apply_ui_command(command, &mut pending_ui_requests)
+                }
                 RuleCommand::Progress(command) => {
                     self.apply_progress_side_effects(command);
                     self.apply_progress_command(command, &mut pending_persistence)
@@ -129,7 +128,10 @@ impl RuleEvaluationService<'_> {
         buffered_velocities: &mut HashMap<EntityId, glam::IVec2>,
     ) {
         match command {
-            MotionCommand::SetVelocity { entity_id, velocity } => {
+            MotionCommand::SetVelocity {
+                entity_id,
+                velocity,
+            } => {
                 buffered_velocities.entry(*entity_id).or_insert(*velocity);
             }
         }
@@ -221,7 +223,10 @@ impl RuleEvaluationService<'_> {
 
     fn apply_entity_command(&mut self, command: &EntityCommand, tilemap: &TileMap) {
         match command {
-            EntityCommand::Spawn { entity_type, position } => {
+            EntityCommand::Spawn {
+                entity_type,
+                position,
+            } => {
                 self.spawn_entity_from_rule(*entity_type, *position);
             }
             EntityCommand::DestroySelf { entity_id } => {

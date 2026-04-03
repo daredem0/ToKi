@@ -287,8 +287,12 @@ mod tests {
         definition.animations.default_state = "walk_down".to_string();
 
         let warnings = validate_entity_definition_warnings(&definition);
-        assert!(warnings.iter().any(|w| w.contains("exactly one animation clip")));
-        assert!(warnings.iter().any(|w| w.contains("default_state should be 'idle'")));
+        assert!(warnings
+            .iter()
+            .any(|w| w.contains("exactly one animation clip")));
+        assert!(warnings
+            .iter()
+            .any(|w| w.contains("default_state should be 'idle'")));
         assert!(warnings.iter().any(|w| w.contains("only the 'idle' state")));
     }
 }

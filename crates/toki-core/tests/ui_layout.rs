@@ -5,8 +5,8 @@ use toki_core::rules::TriggerContext;
 use toki_core::text::{TextAnchor, TextSlant, TextWeight};
 use toki_core::ui_layout::{
     UiBinding, UiBindingContext, UiController, UiLayoutAsset, UiLayoutEngine, UiProgressBinding,
-    UiRequest, UiSurfaceState, UiTextSegment, UiTextTemplate, UiTheme, UiTypography,
-    UiWidgetKind, UiWidgetNode,
+    UiRequest, UiSurfaceState, UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetKind,
+    UiWidgetNode,
 };
 use toki_core::value_path::ValuePathContext;
 
@@ -425,21 +425,30 @@ fn focused_button_uses_generic_selection_fill_and_prefix() {
         .blocks
         .iter()
         .find(|block| {
-            block.text.as_ref().is_some_and(|text| text.content.starts_with("> "))
+            block
+                .text
+                .as_ref()
+                .is_some_and(|text| text.content.starts_with("> "))
         })
         .expect("focused button block should exist");
-    assert_eq!(button_block.fill_color, Some([
-        theme.background_color[0] as f32 / 255.0,
-        theme.background_color[1] as f32 / 255.0,
-        theme.background_color[2] as f32 / 255.0,
-        theme.background_color[3] as f32 / 255.0,
-    ]));
-    assert_eq!(button_block.border_color, Some([
-        theme.selection_color[0] as f32 / 255.0,
-        theme.selection_color[1] as f32 / 255.0,
-        theme.selection_color[2] as f32 / 255.0,
-        theme.selection_color[3] as f32 / 255.0,
-    ]));
+    assert_eq!(
+        button_block.fill_color,
+        Some([
+            theme.background_color[0] as f32 / 255.0,
+            theme.background_color[1] as f32 / 255.0,
+            theme.background_color[2] as f32 / 255.0,
+            theme.background_color[3] as f32 / 255.0,
+        ])
+    );
+    assert_eq!(
+        button_block.border_color,
+        Some([
+            theme.selection_color[0] as f32 / 255.0,
+            theme.selection_color[1] as f32 / 255.0,
+            theme.selection_color[2] as f32 / 255.0,
+            theme.selection_color[3] as f32 / 255.0,
+        ])
+    );
 }
 
 #[test]
@@ -547,10 +556,13 @@ fn progress_bar_falls_back_to_contrasting_fill_when_fill_and_track_match() {
         .find(|block| block.border_color.is_none() && block.fill_color.is_some())
         .expect("fill block should exist");
 
-    assert_eq!(fill_block.fill_color, Some([
-        theme.border_color[0] as f32 / 255.0,
-        theme.border_color[1] as f32 / 255.0,
-        theme.border_color[2] as f32 / 255.0,
-        theme.border_color[3] as f32 / 255.0,
-    ]));
+    assert_eq!(
+        fill_block.fill_color,
+        Some([
+            theme.border_color[0] as f32 / 255.0,
+            theme.border_color[1] as f32 / 255.0,
+            theme.border_color[2] as f32 / 255.0,
+            theme.border_color[3] as f32 / 255.0,
+        ])
+    );
 }

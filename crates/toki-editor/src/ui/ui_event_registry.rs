@@ -2,9 +2,7 @@ use egui::Ui;
 use std::hash::Hash;
 use toki_core::project_runtime::ProjectUiEventDefinition;
 
-pub(crate) fn declared_ui_event_choices(
-    declarations: &[ProjectUiEventDefinition],
-) -> Vec<String> {
+pub(crate) fn declared_ui_event_choices(declarations: &[ProjectUiEventDefinition]) -> Vec<String> {
     let mut choices = declarations
         .iter()
         .map(|declaration| declaration.id.trim())
@@ -16,9 +14,7 @@ pub(crate) fn declared_ui_event_choices(
     choices
 }
 
-pub(crate) fn validate_ui_event_registry(
-    declarations: &[ProjectUiEventDefinition],
-) -> Vec<String> {
+pub(crate) fn validate_ui_event_registry(declarations: &[ProjectUiEventDefinition]) -> Vec<String> {
     let mut seen = std::collections::BTreeSet::new();
     let mut issues = Vec::new();
     for declaration in declarations {
@@ -43,7 +39,9 @@ pub(crate) fn validate_ui_event_reference(
     }
     let declared = declared_ui_event_choices(declarations);
     if !declared.is_empty() && !declared.iter().any(|candidate| candidate == trimmed) {
-        return Some(format!("{label} references undeclared UI event '{trimmed}'"));
+        return Some(format!(
+            "{label} references undeclared UI event '{trimmed}'"
+        ));
     }
     None
 }
@@ -142,8 +140,12 @@ mod tests {
             },
         ]);
 
-        assert!(issues.iter().any(|issue| issue.contains("must not be empty")));
-        assert!(issues.iter().any(|issue| issue.contains("Duplicate UI event id")));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.contains("must not be empty")));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.contains("Duplicate UI event id")));
     }
 
     #[test]

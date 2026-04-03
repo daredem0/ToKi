@@ -1,7 +1,8 @@
 use super::{
-    runtime_ui_text_scale, transform_logical_ui_composition, transform_logical_ui_composition_with_transform,
-    transform_logical_ui_rect, transform_logical_ui_rect_with_transform, ui_presentation_transform,
-    UiBlock, UiComposition, UiRect, UiTextBlock,
+    runtime_ui_text_scale, transform_logical_ui_composition,
+    transform_logical_ui_composition_with_transform, transform_logical_ui_rect,
+    transform_logical_ui_rect_with_transform, ui_presentation_transform, UiBlock, UiComposition,
+    UiRect, UiTextBlock,
 };
 use crate::text::{TextAnchor, TextStyle, TextWeight};
 
@@ -165,7 +166,12 @@ fn ui_presentation_transform_matches_runtime_text_scale_and_rect_transform() {
     assert_eq!(rect.y, 66.0);
     assert_eq!(rect.width, 48.0);
     assert_eq!(rect.height, 30.0);
-    assert!((transform.text_scale - runtime_ui_text_scale(glam::vec2(160.0, 144.0), glam::vec2(480.0, 432.0))).abs() < 0.0001);
+    assert!(
+        (transform.text_scale
+            - runtime_ui_text_scale(glam::vec2(160.0, 144.0), glam::vec2(480.0, 432.0)))
+        .abs()
+            < 0.0001
+    );
 
     let mut composition = UiComposition::default();
     composition.push(UiBlock {

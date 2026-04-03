@@ -30,15 +30,14 @@ impl GpuState {
     }
 
     fn prepare_text_backgrounds(&mut self) -> Result<Vec<TextBackgroundRect>, crate::RenderError> {
-        self.text_renderer
-            .prepare(
-                &self.device,
-                &self.queue,
-                self.config.width,
-                self.config.height,
-                &self.text_items,
-                self.current_mvp,
-            )
+        self.text_renderer.prepare(
+            &self.device,
+            &self.queue,
+            self.config.width,
+            self.config.height,
+            &self.text_items,
+            self.current_mvp,
+        )
     }
 
     fn acquire_surface_texture(&mut self) -> Option<wgpu::SurfaceTexture> {

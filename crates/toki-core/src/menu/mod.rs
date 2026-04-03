@@ -23,8 +23,7 @@ pub mod utilities;
 pub use composition::{
     build_dialog_widget_tree, build_menu_widget_tree, compose_dialog_output, compose_dialog_ui,
     compose_menu_output, compose_menu_ui, dialog_entry_index_from_widget_id,
-    menu_entry_index_from_widget_id,
-    theme_from_menu_appearance,
+    menu_entry_index_from_widget_id, theme_from_menu_appearance,
 };
 pub use constants::{
     DEFAULT_BACKGROUND_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_BORDER_THICKNESS_PX,
@@ -36,11 +35,11 @@ pub use constants::{
 pub use controller::MenuController;
 pub use layout::{build_dialog_layout, build_menu_layout};
 pub use types::{
-    DialogThemeOverride, InventoryEntry, MenuAppearance, MenuBorderStyle, MenuDialogDefinition,
-    MenuDialogLayout, MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput,
-    MenuItemDefinition, MenuLayout, MenuLayoutBlock, MenuListSource, MenuRect,
-    MenuScreenDefinition, MenuSettings, MenuTextAppearance, MenuThemeOverride, MenuView,
-    MenuViewEntry, MenuVisualMetrics, resolve_dialog_appearance, resolve_menu_appearance,
+    resolve_dialog_appearance, resolve_menu_appearance, DialogThemeOverride, InventoryEntry,
+    MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogLayout, MenuDialogPosition,
+    MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition, MenuLayout, MenuLayoutBlock,
+    MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings, MenuTextAppearance,
+    MenuThemeOverride, MenuView, MenuViewEntry, MenuVisualMetrics,
 };
 pub use utilities::{
     apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,

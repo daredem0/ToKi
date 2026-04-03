@@ -1,6 +1,6 @@
+use crate::per_frame_lru::PerFrameLruCache;
 use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
 use crate::pipelines::TextureSource;
-use crate::per_frame_lru::PerFrameLruCache;
 use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::RenderTarget;
 use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
@@ -323,11 +323,7 @@ impl SceneRenderer {
                 self.record_sprite_draw_batch(SceneSpriteBatchKey::Default, instance_index);
             }
             SceneSpriteTextureSource::File { key, path } => {
-                self.add_textured_sprite_instance(
-                    &key,
-                    TextureSource::path(path),
-                    render_instance,
-                );
+                self.add_textured_sprite_instance(&key, TextureSource::path(path), render_instance);
             }
             SceneSpriteTextureSource::Rgba8 { key, image } => {
                 self.add_textured_sprite_instance(
@@ -396,7 +392,9 @@ impl SceneRenderer {
                         .render_range(render_pass, batch.start, batch.count);
                 }
                 SceneSpriteBatchKey::Textured(ref texture_key) => {
-                    if let Some(pipeline) = self.sprite_pipelines_by_texture.get(texture_key.as_path()) {
+                    if let Some(pipeline) =
+                        self.sprite_pipelines_by_texture.get(texture_key.as_path())
+                    {
                         pipeline.render_range(render_pass, batch.start, batch.count);
                     }
                 }

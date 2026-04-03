@@ -122,22 +122,24 @@ mod tests {
             victim: self_id,
             attacker: Some(other_id),
         });
-        let commands = state.rule_evaluation_service().collect_reactive_rule_commands(
-            true,
-            &TileMap {
-                size: glam::UVec2::new(1, 1),
-                tile_size: glam::UVec2::new(16, 16),
-                atlas: std::path::PathBuf::new(),
-                tiles: vec!["default".to_string()],
-            },
-            &AtlasMeta {
-                image: std::path::PathBuf::new(),
-                tile_size: glam::UVec2::new(16, 16),
-                color_mode: crate::assets::atlas::ColorMode::TrueColor,
-                palette: None,
-                tiles: std::collections::HashMap::new(),
-            },
-        );
+        let commands = state
+            .rule_evaluation_service()
+            .collect_reactive_rule_commands(
+                true,
+                &TileMap {
+                    size: glam::UVec2::new(1, 1),
+                    tile_size: glam::UVec2::new(16, 16),
+                    atlas: std::path::PathBuf::new(),
+                    tiles: vec!["default".to_string()],
+                },
+                &AtlasMeta {
+                    image: std::path::PathBuf::new(),
+                    tile_size: glam::UVec2::new(16, 16),
+                    color_mode: crate::assets::atlas::ColorMode::TrueColor,
+                    palette: None,
+                    tiles: std::collections::HashMap::new(),
+                },
+            );
 
         assert!(commands.iter().any(|command| matches!(
             command,

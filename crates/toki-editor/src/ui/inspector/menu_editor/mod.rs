@@ -122,7 +122,10 @@ impl InspectorSystem {
 
         Self::render_runtime_menu_header(ui, project, &available_screen_ids);
 
-        Self::render_menu_theme_override_editor(ui, &mut project.metadata.runtime.menu.theme_override);
+        Self::render_menu_theme_override_editor(
+            ui,
+            &mut project.metadata.runtime.menu.theme_override,
+        );
         Self::commit_menu_settings_change(ui_state, project, before_settings);
 
         Self::render_screens_dialogs_headers(ui, ui_state, project);

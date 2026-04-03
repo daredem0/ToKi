@@ -90,7 +90,9 @@ fn evaluate_node<'a>(
 ) -> Result<EvalValue<'a>, ExpressionError> {
     match node {
         ExprNode::Literal(value) => Ok(borrow_resolved_value(value)),
-        ExprNode::Path(path) => path.resolve_borrowed(context).map_err(ExpressionError::from),
+        ExprNode::Path(path) => path
+            .resolve_borrowed(context)
+            .map_err(ExpressionError::from),
         ExprNode::Unary { op, expr } => {
             let value = evaluate_node(expr, context)?;
             match (op, value) {

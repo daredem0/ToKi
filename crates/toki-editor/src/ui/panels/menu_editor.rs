@@ -351,11 +351,9 @@ fn paint_ui_block(
         job.wrap.max_width = text.max_width.unwrap_or(f32::INFINITY);
         job.append(&text.content, 0.0, format);
         let galley = painter.layout_job(job);
-        let galley_pos = text_anchor_to_align2(text.anchor).anchor_rect(egui::Rect::from_min_size(
-            pos,
-            galley.size(),
-        ))
-        .min;
+        let galley_pos = text_anchor_to_align2(text.anchor)
+            .anchor_rect(egui::Rect::from_min_size(pos, galley.size()))
+            .min;
         painter.galley(galley_pos, galley, menu_preview_color32(text.style.color));
     }
 }

@@ -350,8 +350,14 @@ fn dialog_appearance_keeps_smaller_dialog_scale_than_menu() {
     let appearance = super::resolve_dialog_appearance(&theme, &Default::default());
 
     assert_eq!(appearance.font_size_px, theme.base_font_size_px);
-    assert_eq!(appearance.dialog_speaker_text.font_size_px, theme.dialog_speaker_font_size_px);
-    assert_eq!(appearance.dialog_body_text.font_size_px, theme.dialog_body_font_size_px);
+    assert_eq!(
+        appearance.dialog_speaker_text.font_size_px,
+        theme.dialog_speaker_font_size_px
+    );
+    assert_eq!(
+        appearance.dialog_body_text.font_size_px,
+        theme.dialog_body_font_size_px
+    );
     assert_eq!(appearance.menu_width_percent, 60);
     assert_eq!(appearance.title_spacing_px, 6);
     assert_eq!(appearance.button_spacing_px, 6);
@@ -818,7 +824,8 @@ fn menu_dialog_activation_by_entry_index_triggers_matching_action() {
 
 #[test]
 fn build_dialog_layout_places_bottom_dialogs_near_bottom_edge() {
-    let dialog_defaults = super::resolve_dialog_appearance(&UiTheme::default(), &Default::default());
+    let dialog_defaults =
+        super::resolve_dialog_appearance(&UiTheme::default(), &Default::default());
     let top_layout = build_dialog_layout(
         &super::MenuDialogView {
             dialog_id: "exit_confirm".to_string(),

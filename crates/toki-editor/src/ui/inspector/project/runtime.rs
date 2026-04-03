@@ -41,11 +41,9 @@ pub(super) fn render_runtime_section(
                 changed = true;
             }
             if ui.button("+ Add UI Event").clicked() {
-                draft
-                    .ui_event_declarations
-                    .push(toki_core::project_runtime::ProjectUiEventDefinition {
-                        id: String::new(),
-                    });
+                draft.ui_event_declarations.push(
+                    toki_core::project_runtime::ProjectUiEventDefinition { id: String::new() },
+                );
                 changed = true;
             }
         });

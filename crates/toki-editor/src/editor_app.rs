@@ -102,7 +102,9 @@ pub(crate) struct EditorTabManager {
 
 impl Default for EditorTabManager {
     fn default() -> Self {
-        Self { ui: EditorUI::new() }
+        Self {
+            ui: EditorUI::new(),
+        }
     }
 }
 
@@ -492,7 +494,10 @@ impl ApplicationHandler for EditorApp {
                                     .current_project
                                     .as_mut()
                                     .map(|project| {
-                                        editor_commands::undo_with_project(&mut self.tabs.ui, project)
+                                        editor_commands::undo_with_project(
+                                            &mut self.tabs.ui,
+                                            project,
+                                        )
                                     })
                                     .unwrap_or_else(|| editor_commands::undo(&mut self.tabs.ui));
                                 if undone {
@@ -506,7 +511,10 @@ impl ApplicationHandler for EditorApp {
                                     .current_project
                                     .as_mut()
                                     .map(|project| {
-                                        editor_commands::redo_with_project(&mut self.tabs.ui, project)
+                                        editor_commands::redo_with_project(
+                                            &mut self.tabs.ui,
+                                            project,
+                                        )
                                     })
                                     .unwrap_or_else(|| editor_commands::redo(&mut self.tabs.ui));
                                 if redone {
@@ -517,8 +525,10 @@ impl ApplicationHandler for EditorApp {
                                 // Copy only applies to sprite editor
                                 if self.tabs.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SpriteEditor
-                                    && crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui)
-                                        .copy_selection()
+                                    && crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.tabs.ui,
+                                    )
+                                    .copy_selection()
                                 {
                                     tracing::debug!("Sprite editor: copied selection to clipboard");
                                 }
@@ -528,9 +538,10 @@ impl ApplicationHandler for EditorApp {
                                 if self.tabs.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SpriteEditor
                                 {
-                                    let side =
-                                        crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui)
-                                            .active_canvas;
+                                    let side = crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.tabs.ui,
+                                    )
+                                    .active_canvas;
                                     let sprite = crate::ui::editor_context::sprite_state_mut(
                                         &mut self.tabs.ui,
                                     );
@@ -539,7 +550,9 @@ impl ApplicationHandler for EditorApp {
                                         sprite.canvas_state_mut(side).cursor_canvas_pos =
                                             Some(IVec2::new(0, 0));
                                     }
-                                    if crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui)
+                                    if crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.tabs.ui,
+                                    )
                                     .paste_at_cursor(side)
                                     {
                                         tracing::info!(

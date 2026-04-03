@@ -523,9 +523,15 @@ impl UiLayoutEngine {
                 let fraction = resolve_progress_fraction(value, *context);
                 let panel = make_panel_block(widget, rect, theme, highlighted);
                 output.composition.push(panel);
-                let track_color = widget.style.fill_color.unwrap_or(theme.progress_empty_color);
+                let track_color = widget
+                    .style
+                    .fill_color
+                    .unwrap_or(theme.progress_empty_color);
                 let fill_color = contrasted_progress_fill_color(
-                    widget.style.accent_color.unwrap_or(theme.progress_fill_color),
+                    widget
+                        .style
+                        .accent_color
+                        .unwrap_or(theme.progress_fill_color),
                     track_color,
                     theme.border_color,
                 );
@@ -548,20 +554,29 @@ impl UiLayoutEngine {
                 step_percent,
                 show_value,
             } => {
-                let fraction = quantize_fraction(resolve_progress_fraction(value, *context), *step_percent);
+                let fraction =
+                    quantize_fraction(resolve_progress_fraction(value, *context), *step_percent);
                 let panel = make_panel_block(widget, rect, theme, highlighted);
                 output.composition.push(panel);
                 let track_rect = content_rect.inset(2.0);
-                let track_color = widget.style.fill_color.unwrap_or(theme.progress_empty_color);
+                let track_color = widget
+                    .style
+                    .fill_color
+                    .unwrap_or(theme.progress_empty_color);
                 let fill_color = contrasted_progress_fill_color(
-                    widget.style.accent_color.unwrap_or(theme.progress_fill_color),
+                    widget
+                        .style
+                        .accent_color
+                        .unwrap_or(theme.progress_fill_color),
                     track_color,
                     theme.border_color,
                 );
                 output.composition.push(UiBlock {
                     rect: track_rect,
                     fill_color: Some(color_to_f32(track_color)),
-                    border_color: Some(color_to_f32(widget.style.border_color.unwrap_or(theme.border_color))),
+                    border_color: Some(color_to_f32(
+                        widget.style.border_color.unwrap_or(theme.border_color),
+                    )),
                     border_thickness: theme.border_thickness_px.max(1) as f32,
                     text: None,
                 });
@@ -646,7 +661,8 @@ impl UiLayoutEngine {
         }
 
         if !matches!(widget.kind, UiWidgetKind::GridContainer { .. }) {
-            if widget.focusable || widget.event_id.is_some() || widget_is_interactive(&widget.kind) {
+            if widget.focusable || widget.event_id.is_some() || widget_is_interactive(&widget.kind)
+            {
                 output.hitboxes.push(UiWidgetHitbox {
                     widget_id: widget.id.clone(),
                     rect,
@@ -666,7 +682,10 @@ impl UiLayoutEngine {
 }
 
 fn widget_is_interactive(kind: &UiWidgetKind) -> bool {
-    matches!(kind, UiWidgetKind::Button { .. } | UiWidgetKind::Slider { .. })
+    matches!(
+        kind,
+        UiWidgetKind::Button { .. } | UiWidgetKind::Slider { .. }
+    )
 }
 
 #[derive(Debug, Default)]
@@ -1450,5 +1469,4 @@ mod tests {
             binding_context(&entity_manager, &flags, None, &HashMap::new(), &[]),
         ));
     }
-
 }

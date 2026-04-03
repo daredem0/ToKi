@@ -4,8 +4,8 @@ use crate::ui::entity_kind_policy::{
     effective_kind_for_category, kind_supports_movement, uses_decoration_collision_policy,
 };
 use crate::ui::object_sheet_browser::{
-    build_decoration_placement_draft, resolve_object_sheet_browser_source, sync_selected_object_name,
-    sync_selected_sheet_name,
+    build_decoration_placement_draft, resolve_object_sheet_browser_source,
+    sync_selected_object_name, sync_selected_sheet_name,
 };
 use crate::ui::EditorUI;
 use std::path::Path;
@@ -236,12 +236,19 @@ fn render_decoration_object_section(
 
     sync_selected_sheet_name(&mut selected_sheet, &source.sheet_names);
     let active_source =
-        resolve_object_sheet_browser_source(project_path, selected_sheet.as_deref()).unwrap_or(source);
+        resolve_object_sheet_browser_source(project_path, selected_sheet.as_deref())
+            .unwrap_or(source);
     sync_selected_object_name(&mut selected_object, &active_source.object_names);
 
-    let mut sheet_value = selected_sheet.unwrap_or_else(|| active_source.selected_sheet_name.clone());
-    let mut object_value = selected_object
-        .unwrap_or_else(|| active_source.object_names.first().cloned().unwrap_or_default());
+    let mut sheet_value =
+        selected_sheet.unwrap_or_else(|| active_source.selected_sheet_name.clone());
+    let mut object_value = selected_object.unwrap_or_else(|| {
+        active_source
+            .object_names
+            .first()
+            .cloned()
+            .unwrap_or_default()
+    });
     let mut changed = false;
 
     ui.horizontal(|ui| {
@@ -260,7 +267,11 @@ fn render_decoration_object_section(
     let object_source =
         resolve_object_sheet_browser_source(project_path, Some(sheet_value.as_str()))
             .unwrap_or(active_source);
-    if !object_source.object_names.iter().any(|name| name == &object_value) {
+    if !object_source
+        .object_names
+        .iter()
+        .any(|name| name == &object_value)
+    {
         object_value = object_source
             .object_names
             .first()
@@ -292,7 +303,8 @@ fn render_decoration_object_section(
             object_name: object_value.clone(),
         });
 
-        if let Some(draft) = build_decoration_placement_draft(project_path, &sheet_value, &object_value)
+        if let Some(draft) =
+            build_decoration_placement_draft(project_path, &sheet_value, &object_value)
         {
             let footprint = draft.grounding.footprint;
             edit.definition.rendering.size = [draft.size_px.x, draft.size_px.y];

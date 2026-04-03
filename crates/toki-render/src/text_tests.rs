@@ -104,7 +104,10 @@ fn prune_cached_buffers_keeps_only_used_indices() {
     prune_cached_buffers(&mut cached_buffers, &[true, false]);
 
     assert_eq!(cached_buffers.len(), 1);
-    assert_eq!(cached_buffers[0].key, make_buffer_key(&item_a, 180.0, 320.0));
+    assert_eq!(
+        cached_buffers[0].key,
+        make_buffer_key(&item_a, 180.0, 320.0)
+    );
 }
 
 #[test]
@@ -114,7 +117,10 @@ fn buffer_key_into_owned_shares_content_allocation_on_clone() {
     let owned = borrowed.into_owned();
     let cloned = owned.clone();
     assert!(std::sync::Arc::ptr_eq(&owned.content, &cloned.content));
-    assert!(std::sync::Arc::ptr_eq(&owned.font_family, &cloned.font_family));
+    assert!(std::sync::Arc::ptr_eq(
+        &owned.font_family,
+        &cloned.font_family
+    ));
 }
 
 #[test]

@@ -71,10 +71,7 @@ impl App {
             slot,
         )?;
         self.refresh_runtime_after_scene_restore();
-        tracing::info!(
-            "Loaded slot {} (scene='{}')",
-            slot, active_scene_name
-        );
+        tracing::info!("Loaded slot {} (scene='{}')", slot, active_scene_name);
         Ok(())
     }
 
@@ -189,10 +186,10 @@ impl App {
                     .render_coordinator
                     .splash_started_at
                     .unwrap_or_else(|| {
-                    let now = Instant::now();
-                    self.render_coordinator.splash_started_at = Some(now);
-                    now
-                });
+                        let now = Instant::now();
+                        self.render_coordinator.splash_started_at = Some(now);
+                        now
+                    });
 
                 if started_at.elapsed() < self.render_coordinator.splash_config.duration {
                     self.render_startup_splash();

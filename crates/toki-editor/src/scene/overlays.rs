@@ -182,16 +182,22 @@ pub fn load_preview_sprite_frame(
                         ),
                     });
                 }
-            } else if let Some(object_sheet_asset) = project_assets.object_sheets.get(source_name_clean) {
-                let object_sheet = match toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
-                    &object_sheet_asset.path,
-                ) {
-                    Ok(sheet) => sheet,
-                    Err(error) => {
-                        tracing::warn!("Failed to load object sheet for animated preview: {}", error);
-                        return None;
-                    }
-                };
+            } else if let Some(object_sheet_asset) =
+                project_assets.object_sheets.get(source_name_clean)
+            {
+                let object_sheet =
+                    match toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
+                        &object_sheet_asset.path,
+                    ) {
+                        Ok(sheet) => sheet,
+                        Err(error) => {
+                            tracing::warn!(
+                                "Failed to load object sheet for animated preview: {}",
+                                error
+                            );
+                            return None;
+                        }
+                    };
                 let texture_size = object_sheet
                     .image_size()
                     .unwrap_or(glam::UVec2::new(16, 16));

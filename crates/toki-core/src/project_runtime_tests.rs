@@ -1,9 +1,9 @@
 use crate::menu::{DialogThemeOverride, MenuDialogPosition};
 use crate::project_runtime::{
     default_runtime_viewport_mode, IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition,
-    ProjectPreset, ProjectRuntimeMetadata, ProjectUiEventDefinition, QuantizeStrategy, RuntimeConfigFile,
-    RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings, RuntimeViewportMode,
-    SceneTransitionEffect,
+    ProjectPreset, ProjectRuntimeMetadata, ProjectUiEventDefinition, QuantizeStrategy,
+    RuntimeConfigFile, RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
+    RuntimeViewportMode, SceneTransitionEffect,
 };
 use crate::FlagValue;
 
@@ -140,7 +140,10 @@ fn runtime_settings_defaults_match_engine_baseline() {
         }
     );
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
-    assert_eq!(settings.dialog_theme_override, DialogThemeOverride::default());
+    assert_eq!(
+        settings.dialog_theme_override,
+        DialogThemeOverride::default()
+    );
     assert!(settings.flags.declarations.is_empty());
     assert_eq!(
         settings.scene_transitions.default_effect,

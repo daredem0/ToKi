@@ -90,8 +90,14 @@ fn toolbox_tab_for_category_maps_decoration_variants() {
         toolbox_tab_for_category("decorations"),
         Some(ToolboxTab::Decorations)
     );
-    assert_eq!(toolbox_tab_for_category("prop"), Some(ToolboxTab::Decorations));
-    assert_eq!(toolbox_tab_for_category("props"), Some(ToolboxTab::Decorations));
+    assert_eq!(
+        toolbox_tab_for_category("prop"),
+        Some(ToolboxTab::Decorations)
+    );
+    assert_eq!(
+        toolbox_tab_for_category("props"),
+        Some(ToolboxTab::Decorations)
+    );
 }
 
 #[test]

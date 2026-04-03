@@ -146,7 +146,10 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
             rect_lookup;
         crate::ui::editor_context::animation_state_mut(ui_state)
             .authoring
-            .source_name_lookup = tile_lookup.into_iter().map(|(name, pos)| (pos, name)).collect();
+            .source_name_lookup = tile_lookup
+            .into_iter()
+            .map(|(name, pos)| (pos, name))
+            .collect();
     }
 
     tracing::info!("Loaded entity for animation editing: {}", entity_name);
@@ -226,10 +229,7 @@ fn load_atlas_tile_lookup(
     Some(lookup)
 }
 
-fn load_object_sheet_info(
-    project_path: &Path,
-    sheet_name: &str,
-) -> Option<ObjectSheetPreviewInfo> {
+fn load_object_sheet_info(project_path: &Path, sheet_name: &str) -> Option<ObjectSheetPreviewInfo> {
     if sheet_name.is_empty() {
         return None;
     }
@@ -243,7 +243,8 @@ fn load_object_sheet_info(
         .join("assets")
         .join("sprites")
         .join(&sheet_filename);
-    let object_sheet = toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(&sheet_path).ok()?;
+    let object_sheet =
+        toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(&sheet_path).ok()?;
     let png_path = sheet_path.parent()?.join(&object_sheet.image);
 
     let mut name_lookup = std::collections::HashMap::new();

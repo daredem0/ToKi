@@ -1,8 +1,7 @@
 use chrono::Utc;
 use toki_core::project_runtime::{
     IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition, ProjectUiEventDefinition,
-    QuantizeStrategy,
-    RuntimeViewportMode,
+    QuantizeStrategy, RuntimeViewportMode,
 };
 
 use super::Project;

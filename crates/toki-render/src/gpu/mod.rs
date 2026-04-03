@@ -19,8 +19,8 @@ use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
-    per_frame_lru::PerFrameLruCache, DebugPipeline, GlyphonTextRenderer, PostProcessPipeline,
-    Rect, RenderError, SceneClipRect, SpritePipeline, TextBackgroundRect, TilemapPipeline,
+    per_frame_lru::PerFrameLruCache, DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, Rect,
+    RenderError, SceneClipRect, SpritePipeline, TextBackgroundRect, TilemapPipeline,
 };
 
 const GPU_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY: usize = 64;
@@ -161,16 +161,17 @@ impl GpuState {
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
         let texture_key_buf = texture_key.to_path_buf();
-        let insert_result = self
-            .sprite_pipelines_by_texture
-            .get_or_try_insert_with(texture_key_buf.clone(), || {
+        let insert_result = self.sprite_pipelines_by_texture.get_or_try_insert_with(
+            texture_key_buf.clone(),
+            || {
                 SpritePipeline::new(
                     &self.device,
                     &self.queue,
                     self.config.format,
                     texture_source,
                 )
-            });
+            },
+        );
         let Ok(Some(pipeline)) = insert_result else {
             if let Err(error) = insert_result {
                 tracing::warn!(
@@ -184,10 +185,7 @@ impl GpuState {
             pipeline.update_projection(&self.queue, self.current_mvp);
             pipeline.add_sprite(instance);
         }
-        self.record_sprite_draw_batch(
-            GpuSpriteBatchKey::Textured(texture_key_buf),
-            instance_index,
-        );
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key_buf), instance_index);
     }
 
     fn default_post_process_settings() -> ResolvedPostProcessSettings {

@@ -3,10 +3,10 @@
 use crate::ui::EditorUI;
 
 pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let available_states = crate::ui::editor_context::animation_state(ui_state)
-        .available_new_clip_states();
-    let decoration_idle_only = crate::ui::editor_context::animation_state(ui_state)
-        .decoration_idle_only;
+    let available_states =
+        crate::ui::editor_context::animation_state(ui_state).available_new_clip_states();
+    let decoration_idle_only =
+        crate::ui::editor_context::animation_state(ui_state).decoration_idle_only;
 
     egui::Window::new("New Animation Clip")
         .collapsible(false)

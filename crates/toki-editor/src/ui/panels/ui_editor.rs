@@ -19,8 +19,8 @@ use toki_core::ui::{
 };
 use toki_core::ui_layout::{
     UiAnchor, UiBinding, UiBindingContext, UiLayoutAsset, UiLayoutEngine, UiProgressBinding,
-    UiSpacing, UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetFrame,
-    UiWidgetKind, UiWidgetNode,
+    UiSpacing, UiTextSegment, UiTextTemplate, UiTheme, UiTypography, UiWidgetFrame, UiWidgetKind,
+    UiWidgetNode,
 };
 use toki_core::value_path::{ValuePath, ValuePathContext};
 
@@ -594,17 +594,17 @@ fn render_ui_layout_canvas(
                     preview_viewport_size,
                     pointer_pos,
                 )
-                    .as_deref()
-                    .and_then(|widget_id| {
-                        resize_handle_widget_id_at_point(
-                            &preview.frames,
-                            origin,
-                            zoom,
-                            preview_viewport_size,
-                            pointer_pos,
-                            widget_id,
-                        )
-                    })
+                .as_deref()
+                .and_then(|widget_id| {
+                    resize_handle_widget_id_at_point(
+                        &preview.frames,
+                        origin,
+                        zoom,
+                        preview_viewport_size,
+                        pointer_pos,
+                        widget_id,
+                    )
+                })
             })
     });
 
@@ -1649,7 +1649,8 @@ fn validate_widget(
 ) -> Vec<String> {
     let mut issues = Vec::new();
     if let Some(event_id) = widget.event_id.as_deref() {
-        if let Some(issue) = validate_ui_event_reference(event_id, declared_ui_events, "Widget event")
+        if let Some(issue) =
+            validate_ui_event_reference(event_id, declared_ui_events, "Widget event")
         {
             issues.push(issue);
         }
@@ -2170,7 +2171,12 @@ fn paint_ui_composition(
 ) {
     let transformed = transform_logical_ui_composition_with_transform(
         composition,
-        ui_presentation_transform(origin, scale, logical_viewport_size, logical_viewport_size * scale),
+        ui_presentation_transform(
+            origin,
+            scale,
+            logical_viewport_size,
+            logical_viewport_size * scale,
+        ),
     );
     for block in &transformed.blocks {
         paint_ui_block(painter, block, available_fonts);
@@ -2358,16 +2364,17 @@ fn declared_flags_stub() -> &'static [toki_core::project_runtime::ProjectFlagDef
 mod tests {
     use super::{
         apply_widget_position_preset, bool_expression_choices, clamp_widget_layout_to_viewport,
-        create_widget_preset,
-        resize_handle_rect, resize_handle_widget_id_at_point, scaled_rect_for_viewport,
-        snap_to_grid, topmost_widget_id_at_point, validate_widget, value_path_choices,
-        WidgetPositionPreset, WidgetPreset,
+        create_widget_preset, resize_handle_rect, resize_handle_widget_id_at_point,
+        scaled_rect_for_viewport, snap_to_grid, topmost_widget_id_at_point, validate_widget,
+        value_path_choices, WidgetPositionPreset, WidgetPreset,
     };
     use egui::{pos2, vec2};
     use toki_core::flags::FlagValue;
     use toki_core::project_runtime::ProjectFlagDefinition;
     use toki_core::ui::UiRect;
-    use toki_core::ui_layout::{UiBinding, UiProgressBinding, UiWidgetFrame, UiWidgetKind, UiWidgetNode};
+    use toki_core::ui_layout::{
+        UiBinding, UiProgressBinding, UiWidgetFrame, UiWidgetKind, UiWidgetNode,
+    };
 
     #[test]
     fn child_widget_wins_hit_test_over_root() {
@@ -2429,8 +2436,12 @@ mod tests {
             },
             enabled: true,
         }];
-        let screen_rect =
-            scaled_rect_for_viewport(frames[0].rect, vec2(0.0, 0.0), 1.0, glam::vec2(160.0, 144.0));
+        let screen_rect = scaled_rect_for_viewport(
+            frames[0].rect,
+            vec2(0.0, 0.0),
+            1.0,
+            glam::vec2(160.0, 144.0),
+        );
         let handle_rect = resize_handle_rect(screen_rect);
         let inside = handle_rect.center();
 

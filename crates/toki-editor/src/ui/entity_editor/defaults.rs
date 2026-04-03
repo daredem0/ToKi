@@ -6,8 +6,7 @@ use toki_core::entity::{
 
 use crate::ui::entity_kind_policy::{
     default_audio_for_kind, default_collision_for_kind, default_grounding_for_kind,
-    default_movement_for_kind,
-    effective_kind_for_category,
+    default_movement_for_kind, effective_kind_for_category,
 };
 
 /// Create default projectile definition

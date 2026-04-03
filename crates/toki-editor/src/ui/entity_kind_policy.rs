@@ -30,9 +30,7 @@ pub fn default_grounding_for_kind(kind: EntityKind, size: [u32; 2]) -> EntityGro
         | EntityKind::Npc
         | EntityKind::Item
         | EntityKind::Trigger
-        | EntityKind::Projectile => {
-            bottom_centered_footprint(size, 1, 2, 1, 4)
-        }
+        | EntityKind::Projectile => bottom_centered_footprint(size, 1, 2, 1, 4),
     };
     EntityGrounding {
         origin: None,
