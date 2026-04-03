@@ -147,6 +147,26 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
     }
 }
 
+fn build_textured_sprite_scene(texture_path: PathBuf) -> SceneData {
+    SceneData {
+        sprites: vec![SpriteInstance {
+            frame: SpriteFrame {
+                u0: 0.0,
+                v0: 0.0,
+                u1: 1.0,
+                v1: 1.0,
+            },
+            position: IVec2::new(4, 8),
+            size: UVec2::new(16, 16),
+            texture_path: Some(texture_path),
+            texture_image: None,
+            texture_cache_key: None,
+            flip_x: false,
+        }],
+        ..SceneData::default()
+    }
+}
+
 #[test]
 fn offscreen_target_lifecycle_and_resize_works() {
     let Some((device, _queue)) = create_device_and_queue() else {
@@ -239,6 +259,65 @@ fn scene_renderer_texture_reload_paths_are_supported() {
     renderer
         .load_sprite_texture(creatures_png)
         .expect("sprite texture cache fast path should succeed");
+
+    std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+}
+
+#[test]
+fn scene_renderer_evicts_textured_sprite_pipelines_after_streaming_many_unique_textures() {
+    let Some((device, queue)) = create_device_and_queue() else {
+        eprintln!("Skipping GPU-backed test: no compatible adapter/device available");
+        return;
+    };
+    let tmp = make_unique_temp_dir();
+    let terrain_png = tmp.join("terrain.png");
+    let creatures_png = tmp.join("creatures.png");
+    write_test_png(&terrain_png, [255, 255, 255, 255]);
+    write_test_png(&creatures_png, [255, 0, 255, 255]);
+
+    let mut renderer = SceneRenderer::new(
+        device.clone(),
+        queue,
+        wgpu::TextureFormat::Bgra8UnormSrgb,
+        Some(terrain_png),
+        Some(creatures_png),
+    )
+    .expect("scene renderer should be created with explicit textures");
+    let mut target = OffscreenTarget::new(&device, (160, 144), wgpu::TextureFormat::Bgra8UnormSrgb)
+        .expect("offscreen target should be created");
+
+    let unique_texture_count = 70;
+    let first_streamed = tmp.join("stream_000.png");
+    let last_streamed = tmp.join(format!("stream_{:03}.png", unique_texture_count - 1));
+
+    for index in 0..unique_texture_count {
+        let texture_path = tmp.join(format!("stream_{index:03}.png"));
+        write_test_png(
+            &texture_path,
+            [index as u8, 255u8.saturating_sub(index as u8), 127, 255],
+        );
+        let scene = build_textured_sprite_scene(texture_path);
+        renderer
+            .render_scene(&mut target, &scene)
+            .expect("streamed textured scene render should succeed");
+    }
+
+    renderer
+        .render_scene(&mut target, &SceneData::default())
+        .expect("cleanup render should succeed");
+
+    assert!(
+        renderer.debug_textured_sprite_pipeline_cache_len() <= 64,
+        "textured sprite pipeline cache should be bounded after cleanup render"
+    );
+    assert!(
+        !renderer.debug_has_textured_sprite_pipeline(first_streamed.as_path()),
+        "oldest streamed texture should have been evicted"
+    );
+    assert!(
+        renderer.debug_has_textured_sprite_pipeline(last_streamed.as_path()),
+        "most recently used texture should still be cached"
+    );
 
     std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
 }

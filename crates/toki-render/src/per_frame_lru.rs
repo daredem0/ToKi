@@ -7,6 +7,17 @@ struct CacheEntry<V> {
     last_used_frame: u64,
 }
 
+/// A small LRU-style cache for render resources that are reused across frames.
+///
+/// Frame lifecycle contract:
+/// - call `begin_frame()` when starting a new submission cycle
+/// - use `get_or_try_insert_with()` / `mark_used()` while preparing work for that frame
+/// - once the previous frame's per-frame instance data has been cleared, call
+///   `evict_unused_lru()` to drop least-recently-used entries that were not touched in the
+///   current frame
+///
+/// This cache intentionally does not memoize creation failures. A failed insertion attempt leaves
+/// the cache unchanged so a later frame can retry the same key.
 #[derive(Debug)]
 pub(crate) struct PerFrameLruCache<K, V> {
     entries: BTreeMap<K, CacheEntry<V>>,

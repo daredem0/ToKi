@@ -211,6 +211,16 @@ impl SceneRenderer {
         self.sprite_pipelines_by_texture.clear();
     }
 
+    #[doc(hidden)]
+    pub fn debug_textured_sprite_pipeline_cache_len(&self) -> usize {
+        self.sprite_pipelines_by_texture.len()
+    }
+
+    #[doc(hidden)]
+    pub fn debug_has_textured_sprite_pipeline(&self, texture_path: &std::path::Path) -> bool {
+        self.sprite_pipelines_by_texture.get(texture_path).is_some()
+    }
+
     fn update_sprite_projection(&mut self, projection: glam::Mat4) {
         self.sprite_pipeline
             .update_projection(&self.queue, projection);
