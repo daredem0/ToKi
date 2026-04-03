@@ -76,6 +76,9 @@ pub struct CanvasState {
     /// being dropped immediately (which would crash if the current frame already
     /// submitted draw commands referencing the old texture).
     pub canvas_texture_dirty: bool,
+    /// Cached texture for the floating selection pixels.
+    /// Kept in sync with `floating` by `ensure_floating_texture()`.
+    pub floating_texture: Option<egui::TextureHandle>,
     /// Asset kind being created/edited
     pub asset_kind: Option<SpriteAssetKind>,
     /// Grid cell size for sheet editing (width, height in pixels)
@@ -124,6 +127,7 @@ impl Default for CanvasState {
             cursor_canvas_pos: None,
             canvas_texture: None,
             canvas_texture_dirty: false,
+            floating_texture: None,
             asset_kind: None,
             cell_size: glam::UVec2::new(16, 16),
             selected_cell: None,

@@ -136,12 +136,14 @@ pub fn render_canvas_viewport(
         draw_canvas_with_checkerboard(&painter, rect, &viewport, canvas, texture);
     }
 
-    // Draw tile preview (3x3 tiled copies)
+    // Draw tile preview (3x3 tiled copies) — uses canvas texture, O(1) per copy
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.tile_preview {
-        if let Some(canvas) = &canvas_state.canvas {
-            draw_tile_preview(&painter, rect, &canvas_state.viewport, canvas);
+        if let (Some(canvas), Some(texture)) =
+            (&canvas_state.canvas, canvas_state.canvas_texture.as_ref())
+        {
+            draw_tile_preview(&painter, rect, &canvas_state.viewport, canvas, texture);
         }
     }
 
@@ -216,11 +218,15 @@ pub fn render_canvas_viewport(
         }
     }
 
+    // Keep floating-selection texture in sync before drawing
+    ensure_floating_texture(ui_state, ctx, render_side);
+
     // Draw floating selection overlay OR static selection overlay
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(floating) = &canvas_state.floating {
-        draw_floating_selection(&painter, rect, &canvas_state.viewport, floating);
+        let texture = canvas_state.floating_texture.as_ref();
+        draw_floating_selection(&painter, rect, &canvas_state.viewport, floating, texture);
     } else if let Some(selection) = &canvas_state.selection {
         draw_selection_mask(&painter, rect, &canvas_state.viewport, selection);
     }
@@ -308,6 +314,43 @@ pub fn ensure_canvas_texture_for_side(
         .canvas_texture = Some(texture);
 }
 
+/// Keeps the floating-selection GPU texture in sync with `CanvasState::floating`.
+/// - If `floating` is None, clears any stale texture.
+/// - If `floating` is Some but no texture exists yet, builds it from the pixel data.
+/// - Does nothing if texture is already current.
+pub fn ensure_floating_texture(ui_state: &mut EditorUI, ctx: &egui::Context, side: CanvasSide) {
+    let cs = crate::ui::editor_context::sprite_state(ui_state).canvas_state(side);
+    let has_floating = cs.floating.is_some();
+    let has_texture = cs.floating_texture.is_some();
+
+    if !has_floating {
+        if has_texture {
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .canvas_state_mut(side)
+                .floating_texture = None;
+        }
+        return;
+    }
+    if has_texture {
+        return;
+    }
+
+    let Some((w, h, pixels)) = crate::ui::editor_context::sprite_state(ui_state)
+        .canvas_state(side)
+        .floating
+        .as_ref()
+        .map(|f| (f.pixels.width, f.pixels.height, f.pixels.pixels().to_vec()))
+    else {
+        return;
+    };
+
+    let image = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &pixels);
+    let texture = ctx.load_texture("sprite_editor_floating", image, egui::TextureOptions::NEAREST);
+    crate::ui::editor_context::sprite_state_mut(ui_state)
+        .canvas_state_mut(side)
+        .floating_texture = Some(texture);
+}
+
 pub fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
     crate::ui::editor_context::sprite_state_mut(ui_state)
         .active_mut()
@@ -365,14 +408,22 @@ fn canvas_display_pixels(
     color_mode: ColorMode,
     palette: Option<Palette4>,
 ) -> Vec<u8> {
+    let mut pixels = apply_palette_conversion(canvas, color_mode, palette);
+    composite_checkerboard_into(&mut pixels, canvas.width as usize);
+    pixels
+}
+
+fn apply_palette_conversion(
+    canvas: &SpriteCanvas,
+    color_mode: ColorMode,
+    palette: Option<Palette4>,
+) -> Vec<u8> {
     if color_mode != ColorMode::PaletteIndexed {
         return canvas.pixels().to_vec();
     }
-
     let Some(palette) = palette else {
         return canvas.pixels().to_vec();
     };
-
     let mut pixels = canvas.pixels().to_vec();
     for rgba in pixels.chunks_exact_mut(4) {
         let display = preview_indexed_color(
@@ -382,6 +433,24 @@ fn canvas_display_pixels(
         rgba.copy_from_slice(&display.to_rgba_array());
     }
     pixels
+}
+
+/// Composites transparent pixels against a 1×1 checkerboard pattern in-place.
+/// After this call every pixel has alpha=255, with the transparency indicator baked in.
+/// This avoids O(visible_pixels) per-pixel draw calls for the checkerboard background.
+fn composite_checkerboard_into(pixels: &mut [u8], width: usize) {
+    for (idx, rgba) in pixels.chunks_exact_mut(4).enumerate() {
+        let alpha = rgba[3];
+        if alpha == 255 {
+            continue;
+        }
+        let checker: u8 = if (idx % width + idx / width).is_multiple_of(2) { 180 } else { 220 };
+        let a = alpha as u32;
+        rgba[0] = ((a * rgba[0] as u32 + (255 - a) * checker as u32) / 255) as u8;
+        rgba[1] = ((a * rgba[1] as u32 + (255 - a) * checker as u32) / 255) as u8;
+        rgba[2] = ((a * rgba[2] as u32 + (255 - a) * checker as u32) / 255) as u8;
+        rgba[3] = 255;
+    }
 }
 
 fn draw_canvas_with_checkerboard(
@@ -403,9 +472,9 @@ fn draw_canvas_with_checkerboard(
 
     let visible_rect = canvas_screen_rect.intersect(rect);
     if visible_rect.is_positive() {
-        draw_checkerboard(painter, rect, visible_rect, viewport, canvas);
-
         if let Some(tex) = texture {
+            // Checkerboard is baked into the texture by canvas_display_pixels —
+            // a single image draw replaces O(visible_pixels) rect_filled calls.
             painter.image(
                 tex.id(),
                 canvas_screen_rect,
@@ -423,57 +492,12 @@ fn draw_canvas_with_checkerboard(
     );
 }
 
-fn draw_checkerboard(
-    painter: &egui::Painter,
-    viewport_rect: egui::Rect,
-    visible_rect: egui::Rect,
-    viewport: &SpriteCanvasViewport,
-    canvas: &SpriteCanvas,
-) {
-    let zoom = viewport.zoom;
-    let pan = viewport.pan;
-
-    let pixel_size = zoom;
-    let color1 = egui::Color32::from_gray(180);
-    let color2 = egui::Color32::from_gray(220);
-
-    let canvas_screen_min = egui::pos2(
-        viewport_rect.left() + (-pan.x * zoom),
-        viewport_rect.top() + (-pan.y * zoom),
-    );
-
-    let first_visible_x = ((visible_rect.left() - canvas_screen_min.x) / pixel_size).floor() as i32;
-    let first_visible_y = ((visible_rect.top() - canvas_screen_min.y) / pixel_size).floor() as i32;
-    let last_visible_x = ((visible_rect.right() - canvas_screen_min.x) / pixel_size).ceil() as i32;
-    let last_visible_y = ((visible_rect.bottom() - canvas_screen_min.y) / pixel_size).ceil() as i32;
-
-    let start_x = first_visible_x.max(0) as u32;
-    let start_y = first_visible_y.max(0) as u32;
-    let end_x = (last_visible_x as u32).min(canvas.width);
-    let end_y = (last_visible_y as u32).min(canvas.height);
-
-    for py in start_y..end_y {
-        for px in start_x..end_x {
-            let color = if (px + py) % 2 == 0 { color1 } else { color2 };
-            let screen_x = canvas_screen_min.x + px as f32 * pixel_size;
-            let screen_y = canvas_screen_min.y + py as f32 * pixel_size;
-            let check_rect = egui::Rect::from_min_size(
-                egui::pos2(screen_x, screen_y),
-                egui::vec2(pixel_size, pixel_size),
-            );
-            let clipped = check_rect.intersect(visible_rect);
-            if clipped.width() > 0.0 && clipped.height() > 0.0 {
-                painter.rect_filled(clipped, 0.0, color);
-            }
-        }
-    }
-}
-
 fn draw_tile_preview(
     painter: &egui::Painter,
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
     canvas: &SpriteCanvas,
+    texture: &egui::TextureHandle,
 ) {
     let zoom = viewport.zoom;
     let pan = viewport.pan;
@@ -481,17 +505,13 @@ fn draw_tile_preview(
     let tile_w = canvas.width as f32 * zoom;
     let tile_h = canvas.height as f32 * zoom;
 
-    // Render the canvas pixels directly for each of the 8 surrounding copies
+    // One painter.image() per copy instead of O(W×H) rect_filled calls per copy.
     let tint = egui::Color32::from_white_alpha(90);
+    let full_uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
     let offsets: [(i32, i32); 8] = [
-        (-1, -1),
-        (0, -1),
-        (1, -1),
-        (-1, 0),
-        (1, 0),
-        (-1, 1),
-        (0, 1),
-        (1, 1),
+        (-1, -1), (0, -1), (1, -1),
+        (-1,  0),           (1,  0),
+        (-1,  1), (0,  1), (1,  1),
     ];
 
     for (dx, dy) in offsets {
@@ -503,41 +523,7 @@ fn draw_tile_preview(
         if !copy_rect.intersects(rect) {
             continue;
         }
-        draw_tiled_copy(painter, rect, canvas, copy_min, zoom, tint);
-    }
-}
-
-fn draw_tiled_copy(
-    painter: &egui::Painter,
-    clip_rect: egui::Rect,
-    canvas: &SpriteCanvas,
-    origin: egui::Pos2,
-    zoom: f32,
-    tint: egui::Color32,
-) {
-    for y in 0..canvas.height {
-        for x in 0..canvas.width {
-            let Some(color) = canvas.get_pixel(x, y) else {
-                continue;
-            };
-            if color.a == 0 {
-                continue;
-            }
-            let px = origin.x + x as f32 * zoom;
-            let py = origin.y + y as f32 * zoom;
-            let pixel_rect = egui::Rect::from_min_size(egui::pos2(px, py), egui::vec2(zoom, zoom));
-            if !pixel_rect.intersects(clip_rect) {
-                continue;
-            }
-            // Blend pixel color with tint alpha
-            let blended = egui::Color32::from_rgba_unmultiplied(
-                color.r,
-                color.g,
-                color.b,
-                ((color.a as u16 * tint.a() as u16) / 255) as u8,
-            );
-            painter.rect_filled(pixel_rect, 0.0, blended);
-        }
+        painter.image(texture.id(), copy_rect, full_uv, tint);
     }
 }
 
@@ -822,13 +808,14 @@ fn draw_floating_selection(
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
     floating: &FloatingSelection,
+    texture: Option<&egui::TextureHandle>,
 ) {
     let zoom = viewport.zoom;
     let pan = viewport.pan;
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
 
     let display = floating.display_size();
-    draw_floating_pixels(painter, canvas_screen_min, zoom, floating, display);
+    draw_floating_pixels(painter, canvas_screen_min, zoom, floating, display, texture);
 
     if floating.resize_size.is_some() {
         draw_resize_rect_border(painter, canvas_screen_min, zoom, floating, display);
@@ -846,31 +833,40 @@ fn draw_floating_pixels(
     zoom: f32,
     floating: &FloatingSelection,
     display: glam::UVec2,
+    texture: Option<&egui::TextureHandle>,
 ) {
+    let tl = egui::pos2(
+        canvas_screen_min.x + floating.offset.x as f32 * zoom,
+        canvas_screen_min.y + floating.offset.y as f32 * zoom,
+    );
+    let size = egui::vec2(display.x as f32 * zoom, display.y as f32 * zoom);
+    let dest = egui::Rect::from_min_size(tl, size);
+
+    if let Some(tex) = texture {
+        // Fast path: one GPU blit instead of O(W×H) rect_filled calls.
+        let tint = if floating.origin.is_paste_preview() {
+            egui::Color32::from_white_alpha(160)
+        } else {
+            egui::Color32::WHITE
+        };
+        let full_uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+        painter.image(tex.id(), dest, full_uv, tint);
+        return;
+    }
+
+    // Fallback per-pixel path (used when texture isn't ready yet)
     let src_w = floating.pixels.width;
     let src_h = floating.pixels.height;
-    // Pixel size in screen space when showing the resized preview
     let pixel_w = display.x as f32 / src_w as f32 * zoom;
     let pixel_h = display.y as f32 / src_h as f32 * zoom;
-
     for sy in 0..src_h {
         for sx in 0..src_w {
-            let Some(color) = floating.pixels.get_pixel(sx, sy) else {
-                continue;
-            };
-            if color.a == 0 {
-                continue;
-            }
-            let screen_x = canvas_screen_min.x
-                + (floating.offset.x as f32 + sx as f32 * pixel_w / zoom) * zoom;
-            let screen_y = canvas_screen_min.y
-                + (floating.offset.y as f32 + sy as f32 * pixel_h / zoom) * zoom;
-            let pixel_rect = egui::Rect::from_min_size(
-                egui::pos2(screen_x, screen_y),
-                egui::vec2(pixel_w, pixel_h),
-            );
+            let Some(color) = floating.pixels.get_pixel(sx, sy) else { continue; };
+            if color.a == 0 { continue; }
+            let px = canvas_screen_min.x + (floating.offset.x as f32 + sx as f32 * pixel_w / zoom) * zoom;
+            let py = canvas_screen_min.y + (floating.offset.y as f32 + sy as f32 * pixel_h / zoom) * zoom;
             painter.rect_filled(
-                pixel_rect,
+                egui::Rect::from_min_size(egui::pos2(px, py), egui::vec2(pixel_w, pixel_h)),
                 0.0,
                 floating_preview_color(color, &floating.origin),
             );
@@ -1123,7 +1119,11 @@ mod tests {
 
         let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(palette));
 
-        assert_eq!(pixels, vec![10, 20, 30, 255, 70, 80, 90, 128]);
+        // Pixel 0: fully opaque (A=255) — checkerboard not applied, palette colour unchanged.
+        // Pixel 1: semi-transparent (A=128) — composited against checker square (180/220 grey),
+        //          position (1,0): (1%2 + 1/2)=1 → checker=220.
+        //          R=(128*70 + 127*220)/255=144, G=(128*80+127*220)/255=149, B=(128*90+127*220)/255=154
+        assert_eq!(pixels, vec![10, 20, 30, 255, 144, 149, 154, 255]);
     }
 
     #[test]
