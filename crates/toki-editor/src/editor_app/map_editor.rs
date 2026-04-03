@@ -74,7 +74,7 @@ impl EditorApp {
 
     pub(super) fn handle_map_requests(&mut self) {
         // Handle Map Loading request
-        if let Some(request) = crate::ui::editor_context::map_state_mut(&mut self.core.ui)
+        if let Some(request) = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui)
             .load_requested
             .take()
         {
@@ -86,7 +86,7 @@ impl EditorApp {
                     .join("tilemaps")
                     .join(format!("{}.json", map_name));
 
-                if let Some(viewport) = &mut self.viewports.scene {
+                if let Some(viewport) = &mut self.viewport_manager.scene {
                     match viewport.load_tilemap(&map_file) {
                         Ok(()) => {
                             tracing::info!(
@@ -94,7 +94,7 @@ impl EditorApp {
                                 map_name,
                                 scene_name
                             );
-                            self.session
+                            self.project_session
                                 .loaded_scene_maps
                                 .insert(scene_name.clone(), map_name.clone());
                             // Mark viewport as needing re-render
@@ -127,7 +127,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_new_map_editor_requests(&mut self) {
-        let Some(request) = crate::ui::editor_context::map_state_mut(&mut self.core.ui)
+        let Some(request) = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui)
             .new_map_requested
             .take()
         else {
@@ -151,7 +151,7 @@ impl EditorApp {
             request.tile_height,
         ) {
             Ok(draft) => {
-                let Some(viewport) = &mut self.viewports.map_editor else {
+                let Some(viewport) = &mut self.viewport_manager.map_editor else {
                     tracing::warn!(
                         "No map editor viewport available for new map '{}'",
                         request.name
@@ -168,7 +168,7 @@ impl EditorApp {
                     return;
                 }
 
-                crate::ui::editor_ui::set_map_editor_draft(&mut self.core.ui, draft);
+                crate::ui::editor_ui::set_map_editor_draft(&mut self.tabs.ui, draft);
                 viewport.mark_dirty();
             }
             Err(error) => {
@@ -182,16 +182,16 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_map_editor_request(&mut self) {
-        if !crate::ui::editor_context::map_state_mut(&mut self.core.ui).save_requested {
+        if !crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested {
             return;
         }
 
-        if let Some(draft) = crate::ui::editor_context::map_state_mut(&mut self.core.ui)
+        if let Some(draft) = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui)
             .draft
             .clone()
         {
             let live_tilemap = self
-                .viewports
+                .viewport_manager
                 .map_editor
                 .as_ref()
                 .and_then(|viewport| viewport.tilemap());
@@ -204,7 +204,7 @@ impl EditorApp {
                 Ok(_) => {
                     tracing::info!("Saved map editor draft '{}'", draft.name);
                     crate::ui::editor_ui::finalize_saved_map_editor_draft(
-                        &mut self.core.ui,
+                        &mut self.tabs.ui,
                         draft.name,
                     );
                 }
@@ -214,27 +214,27 @@ impl EditorApp {
                         draft.name,
                         error
                     );
-                    crate::ui::editor_context::map_state_mut(&mut self.core.ui).save_requested =
+                    crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested =
                         false;
                 }
             }
             return;
         }
 
-        let Some(active_map_name) = crate::ui::editor_context::map_state_mut(&mut self.core.ui)
+        let Some(active_map_name) = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui)
             .active_map
             .clone()
         else {
-            crate::ui::editor_context::map_state_mut(&mut self.core.ui).save_requested = false;
+            crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested = false;
             return;
         };
         let Some(tilemap) = self
-            .viewports
+            .viewport_manager
             .map_editor
             .as_ref()
             .and_then(|viewport| viewport.tilemap().cloned())
         else {
-            crate::ui::editor_context::map_state_mut(&mut self.core.ui).save_requested = false;
+            crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested = false;
             return;
         };
 
@@ -245,7 +245,7 @@ impl EditorApp {
         {
             Ok(_) => {
                 tracing::info!("Saved map editor asset '{}'", active_map_name);
-                crate::ui::editor_ui::finalize_saved_existing_map(&mut self.core.ui);
+                crate::ui::editor_ui::finalize_saved_existing_map(&mut self.tabs.ui);
             }
             Err(error) => {
                 tracing::error!(
@@ -253,18 +253,18 @@ impl EditorApp {
                     active_map_name,
                     error
                 );
-                crate::ui::editor_context::map_state_mut(&mut self.core.ui).save_requested = false;
+                crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested = false;
             }
         }
     }
 
     pub(super) fn handle_map_editor_map_requests(&mut self) {
-        if crate::ui::editor_ui::has_unsaved_map_editor_draft(&self.core.ui) {
-            crate::ui::editor_context::map_state_mut(&mut self.core.ui).map_load_requested = None;
+        if crate::ui::editor_ui::has_unsaved_map_editor_draft(&self.tabs.ui) {
+            crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).map_load_requested = None;
             return;
         }
 
-        let Some(map_name) = crate::ui::editor_context::map_state_mut(&mut self.core.ui)
+        let Some(map_name) = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui)
             .map_load_requested
             .take()
         else {
@@ -279,7 +279,7 @@ impl EditorApp {
             return;
         };
 
-        let Some(viewport) = &mut self.viewports.map_editor else {
+        let Some(viewport) = &mut self.viewport_manager.map_editor else {
             tracing::warn!(
                 "No map editor viewport available for loading map '{}'",
                 map_name
@@ -296,10 +296,10 @@ impl EditorApp {
         match viewport.load_tilemap(&map_file) {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
-                crate::ui::editor_context::map_state_mut(&mut self.core.ui).active_map =
+                crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).active_map =
                     Some(map_name);
-                crate::ui::editor_ui::clear_map_editor_dirty(&mut self.core.ui);
-                crate::ui::editor_ui::clear_map_editor_history(&mut self.core.ui);
+                crate::ui::editor_ui::clear_map_editor_dirty(&mut self.tabs.ui);
+                crate::ui::editor_ui::clear_map_editor_history(&mut self.tabs.ui);
                 viewport.mark_dirty();
             }
             Err(e) => {
@@ -314,12 +314,12 @@ impl EditorApp {
 
     pub(super) fn handle_pending_map_editor_tilemap_sync(&mut self) {
         let Some(tilemap) =
-            crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut self.core.ui)
+            crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut self.tabs.ui)
         else {
             return;
         };
 
-        let Some(viewport) = &mut self.viewports.map_editor else {
+        let Some(viewport) = &mut self.viewport_manager.map_editor else {
             return;
         };
 

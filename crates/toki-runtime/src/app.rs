@@ -176,6 +176,39 @@ pub struct RuntimeLaunchOptions {
 }
 
 #[derive(Debug)]
+struct StartupCoordinator {
+    splash_policy: SplashPolicy,
+}
+
+#[derive(Debug, Default)]
+struct TickCoordinator {
+    /// Last tick instant for delta time calculation in delta timing mode.
+    last_tick_instant: Option<Instant>,
+}
+
+#[derive(Debug)]
+struct RenderCoordinator {
+    splash_config: ResolvedSplashConfig,
+    splash_active: bool,
+    splash_started_at: Option<Instant>,
+    splash_logo_loaded: bool,
+    post_splash_sprite_texture_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Default)]
+struct MenuCoordinator {
+    runtime_overlay: Option<RuntimeMenuOverlay>,
+    exit_requested: bool,
+    pending_ui_events: Vec<String>,
+    cursor_position: Option<glam::Vec2>,
+    left_mouse_down: bool,
+    runtime_overlay_slider_drag: Option<usize>,
+}
+
+#[derive(Debug, Default)]
+struct PersistenceCoordinator;
+
+#[derive(Debug)]
 struct App {
     // Core systems
     game_system: GameManager,
@@ -193,24 +226,15 @@ struct App {
     menu_system: MenuController,
     dialog_system: DialogController,
     ui_controller: UiController,
-    splash_policy: SplashPolicy,
-    splash_config: ResolvedSplashConfig,
-    splash_active: bool,
-    splash_started_at: Option<Instant>,
-    splash_logo_loaded: bool,
-    post_splash_sprite_texture_path: Option<PathBuf>,
-    runtime_overlay: Option<RuntimeMenuOverlay>,
-    exit_requested: bool,
-    pending_ui_events: Vec<String>,
-    /// Last tick instant for delta time calculation in delta timing mode
-    last_tick_instant: Option<Instant>,
+    startup: StartupCoordinator,
+    tick_coordinator: TickCoordinator,
+    render_coordinator: RenderCoordinator,
+    menu_coordinator: MenuCoordinator,
+    persistence: PersistenceCoordinator,
     asset_load_plan: RuntimeAssetLoadPlan,
     scene_transition: SceneTransitionController,
     decoded_project_cache: DecodedProjectCache,
     pack_mount: Option<tempfile::TempDir>,
-    cursor_position: Option<glam::Vec2>,
-    left_mouse_down: bool,
-    runtime_overlay_slider_drag: Option<usize>,
 }
 
 struct BuiltStartupState {
@@ -313,23 +337,44 @@ impl AppBuilder {
             menu_system,
             dialog_system,
             ui_controller,
-            splash_policy: self.splash_policy,
+            startup: StartupCoordinator::new(self.splash_policy),
+            tick_coordinator: TickCoordinator::default(),
+            render_coordinator: RenderCoordinator::new(splash_config),
+            menu_coordinator: MenuCoordinator::default(),
+            persistence: PersistenceCoordinator,
+            asset_load_plan: startup.asset_load_plan,
+            scene_transition,
+            decoded_project_cache: startup.decoded_project_cache,
+            pack_mount: startup.pack_mount,
+        }
+    }
+}
+
+impl StartupCoordinator {
+    fn new(splash_policy: SplashPolicy) -> Self {
+        Self { splash_policy }
+    }
+}
+
+impl TickCoordinator {
+    fn next_delta_ms(&mut self, now: Instant) -> f32 {
+        let delta_ms = self
+            .last_tick_instant
+            .map(|last| now.duration_since(last).as_secs_f32() * 1000.0)
+            .unwrap_or(toki_core::DEFAULT_TIMESTEP_MS);
+        self.last_tick_instant = Some(now);
+        delta_ms
+    }
+}
+
+impl RenderCoordinator {
+    fn new(splash_config: ResolvedSplashConfig) -> Self {
+        Self {
             splash_config,
             splash_active: true,
             splash_started_at: None,
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
-            runtime_overlay: None,
-            exit_requested: false,
-            pending_ui_events: Vec::new(),
-            last_tick_instant: None,
-            asset_load_plan: startup.asset_load_plan,
-            scene_transition,
-            decoded_project_cache: startup.decoded_project_cache,
-            pack_mount: startup.pack_mount,
-            cursor_position: None,
-            left_mouse_down: false,
-            runtime_overlay_slider_drag: None,
         }
     }
 }

@@ -21,11 +21,11 @@ impl EditorApp {
                 )
             })
             .unwrap_or_default();
-        self.core
+        self.tabs
             .ui
             .project
             .set_available_palettes(&project_palettes);
-        self.core
+        self.tabs
             .ui
             .project
             .set_available_dialogs(&available_dialogs);
@@ -37,23 +37,23 @@ impl EditorApp {
                 .display
                 .indexed_palette_override
                 .clone();
-            self.core.ui.project.indexed_palette_override = indexed_palette_override.clone();
-            if let Some(viewport) = self.viewports.scene.as_mut() {
-                viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+            self.tabs.ui.project.indexed_palette_override = indexed_palette_override.clone();
+            if let Some(viewport) = self.viewport_manager.scene.as_mut() {
+                viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
                 viewport.set_indexed_palette_override(indexed_palette_override.clone());
                 viewport.clear_asset_caches();
             }
-            if let Some(viewport) = self.viewports.map_editor.as_mut() {
-                viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+            if let Some(viewport) = self.viewport_manager.map_editor.as_mut() {
+                viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
                 viewport.set_indexed_palette_override(indexed_palette_override);
                 viewport.clear_asset_caches();
             }
         }
 
-        self.resources.preview_sprite_frames.clear();
+        self.panel_coordinator.preview_sprite_frames.clear();
 
         match self.core.project_manager.load_scenes() {
-            Ok(loaded_scenes) => self.core.ui.load_scenes_from_project(loaded_scenes),
+            Ok(loaded_scenes) => self.tabs.ui.load_scenes_from_project(loaded_scenes),
             Err(error) => tracing::error!("Failed to reload scenes after asset rescan: {}", error),
         }
     }
@@ -88,9 +88,10 @@ impl EditorApp {
             resolution_height,
         ) {
             Ok(viewport) => {
-                self.viewports.scene = self.initialize_viewport(|| Ok(viewport), "scene viewport");
-                self.session.last_loaded_active_scene = None;
-                self.session.loaded_scene_maps.clear();
+                self.viewport_manager.scene =
+                    self.initialize_viewport(|| Ok(viewport), "scene viewport");
+                self.project_session.last_loaded_active_scene = None;
+                self.project_session.loaded_scene_maps.clear();
 
                 self.core.config.set_project_path(project_path);
                 if let Err(error) = self.core.config.save() {
@@ -125,12 +126,12 @@ impl EditorApp {
                     })
                     .unwrap_or_default();
                 if let Some(project_name) = project_name {
-                    self.core.ui.set_title(&project_name);
-                    self.core
+                    self.tabs.ui.set_title(&project_name);
+                    self.tabs
                         .ui
                         .project
                         .set_available_palettes(&project_palettes);
-                    self.core
+                    self.tabs
                         .ui
                         .project
                         .set_available_dialogs(&available_dialogs);
@@ -148,19 +149,19 @@ impl EditorApp {
                             .indexed_palette_override
                             .clone()
                     });
-                self.core.ui.project.indexed_palette_override = indexed_palette_override.clone();
-                if let Some(viewport) = self.viewports.scene.as_mut() {
-                    viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+                self.tabs.ui.project.indexed_palette_override = indexed_palette_override.clone();
+                if let Some(viewport) = self.viewport_manager.scene.as_mut() {
+                    viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
                     viewport.set_indexed_palette_override(indexed_palette_override.clone());
                 }
-                if let Some(viewport) = self.viewports.map_editor.as_mut() {
-                    viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+                if let Some(viewport) = self.viewport_manager.map_editor.as_mut() {
+                    viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
                     viewport.set_indexed_palette_override(indexed_palette_override.clone());
                 }
 
                 match self.core.project_manager.load_scenes() {
                     Ok(loaded_scenes) => {
-                        self.core.ui.load_scenes_from_project(loaded_scenes);
+                        self.tabs.ui.load_scenes_from_project(loaded_scenes);
                         tracing::info!("Loaded scenes into UI hierarchy");
                     }
                     Err(error) => {
@@ -169,7 +170,7 @@ impl EditorApp {
                 }
 
                 graph_metadata::load_into_ui(
-                    &mut self.core.ui,
+                    &mut self.tabs.ui,
                     self.core.project_manager.current_project.as_ref(),
                 );
             }
@@ -233,14 +234,14 @@ impl EditorApp {
         }
 
         if let Some(project) = self.core.project_manager.current_project.as_mut() {
-            graph_metadata::copy_ui_into_project(&self.core.ui, project);
+            graph_metadata::copy_ui_into_project(&self.tabs.ui, project);
         }
 
-        let scenes = &self.core.ui.scenes;
+        let scenes = &self.tabs.ui.scenes;
         match self.core.project_manager.save_current_project(scenes) {
             Ok(_) => {
                 tracing::info!("Project saved successfully");
-                crate::ui::editor_ui::clear_graph_layout_dirty(&mut self.core.ui);
+                crate::ui::editor_ui::clear_graph_layout_dirty(&mut self.tabs.ui);
             }
             Err(error) => {
                 tracing::error!("Failed to save project: {}", error);
@@ -273,15 +274,15 @@ impl EditorApp {
     pub(super) fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
         self.poll_background_task_updates();
 
-        if self.core.ui.project.cancel_background_task_requested {
-            self.core.ui.project.cancel_background_task_requested = false;
-            if self.background_tasks.request_cancel() {
+        if self.tabs.ui.project.cancel_background_task_requested {
+            self.tabs.ui.project.cancel_background_task_requested = false;
+            if self.command_coordinator.background_tasks.request_cancel() {
                 tracing::info!("Background task cancellation requested");
             }
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::NewProject)
@@ -297,7 +298,7 @@ impl EditorApp {
                     .unwrap_or_else(|| std::path::Path::new(".")),
                 "NewProject",
             );
-            self.core.ui.begin_new_project_dialog(
+            self.tabs.ui.begin_new_project_dialog(
                 ProjectTemplateKind::Empty,
                 suggested_parent,
                 suggested_name,
@@ -305,7 +306,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::NewTopDownProject)
@@ -321,19 +322,19 @@ impl EditorApp {
                     .unwrap_or_else(|| std::path::Path::new(".")),
                 "NewProject",
             );
-            self.core.ui.begin_new_project_dialog(
+            self.tabs.ui.begin_new_project_dialog(
                 ProjectTemplateKind::TopDownStarter,
                 suggested_parent,
                 suggested_name,
             );
         }
 
-        if let Some(request) = self.core.ui.project.new_project_submit_requested.take() {
+        if let Some(request) = self.tabs.ui.project.new_project_submit_requested.take() {
             self.handle_new_project_requested(request.template, request.parent_path, request.name);
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::OpenProject)
@@ -342,7 +343,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::BrowseForProject)
@@ -351,7 +352,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::ReloadProjectAssets)
@@ -360,7 +361,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::SaveProject)
@@ -369,7 +370,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::ExportProject)
@@ -378,7 +379,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::InitConfig)
@@ -387,7 +388,7 @@ impl EditorApp {
         }
 
         if self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::ValidateAssets)
@@ -397,7 +398,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_validate_assets_request(&mut self) {
-        if self.background_tasks.is_running() {
+        if self.command_coordinator.background_tasks.is_running() {
             tracing::warn!("Cannot validate assets: another background task is running");
             return;
         }
@@ -409,6 +410,7 @@ impl EditorApp {
 
         tracing::info!("Starting asset validation task");
         if let Err(error) = self
+            .command_coordinator
             .background_tasks
             .start_validate_assets(ValidateAssetsJob { project_path })
         {

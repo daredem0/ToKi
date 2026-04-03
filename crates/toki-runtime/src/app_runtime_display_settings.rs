@@ -110,7 +110,7 @@ impl App {
     }
 
     pub(super) fn handle_display_overlay_input(&mut self, input: MenuInput) -> bool {
-        let mut selected_index = match self.runtime_overlay.as_ref() {
+        let mut selected_index = match self.menu_coordinator.runtime_overlay.as_ref() {
             Some(RuntimeMenuOverlay::Display { selected_index }) => *selected_index,
             _ => return false,
         };
@@ -124,6 +124,7 @@ impl App {
         };
         if let Some(next_selected) = next_selected {
             let RuntimeMenuOverlay::Display { selected_index } = self
+                .menu_coordinator
                 .runtime_overlay
                 .as_mut()
                 .expect("display overlay must be active")

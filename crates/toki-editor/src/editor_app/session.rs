@@ -18,7 +18,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_active_scene_map_loading(&mut self) {
-        let current_active_scene = self.core.ui.active_scene.clone();
+        let current_active_scene = self.tabs.ui.active_scene.clone();
 
         if !self.should_reload_scene(&current_active_scene) {
             return;
@@ -33,20 +33,20 @@ impl EditorApp {
     }
 
     pub(super) fn should_reload_scene(&self, current_scene: &Option<String>) -> bool {
-        *current_scene != self.session.last_loaded_active_scene
-            || self.core.ui.scene_content_changed
+        *current_scene != self.project_session.last_loaded_active_scene
+            || self.tabs.ui.scene_content_changed
     }
 
     pub(super) fn update_scene_state(&mut self, current_scene: &Option<String>) {
-        self.session.last_loaded_active_scene = current_scene.clone();
-        self.core.ui.scene_content_changed = false;
+        self.project_session.last_loaded_active_scene = current_scene.clone();
+        self.tabs.ui.scene_content_changed = false;
 
         tracing::info!(
             "Active scene or content changed, reloading map for scene: {:?}",
             current_scene
         );
 
-        if let Some(viewport) = &mut self.viewports.scene {
+        if let Some(viewport) = &mut self.viewport_manager.scene {
             viewport.mark_dirty();
         }
     }
@@ -64,13 +64,13 @@ impl EditorApp {
             active_scene.maps
         );
 
-        let Some(viewport) = &mut self.viewports.scene else {
+        let Some(viewport) = &mut self.viewport_manager.scene else {
             return;
         };
 
         let project_path = self.core.config.current_project_path().cloned();
         let preferred_map = self
-            .session
+            .project_session
             .loaded_scene_maps
             .get(scene_name)
             .map(String::as_str);
@@ -89,12 +89,12 @@ impl EditorApp {
         );
 
         if preferred_map.is_some() && map_to_load.as_deref() != preferred_map {
-            self.session.loaded_scene_maps.remove(scene_name);
+            self.project_session.loaded_scene_maps.remove(scene_name);
         }
     }
 
     pub(super) fn find_scene_by_name(&self, scene_name: &str) -> Option<&toki_core::Scene> {
-        self.core.ui.scenes.iter().find(|s| s.name == scene_name)
+        self.tabs.ui.scenes.iter().find(|s| s.name == scene_name)
     }
 
     pub(super) fn build_scene_preview_game_state(
@@ -214,10 +214,10 @@ impl EditorApp {
     }
 
     pub(super) fn clear_viewport_scene(&mut self) {
-        if let Some(viewport) = &mut self.viewports.scene {
+        if let Some(viewport) = &mut self.viewport_manager.scene {
             viewport.clear_tilemap();
         }
-        if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
+        if let Some(map_editor_viewport) = &mut self.viewport_manager.map_editor {
             map_editor_viewport.clear_tilemap();
         }
         tracing::debug!("No active scene set, cleared viewport");

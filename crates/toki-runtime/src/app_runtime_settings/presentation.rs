@@ -24,7 +24,7 @@ impl App {
         appearance: &MenuAppearance,
         viewport: glam::Vec2,
     ) -> Option<RuntimeOverlayPresentation> {
-        let overlay = self.runtime_overlay.clone()?;
+        let overlay = self.menu_coordinator.runtime_overlay.clone()?;
         let (title, entries): (String, Vec<RuntimeOverlayEntry>) = match overlay {
             RuntimeMenuOverlay::Audio { selected_index } => (
                 "Audio Settings".to_string(),

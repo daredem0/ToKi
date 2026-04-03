@@ -121,7 +121,7 @@ impl App {
         self.rendering.clear_text_items();
         self.rendering.clear_debug_shapes();
         self.rendering.finalize_debug_shapes();
-        if self.splash_logo_loaded {
+        if self.render_coordinator.splash_logo_loaded {
             self.rendering.add_sprite(
                 toki_core::sprite::SpriteFrame {
                     u0: 0.0,
@@ -134,7 +134,7 @@ impl App {
                 false,
             );
         }
-        if self.splash_config.show_branding {
+        if self.render_coordinator.splash_config.show_branding {
             let ui_scale = presentation.runtime_ui_scale_factor();
             let branding_style = TextStyle {
                 font_family: "Sans".to_string(),
@@ -164,7 +164,7 @@ impl App {
             };
             let (branding_position, version_position) = Self::splash_branding_positions(
                 surface_view_size,
-                self.splash_logo_loaded,
+                self.render_coordinator.splash_logo_loaded,
                 surface_logo_origin,
                 surface_logo_size,
                 &branding_style,
@@ -197,7 +197,7 @@ impl App {
     }
 
     pub(super) fn restore_runtime_sprite_texture_after_splash(&mut self) {
-        if let Some(path) = &self.post_splash_sprite_texture_path {
+        if let Some(path) = &self.render_coordinator.post_splash_sprite_texture_path {
             if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
                 tracing::warn!(
                     "Failed to restore sprite texture '{}' after splash: {}",
@@ -238,22 +238,23 @@ impl App {
     }
 
     pub(super) fn initialize_splash_resources(&mut self) {
-        self.splash_config = self.splash_policy.resolve(&self.launch_options.splash);
+        self.render_coordinator.splash_config =
+            self.startup.splash_policy.resolve(&self.launch_options.splash);
         if let Ok(decoded_logo) = load_image_rgba8_from_bytes(COMMUNITY_SPLASH_LOGO_PNG) {
             if let Err(error) = self.rendering.load_sprite_texture_rgba8(&decoded_logo) {
                 tracing::warn!(
                     "Failed to load embedded startup logo texture (splash will render branding-only): {}",
                     error
                 );
-                self.splash_logo_loaded = false;
+                self.render_coordinator.splash_logo_loaded = false;
             } else {
-                self.splash_logo_loaded = true;
+                self.render_coordinator.splash_logo_loaded = true;
             }
         } else {
             tracing::warn!(
                 "Failed to decode embedded startup logo bytes; splash will render branding-only"
             );
-            self.splash_logo_loaded = false;
+            self.render_coordinator.splash_logo_loaded = false;
         }
     }
 }

@@ -4,7 +4,7 @@ use super::{App, GraphicsSettingKey, RuntimeMenuOverlay};
 
 impl App {
     pub(super) fn handle_audio_overlay_input(&mut self, input: MenuInput) -> bool {
-        let selected_index = match self.runtime_overlay.as_ref() {
+        let selected_index = match self.menu_coordinator.runtime_overlay.as_ref() {
             Some(RuntimeMenuOverlay::Audio { selected_index }) => *selected_index,
             _ => return false,
         };
@@ -38,7 +38,7 @@ impl App {
     }
 
     pub(super) fn handle_graphics_overlay_input(&mut self, input: MenuInput) -> bool {
-        let mut selected_index = match self.runtime_overlay.as_ref() {
+        let mut selected_index = match self.menu_coordinator.runtime_overlay.as_ref() {
             Some(RuntimeMenuOverlay::Graphics { selected_index }) => *selected_index,
             _ => return false,
         };
@@ -72,7 +72,7 @@ impl App {
     }
 
     pub(super) fn select_runtime_overlay_entry(&mut self, entry_index: usize) {
-        match self.runtime_overlay.as_mut() {
+        match self.menu_coordinator.runtime_overlay.as_mut() {
             Some(RuntimeMenuOverlay::Audio { selected_index })
             | Some(RuntimeMenuOverlay::Display { selected_index })
             | Some(RuntimeMenuOverlay::Graphics { selected_index }) => {

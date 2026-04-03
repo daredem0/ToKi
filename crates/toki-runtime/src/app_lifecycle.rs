@@ -11,7 +11,7 @@ use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
 use winit::window::WindowId;
 
-use super::App;
+use super::{App, PersistenceCoordinator, RuntimeLaunchOptions};
 
 impl App {
     fn event_matches_key(event: &KeyEvent, physical: KeyCode, logical: NamedKey) -> bool {
@@ -55,30 +55,25 @@ impl App {
     }
 
     pub(super) fn save_to_slot(&mut self, slot: u8) -> anyhow::Result<std::path::PathBuf> {
-        let save_root = self.resolve_save_root();
-        let path = save_game_to_slot(&mut self.game_system.game_state, &save_root, slot)?;
-        tracing::info!(
-            "Saved slot {} to '{}' (scene='{}')",
+        let active_scene_name = self.game_system.active_scene_name().map(str::to_string);
+        self.persistence.save_to_slot(
+            &mut self.game_system.game_state,
+            &self.launch_options,
+            active_scene_name.as_deref(),
             slot,
-            path.display(),
-            self.game_system.active_scene_name().unwrap_or("<none>")
-        );
-        Ok(path)
+        )
     }
 
     pub(super) fn load_from_slot(&mut self, slot: u8) -> anyhow::Result<()> {
-        let save_root = self.resolve_save_root();
-        let save_path = save_slot_file_path(&save_root, slot)?;
-        let save_data = load_save_data_from_slot(&save_root, slot)?;
-        let active_scene_name = save_data.active_scene_name.clone();
-        SceneSystem::restore_from_save_data(&mut self.game_system.game_state, &save_data)
-            .map_err(anyhow::Error::from)?;
+        let active_scene_name = self.persistence.load_from_slot(
+            &mut self.game_system.game_state,
+            &self.launch_options,
+            slot,
+        )?;
         self.refresh_runtime_after_scene_restore();
         tracing::info!(
-            "Loaded slot {} from '{}' (scene='{}')",
-            slot,
-            save_path.display(),
-            active_scene_name
+            "Loaded slot {} (scene='{}')",
+            slot, active_scene_name
         );
         Ok(())
     }
@@ -189,19 +184,22 @@ impl App {
         self.platform.pre_present_notify();
 
         if self.rendering.has_gpu() {
-            if self.splash_active {
-                let started_at = self.splash_started_at.unwrap_or_else(|| {
+            if self.render_coordinator.splash_active {
+                let started_at = self
+                    .render_coordinator
+                    .splash_started_at
+                    .unwrap_or_else(|| {
                     let now = Instant::now();
-                    self.splash_started_at = Some(now);
+                    self.render_coordinator.splash_started_at = Some(now);
                     now
                 });
 
-                if started_at.elapsed() < self.splash_config.duration {
+                if started_at.elapsed() < self.render_coordinator.splash_config.duration {
                     self.render_startup_splash();
                     return;
                 }
 
-                self.splash_active = false;
+                self.render_coordinator.splash_active = false;
                 self.rendering.set_tilemap_render_enabled(true);
                 self.restore_runtime_sprite_texture_after_splash();
                 let world_bounds = self.current_world_bounds();
@@ -250,6 +248,50 @@ impl App {
     }
 }
 
+impl PersistenceCoordinator {
+    fn resolve_save_root(&self, launch_options: &RuntimeLaunchOptions) -> std::path::PathBuf {
+        App::resolve_save_root_for_launch_options(launch_options)
+    }
+
+    fn save_to_slot(
+        &self,
+        game_state: &mut toki_core::GameState,
+        launch_options: &RuntimeLaunchOptions,
+        active_scene_name: Option<&str>,
+        slot: u8,
+    ) -> anyhow::Result<std::path::PathBuf> {
+        let save_root = self.resolve_save_root(launch_options);
+        let path = save_game_to_slot(game_state, &save_root, slot)?;
+        tracing::info!(
+            "Saved slot {} to '{}' (scene='{}')",
+            slot,
+            path.display(),
+            active_scene_name.unwrap_or("<none>")
+        );
+        Ok(path)
+    }
+
+    fn load_from_slot(
+        &self,
+        game_state: &mut toki_core::GameState,
+        launch_options: &RuntimeLaunchOptions,
+        slot: u8,
+    ) -> anyhow::Result<String> {
+        let save_root = self.resolve_save_root(launch_options);
+        let save_path = save_slot_file_path(&save_root, slot)?;
+        let save_data = load_save_data_from_slot(&save_root, slot)?;
+        let active_scene_name = save_data.active_scene_name.clone();
+        SceneSystem::restore_from_save_data(game_state, &save_data).map_err(anyhow::Error::from)?;
+        tracing::info!(
+            "Loaded slot {} from '{}' (scene='{}')",
+            slot,
+            save_path.display(),
+            active_scene_name
+        );
+        Ok(active_scene_name.to_string())
+    }
+}
+
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
@@ -286,7 +328,7 @@ impl ApplicationHandler for App {
                     );
                 }
             } else {
-                self.post_splash_sprite_texture_path =
+                self.render_coordinator.post_splash_sprite_texture_path =
                     self.asset_load_plan.sprite_texture_path.clone();
             }
         }
@@ -305,8 +347,11 @@ impl ApplicationHandler for App {
             }
         }
 
-        self.post_splash_sprite_texture_path =
-            self.post_splash_sprite_texture_path.clone().or_else(|| {
+        self.render_coordinator.post_splash_sprite_texture_path = self
+            .render_coordinator
+            .post_splash_sprite_texture_path
+            .clone()
+            .or_else(|| {
                 Self::resolve_post_splash_sprite_texture_path(
                     &self.launch_options,
                     content_root.as_deref(),
@@ -354,7 +399,7 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        if self.splash_active && self.rendering.has_gpu() {
+        if self.render_coordinator.splash_active && self.rendering.has_gpu() {
             self.platform.request_redraw();
             return;
         }
@@ -378,11 +423,7 @@ impl ApplicationHandler for App {
             toki_core::TimingMode::Delta => {
                 // Process single tick with actual elapsed time
                 let now = Instant::now();
-                let delta_ms = self
-                    .last_tick_instant
-                    .map(|last| now.duration_since(last).as_secs_f32() * 1000.0)
-                    .unwrap_or(toki_core::DEFAULT_TIMESTEP_MS);
-                self.last_tick_instant = Some(now);
+                let delta_ms = self.tick_coordinator.next_delta_ms(now);
 
                 let tick_start = Instant::now();
                 self.tick_with_delta(delta_ms);
@@ -407,14 +448,15 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::KeyboardInput { event, .. } => {
                 self.handle_keyboard_input_event(event);
-                if self.exit_requested {
+                if self.menu_coordinator.exit_requested {
                     tracing::info!("Menu requested runtime exit; stopping");
                     event_loop.exit();
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                self.cursor_position = Some(glam::Vec2::new(position.x as f32, position.y as f32));
-                if self.left_mouse_down {
+                self.menu_coordinator.cursor_position =
+                    Some(glam::Vec2::new(position.x as f32, position.y as f32));
+                if self.menu_coordinator.left_mouse_down {
                     self.handle_menu_pointer_drag(glam::Vec2::new(
                         position.x as f32,
                         position.y as f32,
@@ -430,10 +472,10 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => {
-                self.left_mouse_down = true;
-                if let Some(cursor_position) = self.cursor_position {
+                self.menu_coordinator.left_mouse_down = true;
+                if let Some(cursor_position) = self.menu_coordinator.cursor_position {
                     self.handle_menu_pointer_click(cursor_position);
-                    if self.exit_requested {
+                    if self.menu_coordinator.exit_requested {
                         tracing::info!("Menu requested runtime exit; stopping");
                         event_loop.exit();
                     }
@@ -444,7 +486,7 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => {
-                self.left_mouse_down = false;
+                self.menu_coordinator.left_mouse_down = false;
                 self.clear_menu_pointer_drag();
             }
             WindowEvent::CloseRequested => {

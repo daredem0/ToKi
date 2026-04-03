@@ -91,18 +91,18 @@ fn editor_shortcut_action_ignores_non_ctrl_sequences() {
 #[test]
 fn escape_exits_placement_mode_before_requesting_editor_close() {
     let mut app = EditorApp::new(None);
-    crate::ui::editor_context::scene_viewport_context_mut(&mut app.core.ui)
+    crate::ui::editor_context::scene_viewport_context_mut(&mut app.tabs.ui)
         .placement
         .enter_placement_mode("player".to_string());
 
     app.handle_escape_key();
 
     assert!(
-        !crate::ui::editor_context::scene_viewport_context(&app.core.ui)
+        !crate::ui::editor_context::scene_viewport_context(&app.tabs.ui)
             .placement
             .is_in_placement_mode()
     );
-    assert!(app.core.ui.project.pending_confirmation.is_none());
+    assert!(app.tabs.ui.project.pending_confirmation.is_none());
 }
 
 #[test]
@@ -112,7 +112,7 @@ fn escape_requests_exit_confirmation_when_not_in_placement_mode() {
     app.handle_escape_key();
 
     assert_eq!(
-        app.core.ui.project.pending_confirmation,
+        app.tabs.ui.project.pending_confirmation,
         Some(EditorConfirmation::ExitEditor)
     );
 }
@@ -120,25 +120,25 @@ fn escape_requests_exit_confirmation_when_not_in_placement_mode() {
 #[test]
 fn escape_does_not_request_exit_when_sprite_editor_has_selection() {
     let mut app = EditorApp::new(None);
-    app.core.ui.set_active_tab(CenterPanelTab::SpriteEditor);
-    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).new_canvas(8, 8);
+    app.tabs.ui.set_active_tab(CenterPanelTab::SpriteEditor);
+    crate::ui::editor_context::sprite_state_mut(&mut app.tabs.ui).new_canvas(8, 8);
     let mut selection = SelectionMask::new(8, 8);
     selection.select_pixel(1, 1);
-    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui)
+    crate::ui::editor_context::sprite_state_mut(&mut app.tabs.ui)
         .active_mut()
         .selection = Some(selection);
 
     app.handle_escape_key();
 
-    assert!(app.core.ui.project.pending_confirmation.is_none());
+    assert!(app.tabs.ui.project.pending_confirmation.is_none());
 }
 
 #[test]
 fn escape_does_not_request_exit_when_sprite_editor_has_floating_selection() {
     let mut app = EditorApp::new(None);
-    app.core.ui.set_active_tab(CenterPanelTab::SpriteEditor);
-    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).new_canvas(8, 8);
-    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(&mut app.core.ui)
+    app.tabs.ui.set_active_tab(CenterPanelTab::SpriteEditor);
+    crate::ui::editor_context::sprite_state_mut(&mut app.tabs.ui).new_canvas(8, 8);
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(&mut app.tabs.ui)
         .active_mut()
         .canvas
     {
@@ -146,14 +146,14 @@ fn escape_does_not_request_exit_when_sprite_editor_has_floating_selection() {
     }
     let mut selection = SelectionMask::new(8, 8);
     selection.select_pixel(1, 1);
-    crate::ui::editor_context::sprite_state_mut(&mut app.core.ui)
+    crate::ui::editor_context::sprite_state_mut(&mut app.tabs.ui)
         .active_mut()
         .selection = Some(selection);
-    assert!(crate::ui::editor_context::sprite_state_mut(&mut app.core.ui).lift_selection());
+    assert!(crate::ui::editor_context::sprite_state_mut(&mut app.tabs.ui).lift_selection());
 
     app.handle_escape_key();
 
-    assert!(app.core.ui.project.pending_confirmation.is_none());
+    assert!(app.tabs.ui.project.pending_confirmation.is_none());
 }
 
 #[test]
@@ -184,9 +184,9 @@ fn reload_project_assets_refreshes_available_palettes_and_scene_list() {
 
     app.handle_reload_project_assets_request();
 
-    assert!(app.core.ui.project.available_palettes.contains_key("swamp"));
+    assert!(app.tabs.ui.project.available_palettes.contains_key("swamp"));
     assert!(app
-        .core
+        .tabs
         .ui
         .scenes
         .iter()
@@ -1265,7 +1265,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
 
     let mut app = super::EditorApp::new(None);
     let first = super::EditorApp::cached_preview_sprite_frame(
-        &mut app.resources.preview_sprite_frames,
+        &mut app.panel_coordinator.preview_sprite_frames,
         "player",
         &project_path,
         &project_assets,
@@ -1277,7 +1277,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
         .expect("entity definition should be removable after caching");
 
     let second = super::EditorApp::cached_preview_sprite_frame(
-        &mut app.resources.preview_sprite_frames,
+        &mut app.panel_coordinator.preview_sprite_frames,
         "player",
         &project_path,
         &project_assets,
@@ -1388,30 +1388,30 @@ fn build_scene_anchor_overlay_lines_use_drag_preview_instead_of_original_anchor(
 }
 
 // =============================================================================
-// EditorSessionState tests
+// ProjectSessionManager tests
 // =============================================================================
 
 #[test]
 fn editor_session_state_defaults_to_no_loaded_scene() {
-    let session = super::EditorSessionState::default();
+    let session = super::ProjectSessionManager::default();
     assert!(session.last_loaded_active_scene.is_none());
 }
 
 #[test]
 fn editor_session_state_defaults_to_empty_loaded_maps() {
-    let session = super::EditorSessionState::default();
+    let session = super::ProjectSessionManager::default();
     assert!(session.loaded_scene_maps.is_empty());
 }
 
 #[test]
 fn editor_session_state_defaults_to_startup_auto_open_not_done() {
-    let session = super::EditorSessionState::default();
+    let session = super::ProjectSessionManager::default();
     assert!(!session.startup_project_auto_open_done);
 }
 
 #[test]
 fn editor_session_state_tracks_loaded_scene_maps() {
-    let mut session = super::EditorSessionState::default();
+    let mut session = super::ProjectSessionManager::default();
     session
         .loaded_scene_maps
         .insert("Main Scene".to_string(), "main_map".to_string());
@@ -1424,7 +1424,7 @@ fn editor_session_state_tracks_loaded_scene_maps() {
 
 #[test]
 fn editor_session_state_tracks_last_loaded_scene() {
-    let session = super::EditorSessionState {
+    let session = super::ProjectSessionManager {
         last_loaded_active_scene: Some("Main Scene".to_string()),
         ..Default::default()
     };
@@ -1436,30 +1436,30 @@ fn editor_session_state_tracks_last_loaded_scene() {
 }
 
 // =============================================================================
-// EditorResourceCache tests
+// EditorPanelCoordinator tests
 // =============================================================================
 
 #[test]
 fn editor_resource_cache_defaults_to_no_texture() {
-    let cache = super::EditorResourceCache::default();
+    let cache = super::EditorPanelCoordinator::default();
     assert!(cache.busy_logo_texture.is_none());
 }
 
 #[test]
 fn editor_resource_cache_defaults_to_no_font_project_path() {
-    let cache = super::EditorResourceCache::default();
+    let cache = super::EditorPanelCoordinator::default();
     assert!(cache.menu_font_project_path.is_none());
 }
 
 #[test]
 fn editor_resource_cache_defaults_to_empty_preview_sprite_cache() {
-    let cache = super::EditorResourceCache::default();
+    let cache = super::EditorPanelCoordinator::default();
     assert!(cache.preview_sprite_frames.is_empty());
 }
 
 #[test]
 fn editor_resource_cache_tracks_font_project_path() {
-    let cache = super::EditorResourceCache {
+    let cache = super::EditorPanelCoordinator {
         menu_font_project_path: Some(PathBuf::from("/tmp/project")),
         ..Default::default()
     };
@@ -1483,12 +1483,12 @@ fn editor_platform_defaults_to_uninitialized() {
 }
 
 // =============================================================================
-// EditorViewports tests
+// EditorViewportManager tests
 // =============================================================================
 
 #[test]
 fn editor_viewports_defaults_to_no_viewports() {
-    let viewports = super::EditorViewports::default();
+    let viewports = super::EditorViewportManager::default();
     assert!(viewports.scene.is_none());
     assert!(viewports.map_editor.is_none());
 }
@@ -1505,15 +1505,14 @@ fn editor_core_has_default_config() {
 }
 
 #[test]
-fn editor_core_has_default_ui() {
-    let core = super::EditorCore::default();
-    // UI starts with default scene active
-    assert_eq!(core.ui.active_scene, Some("Main Scene".to_string()));
-}
-
-#[test]
 fn editor_core_has_empty_project_manager() {
     let core = super::EditorCore::default();
     // Project manager should have no current project by default
     assert!(core.project_manager.current_project.is_none());
+}
+
+#[test]
+fn editor_tab_manager_has_default_ui() {
+    let tabs = super::EditorTabManager::default();
+    assert_eq!(tabs.ui.active_scene, Some("Main Scene".to_string()));
 }

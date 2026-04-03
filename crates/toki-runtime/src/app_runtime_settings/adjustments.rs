@@ -249,7 +249,7 @@ impl App {
     }
 
     pub(super) fn set_runtime_overlay_slider_percent(&mut self, entry_index: usize, percent: u8) {
-        match self.runtime_overlay {
+        match self.menu_coordinator.runtime_overlay {
             Some(RuntimeMenuOverlay::Audio { .. }) => {
                 self.set_audio_slider_percent(entry_index, percent)
             }

@@ -57,7 +57,7 @@ pub fn run_editor(log_capture: Option<LogCapture>) -> Result<()> {
 
 /// Session state: tracks loaded scenes and maps across the editor session.
 #[derive(Default)]
-pub(crate) struct EditorSessionState {
+pub(crate) struct ProjectSessionManager {
     /// Track last loaded active scene to avoid unnecessary reloading.
     pub last_loaded_active_scene: Option<String>,
     /// Remembers the currently loaded map per scene for viewport reloads.
@@ -68,7 +68,7 @@ pub(crate) struct EditorSessionState {
 
 /// Resource cache: lazily loaded editor resources and their tracking state.
 #[derive(Default)]
-pub(crate) struct EditorResourceCache {
+pub(crate) struct EditorPanelCoordinator {
     /// Lazily loaded ToKi logo texture used for background task activity feedback.
     pub busy_logo_texture: Option<egui::TextureHandle>,
     /// Caches which project's menu preview fonts have been registered with egui.
@@ -91,26 +91,31 @@ pub(crate) struct EditorPlatform {
 
 /// Viewport management: scene preview and map editor viewports.
 #[derive(Default)]
-pub(crate) struct EditorViewports {
+pub(crate) struct EditorViewportManager {
     pub scene: Option<SceneViewport>,
     pub map_editor: Option<SceneViewport>,
 }
 
-/// Editor core: project management, UI state, and configuration.
-pub(crate) struct EditorCore {
-    pub project_manager: ProjectManager,
+pub(crate) struct EditorTabManager {
     pub ui: EditorUI,
-    pub config: EditorConfig,
 }
 
-impl Default for EditorCore {
+impl Default for EditorTabManager {
     fn default() -> Self {
-        Self {
-            project_manager: ProjectManager::new(),
-            ui: EditorUI::new(),
-            config: EditorConfig::default(),
-        }
+        Self { ui: EditorUI::new() }
     }
+}
+
+#[derive(Default)]
+pub(crate) struct EditorCommandCoordinator {
+    pub background_tasks: BackgroundTaskManager,
+}
+
+/// Editor core: project management and configuration.
+#[derive(Default)]
+pub(crate) struct EditorCore {
+    pub project_manager: ProjectManager,
+    pub config: EditorConfig,
 }
 
 struct EditorApp {
@@ -118,10 +123,13 @@ struct EditorApp {
     platform: EditorPlatform,
 
     /// Viewport management: scene and map editor viewports.
-    viewports: EditorViewports,
+    viewport_manager: EditorViewportManager,
 
-    /// Editor core: project management, UI state, configuration.
+    /// Editor core: project management and configuration.
     core: EditorCore,
+
+    /// Tab/workspace ownership, including shared tab contexts.
+    tabs: EditorTabManager,
 
     /// Logging
     log_capture: Option<LogCapture>,
@@ -129,14 +137,14 @@ struct EditorApp {
     /// Keyboard modifiers state
     modifiers: ModifiersState,
 
-    /// Session state: loaded scenes, maps, and startup flags.
-    session: EditorSessionState,
+    /// Session/project lifecycle ownership.
+    project_session: ProjectSessionManager,
 
-    /// Runs long-running editor operations off the UI thread.
-    background_tasks: BackgroundTaskManager,
+    /// Commands and background workflows.
+    command_coordinator: EditorCommandCoordinator,
 
-    /// Resource cache: lazily loaded editor resources.
-    resources: EditorResourceCache,
+    /// Panel-owned resource caches and precomputed editor render state.
+    panel_coordinator: EditorPanelCoordinator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,29 +168,29 @@ impl EditorApp {
 
         Self {
             platform: EditorPlatform::default(),
-            viewports: EditorViewports::default(),
+            viewport_manager: EditorViewportManager::default(),
             core: EditorCore {
                 project_manager: ProjectManager::new(),
-                ui,
                 config,
             },
+            tabs: EditorTabManager { ui },
             log_capture,
             modifiers: ModifiersState::default(),
-            session: EditorSessionState::default(),
-            background_tasks: BackgroundTaskManager::default(),
-            resources: EditorResourceCache::default(),
+            project_session: ProjectSessionManager::default(),
+            command_coordinator: EditorCommandCoordinator::default(),
+            panel_coordinator: EditorPanelCoordinator::default(),
         }
     }
 
     fn sync_project_menu_preview_fonts(&mut self, ctx: &egui::Context) {
         let current_project_path = self.core.config.current_project_path().cloned();
-        if self.resources.menu_font_project_path == current_project_path {
+        if self.panel_coordinator.menu_font_project_path == current_project_path {
             return;
         }
 
         let registry = load_project_fonts_into_egui(ctx, current_project_path.as_deref());
-        self.core.ui.menu_preview_font_families = menu_font_family_choices(&registry);
-        self.resources.menu_font_project_path = current_project_path;
+        self.tabs.ui.menu_preview_font_families = menu_font_family_choices(&registry);
+        self.panel_coordinator.menu_font_project_path = current_project_path;
     }
 
     fn busy_logo_path() -> Option<std::path::PathBuf> {
@@ -196,7 +204,7 @@ impl EditorApp {
     }
 
     fn ensure_busy_logo_texture(&mut self, ctx: &egui::Context) {
-        if self.resources.busy_logo_texture.is_some() {
+        if self.panel_coordinator.busy_logo_texture.is_some() {
             return;
         }
 
@@ -221,7 +229,7 @@ impl EditorApp {
             [decoded.width as usize, decoded.height as usize],
             &decoded.data,
         );
-        self.resources.busy_logo_texture =
+        self.panel_coordinator.busy_logo_texture =
             Some(ctx.load_texture("toki_busy_logo", color_image, egui::TextureOptions::LINEAR));
     }
 
@@ -302,11 +310,11 @@ impl EditorApp {
     }
 
     fn handle_escape_key(&mut self) {
-        if crate::ui::editor_context::scene_viewport_context(&self.core.ui)
+        if crate::ui::editor_context::scene_viewport_context(&self.tabs.ui)
             .placement
             .is_in_placement_mode()
         {
-            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
+            crate::ui::editor_context::scene_viewport_context_mut(&mut self.tabs.ui)
                 .placement
                 .exit_placement_mode();
             tracing::info!("Exited placement mode via Escape");
@@ -318,16 +326,16 @@ impl EditorApp {
             return;
         }
 
-        self.core.ui.project.pending_confirmation = Some(EditorConfirmation::ExitEditor);
+        self.tabs.ui.project.pending_confirmation = Some(EditorConfirmation::ExitEditor);
         tracing::info!("Escape requested editor exit confirmation");
     }
 
     fn escape_belongs_to_active_editor(&self) -> bool {
         use crate::ui::editor_ui::CenterPanelTab;
 
-        if self.core.ui.workspace.center_panel_tab == CenterPanelTab::SpriteEditor {
-            return crate::ui::editor_context::sprite_state(&self.core.ui).has_floating()
-                || crate::ui::editor_context::sprite_state(&self.core.ui)
+        if self.tabs.ui.workspace.center_panel_tab == CenterPanelTab::SpriteEditor {
+            return crate::ui::editor_context::sprite_state(&self.tabs.ui).has_floating()
+                || crate::ui::editor_context::sprite_state(&self.tabs.ui)
                     .active()
                     .selection
                     .is_some();
@@ -393,22 +401,22 @@ impl ApplicationHandler for EditorApp {
         self.platform.renderer = Some(renderer);
         self.platform.egui_winit = Some(egui_winit);
 
-        self.viewports.scene = self.initialize_viewport(
+        self.viewport_manager.scene = self.initialize_viewport(
             || SceneViewport::with_game_state(GameState::new_empty()),
             "scene viewport",
         );
 
-        self.viewports.map_editor = self.initialize_viewport(
+        self.viewport_manager.map_editor = self.initialize_viewport(
             || SceneViewport::with_game_state_responsive(GameState::new_empty()),
             "map editor viewport",
         );
 
         tracing::info!("Editor initialized successfully");
-        if !self.session.startup_project_auto_open_done {
-            self.session.startup_project_auto_open_done = true;
+        if !self.project_session.startup_project_auto_open_done {
+            self.project_session.startup_project_auto_open_done = true;
             if self.core.config.has_project_path() {
                 tracing::info!("Auto-opening last project from config on startup");
-                self.core
+                self.tabs
                     .ui
                     .project
                     .request(crate::ui::editor_ui::ProjectRequest::OpenProject);
@@ -446,9 +454,9 @@ impl ApplicationHandler for EditorApp {
 
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
-                    let active_viewport = match self.core.ui.workspace.center_panel_tab {
-                        CenterPanelTab::SceneViewport => self.viewports.scene.as_mut(),
-                        CenterPanelTab::MapEditor => self.viewports.map_editor.as_mut(),
+                    let active_viewport = match self.tabs.ui.workspace.center_panel_tab {
+                        CenterPanelTab::SceneViewport => self.viewport_manager.scene.as_mut(),
+                        CenterPanelTab::MapEditor => self.viewport_manager.map_editor.as_mut(),
                         CenterPanelTab::SceneGraph
                         | CenterPanelTab::SceneRules
                         | CenterPanelTab::MenuEditor
@@ -484,12 +492,9 @@ impl ApplicationHandler for EditorApp {
                                     .current_project
                                     .as_mut()
                                     .map(|project| {
-                                        editor_commands::undo_with_project(
-                                            &mut self.core.ui,
-                                            project,
-                                        )
+                                        editor_commands::undo_with_project(&mut self.tabs.ui, project)
                                     })
-                                    .unwrap_or_else(|| editor_commands::undo(&mut self.core.ui));
+                                    .unwrap_or_else(|| editor_commands::undo(&mut self.tabs.ui));
                                 if undone {
                                     tracing::debug!("Undo applied via Ctrl+Z");
                                 }
@@ -501,48 +506,40 @@ impl ApplicationHandler for EditorApp {
                                     .current_project
                                     .as_mut()
                                     .map(|project| {
-                                        editor_commands::redo_with_project(
-                                            &mut self.core.ui,
-                                            project,
-                                        )
+                                        editor_commands::redo_with_project(&mut self.tabs.ui, project)
                                     })
-                                    .unwrap_or_else(|| editor_commands::redo(&mut self.core.ui));
+                                    .unwrap_or_else(|| editor_commands::redo(&mut self.tabs.ui));
                                 if redone {
                                     tracing::debug!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
                                 }
                             }
                             EditorShortcutAction::Copy => {
                                 // Copy only applies to sprite editor
-                                if self.core.ui.workspace.center_panel_tab
+                                if self.tabs.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SpriteEditor
-                                    && crate::ui::editor_context::sprite_state_mut(
-                                        &mut self.core.ui,
-                                    )
-                                    .copy_selection()
+                                    && crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui)
+                                        .copy_selection()
                                 {
                                     tracing::debug!("Sprite editor: copied selection to clipboard");
                                 }
                             }
                             EditorShortcutAction::Paste => {
                                 // Paste only applies to sprite editor
-                                if self.core.ui.workspace.center_panel_tab
+                                if self.tabs.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SpriteEditor
                                 {
-                                    let side = crate::ui::editor_context::sprite_state_mut(
-                                        &mut self.core.ui,
-                                    )
-                                    .active_canvas;
+                                    let side =
+                                        crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui)
+                                            .active_canvas;
                                     let sprite = crate::ui::editor_context::sprite_state_mut(
-                                        &mut self.core.ui,
+                                        &mut self.tabs.ui,
                                     );
                                     // Use (0, 0) as fallback if no cursor position
                                     if sprite.canvas_state(side).cursor_canvas_pos.is_none() {
                                         sprite.canvas_state_mut(side).cursor_canvas_pos =
                                             Some(IVec2::new(0, 0));
                                     }
-                                    if crate::ui::editor_context::sprite_state_mut(
-                                        &mut self.core.ui,
-                                    )
+                                    if crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui)
                                     .paste_at_cursor(side)
                                     {
                                         tracing::info!(
@@ -564,21 +561,21 @@ impl ApplicationHandler for EditorApp {
                         // Handle other editor keyboard shortcuts
                         match key_code {
                             KeyCode::Enter | KeyCode::NumpadEnter => {
-                                if self.core.ui.workspace.center_panel_tab
+                                if self.tabs.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SceneViewport
                                     && self
-                                        .core
+                                        .tabs
                                         .ui
                                         .scene_viewport_context()
                                         .placement
                                         .is_in_placement_mode()
                                 {
-                                    self.core
+                                    self.tabs
                                         .ui
                                         .scene_viewport_context_mut()
                                         .placement
                                         .exit_placement_mode();
-                                    if let Some(viewport) = &mut self.viewports.scene {
+                                    if let Some(viewport) = &mut self.viewport_manager.scene {
                                         viewport.mark_dirty();
                                     }
                                     if let Some(window) = &self.platform.window {
@@ -588,14 +585,14 @@ impl ApplicationHandler for EditorApp {
                                 }
                             }
                             KeyCode::Delete => {
-                                if self.core.ui.workspace.center_panel_tab
+                                if self.tabs.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SceneViewport
                                 {
                                     let deleted = crate::ui::interactions::SelectionInteraction::delete_selected_spatial(
-                                        &mut self.core.ui,
+                                        &mut self.tabs.ui,
                                     );
                                     if deleted {
-                                        if let Some(viewport) = &mut self.viewports.scene {
+                                        if let Some(viewport) = &mut self.viewport_manager.scene {
                                             viewport.mark_dirty();
                                         }
                                         if let Some(window) = &self.platform.window {
@@ -622,22 +619,22 @@ impl ApplicationHandler for EditorApp {
                                 }
                             }
                             KeyCode::F1 => {
-                                self.core.ui.visibility.show_hierarchy =
-                                    !self.core.ui.visibility.show_hierarchy;
+                                self.tabs.ui.visibility.show_hierarchy =
+                                    !self.tabs.ui.visibility.show_hierarchy;
                                 tracing::info!(
                                     "Toggled hierarchy panel: {}",
-                                    self.core.ui.visibility.show_hierarchy
+                                    self.tabs.ui.visibility.show_hierarchy
                                 );
                                 if let Some(window) = &self.platform.window {
                                     window.request_redraw();
                                 }
                             }
                             KeyCode::F2 => {
-                                self.core.ui.visibility.show_inspector =
-                                    !self.core.ui.visibility.show_inspector;
+                                self.tabs.ui.visibility.show_inspector =
+                                    !self.tabs.ui.visibility.show_inspector;
                                 tracing::info!(
                                     "Toggled inspector panel: {}",
-                                    self.core.ui.visibility.show_inspector
+                                    self.tabs.ui.visibility.show_inspector
                                 );
                                 if let Some(window) = &self.platform.window {
                                     window.request_redraw();
@@ -645,7 +642,7 @@ impl ApplicationHandler for EditorApp {
                             }
                             KeyCode::F4 => {
                                 // Toggle debug collision rendering (same as toki-runtime)
-                                if let Some(viewport) = &mut self.viewports.scene {
+                                if let Some(viewport) = &mut self.viewport_manager.scene {
                                     toki_core::game::InputSystem::handle_key_press(
                                         viewport.game_state_mut().runtime_mut(),
                                         toki_core::InputKey::DebugToggle,
@@ -732,7 +729,7 @@ impl EditorApp {
         }
 
         graph_metadata::persist_if_dirty(
-            &mut self.core.ui,
+            &mut self.tabs.ui,
             self.core.project_manager.current_project.as_mut(),
             &egui_ctx,
         );
@@ -750,17 +747,17 @@ impl EditorApp {
     }
 
     fn prepare_render_state(&mut self, egui_ctx: &egui::Context) {
-        if self.core.ui.project.background_task_running {
+        if self.tabs.ui.project.background_task_running {
             self.ensure_busy_logo_texture(egui_ctx);
         }
         self.sync_project_menu_preview_fonts(egui_ctx);
     }
 
     fn ensure_placement_preview_cached_frame(&mut self, project_path: Option<&std::path::Path>) {
-        if !(crate::ui::editor_context::scene_viewport_context(&self.core.ui)
+        if !(crate::ui::editor_context::scene_viewport_context(&self.tabs.ui)
             .placement
             .is_in_placement_mode()
-            && crate::ui::editor_context::scene_viewport_context(&self.core.ui)
+            && crate::ui::editor_context::scene_viewport_context(&self.tabs.ui)
                 .placement
                 .preview_cached_frame
                 .is_none())
@@ -769,9 +766,9 @@ impl EditorApp {
         }
 
         let placement_ctx =
-            &crate::ui::editor_context::scene_viewport_context(&self.core.ui).placement;
+            &crate::ui::editor_context::scene_viewport_context(&self.tabs.ui).placement;
         let placement_entity_definition = placement_ctx.entity_definition().map(str::to_string);
-        let placement_decoration = crate::ui::editor_context::scene_viewport_context(&self.core.ui)
+        let placement_decoration = crate::ui::editor_context::scene_viewport_context(&self.tabs.ui)
             .placement
             .decoration_draft()
             .cloned();
@@ -781,34 +778,34 @@ impl EditorApp {
             self.core.project_manager.get_project_assets(),
         ) {
             let cached_frame = scene_overlays::cached_preview_sprite_frame(
-                &mut self.resources.preview_sprite_frames,
+                &mut self.panel_coordinator.preview_sprite_frames,
                 entity_def,
                 project_path,
                 project_assets,
-                &self.core.ui.project.available_palettes,
+                &self.tabs.ui.project.available_palettes,
                 Self::project_indexed_palette_override(
                     self.core.project_manager.current_project.as_ref(),
                 )
                 .as_deref(),
             );
-            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
+            crate::ui::editor_context::scene_viewport_context_mut(&mut self.tabs.ui)
                 .placement
                 .preview_cached_frame = cached_frame;
         } else if let (Some(draft), Some(project_path)) = (placement_decoration, project_path) {
             let cached_frame = scene_overlays::cached_decoration_preview_sprite_frame(
-                &mut self.resources.preview_sprite_frames,
+                &mut self.panel_coordinator.preview_sprite_frames,
                 &draft.sheet,
                 &draft.object_name,
                 project_path,
             );
-            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
+            crate::ui::editor_context::scene_viewport_context_mut(&mut self.tabs.ui)
                 .placement
                 .preview_cached_frame = cached_frame;
         }
     }
 
     fn sync_indexed_palette_override_from_project(&mut self) {
-        self.core.ui.project.indexed_palette_override = Self::project_indexed_palette_override(
+        self.tabs.ui.project.indexed_palette_override = Self::project_indexed_palette_override(
             self.core.project_manager.current_project.as_ref(),
         );
     }
@@ -843,31 +840,31 @@ impl EditorApp {
             return;
         };
 
-        match self.core.ui.workspace.center_panel_tab {
+        match self.tabs.ui.workspace.center_panel_tab {
             CenterPanelTab::SceneViewport => {
                 let scene_player_overlay_sprites =
                     scene_overlays::build_scene_player_overlay_sprites(
-                        self.core.ui.active_scene.as_deref(),
-                        &self.core.ui.scenes,
+                        self.tabs.ui.active_scene.as_deref(),
+                        &self.tabs.ui.scenes,
                         project_path,
                         project_assets,
-                        &mut self.resources.preview_sprite_frames,
-                        &self.core.ui.project.available_palettes,
+                        &mut self.panel_coordinator.preview_sprite_frames,
+                        &self.tabs.ui.project.available_palettes,
                         Self::project_indexed_palette_override(
                             self.core.project_manager.current_project.as_ref(),
                         )
                         .as_deref(),
                     );
-                let overlay_data = self.viewports.scene.as_ref().map(|scene_viewport| {
+                let overlay_data = self.viewport_manager.scene.as_ref().map(|scene_viewport| {
                     Self::build_scene_viewport_overlay_data(
-                        &self.core.ui,
+                        &self.tabs.ui,
                         &self.core.config,
                         scene_viewport,
                         scene_player_overlay_sprites,
                     )
                 });
                 if let (Some(scene_viewport), Some(overlay_data)) =
-                    (&mut self.viewports.scene, overlay_data)
+                    (&mut self.viewport_manager.scene, overlay_data)
                 {
                     Self::pre_render_scene_viewport(
                         scene_viewport,
@@ -882,7 +879,7 @@ impl EditorApp {
                 }
             }
             CenterPanelTab::MapEditor => {
-                if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
+                if let Some(map_editor_viewport) = &mut self.viewport_manager.map_editor {
                     Self::pre_render_map_editor_viewport(
                         map_editor_viewport,
                         project_path,
@@ -1061,37 +1058,37 @@ impl EditorApp {
         let mut current_project = current_project;
         let mut project_assets = project_assets;
         egui_ctx.run(raw_input, |ctx| {
-            self.core.ui.render(
+            self.tabs.ui.render(
                 ctx,
                 crate::ui::editor_ui::EditorRenderContext {
-                    scene_viewport: self.viewports.scene.as_mut(),
-                    map_editor_viewport: self.viewports.map_editor.as_mut(),
+                    scene_viewport: self.viewport_manager.scene.as_mut(),
+                    map_editor_viewport: self.viewport_manager.map_editor.as_mut(),
                     project: current_project.as_deref_mut(),
                     project_assets: project_assets.as_deref_mut(),
                     available_map_names: available_map_names.clone(),
                     config: Some(&mut self.core.config),
                     log_capture: self.log_capture.as_ref(),
                     renderer: None,
-                    busy_logo_texture: self.resources.busy_logo_texture.as_ref(),
+                    busy_logo_texture: self.panel_coordinator.busy_logo_texture.as_ref(),
                 },
             );
         })
     }
 
     fn handle_render_ui_requests(&mut self, event_loop: &ActiveEventLoop) -> bool {
-        if self.core.ui.visibility.should_exit {
+        if self.tabs.ui.visibility.should_exit {
             event_loop.exit();
             return true;
         }
-        if self.core.ui.visibility.create_test_entities {
-            if let Some(viewport) = &mut self.viewports.scene {
+        if self.tabs.ui.visibility.create_test_entities {
+            if let Some(viewport) = &mut self.viewport_manager.scene {
                 let game_state = viewport.game_state_mut();
                 let _player_id = SceneSystem::spawn_player_at(game_state, glam::IVec2::new(80, 72));
                 let _npc_id =
                     SceneSystem::spawn_player_like_npc(game_state, glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");
             }
-            self.core.ui.visibility.create_test_entities = false;
+            self.tabs.ui.visibility.create_test_entities = false;
         }
         false
     }
@@ -1099,12 +1096,12 @@ impl EditorApp {
     fn request_redraw_if_needed(&self, window: &winit::window::Window, egui_ctx: &egui::Context) {
         if egui_ctx.has_requested_repaint()
             || self
-                .viewports
+                .viewport_manager
                 .scene
                 .as_ref()
                 .is_some_and(crate::scene::SceneViewport::needs_render)
             || self
-                .viewports
+                .viewport_manager
                 .map_editor
                 .as_ref()
                 .is_some_and(crate::scene::SceneViewport::needs_render)
@@ -1127,13 +1124,13 @@ impl EditorApp {
 
     /// Handle sprite asset rescan request (after saving new sprites)
     fn handle_sprite_asset_rescan(&mut self) {
-        if crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).needs_asset_rescan {
+        if crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui).needs_asset_rescan {
             if let Err(e) = self.core.project_manager.rescan_assets() {
                 tracing::error!("Failed to rescan assets: {}", e);
             } else {
                 self.refresh_project_assets_after_rescan();
             }
-            crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).needs_asset_rescan =
+            crate::ui::editor_context::sprite_state_mut(&mut self.tabs.ui).needs_asset_rescan =
                 false;
         }
     }

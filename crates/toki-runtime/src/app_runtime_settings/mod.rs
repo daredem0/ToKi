@@ -39,7 +39,7 @@ impl App {
     }
 
     pub(super) fn handle_runtime_overlay_input(&mut self, input: MenuInput) -> bool {
-        let Some(overlay) = self.runtime_overlay.clone() else {
+        let Some(overlay) = self.menu_coordinator.runtime_overlay.clone() else {
             return false;
         };
 
@@ -50,8 +50,8 @@ impl App {
         };
 
         if should_close {
-            self.runtime_overlay = None;
-            self.runtime_overlay_slider_drag = None;
+            self.menu_coordinator.runtime_overlay = None;
+            self.menu_coordinator.runtime_overlay_slider_drag = None;
         }
         true
     }
@@ -119,7 +119,7 @@ impl App {
         match target {
             RuntimeOverlayHitTarget::Entry(entry_index) => {
                 self.select_runtime_overlay_entry(entry_index);
-                let should_close = match self.runtime_overlay.clone() {
+                let should_close = match self.menu_coordinator.runtime_overlay.clone() {
                     Some(RuntimeMenuOverlay::Audio { .. }) => {
                         self.handle_audio_overlay_input(MenuInput::Confirm)
                     }
@@ -132,7 +132,7 @@ impl App {
                     None => false,
                 };
                 if should_close {
-                    self.runtime_overlay = None;
+                    self.menu_coordinator.runtime_overlay = None;
                 }
             }
             RuntimeOverlayHitTarget::Slider {
@@ -140,7 +140,7 @@ impl App {
                 percent,
             } => {
                 self.select_runtime_overlay_entry(entry_index);
-                self.runtime_overlay_slider_drag = Some(entry_index);
+                self.menu_coordinator.runtime_overlay_slider_drag = Some(entry_index);
                 self.set_runtime_overlay_slider_percent(entry_index, percent);
             }
         }
@@ -153,13 +153,13 @@ impl App {
         position: glam::Vec2,
         viewport: glam::Vec2,
     ) -> bool {
-        let Some(entry_index) = self.runtime_overlay_slider_drag else {
+        let Some(entry_index) = self.menu_coordinator.runtime_overlay_slider_drag else {
             return false;
         };
         let appearance =
             self.scaled_runtime_menu_appearance(&self.menu_system.settings().appearance);
         let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
-            self.runtime_overlay_slider_drag = None;
+            self.menu_coordinator.runtime_overlay_slider_drag = None;
             return false;
         };
         let Some((layout_entry, overlay_entry)) = presentation
@@ -168,11 +168,11 @@ impl App {
             .get(entry_index)
             .zip(presentation.entries.get(entry_index))
         else {
-            self.runtime_overlay_slider_drag = None;
+            self.menu_coordinator.runtime_overlay_slider_drag = None;
             return false;
         };
         let Some(slider_rect) = runtime_overlay_slider_rect(layout_entry, overlay_entry) else {
-            self.runtime_overlay_slider_drag = None;
+            self.menu_coordinator.runtime_overlay_slider_drag = None;
             return false;
         };
         self.select_runtime_overlay_entry(entry_index);
@@ -184,7 +184,7 @@ impl App {
     }
 
     pub(super) fn clear_runtime_overlay_pointer_drag(&mut self) {
-        self.runtime_overlay_slider_drag = None;
+        self.menu_coordinator.runtime_overlay_slider_drag = None;
     }
 }
 

@@ -68,7 +68,7 @@ impl App {
                 declared_flags: &declared_flags,
             },
         );
-        self.pending_ui_events
+        self.menu_coordinator.pending_ui_events
             .extend(self.ui_controller.take_emitted_events());
         handled
     }
@@ -92,7 +92,7 @@ impl App {
                 declared_flags: &declared_flags,
             },
         );
-        self.pending_ui_events
+        self.menu_coordinator.pending_ui_events
             .extend(self.ui_controller.take_emitted_events());
         handled
     }
@@ -116,7 +116,7 @@ impl App {
                 declared_flags: &declared_flags,
             },
         );
-        self.pending_ui_events
+        self.menu_coordinator.pending_ui_events
             .extend(self.ui_controller.take_emitted_events());
         handled
     }
@@ -194,7 +194,7 @@ impl App {
 
     fn close_runtime_menu(&mut self) {
         self.menu_system.close();
-        self.runtime_overlay = None;
+        self.menu_coordinator.runtime_overlay = None;
         self.game_system.clear_runtime_inputs();
     }
 
@@ -217,7 +217,7 @@ impl App {
 
     pub(super) fn open_pause_menu(&mut self) {
         self.menu_system.open_pause_root();
-        self.runtime_overlay = None;
+        self.menu_coordinator.runtime_overlay = None;
         self.game_system.clear_runtime_inputs();
     }
 
@@ -239,7 +239,7 @@ impl App {
             return false;
         };
 
-        if self.runtime_overlay.is_some() {
+        if self.menu_coordinator.runtime_overlay.is_some() {
             return self.handle_runtime_overlay_pointer_click(position, viewport);
         }
 
@@ -260,7 +260,7 @@ impl App {
             return false;
         }
 
-        if self.runtime_overlay.is_some() || !self.menu_system.is_open() {
+        if self.menu_coordinator.runtime_overlay.is_some() || !self.menu_system.is_open() {
             return self.handle_authored_ui_pointer_click(position);
         }
 
@@ -304,7 +304,7 @@ impl App {
             return false;
         };
 
-        if self.runtime_overlay.is_some() {
+        if self.menu_coordinator.runtime_overlay.is_some() {
             return self.handle_runtime_overlay_pointer_hover(position, viewport);
         }
 
@@ -322,7 +322,7 @@ impl App {
             return false;
         }
 
-        if self.runtime_overlay.is_some() || !self.menu_system.is_open() {
+        if self.menu_coordinator.runtime_overlay.is_some() || !self.menu_system.is_open() {
             return false;
         }
 
@@ -374,7 +374,7 @@ impl App {
                 error
             );
         } else {
-            self.runtime_overlay = None;
+            self.menu_coordinator.runtime_overlay = None;
             self.game_system.clear_runtime_inputs();
         }
     }
@@ -474,9 +474,9 @@ impl App {
                 }
             }
             other => apply_menu_command(
-                &mut self.exit_requested,
-                &mut self.pending_ui_events,
-                &mut self.runtime_overlay,
+                &mut self.menu_coordinator.exit_requested,
+                &mut self.menu_coordinator.pending_ui_events,
+                &mut self.menu_coordinator.runtime_overlay,
                 other,
             ),
         }

@@ -5,7 +5,7 @@ use std::process::Command;
 impl EditorApp {
     pub(super) fn persist_dirty_ui_layout_draft(&mut self) -> anyhow::Result<()> {
         let (dirty, layout) = {
-            let ui_editor = &crate::ui::editor_context::ui_editor_state(&self.core.ui).ui;
+            let ui_editor = &crate::ui::editor_context::ui_editor_state(&self.tabs.ui).ui;
             (ui_editor.dirty, ui_editor.draft.clone())
         };
         if !dirty {
@@ -23,7 +23,7 @@ impl EditorApp {
             .ok_or_else(|| anyhow::anyhow!("No project assets manager available"))?;
         project_assets.save_ui_layout(&layout)?;
 
-        let ui_editor = &mut crate::ui::editor_context::ui_editor_state_mut(&mut self.core.ui).ui;
+        let ui_editor = &mut crate::ui::editor_context::ui_editor_state_mut(&mut self.tabs.ui).ui;
         ui_editor.loaded_layout_id = Some(layout.id.to_string());
         ui_editor.selected_layout_id = Some(layout.id.to_string());
         ui_editor.dirty = false;
@@ -32,7 +32,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_play_scene_request(&mut self) {
-        if !self.core.ui.project.take_request(ProjectRequest::PlayScene) {
+        if !self.tabs.ui.project.take_request(ProjectRequest::PlayScene) {
             return;
         }
 
@@ -40,7 +40,7 @@ impl EditorApp {
             tracing::warn!("Cannot play scene: no project is currently open");
             return;
         };
-        let Some(active_scene_name) = self.core.ui.active_scene.clone() else {
+        let Some(active_scene_name) = self.tabs.ui.active_scene.clone() else {
             tracing::warn!("Cannot play scene: no active scene is selected");
             return;
         };
@@ -55,13 +55,13 @@ impl EditorApp {
         }
 
         if let Some(project) = self.core.project_manager.current_project.as_mut() {
-            crate::editor_services::graph_metadata::copy_ui_into_project(&self.core.ui, project);
+            crate::editor_services::graph_metadata::copy_ui_into_project(&self.tabs.ui, project);
         }
 
         if let Err(error) = self
             .core
             .project_manager
-            .save_current_project(&self.core.ui.scenes)
+            .save_current_project(&self.tabs.ui.scenes)
         {
             tracing::error!(
                 "Cannot play scene '{}': failed to save current project state: {}",
@@ -74,7 +74,7 @@ impl EditorApp {
         let map_name = self
             .find_scene_by_name(&active_scene_name)
             .and_then(|scene| {
-                self.session
+                self.project_session
                     .loaded_scene_maps
                     .get(&active_scene_name)
                     .cloned()
@@ -113,7 +113,7 @@ impl EditorApp {
 
     pub(super) fn handle_export_project_request(&mut self) {
         if !self
-            .core
+            .tabs
             .ui
             .project
             .take_request(ProjectRequest::ExportProject)
@@ -121,7 +121,7 @@ impl EditorApp {
             return;
         }
 
-        if self.background_tasks.is_running() {
+        if self.command_coordinator.background_tasks.is_running() {
             tracing::warn!("Cannot export game: another background task is running");
             return;
         }
@@ -140,13 +140,13 @@ impl EditorApp {
         }
 
         if let Some(project) = self.core.project_manager.current_project.as_mut() {
-            crate::editor_services::graph_metadata::copy_ui_into_project(&self.core.ui, project);
+            crate::editor_services::graph_metadata::copy_ui_into_project(&self.tabs.ui, project);
         }
 
         if let Err(error) = self
             .core
             .project_manager
-            .save_current_project(&self.core.ui.scenes)
+            .save_current_project(&self.tabs.ui.scenes)
         {
             tracing::error!(
                 "Cannot export game: failed to save current project state: {}",
@@ -171,7 +171,7 @@ impl EditorApp {
             }
         };
 
-        let startup_scene = self.core.ui.active_scene.clone();
+        let startup_scene = self.tabs.ui.active_scene.clone();
         let splash_duration_ms = self
             .core
             .project_manager
@@ -197,7 +197,11 @@ impl EditorApp {
             splash_duration_ms,
         };
 
-        if let Err(error) = self.background_tasks.start_export_bundle(job) {
+        if let Err(error) = self
+            .command_coordinator
+            .background_tasks
+            .start_export_bundle(job)
+        {
             tracing::error!("Failed to start game export job: {}", error);
         } else {
             self.poll_background_task_updates();
