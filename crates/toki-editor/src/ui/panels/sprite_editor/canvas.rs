@@ -1,7 +1,7 @@
 //! Canvas rendering and drawing operations.
 
 use crate::ui::editor_ui::{
-    CanvasSide, PixelColor, SelectionMask, SpriteCanvas, SpriteCanvasViewport,
+    CanvasSide, PixelColor, SelectionMask, SpriteCanvas, SpriteCanvasViewport, SpriteEditorTool,
 };
 use crate::ui::sprite_editor::{preview_indexed_color, FloatingOrigin, FloatingSelection};
 use crate::ui::EditorUI;
@@ -38,9 +38,16 @@ pub fn render_canvas_viewport(
     let is_interactive = target_side.is_none()
         || target_side == Some(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas);
 
-    // Handle pan with right-click drag or middle-click drag
-    if response.dragged_by(egui::PointerButton::Secondary)
-        || response.dragged_by(egui::PointerButton::Middle)
+    // Handle pan with right-click drag or middle-click drag.
+    // Right-click is reserved for erase in paint tools; only pan when no tool claims it.
+    let tool = crate::ui::editor_context::sprite_state(ui_state).tool;
+    let right_click_erases = matches!(
+        tool,
+        SpriteEditorTool::Brush | SpriteEditorTool::Fill | SpriteEditorTool::Line
+            | SpriteEditorTool::Rectangle | SpriteEditorTool::Ellipse
+    );
+    if response.dragged_by(egui::PointerButton::Middle)
+        || (!right_click_erases && response.dragged_by(egui::PointerButton::Secondary))
     {
         let delta = response.drag_delta();
         ui_state
@@ -188,6 +195,8 @@ pub fn render_canvas_viewport(
     }
 
     // Draw hovered pixel highlight
+    let brush_size = crate::ui::editor_context::sprite_state(ui_state).brush_size;
+    let tool = crate::ui::editor_context::sprite_state(ui_state).tool;
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(canvas) = &canvas_state.canvas {
@@ -197,6 +206,8 @@ pub fn render_canvas_viewport(
             &canvas_state.viewport,
             canvas,
             canvas_state.cursor_canvas_pos,
+            brush_size,
+            tool,
         );
     }
 
@@ -968,7 +979,7 @@ fn draw_resize_handles(
         tl.y + display.y as f32 * zoom,
     );
 
-    let handle_half = 3.0_f32;
+    let handle_half = 4.5_f32;
     let fill = egui::Color32::WHITE;
     let outline = egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40));
 
@@ -979,6 +990,7 @@ fn draw_resize_handles(
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn hovered_pixel_screen_rect(
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
@@ -1011,19 +1023,61 @@ fn draw_hovered_pixel_highlight(
     viewport: &SpriteCanvasViewport,
     canvas: &SpriteCanvas,
     cursor_canvas_pos: Option<glam::IVec2>,
+    brush_size: u32,
+    tool: SpriteEditorTool,
 ) {
-    let Some(pixel_rect) = hovered_pixel_screen_rect(rect, viewport, canvas, cursor_canvas_pos)
-    else {
-        return;
+    let pos = match cursor_canvas_pos {
+        Some(p)
+            if p.x >= 0 && p.y >= 0 && p.x < canvas.width as i32 && p.y < canvas.height as i32 =>
+        {
+            p
+        }
+        _ => return,
     };
+
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+
+    let pixel_rect = if uses_brush_size(tool) && brush_size > 1 {
+        let radius = ((brush_size - 1) / 2) as i32;
+        let top_left_canvas = glam::IVec2::new(pos.x - radius, pos.y - radius);
+        let min = egui::pos2(
+            rect.left() + (top_left_canvas.x as f32 - pan.x) * zoom,
+            rect.top() + (top_left_canvas.y as f32 - pan.y) * zoom,
+        );
+        egui::Rect::from_min_size(min, egui::vec2(brush_size as f32 * zoom, brush_size as f32 * zoom))
+    } else {
+        let min = egui::pos2(
+            rect.left() + (pos.x as f32 - pan.x) * zoom,
+            rect.top() + (pos.y as f32 - pan.y) * zoom,
+        );
+        egui::Rect::from_min_size(min, egui::vec2(zoom, zoom))
+    };
+
+    let clipped = pixel_rect.intersect(rect);
+    if !clipped.is_positive() {
+        return;
+    }
 
     let fill = egui::Color32::from_rgba_unmultiplied(90, 160, 255, 70);
     let stroke = egui::Stroke::new(
         1.0,
         egui::Color32::from_rgba_unmultiplied(120, 190, 255, 220),
     );
-    painter.rect_filled(pixel_rect, 0.0, fill);
-    painter.rect_stroke(pixel_rect, 0.0, stroke, egui::StrokeKind::Inside);
+    painter.rect_filled(clipped, 0.0, fill);
+    painter.rect_stroke(pixel_rect, 0.0, stroke, egui::StrokeKind::Outside);
+}
+
+/// Returns true for tools where the cursor footprint matches the brush size.
+fn uses_brush_size(tool: SpriteEditorTool) -> bool {
+    matches!(
+        tool,
+        SpriteEditorTool::Brush
+            | SpriteEditorTool::Eraser
+            | SpriteEditorTool::Line
+            | SpriteEditorTool::Rectangle
+            | SpriteEditorTool::Ellipse
+    )
 }
 
 fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {

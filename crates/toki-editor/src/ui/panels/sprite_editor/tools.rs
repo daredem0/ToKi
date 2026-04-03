@@ -4,7 +4,8 @@ use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{
-    canonical_indexed_color, indexed_slot_for_authored_color, ResizeCorner, ResizeDrag,
+    canonical_indexed_color, indexed_slot_for_authored_color, PixelColor, ResizeCorner,
+    ResizeDrag,
 };
 use crate::ui::EditorUI;
 use glam::UVec2;
@@ -112,6 +113,33 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
     if response.drag_stopped_by(egui::PointerButton::Primary) {
         finish_paint_stroke(ui_state);
     }
+
+    // Right-click drag/click: erase with the same brush size and symmetry.
+    if response.drag_started_by(egui::PointerButton::Secondary) {
+        start_paint_stroke(ui_state);
+    }
+
+    if response.dragged_by(egui::PointerButton::Secondary)
+        || response.clicked_by(egui::PointerButton::Secondary)
+    {
+        let brush_size = crate::ui::editor_context::sprite_state_mut(ui_state).brush_size;
+        let sym = symmetry_config(ui_state);
+        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas
+        {
+            if SpritePaintInteraction::erase_brush_symmetric(canvas, canvas_pos, brush_size, &sym) {
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .dirty = true;
+                invalidate_canvas_texture(ui_state);
+            }
+        }
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Secondary) {
+        finish_paint_stroke(ui_state);
+    }
 }
 
 fn handle_eraser_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
@@ -148,11 +176,35 @@ fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
             crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color,
             selected_palette(ui_state),
         );
+        let sym = symmetry_config(ui_state);
         if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
             .canvas
         {
-            if SpritePaintInteraction::flood_fill(canvas, canvas_pos, color) {
+            if SpritePaintInteraction::flood_fill_symmetric(canvas, canvas_pos, color, &sym) {
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .dirty = true;
+                invalidate_canvas_texture(ui_state);
+            }
+        }
+        finish_paint_stroke(ui_state);
+    }
+
+    // Right-click: erase the filled region (flood fill with transparent).
+    if response.clicked_by(egui::PointerButton::Secondary) {
+        start_paint_stroke(ui_state);
+        let sym = symmetry_config(ui_state);
+        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas
+        {
+            if SpritePaintInteraction::flood_fill_symmetric(
+                canvas,
+                canvas_pos,
+                PixelColor::transparent(),
+                &sym,
+            ) {
                 crate::ui::editor_context::sprite_state_mut(ui_state)
                     .active_mut()
                     .dirty = true;
@@ -212,21 +264,39 @@ fn handle_shape_tool(
     if response.drag_started_by(egui::PointerButton::Primary) {
         crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
+            .stroke_erases = false;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
             .line_start_pos = Some(canvas_pos);
         start_paint_stroke(ui_state);
     }
 
-    // Live preview during drag
-    if response.dragged_by(egui::PointerButton::Primary) {
+    // Right-click drag: erase version of the shape.
+    if response.drag_started_by(egui::PointerButton::Secondary) {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .stroke_erases = true;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .line_start_pos = Some(canvas_pos);
+        start_paint_stroke(ui_state);
+    }
+
+    // Live preview during drag (both buttons share the same preview path).
+    if response.dragged_by(egui::PointerButton::Primary)
+        || response.dragged_by(egui::PointerButton::Secondary)
+    {
         preview_shape(ui_state, canvas_pos, kind);
     }
 
-    if response.drag_stopped_by(egui::PointerButton::Primary) {
+    if response.drag_stopped_by(egui::PointerButton::Primary)
+        || response.drag_stopped_by(egui::PointerButton::Secondary)
+    {
         // Restore and draw final shape
         preview_shape(ui_state, canvas_pos, kind);
-        crate::ui::editor_context::sprite_state_mut(ui_state)
-            .active_mut()
-            .line_start_pos = None;
+        let cs = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut();
+        cs.line_start_pos = None;
+        cs.stroke_erases = false;
         finish_paint_stroke(ui_state);
     }
 }
@@ -274,14 +344,22 @@ fn preview_shape(ui_state: &mut EditorUI, canvas_pos: glam::IVec2, kind: ShapeKi
 }
 
 fn build_shape_params(ui_state: &EditorUI, start: glam::IVec2, end: glam::IVec2) -> ShapeParams {
-    ShapeParams {
-        start,
-        end,
-        color: effective_paint_color(
+    let color = if crate::ui::editor_context::sprite_state(ui_state)
+        .active()
+        .stroke_erases
+    {
+        PixelColor::transparent()
+    } else {
+        effective_paint_color(
             crate::ui::editor_context::sprite_state(ui_state).color_mode,
             crate::ui::editor_context::sprite_state(ui_state).foreground_color,
             selected_palette(ui_state),
-        ),
+        )
+    };
+    ShapeParams {
+        start,
+        end,
+        color,
         brush_size: crate::ui::editor_context::sprite_state(ui_state).brush_size,
         filled: crate::ui::editor_context::sprite_state(ui_state).shape_filled,
     }
@@ -356,7 +434,7 @@ fn handle_floating_canvas_interaction(
 }
 
 /// Screen-space tolerance (pixels) for hitting a corner handle.
-const HANDLE_HIT_RADIUS: f32 = 8.0;
+const HANDLE_HIT_RADIUS: f32 = 12.0;
 
 /// On drag start, check if the pointer is near a corner handle and begin resize if so.
 fn try_start_resize_drag(ui_state: &mut EditorUI, ctx: &egui::Context, rect: egui::Rect) {

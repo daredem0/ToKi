@@ -127,6 +127,46 @@ impl SpriteEditorState {
         }
     }
 
+    /// Center the floating selection within its current tile (sheet mode) or the full canvas.
+    ///
+    /// In sheet mode the tile is whichever cell contains the floating selection's center point.
+    /// In single-sprite mode the selection is centered on the whole canvas.
+    pub fn center_floating_on_tile(&mut self) {
+        let (float_offset, float_size) = match self.active().floating.as_ref() {
+            Some(f) => (f.offset, f.display_size()),
+            None => return,
+        };
+
+        let center_x = float_offset.x + float_size.x as i32 / 2;
+        let center_y = float_offset.y + float_size.y as i32 / 2;
+        let (tile_x, tile_y, tile_w, tile_h) = self.centering_bounds(center_x, center_y);
+
+        let new_offset = glam::IVec2::new(
+            tile_x as i32 + (tile_w as i32 - float_size.x as i32) / 2,
+            tile_y as i32 + (tile_h as i32 - float_size.y as i32) / 2,
+        );
+        if let Some(floating) = &mut self.active_mut().floating {
+            floating.offset = new_offset;
+        }
+    }
+
+    /// Returns `(tile_x, tile_y, tile_w, tile_h)` — the region within which the floating
+    /// selection should be centered. Uses the tile under `(cx, cy)` in sheet mode, or the
+    /// full canvas otherwise.
+    fn centering_bounds(&self, cx: i32, cy: i32) -> (u32, u32, u32, u32) {
+        if self.is_sheet() {
+            let clamped_x = cx.max(0) as u32;
+            let clamped_y = cy.max(0) as u32;
+            if let Some(idx) = self.cell_at_position(clamped_x, clamped_y) {
+                if let Some((sx, sy, ex, ey)) = self.cell_bounds(idx) {
+                    return (sx, sy, ex - sx, ey - sy);
+                }
+            }
+        }
+        let (w, h) = self.canvas_dimensions().unwrap_or((0, 0));
+        (0, 0, w, h)
+    }
+
     /// Set the display/commit size of the floating selection and update the offset
     /// so that the given anchor point stays fixed.
     pub fn resize_floating(&mut self, new_size: glam::UVec2, anchor: glam::IVec2) {

@@ -342,6 +342,21 @@ impl SpritePaintInteraction {
         )
     }
 
+    /// Flood fill at the given position and all its symmetry mirrors.
+    pub fn flood_fill_symmetric(
+        canvas: &mut SpriteCanvas,
+        start_pos: IVec2,
+        fill_color: PixelColor,
+        sym: &SymmetryConfig,
+    ) -> bool {
+        sym.bounds
+            .mirror_positions(start_pos, sym.horizontal, sym.vertical)
+            .into_iter()
+            .fold(false, |changed, pos| {
+                Self::flood_fill(canvas, pos, fill_color) || changed
+            })
+    }
+
     /// Remove the 4-connected region of the clicked color, limited to the provided bounds.
     /// Intended for tile-local background cleanup in sprite sheets.
     pub fn erase_connected_color_in_bounds(

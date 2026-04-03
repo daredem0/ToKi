@@ -16,6 +16,11 @@ impl InspectorSystem {
         ui.separator();
 
         render_tool_options(ui, ui_state);
+
+        if crate::ui::editor_context::sprite_state(ui_state).has_floating() {
+            ui.separator();
+            render_floating_controls(ui, ui_state);
+        }
     }
 
     pub(crate) fn render_sprite_editor_inspector(
@@ -223,6 +228,7 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         crate::ui::editor_context::sprite_state_mut(ui_state).tool,
         SpriteEditorTool::Brush
             | SpriteEditorTool::Eraser
+            | SpriteEditorTool::Fill
             | SpriteEditorTool::Line
             | SpriteEditorTool::Rectangle
             | SpriteEditorTool::Ellipse
@@ -857,5 +863,15 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         } else {
             ui.label("Selected: None (click to select)");
         }
+    }
+}
+
+fn render_floating_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let is_sheet = crate::ui::editor_context::sprite_state(ui_state).is_sheet();
+    let label = if is_sheet { "Center to tile" } else { "Center to canvas" };
+    ui.label("Floating Selection:");
+    if ui.button(label).clicked() {
+        crate::ui::editor_context::sprite_state_mut(ui_state).center_floating_on_tile();
+        crate::ui::editor_context::sprite_state_mut(ui_state).invalidate_all_canvas_textures();
     }
 }

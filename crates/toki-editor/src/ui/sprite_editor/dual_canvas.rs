@@ -111,6 +111,9 @@ pub struct CanvasState {
     pub floating: Option<FloatingSelection>,
     /// Active corner-handle resize drag (while the user is dragging a handle).
     pub resize_drag: Option<super::ResizeDrag>,
+    /// True when the current shape/line stroke was started with the secondary (right) mouse button,
+    /// meaning it should erase instead of paint.
+    pub stroke_erases: bool,
 }
 
 impl Default for CanvasState {
@@ -144,6 +147,7 @@ impl Default for CanvasState {
             swap_target_cell: 0,
             floating: None,
             resize_drag: None,
+            stroke_erases: false,
         }
     }
 }
