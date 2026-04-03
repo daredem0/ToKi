@@ -5,7 +5,7 @@ use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
 use glam::IVec2;
 use tempfile::tempdir;
-use toki_core::entity::{Entity, EntityRendering, OptionalEntityComponents, StoredEntity};
+use toki_core::entity::{Entity, EntityRendering, OptionalEntityComponents, PickupDef, StoredEntity};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 
@@ -138,6 +138,28 @@ fn main_scene(ui_state: &EditorUI) -> toki_core::Scene {
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
         .clone()
+}
+
+fn sample_stored_item(id: u32, position: IVec2) -> StoredEntity {
+    let mut entity = sample_entity(id, position);
+    entity.entity_kind = toki_core::entity::EntityKind::Item;
+    entity.category = "item".to_string();
+    entity.solid = false;
+    entity.collision_box = Some(toki_core::collision::CollisionBox {
+        offset: glam::IVec2::ZERO,
+        size: glam::UVec2::new(12, 12),
+        trigger: true,
+    });
+    StoredEntity::new(
+        entity,
+        OptionalEntityComponents {
+            pickup: Some(PickupDef {
+                item_id: "coin".to_string(),
+                count: 1,
+            }),
+            ..Default::default()
+        },
+    )
 }
 
 #[test]
@@ -307,6 +329,48 @@ fn add_entity_command_supports_undo_and_redo() {
 
     assert!(history.redo(&mut ui_state, None));
     assert_eq!(main_scene_entities(&ui_state).len(), 1);
+}
+
+#[test]
+fn add_stored_entity_command_preserves_optional_components_through_undo_redo() {
+    let mut ui_state = EditorUI::new();
+    let mut history = UndoRedoHistory::default();
+    let stored = sample_stored_item(9, IVec2::new(12, 20));
+
+    assert!(history.execute(
+        EditorCommand::add_stored_entity("Main Scene", stored.clone()),
+        &mut ui_state,
+        None
+    ));
+
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist");
+    let placed = scene
+        .stored_entity(9)
+        .expect("stored entity should exist after add");
+    assert!(placed.components.pickup.is_some());
+
+    assert!(history.undo(&mut ui_state, None));
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist");
+    assert!(scene.stored_entity(9).is_none());
+
+    assert!(history.redo(&mut ui_state, None));
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist");
+    let replaced = scene
+        .stored_entity(9)
+        .expect("stored entity should exist after redo");
+    assert!(replaced.components.pickup.is_some());
 }
 
 #[test]

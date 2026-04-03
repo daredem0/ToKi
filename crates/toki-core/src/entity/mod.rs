@@ -15,6 +15,7 @@ mod definition;
 mod manager;
 mod model;
 mod storage;
+mod validation;
 mod wire;
 
 // Re-export all public types
@@ -37,4 +38,5 @@ pub use storage::{
     EntitySpawnBundle, EntityStorage, Inventory, OptionalComponentRegistry,
     OptionalEntityComponents, PickupDef, PrimaryProjectileDef, ProjectileState, SparseComponentMap,
 };
+pub use validation::{validate_entity_definition_warnings, validate_stored_entity_warnings};
 pub use wire::{EntityComponentsWire, EntityWire, StoredEntity};

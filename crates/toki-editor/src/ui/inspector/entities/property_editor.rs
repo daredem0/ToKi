@@ -8,6 +8,10 @@ use super::helpers::{
 use super::types::EntityPropertyDraft;
 use crate::config::EditorConfig;
 use crate::ui::editor_ui::EditorUI;
+use crate::ui::entity_kind_policy::{
+    default_collision_for_kind, effective_kind_for_category, kind_supports_audio,
+    kind_supports_combat_defaults, kind_supports_movement,
+};
 use crate::ui::object_sheet_browser::{
     build_decoration_placement_draft, ensure_object_sheet_preview_texture,
     render_object_gallery_item, resolve_object_sheet_browser_source, sync_selected_object_name,
@@ -15,36 +19,18 @@ use crate::ui::object_sheet_browser::{
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use toki_core::entity::{
-    runtime_entity_kind_for_category, AiBehavior, ControlRole, EntityKind, MovementProfile,
-    MovementSoundTrigger,
-};
+use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
 use toki_core::palette::Palette4;
-
-fn kind_supports_movement(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Player | EntityKind::Npc)
-}
-
-fn kind_supports_audio(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Player | EntityKind::Npc)
-}
-
-fn kind_supports_combat(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Player | EntityKind::Npc | EntityKind::Item
-    )
-}
 
 /// Whether the movement section (speed, can_move, movement_profile, control_role) is relevant.
 pub fn should_show_movement_section(draft: &EntityPropertyDraft) -> bool {
-    let kind = runtime_entity_kind_for_category(&draft.category);
+    let kind = effective_kind_for_category(&draft.category);
     draft.movement_component_present || draft.ai_component_present || kind_supports_movement(kind)
 }
 
 /// Whether the audio section (footstep sounds, hearing) is relevant.
 pub fn should_show_audio_section(draft: &EntityPropertyDraft) -> bool {
-    let kind = runtime_entity_kind_for_category(&draft.category);
+    let kind = effective_kind_for_category(&draft.category);
     draft.movement_component_present
         || draft.ai_component_present
         || !draft.movement_sound.trim().is_empty()
@@ -53,11 +39,16 @@ pub fn should_show_audio_section(draft: &EntityPropertyDraft) -> bool {
 
 /// Whether the combat/stats section (health, attack power) is relevant.
 pub fn should_show_combat_section(draft: &EntityPropertyDraft) -> bool {
-    let kind = runtime_entity_kind_for_category(&draft.category);
+    let kind = effective_kind_for_category(&draft.category);
     draft.combat_component_present
         || draft.health_enabled
         || draft.attack_power_enabled
-        || kind_supports_combat(kind)
+        || kind_supports_combat_defaults(kind)
+}
+
+pub fn should_show_pickup_section(draft: &EntityPropertyDraft) -> bool {
+    let kind = effective_kind_for_category(&draft.category);
+    draft.pickup_present || kind == toki_core::entity::EntityKind::Item
 }
 
 impl InspectorSystem {
@@ -74,6 +65,7 @@ impl InspectorSystem {
         let show_movement = should_show_movement_section(draft);
         let show_audio = should_show_audio_section(draft);
         let show_combat = should_show_combat_section(draft);
+        let show_pickup = should_show_pickup_section(draft);
 
         ui.label(section_label);
         ui.separator();
@@ -95,6 +87,11 @@ impl InspectorSystem {
         changed |= render_palette_override_row(ui, draft, available_palettes);
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
+
+        if show_pickup {
+            changed |= render_pickup_section(ui, draft);
+        }
+
         changed |= ui
             .checkbox(&mut draft.interactable, "Interactable")
             .changed();
@@ -433,6 +430,42 @@ fn render_speed_row(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool 
     changed
 }
 
+fn render_pickup_section(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {
+    let mut changed = false;
+    let pickup_toggled = ui.checkbox(&mut draft.pickup_present, "Pickup").changed();
+    changed |= pickup_toggled;
+    if pickup_toggled {
+        let kind = effective_kind_for_category(&draft.category);
+        let defaults =
+            default_collision_for_kind(kind, [draft.size_x as u32, draft.size_y as u32], draft.pickup_present);
+        draft.collision.enabled = defaults.enabled;
+        draft.collision.trigger = defaults.trigger;
+        draft.collision.offset_x = defaults.offset[0];
+        draft.collision.offset_y = defaults.offset[1];
+        draft.collision.size_x = defaults.size[0] as i64;
+        draft.collision.size_y = defaults.size[1] as i64;
+        changed = true;
+    }
+    if draft.pickup_present {
+        ui.horizontal(|ui| {
+            ui.label("Pickup Item:");
+            changed |= ui.text_edit_singleline(&mut draft.pickup_item_id).changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Pickup Count:");
+            let mut count = draft.pickup_count as i64;
+            if ui
+                .add(egui::DragValue::new(&mut count).range(1..=9999))
+                .changed()
+            {
+                draft.pickup_count = count.max(1) as u32;
+                changed = true;
+            }
+        });
+    }
+    changed
+}
+
 fn render_interaction_reach_row(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
@@ -768,6 +801,9 @@ mod tests {
             solid: false,
             interactable: false,
             interaction_reach: 0,
+            pickup_present: false,
+            pickup_item_id: String::new(),
+            pickup_count: 1,
             movement_component_present: false,
             can_move: false,
             ai_component_present: false,
@@ -834,8 +870,7 @@ mod tests {
     }
 
     #[test]
-    fn combat_section_visible_for_items_and_promoted_decorations() {
-        assert!(should_show_combat_section(&draft_with_category("item")));
+    fn combat_section_visible_for_promoted_decorations() {
         let mut draft = draft_with_category("decoration");
         draft.combat_component_present = true;
         assert!(should_show_combat_section(&draft));
@@ -844,6 +879,19 @@ mod tests {
     #[test]
     fn combat_section_hidden_for_plain_non_combat_decoration() {
         assert!(!should_show_combat_section(&draft_with_category(
+            "decoration"
+        )));
+    }
+
+    #[test]
+    fn combat_section_hidden_for_plain_items_without_combat_component() {
+        assert!(!should_show_combat_section(&draft_with_category("item")));
+    }
+
+    #[test]
+    fn pickup_section_visible_for_items_and_hidden_for_plain_decorations() {
+        assert!(should_show_pickup_section(&draft_with_category("item")));
+        assert!(!should_show_pickup_section(&draft_with_category(
             "decoration"
         )));
     }

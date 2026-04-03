@@ -833,3 +833,43 @@ fn default_definition_has_sensible_defaults() {
     assert_eq!(def.collision.size, [32, 32]);
     assert!(!def.collision.trigger);
 }
+
+#[test]
+fn default_item_definition_is_minimal_and_non_moving() {
+    let def = create_default_definition("coin_pickup", "Coin Pickup", "item");
+
+    assert_eq!(def.category, "item");
+    assert!(!def.solid);
+    assert!(def.components.movement.is_none());
+    assert!(!def.collision.enabled);
+    assert!(!def.collision.trigger);
+    assert_eq!(def.audio.footstep_trigger_distance, 0.0);
+    assert_eq!(def.audio.hearing_radius, 0);
+}
+
+#[test]
+fn default_decoration_definition_omits_behavior_components() {
+    let def = create_default_definition("tree", "Tree", "decoration");
+
+    assert!(def.components.movement.is_none());
+    assert!(def.components.ai.is_none());
+    assert!(def.components.combat.is_none());
+    assert!(def.components.interaction.is_none());
+    assert!(def.solid);
+    assert!(def.collision.enabled);
+    assert!(!def.collision.trigger);
+}
+
+#[test]
+fn toggle_pickup_on_item_definition_enables_trigger_collision() {
+    let mut state = EntityEditState::from_definition(
+        create_default_definition("coin_pickup", "Coin Pickup", "item"),
+        PathBuf::from("/test/coin_pickup.json"),
+    );
+
+    state.toggle_pickup();
+
+    assert!(state.definition.components.pickup.is_some());
+    assert!(state.definition.collision.enabled);
+    assert!(state.definition.collision.trigger);
+}

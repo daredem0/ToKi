@@ -11,8 +11,8 @@ use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     build_decoration_entity, decoration_collision_box, AiComponent, CombatComponent, ControlRole,
     DecorationSpec, EntityKind, EntityManager, EntityRendering, EntityStats, MovementComponent,
-    MovementSoundTrigger, OptionalEntityComponents, StoredEntity, ATTACK_POWER_STAT_ID,
-    HEALTH_STAT_ID,
+    MovementSoundTrigger, OptionalEntityComponents, PickupDef, StaticObjectRenderDef,
+    StoredEntity, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{
@@ -351,6 +351,88 @@ fn apply_entity_property_draft_updates_static_object_render_for_decorations() {
     assert_eq!(collision.offset, expected.offset);
     assert_eq!(collision.size, expected.size);
     assert_eq!(collision.trigger, expected.trigger);
+}
+
+#[test]
+fn entity_property_draft_reads_pickup_fields_from_item_entity() {
+    let mut entity = sample_entity_with_id(44);
+    entity.entity.entity_kind = EntityKind::Item;
+    entity.entity.category = "item".to_string();
+    entity.components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 3,
+    });
+
+    let draft = EntityPropertyDraft::from_entity(&entity);
+
+    assert!(draft.pickup_present);
+    assert_eq!(draft.pickup_item_id, "coin");
+    assert_eq!(draft.pickup_count, 3);
+}
+
+#[test]
+fn apply_entity_property_draft_updates_pickup_component_for_item() {
+    let mut entity = sample_entity_with_id(45);
+    entity.entity.entity_kind = EntityKind::Item;
+    entity.entity.category = "item".to_string();
+    entity.components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 1,
+    });
+    let mut draft = EntityPropertyDraft::from_entity(&entity);
+    draft.pickup_present = true;
+    draft.pickup_item_id = "gem".to_string();
+    draft.pickup_count = 5;
+    draft.collision.enabled = true;
+    draft.collision.trigger = true;
+
+    let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
+
+    assert!(changed);
+    let pickup = entity
+        .components
+        .pickup
+        .as_ref()
+        .expect("pickup should remain enabled");
+    assert_eq!(pickup.item_id, "gem");
+    assert_eq!(pickup.count, 5);
+}
+
+#[test]
+fn apply_entity_property_draft_keeps_static_render_items_on_trigger_collision_path() {
+    let mut entity = sample_entity_with_id(46);
+    entity.entity.entity_kind = EntityKind::Item;
+    entity.entity.category = "item".to_string();
+    entity.entity.rendering.static_object_render = Some(StaticObjectRenderDef {
+        sheet: "items".to_string(),
+        object_name: "coin".to_string(),
+    });
+    entity.components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 1,
+    });
+
+    let mut draft = EntityPropertyDraft::from_entity(&entity);
+    draft.pickup_present = true;
+    draft.collision.enabled = true;
+    draft.collision.trigger = true;
+    draft.collision.offset_x = 2;
+    draft.collision.offset_y = 3;
+    draft.collision.size_x = 12;
+    draft.collision.size_y = 10;
+    draft.solid = false;
+
+    let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
+
+    assert!(changed);
+    let collision = entity
+        .entity
+        .collision_box
+        .as_ref()
+        .expect("item pickup should keep authored collision");
+    assert_eq!(collision.offset, IVec2::new(2, 3));
+    assert_eq!(collision.size, UVec2::new(12, 10));
+    assert!(collision.trigger);
 }
 
 #[test]

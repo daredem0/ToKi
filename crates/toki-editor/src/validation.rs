@@ -6,6 +6,8 @@ use std::path::Path;
 
 use crate::io::{read_text_file_with_limit, DEFAULT_TEXT_FILE_SIZE_LIMIT};
 use crate::project::ProjectAssets;
+use toki_core::entity::validate_entity_definition_warnings;
+use toki_core::{Scene};
 
 pub struct AssetValidator {
     schemas: HashMap<String, JSONSchema>,
@@ -139,6 +141,7 @@ impl AssetValidator {
         match validation_result {
             Ok(_) => {
                 tracing::info!("✅ {} '{}': Valid", schema_type, asset_name);
+                self.log_phase7_warnings(schema_type, asset_name, &json_value);
                 true
             }
             Err(errors) => {
@@ -152,6 +155,39 @@ impl AssetValidator {
                 }
                 false
             }
+        }
+    }
+
+    fn log_phase7_warnings(&self, schema_type: &str, asset_name: &str, json_value: &Value) {
+        match schema_type {
+            "entity" => {
+                if let Ok(definition) =
+                    serde_json::from_value::<toki_core::entity::EntityDefinition>(json_value.clone())
+                {
+                    for warning in validate_entity_definition_warnings(&definition) {
+                        tracing::warn!("⚠ entity '{}': {}", asset_name, warning);
+                    }
+                }
+            }
+            "scene" => {
+                if let Ok(scene) = serde_json::from_value::<Scene>(json_value.clone()) {
+                    for entity in scene.entities() {
+                        let stored = toki_core::entity::StoredEntity::new(
+                            entity.clone(),
+                            scene.optional_components(entity.id),
+                        );
+                        for warning in toki_core::entity::validate_stored_entity_warnings(&stored) {
+                            tracing::warn!(
+                                "⚠ scene '{}' entity {}: {}",
+                                asset_name,
+                                stored.entity.id,
+                                warning
+                            );
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

@@ -29,11 +29,21 @@ pub fn render_save_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     // Show validation errors summary
     if let Some(edit) = &crate::ui::editor_context::entity_editor_state(ui_state).edit_state {
+        let warnings = toki_core::entity::validate_entity_definition_warnings(&edit.definition);
         if !edit.validation_errors.is_empty() {
             ui.colored_label(
                 egui::Color32::RED,
                 format!("{} validation error(s)", edit.validation_errors.len()),
             );
+        }
+        if !warnings.is_empty() {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 210, 80),
+                format!("{} validation warning(s)", warnings.len()),
+            );
+            for warning in &warnings {
+                ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
+            }
         }
     }
 }

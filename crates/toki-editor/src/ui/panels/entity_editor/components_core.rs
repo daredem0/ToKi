@@ -1,5 +1,6 @@
 //! Core component section rendering - Rendering and Attributes.
 
+use crate::ui::entity_kind_policy::{effective_kind_for_category, kind_supports_movement};
 use crate::ui::EditorUI;
 use toki_core::entity::EntityFootprint;
 
@@ -189,21 +190,34 @@ pub fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     egui::CollapsingHeader::new("Attributes")
         .default_open(true)
         .show(ui, |ui| {
-            // Speed
-            ui.horizontal(|ui| {
-                ui.label("Speed:");
-                let movement = edit
-                    .definition
-                    .components
-                    .movement
-                    .get_or_insert_with(toki_core::entity::MovementComponent::default);
-                if ui
-                    .add(egui::DragValue::new(&mut movement.speed).speed(0.1))
-                    .changed()
-                {
-                    edit.mark_dirty();
-                }
-            });
+            let kind = effective_kind_for_category(&edit.definition.category);
+            let show_movement =
+                edit.definition.components.movement.is_some() || kind_supports_movement(kind);
+
+            if show_movement {
+                ui.horizontal(|ui| {
+                    ui.label("Speed:");
+                    let speed = edit
+                        .definition
+                        .components
+                        .movement
+                        .as_ref()
+                        .map(|movement| movement.speed)
+                        .unwrap_or(0.0);
+                    let mut speed = speed;
+                    if ui
+                        .add(egui::DragValue::new(&mut speed).speed(0.1))
+                        .changed()
+                    {
+                        edit.definition
+                            .components
+                            .movement
+                            .get_or_insert_with(toki_core::entity::MovementComponent::default)
+                            .speed = speed.max(0.0);
+                        edit.mark_dirty();
+                    }
+                });
+            }
 
             // Boolean attributes
             if ui.checkbox(&mut edit.definition.solid, "Solid").changed() {
@@ -212,23 +226,25 @@ pub fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             if ui.checkbox(&mut edit.definition.active, "Active").changed() {
                 edit.mark_dirty();
             }
-            let mut can_move = edit
-                .definition
-                .components
-                .movement
-                .as_ref()
-                .is_some_and(|movement| movement.can_move);
-            if ui.checkbox(&mut can_move, "Can Move").changed() {
-                if can_move {
-                    edit.definition
-                        .components
-                        .movement
-                        .get_or_insert_with(toki_core::entity::MovementComponent::default)
-                        .can_move = true;
-                } else if let Some(movement) = edit.definition.components.movement.as_mut() {
-                    movement.can_move = false;
+            if show_movement {
+                let mut can_move = edit
+                    .definition
+                    .components
+                    .movement
+                    .as_ref()
+                    .is_some_and(|movement| movement.can_move);
+                if ui.checkbox(&mut can_move, "Can Move").changed() {
+                    if can_move {
+                        edit.definition
+                            .components
+                            .movement
+                            .get_or_insert_with(toki_core::entity::MovementComponent::default)
+                            .can_move = true;
+                    } else if let Some(movement) = edit.definition.components.movement.as_mut() {
+                        movement.can_move = false;
+                    }
+                    edit.mark_dirty();
                 }
-                edit.mark_dirty();
             }
             let mut interactable = edit.definition.components.interaction.is_some();
             if ui.checkbox(&mut interactable, "Interactable").changed() {

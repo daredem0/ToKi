@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::entity::{
     build_decoration_entity, decoration_collision_box, DecorationSpec, Entity, EntityDefinition,
+    StoredEntity,
 };
 use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 
@@ -429,8 +430,8 @@ impl PlacementInteraction {
 
         let new_id = Self::next_entity_id(ui_state.scenes[scene_index].entities());
 
-        let entity = match entity_def.create_entity(world_pos_i32, new_id) {
-            Ok(entity) => entity,
+        let spawn_bundle = match entity_def.create_spawn_bundle(world_pos_i32, new_id) {
+            Ok(bundle) => bundle,
             Err(e) => {
                 tracing::error!("Failed to create entity '{}': {}", entity_def_name, e);
                 crate::ui::editor_context::scene_viewport_context_mut(ui_state)
@@ -439,11 +440,13 @@ impl PlacementInteraction {
                 return false;
             }
         };
+        let entity = spawn_bundle.entity.clone();
+        let stored = StoredEntity::new(spawn_bundle.entity, spawn_bundle.optional_components);
 
         let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, terrain_atlas);
 
         if can_place {
-            let add_command = EditorCommand::add_entity(active_scene_name.clone(), entity);
+            let add_command = EditorCommand::add_stored_entity(active_scene_name.clone(), stored);
             let added = editor_commands::execute(ui_state, add_command);
             if !added {
                 tracing::warn!(

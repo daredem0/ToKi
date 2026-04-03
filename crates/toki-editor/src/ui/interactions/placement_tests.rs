@@ -9,7 +9,7 @@ use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
-    EntityDefinition, EntityStats, RenderingDef,
+    EntityDefinition, EntityStats, PickupDef, RenderingDef, StaticObjectRenderDef,
 };
 use toki_core::scene::SceneAnchorKind;
 
@@ -64,6 +64,25 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
         category: "creature".to_string(),
         tags: vec!["placement".to_string()],
     }
+}
+
+fn sample_item_definition(name: &str) -> EntityDefinition {
+    let mut definition = sample_entity_definition(name);
+    definition.category = "item".to_string();
+    definition.solid = false;
+    definition.components.combat = None;
+    definition.components.movement = None;
+    definition.components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 2,
+    });
+    definition.collision.enabled = true;
+    definition.collision.trigger = true;
+    definition.rendering.static_object = Some(StaticObjectRenderDef {
+        sheet: "items".to_string(),
+        object_name: "coin".to_string(),
+    });
+    definition
 }
 
 fn unique_temp_project_dir() -> PathBuf {
@@ -275,6 +294,45 @@ fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
     assert_eq!(scene.entities().len(), 1);
+}
+
+#[test]
+fn create_entity_in_scene_preserves_item_kind_and_pickup_components() {
+    let mut ui_state = EditorUI::new();
+    ui_state
+        .scene_viewport_context_mut()
+        .placement
+        .enter_placement_mode("coin_pickup".to_string());
+    let entity_def = sample_item_definition("coin_pickup");
+
+    let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
+        &mut ui_state,
+        entity_def,
+        "coin_pickup",
+        IVec2::new(16, 16),
+        None,
+        None,
+    );
+
+    assert!(placed);
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|s| s.name == "Main Scene")
+        .expect("missing default scene");
+    let stored = scene
+        .stored_entity(scene.entities()[0].id)
+        .expect("stored entity should exist");
+    assert_eq!(stored.entity.entity_kind, toki_core::entity::EntityKind::Item);
+    assert_eq!(stored.entity.category, "item");
+    let pickup = stored.components.pickup.expect("pickup should be present");
+    assert_eq!(pickup.item_id, "coin");
+    assert_eq!(pickup.count, 2);
+    assert!(stored
+        .entity
+        .collision_box
+        .as_ref()
+        .is_some_and(|collision| collision.trigger));
 }
 
 #[test]

@@ -1,0 +1,187 @@
+use super::{
+    runtime_entity_kind_for_category, EntityDefinition, EntityKind, StoredEntity,
+};
+
+struct ValidationInput<'a> {
+    kind: EntityKind,
+    has_movement: bool,
+    has_ai: bool,
+    has_combat: bool,
+    has_pickup: bool,
+    collision_trigger: bool,
+    collision_enabled: bool,
+    item_id: Option<&'a str>,
+    item_count: Option<u32>,
+}
+
+fn collect_component_warnings(input: ValidationInput<'_>) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let ValidationInput {
+        kind,
+        has_movement,
+        has_ai,
+        has_combat,
+        has_pickup,
+        collision_trigger,
+        collision_enabled,
+        item_id,
+        item_count,
+    } = input;
+
+    if kind == EntityKind::Decoration {
+        if has_movement {
+            warnings.push("Decoration should not carry MovementComponent".to_string());
+        }
+        if has_ai {
+            warnings.push("Decoration should not carry AiComponent".to_string());
+        }
+        if has_combat {
+            warnings.push("Decoration should not carry CombatComponent".to_string());
+        }
+    }
+
+    if kind == EntityKind::Item && has_ai {
+        warnings.push("Item should not carry AiComponent".to_string());
+    }
+    if kind == EntityKind::Item && has_movement {
+        warnings.push("Item should not carry MovementComponent".to_string());
+    }
+
+    if has_pickup && kind != EntityKind::Item {
+        warnings.push("Pickup payload is only valid on EntityKind::Item".to_string());
+    }
+
+    if kind == EntityKind::Item && has_pickup {
+        if item_id.is_none_or(|id| id.trim().is_empty()) {
+            warnings.push("Item pickup is missing item_id".to_string());
+        }
+        if item_count.unwrap_or(0) == 0 {
+            warnings.push("Item pickup count must be greater than 0".to_string());
+        }
+        if !collision_enabled || !collision_trigger {
+            warnings.push("Pickup item should use trigger collision".to_string());
+        }
+    }
+
+    warnings
+}
+
+pub fn validate_entity_definition_warnings(definition: &EntityDefinition) -> Vec<String> {
+    let kind = runtime_entity_kind_for_category(&definition.category);
+    collect_component_warnings(ValidationInput {
+        kind,
+        has_movement: definition.components.movement.is_some(),
+        has_ai: definition.components.ai.is_some(),
+        has_combat: definition.components.combat.is_some(),
+        has_pickup: definition.components.pickup.is_some(),
+        collision_trigger: definition.collision.trigger,
+        collision_enabled: definition.collision.enabled,
+        item_id: definition
+            .components
+            .pickup
+            .as_ref()
+            .map(|pickup| pickup.item_id.as_str()),
+        item_count: definition.components.pickup.as_ref().map(|pickup| pickup.count),
+    })
+}
+
+pub fn validate_stored_entity_warnings(stored: &StoredEntity) -> Vec<String> {
+    collect_component_warnings(ValidationInput {
+        kind: stored.entity.entity_kind,
+        has_movement: stored.components.movement.is_some(),
+        has_ai: stored.components.ai.is_some(),
+        has_combat: stored.components.combat.is_some(),
+        has_pickup: stored.components.pickup.is_some(),
+        collision_trigger: stored
+            .entity
+            .collision_box
+            .as_ref()
+            .is_some_and(|collision| collision.trigger),
+        collision_enabled: stored.entity.collision_box.is_some(),
+        item_id: stored
+            .components
+            .pickup
+            .as_ref()
+            .map(|pickup| pickup.item_id.as_str()),
+        item_count: stored.components.pickup.as_ref().map(|pickup| pickup.count),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::{
+        AnimationsDef, AudioDef, CollisionDef, ComponentsDef, EntityDefinition, RenderingDef,
+        StaticObjectRenderDef,
+    };
+
+    fn base_definition(category: &str) -> EntityDefinition {
+        EntityDefinition {
+            name: "test".to_string().into(),
+            display_name: "Test".to_string(),
+            description: String::new(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+                has_shadow: true,
+                palette_override: None,
+                static_object: Some(StaticObjectRenderDef {
+                    sheet: "items".to_string(),
+                    object_name: "coin".to_string(),
+                }),
+                grounding: Default::default(),
+            },
+            solid: false,
+            active: true,
+            components: ComponentsDef::default(),
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: true,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 0.0,
+                hearing_radius: 0,
+                movement_sound_trigger: Default::default(),
+                movement_sound: String::new(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: String::new(),
+                clips: Vec::new(),
+                default_state: String::new(),
+            },
+            category: category.to_string(),
+            tags: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn validation_warns_for_item_with_movement_and_missing_pickup_payload() {
+        let mut definition = base_definition("item");
+        definition.components.movement = Some(Default::default());
+        definition.components.pickup = Some(crate::entity::PickupDef {
+            item_id: String::new(),
+            count: 0,
+        });
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.iter().any(|w| w.contains("MovementComponent")));
+        assert!(warnings.iter().any(|w| w.contains("missing item_id")));
+        assert!(warnings.iter().any(|w| w.contains("greater than 0")));
+    }
+
+    #[test]
+    fn validation_warns_for_non_item_pickup_payload() {
+        let mut definition = base_definition("decoration");
+        definition.components.pickup = Some(crate::entity::PickupDef {
+            item_id: "coin".to_string(),
+            count: 1,
+        });
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.iter().any(|w| w.contains("only valid on EntityKind::Item")));
+    }
+}

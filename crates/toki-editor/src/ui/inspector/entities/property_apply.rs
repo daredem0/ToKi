@@ -4,10 +4,11 @@ use super::super::InspectorSystem;
 use super::types::EntityPropertyDraft;
 use crate::editor_services::commands as editor_commands;
 use crate::ui::editor_ui::EditorUI;
+use crate::ui::entity_kind_policy::{effective_kind_for_category, uses_decoration_collision_policy};
 use crate::ui::undo_redo::EditorCommand;
 use toki_core::entity::{
     decoration_collision_box, AiBehavior, AiComponent, CombatComponent, ControlRole, EntityId,
-    InteractionComponent, MovementComponent, StaticObjectRenderDef, StoredEntity,
+    InteractionComponent, MovementComponent, PickupDef, StaticObjectRenderDef, StoredEntity,
 };
 
 pub(super) const HEALTH_STAT_ID: &str = "health";
@@ -244,6 +245,15 @@ impl InspectorSystem {
             None
         };
         changed |= set_if_changed(&mut stored.components.inventory, desired_inventory);
+        let desired_pickup = if draft.pickup_present {
+            Some(PickupDef {
+                item_id: draft.pickup_item_id.trim().to_string(),
+                count: draft.pickup_count.max(1),
+            })
+        } else {
+            None
+        };
+        changed |= set_if_changed(&mut stored.components.pickup, desired_pickup.clone());
 
         let mut desired_combat =
             if draft.combat_component_present || draft.health_enabled || draft.attack_power_enabled
@@ -272,7 +282,8 @@ impl InspectorSystem {
             };
         changed |= set_if_changed(&mut stored.components.combat, desired_combat);
 
-        if entity.rendering.static_object_render.is_some() {
+        let kind = effective_kind_for_category(&draft.category);
+        if uses_decoration_collision_policy(kind) {
             let new_collision_box =
                 decoration_collision_box(entity.size, &entity.rendering.grounding, draft.solid);
             let collision_changed = match (&entity.collision_box, &new_collision_box) {
@@ -391,6 +402,18 @@ fn apply_attribute_fields(
         definition.components.inventory = desired_inventory;
         changed = true;
     }
+    let desired_pickup = if draft.pickup_present {
+        Some(PickupDef {
+            item_id: draft.pickup_item_id.trim().to_string(),
+            count: draft.pickup_count.max(1),
+        })
+    } else {
+        None
+    };
+    if definition.components.pickup != desired_pickup {
+        definition.components.pickup = desired_pickup;
+        changed = true;
+    }
 
     changed
 }
@@ -440,6 +463,33 @@ fn apply_collision_fields(
     draft: &EntityPropertyDraft,
 ) -> bool {
     let mut changed = false;
+    let kind = effective_kind_for_category(&draft.category);
+
+    if uses_decoration_collision_policy(kind) {
+        let desired = toki_core::entity::CollisionDef {
+            enabled: draft.solid,
+            offset: [0, 0],
+            size: definition.rendering.size,
+            trigger: false,
+        };
+        if definition.collision.enabled != desired.enabled {
+            definition.collision.enabled = desired.enabled;
+            changed = true;
+        }
+        if definition.collision.offset != desired.offset {
+            definition.collision.offset = desired.offset;
+            changed = true;
+        }
+        if definition.collision.size != desired.size {
+            definition.collision.size = desired.size;
+            changed = true;
+        }
+        if definition.collision.trigger != desired.trigger {
+            definition.collision.trigger = desired.trigger;
+            changed = true;
+        }
+        return changed;
+    }
 
     let new_collision_enabled = draft.collision.enabled;
     if definition.collision.enabled != new_collision_enabled {

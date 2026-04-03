@@ -177,6 +177,7 @@ impl UndoRedoHistory {
 #[derive(Debug, Clone)]
 pub enum EditorCommand {
     AddEntity(Box<AddEntityCommand>),
+    AddStoredEntity(Box<AddStoredEntityCommand>),
     RemoveEntity(Box<RemoveEntityCommand>),
     MoveEntities(Box<MoveEntitiesCommand>),
     UpdateEntities(Box<UpdateEntitiesCommand>),
@@ -189,6 +190,13 @@ pub enum EditorCommand {
 impl EditorCommand {
     pub fn add_entity(scene_name: impl Into<String>, entity: Entity) -> Self {
         Self::AddEntity(Box::new(AddEntityCommand {
+            scene_name: scene_name.into(),
+            entity,
+        }))
+    }
+
+    pub fn add_stored_entity(scene_name: impl Into<String>, entity: StoredEntity) -> Self {
+        Self::AddStoredEntity(Box::new(AddStoredEntityCommand {
             scene_name: scene_name.into(),
             entity,
         }))
@@ -267,6 +275,7 @@ impl EditorCommand {
     pub fn apply(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         match self {
             Self::AddEntity(command) => command.apply(ui_state),
+            Self::AddStoredEntity(command) => command.apply(ui_state),
             Self::RemoveEntity(command) => command.apply(ui_state),
             Self::MoveEntities(command) => command.apply(ui_state),
             Self::UpdateEntities(command) => command.apply(ui_state),
@@ -280,6 +289,7 @@ impl EditorCommand {
     pub fn undo(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         match self {
             Self::AddEntity(command) => command.undo(ui_state),
+            Self::AddStoredEntity(command) => command.undo(ui_state),
             Self::RemoveEntity(command) => command.undo(ui_state),
             Self::MoveEntities(command) => command.undo(ui_state),
             Self::UpdateEntities(command) => command.undo(ui_state),
@@ -294,6 +304,7 @@ impl EditorCommand {
         if matches!(
             self,
             Self::AddEntity(_)
+                | Self::AddStoredEntity(_)
                 | Self::RemoveEntity(_)
                 | Self::MoveEntities(_)
                 | Self::UpdateEntities(_)
@@ -356,6 +367,12 @@ pub struct AddEntityCommand {
 }
 
 #[derive(Debug, Clone)]
+pub struct AddStoredEntityCommand {
+    scene_name: String,
+    entity: StoredEntity,
+}
+
+#[derive(Debug, Clone)]
 pub struct UpdateMenuSettingsCommand {
     before: MenuSettings,
     after: MenuSettings,
@@ -410,6 +427,37 @@ impl AddEntityCommand {
             .entities()
             .iter()
             .position(|existing| existing.id == self.entity.id)
+        else {
+            return false;
+        };
+        scene.remove_entity_at(index).is_some()
+    }
+}
+
+impl AddStoredEntityCommand {
+    fn apply(&self, ui_state: &mut EditorUI) -> bool {
+        let Some(scene) = scene_mut(ui_state, &self.scene_name) else {
+            return false;
+        };
+        if scene
+            .entities()
+            .iter()
+            .any(|existing| existing.id == self.entity.entity.id)
+        {
+            return false;
+        }
+        scene.add_stored_entity(self.entity.clone());
+        true
+    }
+
+    fn undo(&self, ui_state: &mut EditorUI) -> bool {
+        let Some(scene) = scene_mut(ui_state, &self.scene_name) else {
+            return false;
+        };
+        let Some(index) = scene
+            .entities()
+            .iter()
+            .position(|existing| existing.id == self.entity.entity.id)
         else {
             return false;
         };

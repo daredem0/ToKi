@@ -4,11 +4,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use toki_core::entity::{
-    AiBehavior, AiComponent, AiConfig, CombatComponent, EntityDefinition, Inventory,
+    validate_entity_definition_warnings, AiBehavior, AiComponent, AiConfig, CombatComponent,
+    EntityDefinition, Inventory,
 };
 
 use super::defaults::{default_pickup_def, default_projectile_def};
 use super::toggles::ComponentToggles;
+use crate::ui::entity_kind_policy::{default_collision_for_kind, effective_kind_for_category};
 
 /// State for editing an entity definition.
 #[derive(Debug, Clone)]
@@ -25,6 +27,8 @@ pub struct EntityEditState {
     pub dirty: bool,
     /// Validation errors by field
     pub validation_errors: HashMap<String, String>,
+    /// Non-fatal authoring warnings
+    pub validation_warnings: Vec<String>,
 }
 
 impl EntityEditState {
@@ -39,6 +43,7 @@ impl EntityEditState {
             tags_input,
             dirty: false,
             validation_errors: HashMap::new(),
+            validation_warnings: Vec::new(),
         }
     }
 
@@ -98,6 +103,15 @@ impl EntityEditState {
         } else {
             None
         };
+        let kind = effective_kind_for_category(&self.definition.category);
+        if kind == toki_core::entity::EntityKind::Item && self.definition.components.pickup.is_some() {
+            self.definition.solid = false;
+        }
+        self.definition.collision = default_collision_for_kind(
+            kind,
+            self.definition.rendering.size,
+            self.definition.components.pickup.is_some(),
+        );
         self.mark_dirty();
     }
 
@@ -137,6 +151,7 @@ impl EntityEditState {
     /// Validate the current entity definition
     pub fn validate(&mut self) -> bool {
         self.validation_errors.clear();
+        self.validation_warnings = validate_entity_definition_warnings(&self.definition);
         self.validate_name();
         self.validate_display_name();
         self.validate_size();

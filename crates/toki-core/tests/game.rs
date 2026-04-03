@@ -398,13 +398,10 @@ fn fixed_tick_collects_overlapping_pickup_and_despawns_it() {
 
     let mut pickup = test_entity_definition("coin_pickup", "item");
     pickup.solid = false;
-    pickup.collision.enabled = false;
+    pickup.collision.enabled = true;
+    pickup.collision.trigger = true;
     pickup.components.combat = None;
-    pickup.components.movement = Some(MovementComponent {
-        speed: 0.0,
-        movement_profile: MovementProfile::None,
-        can_move: false,
-    });
+    pickup.components.movement = None;
     pickup.components.pickup = Some(PickupDef {
         item_id: "coin".to_string(),
         count: 3,
@@ -433,13 +430,10 @@ fn fixed_tick_pickup_collection_stacks_without_double_collecting() {
 
     let mut pickup = test_entity_definition("gem_pickup", "item");
     pickup.solid = false;
-    pickup.collision.enabled = false;
+    pickup.collision.enabled = true;
+    pickup.collision.trigger = true;
     pickup.components.combat = None;
-    pickup.components.movement = Some(MovementComponent {
-        speed: 0.0,
-        movement_profile: MovementProfile::None,
-        can_move: false,
-    });
+    pickup.components.movement = None;
     pickup.components.pickup = Some(PickupDef {
         item_id: "gem".to_string(),
         count: 2,
@@ -463,6 +457,42 @@ fn fixed_tick_pickup_collection_stacks_without_double_collecting() {
         &test_atlas(),
     );
     assert_eq!(player_inventory_count(&state, "gem"), 4);
+}
+
+#[test]
+fn fixed_tick_collects_static_render_pickup_item_without_treating_it_as_decoration() {
+    let mut state = GameState::new(create_test_sprite());
+    let pickup_position = player_position(&state);
+
+    let mut pickup = test_entity_definition("coin_pickup", "item");
+    pickup.solid = false;
+    pickup.collision.enabled = true;
+    pickup.collision.trigger = true;
+    pickup.components.combat = None;
+    pickup.components.movement = None;
+    pickup.components.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 1,
+    });
+    pickup.rendering.static_object = Some(toki_core::entity::StaticObjectRenderDef {
+        sheet: "items".to_string(),
+        object_name: "coin".to_string(),
+    });
+
+    let pickup_id = spawn_definition_entity(&mut state, &pickup, pickup_position);
+    GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(160, 160),
+        &test_tilemap(),
+        &test_atlas(),
+    );
+
+    assert_eq!(player_inventory_count(&state, "coin"), 1);
+    assert!(state
+        .world()
+        .entity_manager()
+        .get_entity(pickup_id)
+        .is_none());
 }
 
 #[test]

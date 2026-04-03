@@ -34,6 +34,13 @@ impl Inspector for EntityInspector {
             if let Some(scene_entity) =
                 InspectorSystem::find_selected_scene_entity(ctx.ui_state, self.entity_id)
             {
+                let warnings = toki_core::entity::validate_stored_entity_warnings(&scene_entity);
+                for warning in &warnings {
+                    ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
+                }
+                if !warnings.is_empty() {
+                    ui.separator();
+                }
                 let mut draft = super::super::EntityPropertyDraft::from_entity(&scene_entity);
                 let mut draft_changed = InspectorSystem::render_scene_entity_editor(
                     ui,

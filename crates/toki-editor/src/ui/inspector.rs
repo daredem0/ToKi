@@ -71,6 +71,9 @@ pub(super) struct EntityPropertyDraft {
     pub(super) solid: bool,
     pub(super) interactable: bool,
     pub(super) interaction_reach: u32,
+    pub(super) pickup_present: bool,
+    pub(super) pickup_item_id: String,
+    pub(super) pickup_count: u32,
     pub(super) movement_component_present: bool,
     pub(super) can_move: bool,
     pub(super) ai_component_present: bool,
@@ -221,6 +224,19 @@ impl EntityPropertyDraft {
                 .as_ref()
                 .map(|interaction| interaction.interaction_reach)
                 .unwrap_or(0),
+            pickup_present: stored.components.pickup.is_some(),
+            pickup_item_id: stored
+                .components
+                .pickup
+                .as_ref()
+                .map(|pickup| pickup.item_id.clone())
+                .unwrap_or_default(),
+            pickup_count: stored
+                .components
+                .pickup
+                .as_ref()
+                .map(|pickup| pickup.count)
+                .unwrap_or(1),
             movement_component_present: stored.components.movement.is_some(),
             can_move: stored
                 .components
@@ -335,6 +351,19 @@ impl EntityPropertyDraft {
                 .as_ref()
                 .map(|interaction| interaction.interaction_reach)
                 .unwrap_or(0),
+            pickup_present: definition.components.pickup.is_some(),
+            pickup_item_id: definition
+                .components
+                .pickup
+                .as_ref()
+                .map(|pickup| pickup.item_id.clone())
+                .unwrap_or_default(),
+            pickup_count: definition
+                .components
+                .pickup
+                .as_ref()
+                .map(|pickup| pickup.count)
+                .unwrap_or(1),
             movement_component_present: definition.components.movement.is_some(),
             can_move: definition
                 .components

@@ -1,9 +1,13 @@
 //! Default entity definitions and component values.
 
 use toki_core::entity::{
-    AnimationsDef, AudioDef, CollisionDef, ComponentsDef, EntityDefinition, EntityGrounding,
-    MovementComponent, MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
-    RenderingDef,
+    AnimationsDef, ComponentsDef, EntityDefinition, EntityGrounding, PickupDef,
+    PrimaryProjectileDef, RenderingDef,
+};
+
+use crate::ui::entity_kind_policy::{
+    default_audio_for_kind, default_collision_for_kind, default_movement_for_kind,
+    effective_kind_for_category,
 };
 
 /// Create default projectile definition
@@ -33,12 +37,14 @@ pub fn create_default_definition(
     display_name: &str,
     category: &str,
 ) -> EntityDefinition {
+    let kind = effective_kind_for_category(category);
+    let size = [32, 32];
     EntityDefinition {
         name: name.to_string().into(),
         display_name: display_name.to_string(),
         description: String::new(),
         rendering: RenderingDef {
-            size: [32, 32],
+            size,
             render_layer: 0,
             visible: true,
             has_shadow: true,
@@ -46,14 +52,10 @@ pub fn create_default_definition(
             static_object: None,
             grounding: EntityGrounding::default(),
         },
-        solid: true,
+        solid: kind != toki_core::entity::EntityKind::Item,
         active: true,
         components: ComponentsDef {
-            movement: Some(MovementComponent {
-                speed: 100.0,
-                movement_profile: MovementProfile::default(),
-                can_move: true,
-            }),
+            movement: default_movement_for_kind(kind),
             ai: None,
             interaction: None,
             combat: None,
@@ -61,19 +63,8 @@ pub fn create_default_definition(
             pickup: None,
             inventory: None,
         },
-        collision: CollisionDef {
-            enabled: true,
-            offset: [0, 0],
-            size: [32, 32],
-            trigger: false,
-        },
-        audio: AudioDef {
-            footstep_trigger_distance: 32.0,
-            hearing_radius: 192,
-            movement_sound_trigger: MovementSoundTrigger::Distance,
-            movement_sound: String::new(),
-            collision_sound: None,
-        },
+        collision: default_collision_for_kind(kind, size, false),
+        audio: default_audio_for_kind(kind),
         animations: AnimationsDef {
             atlas_name: String::new(),
             clips: Vec::new(),
