@@ -27,7 +27,7 @@ pub(super) fn restore_from_save_data(
         .clone();
 
     let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
-        .prepare_scene_load(&scene, None, save_data.player.clone())
+        .prepare_scene_load(scene, None, save_data.player.clone())
         .map_err(|source| RestoreError::PrepareSceneLoad { source })?;
 
     state

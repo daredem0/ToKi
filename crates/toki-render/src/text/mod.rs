@@ -35,8 +35,8 @@ pub(super) struct PreparedTextLayout {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct TextBufferKey {
-    content: String,
-    font_family: String,
+    content: std::sync::Arc<str>,
+    font_family: std::sync::Arc<str>,
     size_px_bits: u32,
     weight: toki_core::text::TextWeight,
     slant: TextSlant,
@@ -119,8 +119,8 @@ impl GlyphonTextRenderer {
 #[cfg(test)]
 fn make_buffer_key(item: &TextItem, max_width: f32, layout_height: f32) -> TextBufferKey {
     TextBufferKey {
-        content: item.content.clone(),
-        font_family: item.style.font_family.clone(),
+        content: std::sync::Arc::from(item.content.as_str()),
+        font_family: std::sync::Arc::from(item.style.font_family.as_str()),
         size_px_bits: item.style.size_px.to_bits(),
         weight: item.style.weight,
         slant: item.style.slant,
@@ -148,8 +148,8 @@ fn borrowed_buffer_key(
 impl<'a> BorrowedTextBufferKey<'a> {
     fn into_owned(self) -> TextBufferKey {
         TextBufferKey {
-            content: self.content.to_string(),
-            font_family: self.font_family.to_string(),
+            content: std::sync::Arc::from(self.content),
+            font_family: std::sync::Arc::from(self.font_family),
             size_px_bits: self.size_px_bits,
             weight: self.weight,
             slant: self.slant,
@@ -161,8 +161,8 @@ impl<'a> BorrowedTextBufferKey<'a> {
 
 impl TextBufferKey {
     fn matches(&self, other: BorrowedTextBufferKey<'_>) -> bool {
-        self.content == other.content
-            && self.font_family == other.font_family
+        *self.content == *other.content
+            && *self.font_family == *other.font_family
             && self.size_px_bits == other.size_px_bits
             && self.weight == other.weight
             && self.slant == other.slant

@@ -108,6 +108,16 @@ fn prune_cached_buffers_keeps_only_used_indices() {
 }
 
 #[test]
+fn buffer_key_into_owned_shares_content_allocation_on_clone() {
+    let item = TextItem::new_screen("Shared", glam::Vec2::ZERO, TextStyle::default());
+    let borrowed = borrowed_buffer_key(&item, 200.0, 100.0);
+    let owned = borrowed.into_owned();
+    let cloned = owned.clone();
+    assert!(std::sync::Arc::ptr_eq(&owned.content, &cloned.content));
+    assert!(std::sync::Arc::ptr_eq(&owned.font_family, &cloned.font_family));
+}
+
+#[test]
 fn measure_buffer_size_uses_actual_shaped_line_width() {
     let mut font_system = FontSystem::new();
     let style = TextStyle {

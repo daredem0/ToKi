@@ -88,7 +88,7 @@ pub struct SceneRenderer {
     format: wgpu::TextureFormat,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
-    sprite_pipelines_by_texture: BTreeMap<String, SpritePipeline>,
+    sprite_pipelines_by_texture: BTreeMap<std::path::PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<SceneSpriteBatchKey>>,
     underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
@@ -99,17 +99,17 @@ pub struct SceneRenderer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SceneSpriteBatchKey {
     Default,
-    Textured(String),
+    Textured(std::path::PathBuf),
 }
 
 enum SceneSpriteTextureSource<'a> {
     Default,
     File {
-        key: String,
+        key: std::path::PathBuf,
         path: &'a std::path::Path,
     },
     Rgba8 {
-        key: String,
+        key: std::path::PathBuf,
         image: &'a DecodedImage,
     },
 }
@@ -234,25 +234,21 @@ impl SceneRenderer {
         if let Some(image) = &sprite.texture_image {
             let key = sprite
                 .texture_cache_key
-                .clone()
-                .or_else(|| {
-                    sprite
-                        .texture_path
-                        .as_ref()
-                        .map(|path| path.to_string_lossy().to_string())
-                })
+                .as_deref()
+                .map(std::path::PathBuf::from)
+                .or_else(|| sprite.texture_path.clone())
                 .unwrap_or_else(|| {
-                    format!(
+                    std::path::PathBuf::from(format!(
                         "__inline_rgba8_{}x{}_{}",
                         image.width,
                         image.height,
                         self.sprite_pipelines_by_texture.len()
-                    )
+                    ))
                 });
             SceneSpriteTextureSource::Rgba8 { key, image }
         } else if let Some(texture_path) = &sprite.texture_path {
             SceneSpriteTextureSource::File {
-                key: texture_path.to_string_lossy().to_string(),
+                key: texture_path.clone(),
                 path: texture_path.as_path(),
             }
         } else {
@@ -262,7 +258,7 @@ impl SceneRenderer {
 
     fn ensure_textured_sprite_pipeline(
         &mut self,
-        texture_key: &str,
+        texture_key: &std::path::Path,
         texture_source: TextureSource<'_>,
     ) -> bool {
         if self.sprite_pipelines_by_texture.contains_key(texture_key) {
@@ -271,12 +267,12 @@ impl SceneRenderer {
         match SpritePipeline::new(&self.device, &self.queue, self.format, texture_source) {
             Ok(pipeline) => {
                 self.sprite_pipelines_by_texture
-                    .insert(texture_key.to_string(), pipeline);
+                    .insert(texture_key.to_path_buf(), pipeline);
                 true
             }
             Err(error) => {
                 tracing::warn!(
-                    texture_key = %texture_key,
+                    texture_key = ?texture_key,
                     "Skipping sprite with failed texture pipeline creation: {error}"
                 );
                 false
@@ -286,7 +282,7 @@ impl SceneRenderer {
 
     fn add_textured_sprite_instance(
         &mut self,
-        texture_key: &str,
+        texture_key: &std::path::Path,
         texture_source: TextureSource<'_>,
         render_instance: SpriteRenderInstance,
     ) {
@@ -302,7 +298,7 @@ impl SceneRenderer {
             pipeline.update_projection(&self.queue, self.current_projection);
             pipeline.add_sprite(render_instance);
             self.record_sprite_draw_batch(
-                SceneSpriteBatchKey::Textured(texture_key.to_string()),
+                SceneSpriteBatchKey::Textured(texture_key.to_path_buf()),
                 instance_index,
             );
         }
@@ -324,14 +320,14 @@ impl SceneRenderer {
             }
             SceneSpriteTextureSource::File { key, path } => {
                 self.add_textured_sprite_instance(
-                    key.as_str(),
+                    &key,
                     TextureSource::path(path),
                     render_instance,
                 );
             }
             SceneSpriteTextureSource::Rgba8 { key, image } => {
                 self.add_textured_sprite_instance(
-                    key.as_str(),
+                    &key,
                     TextureSource::rgba8(image),
                     render_instance,
                 );
@@ -395,8 +391,8 @@ impl SceneRenderer {
                     self.sprite_pipeline
                         .render_range(render_pass, batch.start, batch.count);
                 }
-                SceneSpriteBatchKey::Textured(texture_key) => {
-                    if let Some(pipeline) = self.sprite_pipelines_by_texture.get(texture_key) {
+                SceneSpriteBatchKey::Textured(ref texture_key) => {
+                    if let Some(pipeline) = self.sprite_pipelines_by_texture.get(texture_key.as_path()) {
                         pipeline.render_range(render_pass, batch.start, batch.count);
                     }
                 }
@@ -576,5 +572,22 @@ impl SceneRenderer {
         self.underlay_pipeline
             .update_camera(&self.queue, projection);
         self.debug_pipeline.update_camera(&self.queue, projection);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SceneSpriteBatchKey;
+    use std::path::PathBuf;
+
+    #[test]
+    fn textured_batch_key_stores_pathbuf() {
+        let key = SceneSpriteBatchKey::Textured(PathBuf::from("sprites/hero.png"));
+        match &key {
+            SceneSpriteBatchKey::Textured(path) => {
+                assert_eq!(path.extension().and_then(|e| e.to_str()), Some("png"));
+            }
+            _ => panic!("expected Textured variant"),
+        }
     }
 }

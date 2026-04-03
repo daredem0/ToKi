@@ -39,7 +39,7 @@ impl<'a> SceneTransitionPlanner<'a> {
 
     pub(super) fn prepare_scene_load(
         &self,
-        scene: &Scene,
+        scene: Scene,
         transition_spawn_point_id: Option<&str>,
         preserved_player: Option<StoredEntity>,
     ) -> Result<PreparedSceneLoad, SceneLoadError> {
@@ -66,7 +66,7 @@ impl<'a> SceneTransitionPlanner<'a> {
             let spawn_point_id = transition_spawn_point_id.unwrap_or(&player_entry.spawn_point_id);
             if let Some(preserved_player) = preserved_player.as_ref() {
                 let mut player = self.instantiate_scene_player_entry(
-                    scene,
+                    &scene,
                     &player_entry.entity_definition_name,
                     spawn_point_id,
                     preserved_player,
@@ -76,7 +76,7 @@ impl<'a> SceneTransitionPlanner<'a> {
                 player.entity.id = player_id;
                 self.reset_spawned_player_transient_state(
                     &mut player.entity,
-                    scene,
+                    &scene,
                     spawn_point_id,
                 );
                 entity_manager.add_existing_stored_entity(player);
@@ -85,7 +85,7 @@ impl<'a> SceneTransitionPlanner<'a> {
                     player.entity_kind = EntityKind::Player;
                 }
             } else {
-                let (position, facing) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
+                let (position, facing) = self.resolve_spawn_anchor(&scene, spawn_point_id)?;
                 let definition = self
                     .entity_definitions
                     .get(&player_entry.entity_definition_name)
@@ -107,7 +107,7 @@ impl<'a> SceneTransitionPlanner<'a> {
             }
         } else if let Some(mut player) = preserved_player {
             if let Some(spawn_point_id) = transition_spawn_point_id {
-                self.reposition_preserved_player(&mut player.entity, scene, spawn_point_id)?;
+                self.reposition_preserved_player(&mut player.entity, &scene, spawn_point_id)?;
             } else {
                 Self::reset_player_transient_state(&mut player.entity, None);
             }
@@ -122,7 +122,7 @@ impl<'a> SceneTransitionPlanner<'a> {
 
         Ok(PreparedSceneLoad {
             entity_manager,
-            rules: scene.rules.clone(),
+            rules: scene.rules,
         })
     }
 
@@ -389,7 +389,7 @@ mod tests {
 
         let prepared = planner
             .prepare_scene_load(
-                &scene,
+                scene,
                 Some("gate"),
                 Some(StoredEntity::new(preserved, preserved_components)),
             )
@@ -505,7 +505,7 @@ mod tests {
 
         let prepared = planner
             .prepare_scene_load(
-                &scene,
+                scene,
                 Some("gate"),
                 Some(StoredEntity::new(
                     preserved,
@@ -614,7 +614,7 @@ mod tests {
         scene.add_entity(legacy_entity);
 
         let prepared = planner
-            .prepare_scene_load(&scene, None, None)
+            .prepare_scene_load(scene, None, None)
             .expect("scene should load");
 
         let entity = prepared
@@ -637,5 +637,33 @@ mod tests {
             .expect("collision should exist");
         assert_eq!(collision_box.offset, glam::IVec2::new(4, 12));
         assert_eq!(collision_box.size, glam::UVec2::new(8, 4));
+    }
+
+    #[test]
+    fn prepare_scene_load_carries_scene_rules() {
+        use crate::rules::{Rule, RuleSet, RuleTrigger};
+
+        let definitions = HashMap::new();
+        let planner = SceneTransitionPlanner::new(&definitions);
+        let mut scene = Scene::new("RulesScene".to_string());
+        scene.rules = RuleSet {
+            rules: vec![Rule {
+                id: "test_rule".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![],
+                actions: vec![],
+            }],
+        };
+
+        let prepared = planner
+            .prepare_scene_load(scene, None, None)
+            .expect("scene should load");
+
+        assert_eq!(prepared.rules.rules.len(), 1);
+        assert_eq!(prepared.rules.rules[0].id, "test_rule");
     }
 }

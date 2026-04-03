@@ -82,7 +82,7 @@ impl SceneSystem {
             .clone();
 
         let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
-            .prepare_scene_load(&scene, None, None)?;
+            .prepare_scene_load(scene, None, None)?;
         state.apply_prepared_scene_load(&scene_id, prepared)
     }
 
@@ -105,7 +105,7 @@ impl SceneSystem {
             .player_id()
             .and_then(|player_id| state.world().entity_manager().stored_entity(player_id));
         let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
-            .prepare_scene_load(&scene, Some(spawn_point_id), preserved_player)?;
+            .prepare_scene_load(scene, Some(spawn_point_id), preserved_player)?;
 
         state.apply_prepared_scene_load(&scene_id, prepared)
     }
