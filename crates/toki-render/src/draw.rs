@@ -6,8 +6,9 @@ pub fn build_quad_vertices(
     frame: SpriteFrame,
     width: f32,
     height: f32,
-    origin: Vec2, // <— new
+    origin: Vec2,
     flip_x: bool,
+    tint_alpha: f32,
 ) -> [QuadVertex; 6] {
     let ox = origin.x;
     let oy = origin.y;
@@ -17,30 +18,12 @@ pub fn build_quad_vertices(
         (frame.u0, frame.u1)
     };
     [
-        QuadVertex {
-            position: [ox, oy],
-            tex_coords: [u0, frame.v0],
-        },
-        QuadVertex {
-            position: [ox + width, oy],
-            tex_coords: [u1, frame.v0],
-        },
-        QuadVertex {
-            position: [ox + width, oy + height],
-            tex_coords: [u1, frame.v1],
-        },
-        QuadVertex {
-            position: [ox, oy],
-            tex_coords: [u0, frame.v0],
-        },
-        QuadVertex {
-            position: [ox + width, oy + height],
-            tex_coords: [u1, frame.v1],
-        },
-        QuadVertex {
-            position: [ox, oy + height],
-            tex_coords: [u0, frame.v1],
-        },
+        QuadVertex { position: [ox, oy], tex_coords: [u0, frame.v0], tint_alpha },
+        QuadVertex { position: [ox + width, oy], tex_coords: [u1, frame.v0], tint_alpha },
+        QuadVertex { position: [ox + width, oy + height], tex_coords: [u1, frame.v1], tint_alpha },
+        QuadVertex { position: [ox, oy], tex_coords: [u0, frame.v0], tint_alpha },
+        QuadVertex { position: [ox + width, oy + height], tex_coords: [u1, frame.v1], tint_alpha },
+        QuadVertex { position: [ox, oy + height], tex_coords: [u0, frame.v1], tint_alpha },
     ]
 }
 

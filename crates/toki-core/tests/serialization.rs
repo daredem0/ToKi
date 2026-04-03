@@ -117,6 +117,7 @@ fn static_render_pickup_item(id: u32, position: IVec2) -> StoredEntity {
         rendering: EntityRendering {
             visible: true,
             has_shadow: false,
+            has_drop_shadow: false,
             palette_override: None,
             animation_controller: None,
             static_object_render: Some(StaticObjectRenderDef {

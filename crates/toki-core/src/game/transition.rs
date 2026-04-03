@@ -298,6 +298,7 @@ mod tests {
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: None,
                 grounding: Default::default(),
@@ -435,6 +436,7 @@ mod tests {
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: None,
                 grounding: Default::default(),
@@ -548,6 +550,7 @@ mod tests {
                 render_layer: 1,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: None,
                 grounding: EntityGrounding {

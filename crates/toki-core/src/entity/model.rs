@@ -337,6 +337,8 @@ pub struct EntityRendering {
     pub visible: bool,
     #[serde(default = "default_has_shadow")]
     pub has_shadow: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub has_drop_shadow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub palette_override: Option<String>,
     pub animation_controller: Option<AnimationController>,
@@ -352,6 +354,7 @@ impl Default for EntityRendering {
         Self {
             visible: true,
             has_shadow: true,
+            has_drop_shadow: false,
             palette_override: None,
             animation_controller: None,
             render_layer: 0,

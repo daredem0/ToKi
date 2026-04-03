@@ -159,6 +159,7 @@ mod tests {
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: Some(StaticObjectRenderDef {
                     sheet: "items".to_string(),

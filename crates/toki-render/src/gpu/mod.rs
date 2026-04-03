@@ -123,12 +123,14 @@ impl GpuState {
         pos: glam::IVec2,
         size: glam::UVec2,
         flip_x: bool,
+        tint_alpha: f32,
     ) -> SpriteInstance {
         SpriteInstance {
             frame,
             position: pos.as_vec2(),
             size: size.as_vec2(),
             flip_x,
+            tint_alpha,
         }
     }
 
@@ -139,7 +141,7 @@ impl GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        let instance = Self::build_sprite_instance(frame, pos, size, flip_x);
+        let instance = Self::build_sprite_instance(frame, pos, size, flip_x, 0.0);
         let instance_index = self.sprite_pipeline.instance_count();
         self.sprite_pipeline.add_sprite(instance);
         self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
@@ -149,12 +151,8 @@ impl GpuState {
         &mut self,
         texture_key: &Path,
         texture_source: TextureSource<'_>,
-        frame: SpriteFrame,
-        pos: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
+        instance: SpriteInstance,
     ) {
-        let instance = Self::build_sprite_instance(frame, pos, size, flip_x);
         let instance_index = self
             .sprite_pipelines_by_texture
             .get(texture_key)
@@ -370,13 +368,11 @@ impl crate::SpriteBackend for GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
+        let instance = Self::build_sprite_instance(frame, position, size, flip_x, 0.0);
         self.add_textured_sprite(
             texture_path.as_path(),
             TextureSource::path(texture_path.as_path()),
-            frame,
-            position,
-            size,
-            flip_x,
+            instance,
         );
     }
 
@@ -389,13 +385,23 @@ impl crate::SpriteBackend for GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
+        let instance = Self::build_sprite_instance(frame, position, size, flip_x, 0.0);
+        self.add_textured_sprite(texture_key.as_path(), TextureSource::rgba8(image), instance);
+    }
+
+    fn add_shadow_sprite_with_texture(
+        &mut self,
+        texture_path: PathBuf,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        let instance = Self::build_sprite_instance(frame, position, size, flip_x, 0.35);
         self.add_textured_sprite(
-            texture_key.as_path(),
-            TextureSource::rgba8(image),
-            frame,
-            position,
-            size,
-            flip_x,
+            texture_path.as_path(),
+            TextureSource::path(texture_path.as_path()),
+            instance,
         );
     }
 }

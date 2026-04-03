@@ -5,6 +5,7 @@ fn quad_vertex_has_correct_defaults() {
     let v = QuadVertex {
         position: [1.0, 2.0],
         tex_coords: [0.5, 0.5],
+        tint_alpha: 0.0,
     };
     assert_eq!(v.position, [1.0, 2.0]);
     assert_eq!(v.tex_coords, [0.5, 0.5]);

@@ -27,6 +27,10 @@ fn default_has_shadow() -> bool {
     true
 }
 
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityDefinition {
     pub name: EntityDefName,
@@ -52,6 +56,8 @@ pub struct RenderingDef {
     pub visible: bool,
     #[serde(default = "default_has_shadow")]
     pub has_shadow: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub has_drop_shadow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub palette_override: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -261,6 +267,7 @@ impl EntityDefinition {
         EntityRendering {
             visible: self.rendering.visible,
             has_shadow: self.rendering.has_shadow,
+            has_drop_shadow: self.rendering.has_drop_shadow,
             palette_override: self.rendering.palette_override.clone(),
             animation_controller,
             render_layer: self.rendering.render_layer,

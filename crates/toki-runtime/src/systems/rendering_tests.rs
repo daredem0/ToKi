@@ -163,6 +163,17 @@ impl SpriteBackend for FakeBackend {
     ) {
         self.sprite_count.set(self.sprite_count.get() + 1);
     }
+
+    fn add_shadow_sprite_with_texture(
+        &mut self,
+        _texture_path: std::path::PathBuf,
+        _frame: SpriteFrame,
+        _position: glam::IVec2,
+        _size: glam::UVec2,
+        _flip_x: bool,
+    ) {
+        self.sprite_count.set(self.sprite_count.get() + 1);
+    }
 }
 
 impl TextBackend for FakeBackend {
@@ -623,14 +634,8 @@ fn backend_seam_dispatches_runtime_render_commands() {
     rendering.set_tilemap_render_enabled(false);
     rendering.set_tilemap_render_enabled(true);
     rendering.update_tilemap_vertices(&[
-        QuadVertex {
-            position: [0.0, 0.0],
-            tex_coords: [0.0, 0.0],
-        },
-        QuadVertex {
-            position: [16.0, 16.0],
-            tex_coords: [1.0, 1.0],
-        },
+        QuadVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], tint_alpha: 0.0 },
+        QuadVertex { position: [16.0, 16.0], tex_coords: [1.0, 1.0], tint_alpha: 0.0 },
     ]);
     rendering.clear_sprites();
     rendering.add_sprite(

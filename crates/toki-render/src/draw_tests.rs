@@ -10,7 +10,7 @@ fn build_quad_vertices_maps_positions_and_uvs() {
         u1: 0.9,
         v1: 0.8,
     };
-    let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0), false);
+    let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0), false, 0.0);
 
     assert_eq!(vertices.len(), 6);
     assert_eq!(vertices[0].position, [5.0, 7.0]);
@@ -30,7 +30,7 @@ fn build_quad_vertices_swaps_horizontal_uvs_when_flipped() {
         u1: 0.9,
         v1: 0.8,
     };
-    let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0), true);
+    let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0), true, 0.0);
 
     assert_eq!(vertices[0].tex_coords, [0.9, 0.2]);
     assert_eq!(vertices[1].tex_coords, [0.1, 0.2]);

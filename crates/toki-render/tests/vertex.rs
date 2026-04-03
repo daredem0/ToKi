@@ -5,9 +5,9 @@ use toki_render::VertexLayout;
 fn quad_vertex_layout_has_correct_stride() {
     let layout = QuadVertex::desc();
 
-    // QuadVertex has 2 f32 values for position and 2 f32 values for tex_coords
-    // Total: 4 * f32 = 4 * 4 bytes = 16 bytes
-    assert_eq!(layout.array_stride, 16);
+    // QuadVertex has 2 f32 for position, 2 f32 for tex_coords, 1 f32 for tint_alpha
+    // Total: 5 * 4 bytes = 20 bytes
+    assert_eq!(layout.array_stride, 20);
 }
 
 #[test]
@@ -17,9 +17,9 @@ fn quad_vertex_layout_uses_vertex_step_mode() {
 }
 
 #[test]
-fn quad_vertex_layout_has_two_attributes() {
+fn quad_vertex_layout_has_three_attributes() {
     let layout = QuadVertex::desc();
-    assert_eq!(layout.attributes.len(), 2);
+    assert_eq!(layout.attributes.len(), 3);
 }
 
 #[test]

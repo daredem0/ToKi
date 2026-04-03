@@ -5,4 +5,5 @@ use bytemuck::{Pod, Zeroable};
 pub struct QuadVertex {
     pub position: [f32; 2],
     pub tex_coords: [f32; 2],
+    pub tint_alpha: f32,
 }

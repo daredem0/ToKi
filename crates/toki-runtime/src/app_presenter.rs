@@ -48,6 +48,7 @@ impl<'a> WorldFramePresenter<'a> {
             self.render_ground_shadows();
         }
         self.rendering.finalize_world_underlay_shapes();
+        self.render_drop_shadow_sprites();
         self.render_world_sprites();
 
         self.rendering.clear_debug_shapes();
@@ -80,6 +81,14 @@ impl<'a> WorldFramePresenter<'a> {
             .with_anchor(TextAnchor::TopLeft)
             .with_layer(1);
             self.rendering.add_viewport_text_item(hud_text);
+        }
+    }
+
+    fn render_drop_shadow_sprites(&mut self) {
+        let requests = self.render_queries().drop_shadow_sprite_requests();
+        let (resolved, _) = resolve_sprite_render_requests(self.resources, &requests);
+        for sprite in resolved {
+            self.rendering.add_resolved_shadow_sprite(&sprite);
         }
     }
 
@@ -218,7 +227,7 @@ impl<'a> WorldFramePresenter<'a> {
 }
 
 fn ground_shadow_bands(shadow: &GroundShadow) -> Vec<GroundShadowBand> {
-    let band_count = if shadow.size.y >= 5.0 { 7 } else { 5 };
+    let band_count = if shadow.size.y >= 8.0 { 11 } else if shadow.size.y >= 5.0 { 7 } else { 5 };
     let mut bands = Vec::with_capacity(band_count);
     let band_height = (shadow.size.y / band_count as f32).max(0.5);
     let center_x = shadow.position.x + shadow.size.x * 0.5;

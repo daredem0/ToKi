@@ -47,6 +47,7 @@ pub fn create_default_definition(
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            has_drop_shadow: false,
             palette_override: None,
             static_object: None,
             grounding: default_grounding_for_kind(kind, size),

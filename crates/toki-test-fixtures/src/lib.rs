@@ -56,6 +56,7 @@ pub fn test_entity_definition(name: &str, category: &str) -> EntityDefinition {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             static_object: None,
             grounding: Default::default(),
@@ -152,6 +153,7 @@ pub fn test_entity_with_kind(
         rendering: toki_core::entity::EntityRendering {
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             animation_controller: Some(controller),
             render_layer: 2,

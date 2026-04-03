@@ -1,6 +1,6 @@
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::entity::{EntityId, EntityManager};
+use crate::entity::{Entity, EntityId, EntityManager};
 use crate::project_assets::normalize_asset_name;
 use crate::sprite::SpriteFrame;
 use crate::sprite_render::{
@@ -21,6 +21,33 @@ pub struct RenderQueryService<'a> {
     entity_manager: &'a EntityManager,
     player_id: Option<EntityId>,
     debug_collision_rendering: bool,
+}
+
+fn entity_shadow_visual(entity: &Entity) -> Option<SpriteVisualRef> {
+    if let Some(controller) = &entity.rendering.animation_controller {
+        let atlas_name: String = controller.current_atlas_name().ok()?;
+        let tile_name: String = controller.current_tile_name().ok()?;
+        let atlas_clean = normalize_asset_name(&atlas_name);
+        let object_source = entity
+            .rendering
+            .static_object_render
+            .as_ref()
+            .filter(|r| normalize_asset_name(&r.sheet) == atlas_clean);
+        return Some(if let Some(static_render) = object_source {
+            SpriteVisualRef::ObjectSheetObject {
+                sheet_name: static_render.sheet.clone(),
+                object_name: tile_name,
+            }
+        } else {
+            SpriteVisualRef::AtlasTile { atlas_name, tile_name }
+        });
+    }
+    entity.rendering.static_object_render.as_ref().map(|static_render| {
+        SpriteVisualRef::ObjectSheetObject {
+            sheet_name: static_render.sheet.clone(),
+            object_name: static_render.object_name.clone(),
+        }
+    })
 }
 
 impl<'a> RenderQueryService<'a> {
@@ -233,7 +260,7 @@ impl<'a> RenderQueryService<'a> {
                         .round()
                         .max(4.0)
                 };
-                let shadow_height = (footprint_height * 0.5 + 1.0).round().clamp(2.0, 4.0);
+                let shadow_height = (shadow_width * 0.25).round().clamp(2.0, 16.0);
                 let shadow_x = ground_origin.x as f32 - shadow_width * 0.5;
                 let shadow_y = footprint_pos.y as f32 + footprint_height - shadow_height;
 
@@ -241,6 +268,47 @@ impl<'a> RenderQueryService<'a> {
                     position: glam::Vec2::new(shadow_x, shadow_y),
                     size: glam::Vec2::new(shadow_width, shadow_height),
                     color: [0.0, 0.0, 0.0, 0.28],
+                })
+            })
+            .collect()
+    }
+
+    pub fn drop_shadow_sprite_requests(&self) -> Vec<SpriteRenderRequest> {
+        let projectile_ids: HashSet<_> =
+            self.entity_manager.storage().components().projectile_ids().collect();
+        let mut sequence = 0_u32;
+
+        self.entity_manager
+            .entity_ids_iter()
+            .filter_map(|entity_id| {
+                let entity = self.entity_manager.get_entity(entity_id)?;
+                if !entity.rendering.visible || !entity.rendering.has_drop_shadow {
+                    return None;
+                }
+                if projectile_ids.contains(&entity_id) {
+                    return None;
+                }
+                let visual = entity_shadow_visual(entity)?;
+                let flip_x = entity
+                    .rendering
+                    .animation_controller
+                    .as_ref()
+                    .map(|c| GameState::animation_state_flip_x(c.current_clip_state))
+                    .unwrap_or(false);
+                let seq = sequence;
+                sequence += 1;
+                Some(SpriteRenderRequest {
+                    origin: SpriteRenderOrigin::StaticEntity(entity_id),
+                    sort_key: SpriteSortKey {
+                        primary: entity.ground_contact_y(),
+                        secondary: entity.rendering.render_layer - 1,
+                        sequence: seq,
+                    },
+                    visual,
+                    position: entity.position + glam::IVec2::new(0, 4),
+                    size: SpriteRenderSize::Explicit(entity.size),
+                    palette_override: None,
+                    flip_x,
                 })
             })
             .collect()
@@ -664,8 +732,8 @@ mod tests {
         assert_eq!(
             shadows,
             vec![GroundShadow {
-                position: glam::Vec2::new(11.5, 32.0),
-                size: glam::Vec2::new(13.0, 4.0),
+                position: glam::Vec2::new(11.5, 33.0),
+                size: glam::Vec2::new(13.0, 3.0),
                 color: [0.0, 0.0, 0.0, 0.28],
             }]
         );
@@ -703,8 +771,8 @@ mod tests {
         assert_eq!(
             shadows,
             vec![GroundShadow {
-                position: glam::Vec2::new(16.0, 64.0),
-                size: glam::Vec2::new(20.0, 4.0),
+                position: glam::Vec2::new(16.0, 63.0),
+                size: glam::Vec2::new(20.0, 5.0),
                 color: [0.0, 0.0, 0.0, 0.28],
             }]
         );

@@ -314,6 +314,7 @@ impl SceneRenderer {
             position: sprite.position.as_vec2(),
             size: sprite.size.as_vec2(),
             flip_x: sprite.flip_x,
+            tint_alpha: 0.0,
         };
 
         match self.resolve_sprite_texture_source(sprite) {

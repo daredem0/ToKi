@@ -668,6 +668,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
@@ -768,6 +769,7 @@ fn load_preview_sprite_frame_static_prefers_animation_for_decorations_with_both_
             render_layer: 0,
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "objects".to_string(),
@@ -856,6 +858,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_decoration_anim
             render_layer: 0,
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "HouseM".to_string(),
@@ -947,6 +950,7 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
@@ -1033,6 +1037,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: None,
                 grounding: Default::default(),
@@ -1082,6 +1087,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: None,
                 grounding: Default::default(),
@@ -1181,6 +1187,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
             render_layer: 0,
             visible: true,
             has_shadow: true,
+                has_drop_shadow: false,
             palette_override: None,
             static_object: None,
             grounding: EntityGrounding {
@@ -1315,6 +1322,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: Some(StaticObjectRenderDef {
                     sheet: "items".to_string(),
@@ -1415,6 +1423,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                has_drop_shadow: false,
                 palette_override: None,
                 static_object: Some(StaticObjectRenderDef {
                     sheet: "items".to_string(),

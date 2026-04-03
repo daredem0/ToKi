@@ -114,6 +114,17 @@ pub trait SpriteBackend {
         size: glam::UVec2,
         flip_x: bool,
     );
+
+    /// Add a shadow silhouette sprite — same texture as the entity, rendered as a black
+    /// semi-transparent shape using texture alpha for the silhouette outline.
+    fn add_shadow_sprite_with_texture(
+        &mut self,
+        texture_path: PathBuf,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    );
 }
 
 /// Text submission operations.

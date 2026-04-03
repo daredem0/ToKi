@@ -155,6 +155,7 @@ impl InspectorSystem {
 
         changed |= set_if_changed(&mut entity.rendering.visible, draft.visible);
         changed |= set_if_changed(&mut entity.rendering.has_shadow, draft.has_shadow);
+        changed |= set_if_changed(&mut entity.rendering.has_drop_shadow, draft.has_drop_shadow);
         let runtime_palette_override = {
             let trimmed = draft.palette_override.trim();
             if trimmed.is_empty() {
@@ -325,6 +326,10 @@ fn apply_rendering_fields(
     }
     if definition.rendering.has_shadow != draft.has_shadow {
         definition.rendering.has_shadow = draft.has_shadow;
+        changed = true;
+    }
+    if definition.rendering.has_drop_shadow != draft.has_drop_shadow {
+        definition.rendering.has_drop_shadow = draft.has_drop_shadow;
         changed = true;
     }
     let definition_palette_override = {

@@ -510,6 +510,21 @@ impl RenderingSystem {
         }
     }
 
+    pub fn add_resolved_shadow_sprite(&mut self, sprite: &ResolvedSpriteRenderInstance) {
+        let Some(texture_path) = &sprite.texture_path else {
+            return;
+        };
+        if let Some(backend) = &mut self.backend {
+            backend.as_mut().add_shadow_sprite_with_texture(
+                texture_path.clone(),
+                sprite.frame,
+                sprite.position,
+                sprite.size,
+                sprite.flip_x,
+            );
+        }
+    }
+
     pub fn clear_text_items(&mut self) {
         if let Some(backend) = &mut self.backend {
             backend.as_mut().clear_text_items();
