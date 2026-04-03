@@ -34,41 +34,11 @@ impl Rect {
     }
 }
 
-/// Trait defining the rendering backend interface.
-///
-/// This trait abstracts GPU rendering operations, allowing for different implementations
-/// (real GPU via wgpu, or mock for testing). It consolidates all rendering operations
-/// into a single interface.
-pub trait RenderBackend: std::fmt::Debug {
+/// Frame-level render control and scene lifecycle operations.
+pub trait RenderFrameControl {
     /// Set the clip rect used for the scene pass. When present, all scene-pass rendering is
     /// scissored to this rectangle and the cleared background remains visible outside it.
     fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>);
-
-    /// Load a tilemap texture from file
-    fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
-
-    /// Load a tilemap texture from raw RGBA8 image data
-    fn load_tilemap_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError>;
-
-    /// Load a sprite texture from file
-    fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
-
-    /// Load a sprite texture from raw RGBA8 image data
-    fn load_sprite_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError>;
-
-    /// Add a sprite using a cached RGBA8 texture identified by a synthetic texture key.
-    fn add_sprite_with_texture_rgba8(
-        &mut self,
-        texture_key: PathBuf,
-        image: &DecodedImage,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    );
-
-    /// Load a font file for text rendering
-    fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), RenderError>;
 
     /// Update the projection/view matrix
     fn update_projection(&mut self, mvp: glam::Mat4);
@@ -90,7 +60,28 @@ pub trait RenderBackend: std::fmt::Debug {
 
     /// Update tilemap vertex data
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
+}
 
+/// Texture and font asset loading operations used by rendering backends.
+pub trait TextureBackend {
+    /// Load a tilemap texture from file
+    fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
+
+    /// Load a tilemap texture from raw RGBA8 image data
+    fn load_tilemap_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError>;
+
+    /// Load a sprite texture from file
+    fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
+
+    /// Load a sprite texture from raw RGBA8 image data
+    fn load_sprite_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError>;
+
+    /// Load a font file for text rendering
+    fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), RenderError>;
+}
+
+/// Sprite submission operations.
+pub trait SpriteBackend {
     /// Clear all sprites
     fn clear_sprites(&mut self);
 
@@ -113,12 +104,29 @@ pub trait RenderBackend: std::fmt::Debug {
         flip_x: bool,
     );
 
+    /// Add a sprite using a cached RGBA8 texture identified by a synthetic texture key.
+    fn add_sprite_with_texture_rgba8(
+        &mut self,
+        texture_key: PathBuf,
+        image: &DecodedImage,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    );
+}
+
+/// Text submission operations.
+pub trait TextBackend {
     /// Clear all text items
     fn clear_text_items(&mut self);
 
     /// Add a text item to be rendered
     fn add_text_item(&mut self, text: TextItem);
+}
 
+/// Shape submission operations for world underlay, debug, and UI lanes.
+pub trait ShapeBackend {
     /// Clear all world underlay shapes rendered below sprites.
     fn clear_world_underlay_shapes(&mut self);
 

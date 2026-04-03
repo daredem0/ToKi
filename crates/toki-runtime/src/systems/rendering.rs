@@ -11,7 +11,10 @@ use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMaterial};
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
-use toki_render::{GpuState, Rect, RenderBackend, SceneClipRect};
+use toki_render::{
+    GpuState, Rect, RenderFrameControl, SceneClipRect, ShapeBackend, SpriteBackend, TextBackend,
+    TextureBackend,
+};
 use winit::window::Window;
 
 use crate::viewport::presentation::ViewportPresentation;
@@ -19,13 +22,33 @@ use crate::viewport::runtime_state::{
     resolve_effective_runtime_viewport, EffectiveRuntimeViewport,
 };
 
+trait RuntimeRenderBackend:
+    std::fmt::Debug
+    + RenderFrameControl
+    + TextureBackend
+    + SpriteBackend
+    + TextBackend
+    + ShapeBackend
+{
+}
+
+impl<T> RuntimeRenderBackend for T where
+    T: std::fmt::Debug
+        + RenderFrameControl
+        + TextureBackend
+        + SpriteBackend
+        + TextBackend
+        + ShapeBackend
+{
+}
+
 /// Rendering system that manages GPU state and projection calculations.
 ///
 /// Centralizes all rendering-related state and provides clean APIs for
 /// graphics operations while abstracting GPU implementation details.
 #[derive(Debug)]
 pub struct RenderingSystem {
-    backend: Option<Box<dyn RenderBackend>>,
+    backend: Option<Box<dyn RuntimeRenderBackend>>,
     projection_params: ProjectionParameter,
     viewport_mode: RuntimeViewportMode,
     loaded_tilemap_texture_path: Option<std::path::PathBuf>,
@@ -43,7 +66,7 @@ impl Default for RenderingSystem {
 impl RenderingSystem {
     fn backend_mut(
         &mut self,
-    ) -> Result<&mut (dyn RenderBackend + 'static), toki_render::RenderError> {
+    ) -> Result<&mut (dyn RuntimeRenderBackend + 'static), toki_render::RenderError> {
         self.backend
             .as_deref_mut()
             .ok_or_else(|| toki_render::RenderError::Other("GPU not initialized".to_string()))
@@ -127,7 +150,7 @@ impl RenderingSystem {
     }
 
     #[cfg(test)]
-    fn set_backend_for_tests(&mut self, backend: Box<dyn RenderBackend>) {
+    fn set_backend_for_tests(&mut self, backend: Box<dyn RuntimeRenderBackend>) {
         self.backend = Some(backend);
     }
 

@@ -16,7 +16,10 @@ use toki_core::sprite_render::{
 };
 use toki_core::text::{TextItem, TextStyle};
 use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
-use toki_render::{Rect, RenderBackend, SceneClipRect};
+use toki_render::{
+    Rect, RenderFrameControl, SceneClipRect, ShapeBackend, SpriteBackend, TextBackend,
+    TextureBackend,
+};
 
 #[derive(Default, Debug)]
 struct FakeBackend {
@@ -41,10 +44,41 @@ struct FakeBackend {
     scene_clip_rect: Rc<RefCell<Option<SceneClipRect>>>,
 }
 
-impl RenderBackend for FakeBackend {
+impl RenderFrameControl for FakeBackend {
     fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
         *self.scene_clip_rect.borrow_mut() = rect;
     }
+
+    fn update_projection(&mut self, _mvp: glam::Mat4) {
+        self.projection_updates
+            .set(self.projection_updates.get() + 1);
+    }
+
+    fn set_post_process_settings(&mut self, _settings: ResolvedPostProcessSettings) {
+        self.post_process_updates
+            .set(self.post_process_updates.get() + 1);
+    }
+
+    fn set_vsync(&mut self, _enabled: bool) {}
+
+    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+        self.tilemap_render_enabled.set(enabled);
+    }
+
+    fn resize(&mut self, _new_size: winit::dpi::PhysicalSize<u32>) {
+        self.resize_calls.set(self.resize_calls.get() + 1);
+    }
+
+    fn draw(&mut self) {
+        self.draw_calls.set(self.draw_calls.get() + 1);
+    }
+
+    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        self.tilemap_vertex_counts.borrow_mut().push(vertices.len());
+    }
+}
+
+impl TextureBackend for FakeBackend {
 
     fn load_tilemap_texture(
         &mut self,
@@ -80,52 +114,15 @@ impl RenderBackend for FakeBackend {
         Ok(())
     }
 
-    fn add_sprite_with_texture_rgba8(
-        &mut self,
-        _texture_key: std::path::PathBuf,
-        _image: &DecodedImage,
-        _frame: SpriteFrame,
-        _position: glam::IVec2,
-        _size: glam::UVec2,
-        _flip_x: bool,
-    ) {
-        self.sprite_count.set(self.sprite_count.get() + 1);
-    }
-
     fn load_font_file(
         &mut self,
         _font_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
         Ok(())
     }
+}
 
-    fn update_projection(&mut self, _mvp: glam::Mat4) {
-        self.projection_updates
-            .set(self.projection_updates.get() + 1);
-    }
-
-    fn set_post_process_settings(&mut self, _settings: ResolvedPostProcessSettings) {
-        self.post_process_updates
-            .set(self.post_process_updates.get() + 1);
-    }
-
-    fn set_vsync(&mut self, _enabled: bool) {}
-
-    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
-        self.tilemap_render_enabled.set(enabled);
-    }
-
-    fn resize(&mut self, _new_size: winit::dpi::PhysicalSize<u32>) {
-        self.resize_calls.set(self.resize_calls.get() + 1);
-    }
-
-    fn draw(&mut self) {
-        self.draw_calls.set(self.draw_calls.get() + 1);
-    }
-
-    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
-        self.tilemap_vertex_counts.borrow_mut().push(vertices.len());
-    }
+impl SpriteBackend for FakeBackend {
 
     fn clear_sprites(&mut self) {
         self.sprite_count.set(0);
@@ -152,6 +149,20 @@ impl RenderBackend for FakeBackend {
         self.sprite_count.set(self.sprite_count.get() + 1);
     }
 
+    fn add_sprite_with_texture_rgba8(
+        &mut self,
+        _texture_key: std::path::PathBuf,
+        _image: &DecodedImage,
+        _frame: SpriteFrame,
+        _position: glam::IVec2,
+        _size: glam::UVec2,
+        _flip_x: bool,
+    ) {
+        self.sprite_count.set(self.sprite_count.get() + 1);
+    }
+}
+
+impl TextBackend for FakeBackend {
     fn clear_text_items(&mut self) {
         self.text_count.set(0);
     }
@@ -159,7 +170,9 @@ impl RenderBackend for FakeBackend {
     fn add_text_item(&mut self, _text: TextItem) {
         self.text_count.set(self.text_count.get() + 1);
     }
+}
 
+impl ShapeBackend for FakeBackend {
     fn clear_world_underlay_shapes(&mut self) {
         self.world_underlay_rect_count.set(0);
     }

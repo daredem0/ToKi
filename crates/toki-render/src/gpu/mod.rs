@@ -287,54 +287,9 @@ impl GpuState {
     }
 }
 
-impl crate::RenderBackend for GpuState {
+impl crate::RenderFrameControl for GpuState {
     fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
         self.scene_clip_rect = rect;
-    }
-
-    fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
-        GpuState::load_tilemap_texture(self, texture_path)
-    }
-
-    fn load_tilemap_texture_rgba8(
-        &mut self,
-        image: &DecodedImage,
-    ) -> Result<(), crate::RenderError> {
-        GpuState::load_tilemap_texture_rgba8(self, image)
-    }
-
-    fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
-        GpuState::load_sprite_texture(self, texture_path)
-    }
-
-    fn load_sprite_texture_rgba8(
-        &mut self,
-        image: &DecodedImage,
-    ) -> Result<(), crate::RenderError> {
-        GpuState::load_sprite_texture_rgba8(self, image)
-    }
-
-    fn add_sprite_with_texture_rgba8(
-        &mut self,
-        texture_key: PathBuf,
-        image: &DecodedImage,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        self.add_textured_sprite(
-            texture_key.clone(),
-            TextureSource::rgba8(image),
-            frame,
-            position,
-            size,
-            flip_x,
-        );
-    }
-
-    fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), crate::RenderError> {
-        self.text_renderer.load_font_file(&font_path)
     }
 
     fn update_projection(&mut self, mvp: glam::Mat4) {
@@ -364,6 +319,38 @@ impl crate::RenderBackend for GpuState {
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         GpuState::update_tilemap_vertices(self, vertices);
     }
+}
+
+impl crate::TextureBackend for GpuState {
+
+    fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
+        GpuState::load_tilemap_texture(self, texture_path)
+    }
+
+    fn load_tilemap_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_tilemap_texture_rgba8(self, image)
+    }
+
+    fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
+        GpuState::load_sprite_texture(self, texture_path)
+    }
+
+    fn load_sprite_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_sprite_texture_rgba8(self, image)
+    }
+
+    fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), crate::RenderError> {
+        self.text_renderer.load_font_file(&font_path)
+    }
+}
+
+impl crate::SpriteBackend for GpuState {
 
     fn clear_sprites(&mut self) {
         self.sprite_pipeline.clear_sprites();
@@ -401,6 +388,27 @@ impl crate::RenderBackend for GpuState {
         );
     }
 
+    fn add_sprite_with_texture_rgba8(
+        &mut self,
+        texture_key: PathBuf,
+        image: &DecodedImage,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        self.add_textured_sprite(
+            texture_key.clone(),
+            TextureSource::rgba8(image),
+            frame,
+            position,
+            size,
+            flip_x,
+        );
+    }
+}
+
+impl crate::TextBackend for GpuState {
     fn clear_text_items(&mut self) {
         self.text_items.clear();
     }
@@ -408,7 +416,9 @@ impl crate::RenderBackend for GpuState {
     fn add_text_item(&mut self, text: TextItem) {
         self.text_items.push(text);
     }
+}
 
+impl crate::ShapeBackend for GpuState {
     fn clear_world_underlay_shapes(&mut self) {
         self.world_underlay_pipeline.clear();
     }
