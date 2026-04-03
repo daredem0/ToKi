@@ -184,4 +184,19 @@ mod tests {
         let warnings = validate_entity_definition_warnings(&definition);
         assert!(warnings.iter().any(|w| w.contains("only valid on EntityKind::Item")));
     }
+
+    #[test]
+    fn validation_warns_for_item_pickup_without_trigger_collision() {
+        let mut definition = base_definition("item");
+        definition.components.pickup = Some(crate::entity::PickupDef {
+            item_id: "coin".to_string(),
+            count: 1,
+        });
+        definition.collision.trigger = false;
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings
+            .iter()
+            .any(|w| w.contains("Pickup item should use trigger collision")));
+    }
 }

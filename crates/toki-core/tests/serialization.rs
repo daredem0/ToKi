@@ -2,6 +2,7 @@ use glam::{IVec2, UVec2};
 mod support;
 use support::{save_test_state, test_entity, test_entity_definition};
 use tempfile::NamedTempFile;
+use toki_core::collision::CollisionBox;
 use toki_core::entity::*;
 use toki_core::game::{InputSystem, RenderQueryService, SceneSystem};
 use toki_core::serialization::*;
@@ -100,6 +101,52 @@ fn persistent_npc(id: u32, position: IVec2) -> Entity {
     entity.position = position;
     entity.persistent_across_saves = true;
     entity
+}
+
+fn static_render_pickup_item(id: u32, position: IVec2) -> StoredEntity {
+    let entity = Entity {
+        id,
+        position,
+        size: UVec2::new(16, 16),
+        entity_kind: EntityKind::Item,
+        category: "item".to_string(),
+        definition_name: Some("coin_pickup".to_string().into()),
+        persistent_across_saves: false,
+        control_role: ControlRole::None,
+        audio: EntityAudioSettings::default(),
+        rendering: EntityRendering {
+            visible: true,
+            has_shadow: false,
+            palette_override: None,
+            animation_controller: None,
+            static_object_render: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
+            grounding: Default::default(),
+            render_layer: 0,
+        },
+        collision_box: Some(CollisionBox {
+            offset: IVec2::new(2, 3),
+            size: UVec2::new(12, 10),
+            trigger: true,
+        }),
+        solid: false,
+        active: true,
+        movement_accumulator: glam::Vec2::ZERO,
+        tags: vec!["pickup".to_string()],
+    };
+
+    StoredEntity::new(
+        entity,
+        OptionalEntityComponents {
+            pickup: Some(PickupDef {
+                item_id: "coin".to_string(),
+                count: 2,
+            }),
+            ..Default::default()
+        },
+    )
 }
 
 fn player_position(state: &GameState) -> IVec2 {
@@ -578,6 +625,51 @@ fn save_data_round_trips_with_versioned_metadata() {
     assert_eq!(loaded.camera.scale, Some(3));
     assert_eq!(loaded.scene_snapshots.len(), 1);
     assert_eq!(loaded.scene_snapshots[0].name, "main");
+}
+
+#[test]
+fn restore_from_save_data_preserves_static_render_pickup_items() {
+    let mut state = GameState::new_empty();
+    let mut scene = Scene::new("main".to_string());
+    scene.add_stored_entity(static_render_pickup_item(11, IVec2::new(48, 64)));
+    SceneSystem::add_scene(&mut state, scene);
+    SceneSystem::load(&mut state, "main").expect("scene should load");
+
+    let save = SaveData::capture(&state, 1).expect("save should capture");
+
+    let mut restored = GameState::new_empty();
+    SceneSystem::add_scene(&mut restored, Scene::new("main".to_string()));
+    SceneSystem::load(&mut restored, "main").expect("scene should load");
+    toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save)
+        .expect("save should restore");
+
+    let restored_scene = SceneSystem::active_scene(&restored).expect("scene should stay active");
+    let restored_item = restored_scene
+        .stored_entity(11)
+        .expect("pickup item should restore");
+    assert_eq!(restored_item.entity.entity_kind, EntityKind::Item);
+    assert_eq!(restored_item.entity.category, "item");
+    assert_eq!(
+        restored_item
+            .entity
+            .rendering
+            .static_object_render
+            .as_ref()
+            .map(|render| (render.sheet.as_str(), render.object_name.as_str())),
+        Some(("items", "coin"))
+    );
+    assert_eq!(
+        restored_item.components.pickup,
+        Some(PickupDef {
+            item_id: "coin".to_string(),
+            count: 2,
+        })
+    );
+    assert!(restored_item
+        .entity
+        .collision_box
+        .as_ref()
+        .is_some_and(|collision| collision.trigger));
 }
 
 #[test]

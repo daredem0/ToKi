@@ -47,11 +47,6 @@
   "solid": false,
   "active": true,
   "components": {
-    "movement": {
-      "speed": 0,
-      "movement_profile": "none",
-      "can_move": false
-    },
     "pickup": {
       "item_id": "potion",
       "count": 1

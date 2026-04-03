@@ -436,6 +436,33 @@ fn apply_entity_property_draft_keeps_static_render_items_on_trigger_collision_pa
 }
 
 #[test]
+fn apply_entity_property_draft_disabling_pickup_removes_component_and_disables_collision() {
+    let mut entity = sample_entity_with_id(47);
+    entity.entity.entity_kind = EntityKind::Item;
+    entity.entity.category = "item".to_string();
+    entity.entity.rendering.static_object_render = Some(StaticObjectRenderDef {
+        sheet: "items".to_string(),
+        object_name: "potion".to_string(),
+    });
+    entity.components.pickup = Some(PickupDef {
+        item_id: "potion".to_string(),
+        count: 1,
+    });
+
+    let mut draft = EntityPropertyDraft::from_entity(&entity);
+    draft.pickup_present = false;
+    draft.collision.enabled = false;
+    draft.collision.trigger = false;
+    draft.solid = false;
+
+    let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
+
+    assert!(changed);
+    assert!(entity.components.pickup.is_none());
+    assert!(entity.entity.collision_box.is_none());
+}
+
+#[test]
 fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
     let temp_dir = tempfile::tempdir().expect("temp dir should be created");
     let mut project = Project::new("Demo".to_string(), temp_dir.path().join("Demo"));
