@@ -1,13 +1,15 @@
 use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
 use crate::pipelines::TextureSource;
+use crate::per_frame_lru::PerFrameLruCache;
 use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::RenderTarget;
 use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
-use std::collections::BTreeMap;
 use toki_core::assets::atlas::AtlasMeta;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::sprite::SpriteFrame;
+
+const SCENE_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY: usize = 64;
 
 /// Data needed to render a scene
 #[derive(Debug)]
@@ -88,7 +90,7 @@ pub struct SceneRenderer {
     format: wgpu::TextureFormat,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
-    sprite_pipelines_by_texture: BTreeMap<std::path::PathBuf, SpritePipeline>,
+    sprite_pipelines_by_texture: PerFrameLruCache<std::path::PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<SceneSpriteBatchKey>>,
     underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
@@ -152,7 +154,9 @@ impl SceneRenderer {
             format: surface_format,
             tilemap_pipeline,
             sprite_pipeline,
-            sprite_pipelines_by_texture: BTreeMap::new(),
+            sprite_pipelines_by_texture: PerFrameLruCache::new(
+                SCENE_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY,
+            ),
             sprite_draw_batches: Vec::new(),
             underlay_pipeline,
             debug_pipeline,
@@ -216,11 +220,13 @@ impl SceneRenderer {
     }
 
     fn clear_sprite_batches(&mut self) {
+        self.sprite_pipelines_by_texture.begin_frame();
         self.sprite_pipeline.clear_sprites();
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.clear_sprites();
         }
         self.sprite_draw_batches.clear();
+        self.sprite_pipelines_by_texture.evict_unused_lru();
     }
 
     fn record_sprite_draw_batch(&mut self, key: SceneSpriteBatchKey, start: usize) {
@@ -256,30 +262,6 @@ impl SceneRenderer {
         }
     }
 
-    fn ensure_textured_sprite_pipeline(
-        &mut self,
-        texture_key: &std::path::Path,
-        texture_source: TextureSource<'_>,
-    ) -> bool {
-        if self.sprite_pipelines_by_texture.contains_key(texture_key) {
-            return true;
-        }
-        match SpritePipeline::new(&self.device, &self.queue, self.format, texture_source) {
-            Ok(pipeline) => {
-                self.sprite_pipelines_by_texture
-                    .insert(texture_key.to_path_buf(), pipeline);
-                true
-            }
-            Err(error) => {
-                tracing::warn!(
-                    texture_key = ?texture_key,
-                    "Skipping sprite with failed texture pipeline creation: {error}"
-                );
-                false
-            }
-        }
-    }
-
     fn add_textured_sprite_instance(
         &mut self,
         texture_key: &std::path::Path,
@@ -291,17 +273,29 @@ impl SceneRenderer {
             .get(texture_key)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        if !self.ensure_textured_sprite_pipeline(texture_key, texture_source) {
+        let texture_key_buf = texture_key.to_path_buf();
+        let insert_result = self
+            .sprite_pipelines_by_texture
+            .get_or_try_insert_with(texture_key_buf.clone(), || {
+                SpritePipeline::new(&self.device, &self.queue, self.format, texture_source)
+            });
+        let Ok(Some(pipeline)) = insert_result else {
+            if let Err(error) = insert_result {
+                tracing::warn!(
+                    texture_key = ?texture_key,
+                    "Skipping sprite with failed texture pipeline creation: {error}"
+                );
+            }
             return;
-        }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(texture_key) {
+        };
+        {
             pipeline.update_projection(&self.queue, self.current_projection);
             pipeline.add_sprite(render_instance);
-            self.record_sprite_draw_batch(
-                SceneSpriteBatchKey::Textured(texture_key.to_path_buf()),
-                instance_index,
-            );
         }
+        self.record_sprite_draw_batch(
+            SceneSpriteBatchKey::Textured(texture_key_buf),
+            instance_index,
+        );
     }
 
     fn add_sprite_instance(&mut self, sprite: &SpriteInstance) {

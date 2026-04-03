@@ -2,6 +2,7 @@ mod backend;
 mod draw;
 mod errors;
 mod gpu;
+mod per_frame_lru;
 mod pipelines;
 mod scene;
 mod sprite_batch_order;

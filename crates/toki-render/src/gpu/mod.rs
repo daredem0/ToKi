@@ -1,7 +1,6 @@
 mod frame;
 mod textures;
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
@@ -20,9 +19,11 @@ use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
-    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, Rect, RenderError, SceneClipRect,
-    SpritePipeline, TextBackgroundRect, TilemapPipeline,
+    per_frame_lru::PerFrameLruCache, DebugPipeline, GlyphonTextRenderer, PostProcessPipeline,
+    Rect, RenderError, SceneClipRect, SpritePipeline, TextBackgroundRect, TilemapPipeline,
 };
+
+const GPU_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY: usize = 64;
 
 #[allow(dead_code)]
 pub struct GpuState {
@@ -33,7 +34,7 @@ pub struct GpuState {
     queue: Queue,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
-    sprite_pipelines_by_texture: BTreeMap<PathBuf, SpritePipeline>,
+    sprite_pipelines_by_texture: PerFrameLruCache<PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<GpuSpriteBatchKey>>,
     world_underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
@@ -98,7 +99,9 @@ impl GpuState {
             queue,
             tilemap_pipeline,
             sprite_pipeline,
-            sprite_pipelines_by_texture: BTreeMap::new(),
+            sprite_pipelines_by_texture: PerFrameLruCache::new(
+                GPU_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY,
+            ),
             sprite_draw_batches: Vec::new(),
             world_underlay_pipeline,
             debug_pipeline,
@@ -142,35 +145,6 @@ impl GpuState {
         self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
     }
 
-    fn ensure_textured_sprite_pipeline(
-        &mut self,
-        texture_key: &Path,
-        texture_source: TextureSource<'_>,
-    ) -> bool {
-        if self.sprite_pipelines_by_texture.contains_key(texture_key) {
-            return true;
-        }
-        match SpritePipeline::new(
-            &self.device,
-            &self.queue,
-            self.config.format,
-            texture_source,
-        ) {
-            Ok(pipeline) => {
-                self.sprite_pipelines_by_texture
-                    .insert(texture_key.to_path_buf(), pipeline);
-                true
-            }
-            Err(error) => {
-                tracing::warn!(
-                    texture_key = %texture_key.display(),
-                    "Skipping sprite with failed texture pipeline creation: {error}"
-                );
-                false
-            }
-        }
-    }
-
     fn add_textured_sprite(
         &mut self,
         texture_key: &Path,
@@ -186,17 +160,34 @@ impl GpuState {
             .get(texture_key)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        if !self.ensure_textured_sprite_pipeline(texture_key, texture_source) {
+        let texture_key_buf = texture_key.to_path_buf();
+        let insert_result = self
+            .sprite_pipelines_by_texture
+            .get_or_try_insert_with(texture_key_buf.clone(), || {
+                SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    texture_source,
+                )
+            });
+        let Ok(Some(pipeline)) = insert_result else {
+            if let Err(error) = insert_result {
+                tracing::warn!(
+                    texture_key = %texture_key.display(),
+                    "Skipping sprite with failed texture pipeline creation: {error}"
+                );
+            }
             return;
-        }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(texture_key) {
+        };
+        {
             pipeline.update_projection(&self.queue, self.current_mvp);
             pipeline.add_sprite(instance);
-            self.record_sprite_draw_batch(
-                GpuSpriteBatchKey::Textured(texture_key.to_path_buf()),
-                instance_index,
-            );
         }
+        self.record_sprite_draw_batch(
+            GpuSpriteBatchKey::Textured(texture_key_buf),
+            instance_index,
+        );
     }
 
     fn default_post_process_settings() -> ResolvedPostProcessSettings {
@@ -354,11 +345,13 @@ impl crate::TextureBackend for GpuState {
 
 impl crate::SpriteBackend for GpuState {
     fn clear_sprites(&mut self) {
+        self.sprite_pipelines_by_texture.begin_frame();
         self.sprite_pipeline.clear_sprites();
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.clear_sprites();
         }
         self.sprite_draw_batches.clear();
+        self.sprite_pipelines_by_texture.evict_unused_lru();
     }
 
     fn add_sprite(
