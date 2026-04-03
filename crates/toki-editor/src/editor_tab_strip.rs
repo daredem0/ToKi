@@ -4,6 +4,8 @@ use egui::{scroll_area::ScrollBarVisibility, Align, Button, FontId, Layout, Scro
 pub struct EditorTabStripState {
     pub horizontal_offset: f32,
     pub last_selected_index: Option<usize>,
+    pub last_viewport_width: f32,
+    pub last_total_content_width: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -52,13 +54,20 @@ impl EditorTabStripState {
     ) {
         self.clamp_offset(total_content_width, viewport_width);
 
-        if selected_index != self.last_selected_index {
+        let viewport_changed = (viewport_width - self.last_viewport_width).abs() > f32::EPSILON;
+        let content_changed =
+            (total_content_width - self.last_total_content_width).abs() > f32::EPSILON;
+
+        if selected_index != self.last_selected_index || viewport_changed || content_changed {
             if let Some(index) = selected_index {
                 let (start, end) = ranges[index];
                 self.ensure_range_visible(start, end, total_content_width, viewport_width);
             }
             self.last_selected_index = selected_index;
         }
+
+        self.last_viewport_width = viewport_width;
+        self.last_total_content_width = total_content_width;
     }
 
     fn button_scroll_step(viewport_width: f32) -> f32 {
@@ -153,13 +162,16 @@ pub fn render_tab_strip<T: Copy + PartialEq>(
                         .horizontal_scroll_offset(state.horizontal_offset)
                         .auto_shrink([false, true])
                         .show(ui, |ui| {
-                            // Force the tab row to keep its full natural width so horizontal
-                            // scrolling has real overflow to operate on instead of shrinking
-                            // content to the viewport width.
                             ui.set_min_width(total_width);
                             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                                for item in items {
-                                    ui.selectable_value(selected, item.value, item.label);
+                                for (index, item) in items.iter().enumerate() {
+                                    let response = ui.add_sized(
+                                        [widths[index], ui.spacing().interact_size.y],
+                                        Button::new(item.label).selected(*selected == item.value),
+                                    );
+                                    if response.clicked() {
+                                        *selected = item.value;
+                                    }
                                 }
                             });
                         })
@@ -218,6 +230,8 @@ mod tests {
         let mut state = EditorTabStripState {
             horizontal_offset: 80.0,
             last_selected_index: None,
+            last_viewport_width: 0.0,
+            last_total_content_width: 0.0,
         };
         state.ensure_range_visible(20.0, 60.0, 400.0, 120.0);
         assert_eq!(state.horizontal_offset, 20.0);
@@ -228,6 +242,8 @@ mod tests {
         let mut state = EditorTabStripState {
             horizontal_offset: 20.0,
             last_selected_index: None,
+            last_viewport_width: 0.0,
+            last_total_content_width: 0.0,
         };
         state.ensure_range_visible(130.0, 190.0, 400.0, 120.0);
         assert_eq!(state.horizontal_offset, 70.0);
@@ -245,6 +261,8 @@ mod tests {
         let mut state = EditorTabStripState {
             horizontal_offset: 120.0,
             last_selected_index: Some(0),
+            last_viewport_width: 120.0,
+            last_total_content_width: 260.0,
         };
 
         state.update_selection_visibility(Some(0), &ranges, 260.0, 120.0);
@@ -252,5 +270,37 @@ mod tests {
 
         state.update_selection_visibility(Some(2), &ranges, 260.0, 120.0);
         assert_eq!(state.horizontal_offset, 140.0);
+    }
+
+    #[test]
+    fn update_selection_visibility_repositions_when_viewport_width_changes() {
+        let ranges = vec![(0.0, 80.0), (90.0, 170.0), (180.0, 260.0)];
+        let mut state = EditorTabStripState {
+            horizontal_offset: 140.0,
+            last_selected_index: Some(2),
+            last_viewport_width: 120.0,
+            last_total_content_width: 260.0,
+        };
+
+        state.update_selection_visibility(Some(2), &ranges, 260.0, 180.0);
+
+        assert_eq!(state.horizontal_offset, 80.0);
+        assert_eq!(state.last_viewport_width, 180.0);
+    }
+
+    #[test]
+    fn update_selection_visibility_repositions_when_content_width_changes() {
+        let ranges = vec![(0.0, 80.0), (90.0, 170.0), (180.0, 320.0)];
+        let mut state = EditorTabStripState {
+            horizontal_offset: 60.0,
+            last_selected_index: Some(2),
+            last_viewport_width: 120.0,
+            last_total_content_width: 260.0,
+        };
+
+        state.update_selection_visibility(Some(2), &ranges, 320.0, 120.0);
+
+        assert_eq!(state.horizontal_offset, 200.0);
+        assert_eq!(state.last_total_content_width, 320.0);
     }
 }

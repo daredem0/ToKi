@@ -158,15 +158,17 @@ pub(crate) fn render_menu_editor(
                 &ui_state.menu_preview_font_families,
             );
             let panel_rect = translated_rect(&layout.panel, origin);
-            if ui
-                .interact(
-                    panel_rect,
-                    ui.id().with(("menu_dialog", &dialog.id)),
-                    egui::Sense::click(),
-                )
-                .clicked()
-            {
-                crate::ui::editor_ui::select_menu_dialog(ui_state, dialog.id.clone());
+            if let Some(clipped_panel_rect) = clipped_interaction_rect(panel_rect, rect) {
+                if ui
+                    .interact(
+                        clipped_panel_rect,
+                        ui.id().with(("menu_dialog", &dialog.id)),
+                        egui::Sense::click(),
+                    )
+                    .clicked()
+                {
+                    crate::ui::editor_ui::select_menu_dialog(ui_state, dialog.id.clone());
+                }
             }
         }
         _ => {
@@ -262,26 +264,33 @@ pub(crate) fn render_menu_editor(
             );
 
             let title_rect = translated_rect(&layout.title.rect, origin);
-            if ui
-                .interact(
-                    title_rect,
-                    ui.id().with(("menu_title", &screen.id)),
-                    egui::Sense::click(),
-                )
-                .clicked()
-            {
-                crate::ui::editor_ui::select_menu_screen(ui_state, screen.id.clone());
+            if let Some(clipped_title_rect) = clipped_interaction_rect(title_rect, rect) {
+                if ui
+                    .interact(
+                        clipped_title_rect,
+                        ui.id().with(("menu_title", &screen.id)),
+                        egui::Sense::click(),
+                    )
+                    .clicked()
+                {
+                    crate::ui::editor_ui::select_menu_screen(ui_state, screen.id.clone());
+                }
             }
 
             for (item_index, entry) in layout.entries.iter().enumerate() {
                 let entry_rect = translated_rect(&entry.rect, origin);
                 let id = ui.id().with(("menu_entry", &screen.id, item_index));
-                if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
-                    crate::ui::editor_ui::select_menu_entry(
-                        ui_state,
-                        screen.id.clone(),
-                        item_index,
-                    );
+                if let Some(clipped_entry_rect) = clipped_interaction_rect(entry_rect, rect) {
+                    if ui
+                        .interact(clipped_entry_rect, id, egui::Sense::click())
+                        .clicked()
+                    {
+                        crate::ui::editor_ui::select_menu_entry(
+                            ui_state,
+                            screen.id.clone(),
+                            item_index,
+                        );
+                    }
                 }
             }
         }
@@ -361,4 +370,33 @@ fn translated_rect(rect: &toki_core::menu::MenuRect, origin: egui::Vec2) -> egui
         egui::pos2(rect.x + origin.x, rect.y + origin.y),
         egui::vec2(rect.width, rect.height),
     )
+}
+
+fn clipped_interaction_rect(
+    interaction_rect: egui::Rect,
+    bounds: egui::Rect,
+) -> Option<egui::Rect> {
+    let clipped = interaction_rect.intersect(bounds);
+    (clipped.width() > 0.0 && clipped.height() > 0.0).then_some(clipped)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clipped_interaction_rect;
+
+    #[test]
+    fn clipped_interaction_rect_discards_non_overlapping_rects() {
+        let a = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(10.0, 10.0));
+        let b = egui::Rect::from_min_size(egui::pos2(20.0, 20.0), egui::vec2(5.0, 5.0));
+        assert_eq!(clipped_interaction_rect(a, b), None);
+    }
+
+    #[test]
+    fn clipped_interaction_rect_clamps_to_bounds() {
+        let interaction = egui::Rect::from_min_size(egui::pos2(-5.0, -4.0), egui::vec2(20.0, 20.0));
+        let bounds = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(8.0, 6.0));
+        let clipped = clipped_interaction_rect(interaction, bounds).expect("should overlap");
+        assert_eq!(clipped.min, bounds.min);
+        assert_eq!(clipped.max, bounds.max);
+    }
 }
