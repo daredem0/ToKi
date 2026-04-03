@@ -2877,6 +2877,52 @@ fn on_interact_provides_trigger_context() {
 }
 
 #[test]
+fn on_interact_fires_for_inactive_interactable_entities() {
+    let mut state = GameState::new_empty();
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
+
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
+    set_entity_interactable(&mut state, npc_id, true);
+    state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("interactable should exist")
+        .active = false;
+
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "inactive-interact",
+                RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: Some(RuleTarget::Entity(npc_id)),
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "inactive_interact".to_string(),
+                }],
+            )],
+        },
+    );
+
+    InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
+    let result = GameSimulation::tick_fixed(
+        &mut state,
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(result.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "inactive_interact"
+    )));
+}
+
+#[test]
 fn interaction_rules_respect_priority_ordering() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));

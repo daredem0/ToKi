@@ -11,9 +11,9 @@ use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef, Entity,
-    EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, EntityRendering, EntityStats,
-    Inventory, MovementSoundTrigger, PickupDef, RenderingDef, StaticObjectRenderDef,
+    AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
+    Entity, EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, EntityRendering,
+    EntityStats, Inventory, MovementSoundTrigger, PickupDef, RenderingDef, StaticObjectRenderDef,
 };
 use toki_core::game::SceneSystem;
 use toki_core::scene::{SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
@@ -722,6 +722,204 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
 
     assert_eq!(preview.size, UVec2::new(16, 16));
     assert!(preview.texture_path.is_some());
+}
+
+#[test]
+fn load_preview_sprite_frame_static_prefers_animation_for_decorations_with_both_paths() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+    fs::create_dir_all(project_path.join("assets/sprites")).expect("sprites dir should exist");
+    fs::write(
+        project_path.join("assets/sprites/objects.json"),
+        r#"{
+            "sheet_type": "objects",
+            "image": "objects.png",
+            "tile_size": [16, 16],
+            "objects": {
+                "torch_static": {
+                    "position": [0, 0],
+                    "size_tiles": [1, 2]
+                }
+            }
+        }"#,
+    )
+    .expect("object sheet should be written");
+    fs::write(
+        project_path.join("assets/sprites/decor.json"),
+        r#"{
+            "image": "decor.png",
+            "tile_size": [16, 16],
+            "tiles": {
+                "torch/idle_a": {
+                    "position": [0, 0],
+                    "properties": { "solid": false, "trigger": false }
+                }
+            }
+        }"#,
+    )
+    .expect("atlas should be written");
+    let entity_def = EntityDefinition {
+        name: "torch".to_string().into(),
+        display_name: "Torch".to_string(),
+        description: "Animated torch".to_string(),
+        rendering: RenderingDef {
+            size: [16, 32],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "objects".to_string(),
+                object_name: "torch_static".to_string(),
+            }),
+            grounding: Default::default(),
+        },
+        solid: false,
+        active: true,
+        components: ComponentsDef::default(),
+        collision: CollisionDef {
+            enabled: false,
+            offset: [0, 0],
+            size: [16, 32],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 0.0,
+            hearing_radius: 0,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "decor".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["torch/idle_a".to_string()],
+                frame_positions: None,
+                frame_duration_ms: 120.0,
+                frame_durations_ms: None,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "decoration".to_string(),
+        tags: vec![],
+    };
+    fs::write(
+        project_path.join("entities/torch.json"),
+        serde_json::to_string_pretty(&entity_def).expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path.clone());
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let preview = EditorApp::load_preview_sprite_frame_static("torch", &project_path, &project_assets)
+        .expect("animated decoration should produce a preview visual");
+
+    assert_eq!(preview.size, UVec2::new(16, 32));
+    assert!(
+        preview
+            .texture_path
+            .as_ref()
+            .is_some_and(|path| path.ends_with("decor.png"))
+    );
+}
+
+#[test]
+fn load_preview_sprite_frame_static_supports_object_sheet_backed_decoration_animation() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+    fs::create_dir_all(project_path.join("assets/sprites")).expect("sprites dir should exist");
+    fs::write(
+        project_path.join("assets/sprites/HouseM.json"),
+        r#"{
+            "sheet_type": "objects",
+            "image": "HouseM.png",
+            "tile_size": [64, 64],
+            "objects": {
+                "object_0": {"position": [0, 0], "size_tiles": [1, 1]},
+                "object_1": {"position": [1, 0], "size_tiles": [1, 1]}
+            }
+        }"#,
+    )
+    .expect("object sheet should be written");
+    let entity_def = EntityDefinition {
+        name: "house_anim".to_string().into(),
+        display_name: "House Anim".to_string(),
+        description: "Animated house".to_string(),
+        rendering: RenderingDef {
+            size: [64, 64],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "HouseM".to_string(),
+                object_name: "object_0".to_string(),
+            }),
+            grounding: Default::default(),
+        },
+        solid: true,
+        active: true,
+        components: ComponentsDef::default(),
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [64, 64],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 0.0,
+            hearing_radius: 0,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "HouseM".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["object_1".to_string()],
+                frame_positions: None,
+                frame_duration_ms: 120.0,
+                frame_durations_ms: None,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "decoration".to_string(),
+        tags: vec![],
+    };
+    fs::write(
+        project_path.join("entities/house_anim.json"),
+        serde_json::to_string_pretty(&entity_def).expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path.clone());
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let preview = EditorApp::load_preview_sprite_frame_static(
+        "house_anim",
+        &project_path,
+        &project_assets,
+    )
+    .expect("object-sheet-backed animated decoration should produce a preview visual");
+
+    assert_eq!(preview.size, UVec2::new(64, 64));
+    assert!(
+        preview
+            .texture_path
+            .as_ref()
+            .is_some_and(|path| path.ends_with("HouseM.png"))
+    );
 }
 
 #[test]

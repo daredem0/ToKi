@@ -165,18 +165,14 @@ impl<'a> InteractionService<'a> {
         let mut interactable_ids = self
             .world
             .entity_manager
-            .active_entities()
-            .into_iter()
+            .storage()
+            .components()
+            .interaction_ids()
             .filter(|&entity_id| {
                 if entity_id == player_id {
                     return false;
                 }
-                self.world
-                    .entity_manager
-                    .get_entity(entity_id)
-                    .is_some_and(|entity| {
-                        entity.active && self.world.entity_manager.interaction(entity_id).is_some()
-                    })
+                self.world.entity_manager.get_entity(entity_id).is_some()
             })
             .collect::<Vec<_>>();
         interactable_ids.sort_unstable();

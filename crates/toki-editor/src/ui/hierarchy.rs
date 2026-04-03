@@ -40,6 +40,7 @@ impl HierarchySystem {
             "creature" => "Creatures".to_string(),
             "human" => "Humans".to_string(),
             "item" => "Items".to_string(),
+            "decoration" => "Decorations".to_string(),
             _ => Self::category_label(raw),
         }
     }
@@ -149,13 +150,14 @@ impl HierarchySystem {
 /// Maps an entity definition category string to the corresponding [`ToolboxTab`].
 ///
 /// Returns `None` for categories that are not placeable from the toolbox
-/// (e.g. decorations use the object-sheet flow, triggers/projectiles are internal).
+/// (e.g. triggers/projectiles are internal).
 pub fn toolbox_tab_for_category(category: &str) -> Option<super::editor_ui::ToolboxTab> {
     use super::editor_ui::ToolboxTab;
     match category.trim().to_ascii_lowercase().as_str() {
         "creature" | "creatures" | "enemy" => Some(ToolboxTab::Creatures),
         "human" | "humans" | "player" | "players" => Some(ToolboxTab::Humans),
         "item" | "items" => Some(ToolboxTab::Items),
+        "decoration" | "decorations" | "prop" | "props" => Some(ToolboxTab::Decorations),
         _ => None,
     }
 }

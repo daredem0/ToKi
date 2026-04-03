@@ -230,7 +230,7 @@ fn render_sprite_frame_scaled(
     let Some(texture) = &crate::ui::editor_context::animation_state(ui_state).atlas_texture else {
         return false;
     };
-    let Some((cell_w, cell_h)) =
+    let Some((default_cell_w, default_cell_h)) =
         crate::ui::editor_context::animation_state(ui_state).atlas_cell_size
     else {
         return false;
@@ -241,14 +241,24 @@ fn render_sprite_frame_scaled(
         return false;
     };
 
-    // Calculate UV coordinates for this cell
-    let col = position[0];
-    let row = position[1];
+    let rect = crate::ui::editor_context::animation_state(ui_state)
+        .source_rects_by_position
+        .get(&position)
+        .copied()
+        .unwrap_or([
+            position[0] * default_cell_w,
+            position[1] * default_cell_h,
+            default_cell_w,
+            default_cell_h,
+        ]);
 
-    let u_min = (col * cell_w) as f32 / img_w as f32;
-    let v_min = (row * cell_h) as f32 / img_h as f32;
-    let u_max = ((col + 1) * cell_w) as f32 / img_w as f32;
-    let v_max = ((row + 1) * cell_h) as f32 / img_h as f32;
+    let cell_w = rect[2];
+    let cell_h = rect[3];
+
+    let u_min = rect[0] as f32 / img_w as f32;
+    let v_min = rect[1] as f32 / img_h as f32;
+    let u_max = (rect[0] + rect[2]) as f32 / img_w as f32;
+    let v_max = (rect[1] + rect[3]) as f32 / img_h as f32;
 
     let uv_rect = egui::Rect::from_min_max(egui::pos2(u_min, v_min), egui::pos2(u_max, v_max));
 

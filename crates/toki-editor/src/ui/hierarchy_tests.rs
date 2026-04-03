@@ -19,6 +19,10 @@ fn category_section_label_pluralizes_editor_palette_categories() {
     assert_eq!(HierarchySystem::category_section_label("human"), "Humans");
     assert_eq!(HierarchySystem::category_section_label("item"), "Items");
     assert_eq!(
+        HierarchySystem::category_section_label("decoration"),
+        "Decorations"
+    );
+    assert_eq!(
         HierarchySystem::category_section_label("player_character"),
         "Player Character"
     );
@@ -77,8 +81,21 @@ fn toolbox_tab_for_category_maps_item_variants() {
 }
 
 #[test]
-fn toolbox_tab_for_category_returns_none_for_non_placeable() {
-    assert_eq!(toolbox_tab_for_category("decoration"), None);
+fn toolbox_tab_for_category_maps_decoration_variants() {
+    assert_eq!(
+        toolbox_tab_for_category("decoration"),
+        Some(ToolboxTab::Decorations)
+    );
+    assert_eq!(
+        toolbox_tab_for_category("decorations"),
+        Some(ToolboxTab::Decorations)
+    );
+    assert_eq!(toolbox_tab_for_category("prop"), Some(ToolboxTab::Decorations));
+    assert_eq!(toolbox_tab_for_category("props"), Some(ToolboxTab::Decorations));
+}
+
+#[test]
+fn toolbox_tab_for_category_returns_none_for_internal_non_placeable() {
     assert_eq!(toolbox_tab_for_category("trigger"), None);
     assert_eq!(toolbox_tab_for_category("projectile"), None);
     assert_eq!(toolbox_tab_for_category("unknown"), None);
@@ -151,6 +168,13 @@ fn collect_entity_definitions_for_toolbox_groups_from_entity_editor_state() {
             tags: Vec::new(),
             file_path: PathBuf::from("coin.json"),
         },
+        EntitySummary {
+            name: "torch".to_string(),
+            display_name: "Torch".to_string(),
+            category: "decoration".to_string(),
+            tags: Vec::new(),
+            file_path: PathBuf::from("torch.json"),
+        },
     ];
 
     let result = collect_entity_definitions_for_toolbox(&ui_state, None);
@@ -164,7 +188,10 @@ fn collect_entity_definitions_for_toolbox_groups_from_entity_editor_state() {
     );
     assert_eq!(result.get(&ToolboxTab::Humans).unwrap()[0].name, "knight");
     assert_eq!(result.get(&ToolboxTab::Items).unwrap()[0].name, "coin");
-    assert!(!result.contains_key(&ToolboxTab::Decorations));
+    assert_eq!(
+        result.get(&ToolboxTab::Decorations).unwrap()[0].name,
+        "torch"
+    );
 }
 
 #[test]
@@ -240,6 +267,13 @@ fn collect_entity_definitions_for_toolbox_falls_back_to_project_assets() {
             definition: Some(minimal_definition("coin", "item")),
         },
     );
+    project_assets.entities.insert(
+        "torch".to_string(),
+        EntityAsset {
+            path: dir.path().join("entities/torch.json"),
+            definition: Some(minimal_definition("torch", "decoration")),
+        },
+    );
 
     let ui_state = EditorUI::new();
     let result = collect_entity_definitions_for_toolbox(&ui_state, Some(&mut project_assets));
@@ -249,4 +283,8 @@ fn collect_entity_definitions_for_toolbox_falls_back_to_project_assets() {
         "goblin"
     );
     assert_eq!(result.get(&ToolboxTab::Items).unwrap()[0].name, "coin");
+    assert_eq!(
+        result.get(&ToolboxTab::Decorations).unwrap()[0].name,
+        "torch"
+    );
 }

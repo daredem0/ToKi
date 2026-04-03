@@ -1,7 +1,14 @@
 //! Core component section rendering - Rendering and Attributes.
 
-use crate::ui::entity_kind_policy::{effective_kind_for_category, kind_supports_movement};
+use crate::ui::entity_kind_policy::{
+    effective_kind_for_category, kind_supports_movement, uses_decoration_collision_policy,
+};
+use crate::ui::object_sheet_browser::{
+    build_decoration_placement_draft, resolve_object_sheet_browser_source, sync_selected_object_name,
+    sync_selected_sheet_name,
+};
 use crate::ui::EditorUI;
+use std::path::Path;
 use toki_core::entity::EntityFootprint;
 
 use super::widgets::{render_atlas_dropdown, show_field_error};
@@ -31,7 +38,11 @@ fn sync_collision_from_grounding(edit: &mut crate::ui::editor_ui::EntityEditStat
     }
 }
 
-pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+pub fn render_rendering_section(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    project_path: Option<&Path>,
+) {
     let available_atlases = crate::ui::editor_context::entity_editor_state_mut(ui_state)
         .available_atlases
         .clone();
@@ -47,7 +58,7 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         .show(ui, |ui| {
             // Sprite Atlas dropdown
             ui.horizontal(|ui| {
-                ui.label("Sprite Atlas:");
+                ui.label("Animation Source:");
                 render_atlas_dropdown(
                     ui,
                     "sprite_atlas",
@@ -56,6 +67,8 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     &mut edit.dirty,
                 );
             });
+
+            render_decoration_object_section(ui, edit, project_path);
 
             // Size
             ui.horizontal(|ui| {
@@ -177,6 +190,123 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     });
                 });
         });
+}
+
+fn render_decoration_object_section(
+    ui: &mut egui::Ui,
+    edit: &mut crate::ui::editor_ui::EntityEditState,
+    project_path: Option<&Path>,
+) {
+    if !uses_decoration_collision_policy(effective_kind_for_category(&edit.definition.category)) {
+        return;
+    }
+
+    ui.separator();
+    ui.label("Static Decoration");
+
+    let Some(project_path) = project_path else {
+        ui.small("Open a project to browse decoration object sheets.");
+        return;
+    };
+
+    let selected_sheet = edit
+        .definition
+        .rendering
+        .static_object
+        .as_ref()
+        .map(|render| render.sheet.clone());
+    let Some(source) = resolve_object_sheet_browser_source(project_path, selected_sheet.as_deref())
+    else {
+        ui.small("No object sheets found in assets/sprites.");
+        return;
+    };
+
+    let mut selected_sheet = edit
+        .definition
+        .rendering
+        .static_object
+        .as_ref()
+        .map(|render| render.sheet.clone());
+    let mut selected_object = edit
+        .definition
+        .rendering
+        .static_object
+        .as_ref()
+        .map(|render| render.object_name.clone());
+
+    sync_selected_sheet_name(&mut selected_sheet, &source.sheet_names);
+    let active_source =
+        resolve_object_sheet_browser_source(project_path, selected_sheet.as_deref()).unwrap_or(source);
+    sync_selected_object_name(&mut selected_object, &active_source.object_names);
+
+    let mut sheet_value = selected_sheet.unwrap_or_else(|| active_source.selected_sheet_name.clone());
+    let mut object_value = selected_object
+        .unwrap_or_else(|| active_source.object_names.first().cloned().unwrap_or_default());
+    let mut changed = false;
+
+    ui.horizontal(|ui| {
+        ui.label("Object Sheet:");
+        egui::ComboBox::from_id_salt("entity_definition_static_object_sheet")
+            .selected_text(sheet_value.as_str())
+            .show_ui(ui, |ui| {
+                for sheet_name in &active_source.sheet_names {
+                    changed |= ui
+                        .selectable_value(&mut sheet_value, sheet_name.clone(), sheet_name.as_str())
+                        .changed();
+                }
+            });
+    });
+
+    let object_source =
+        resolve_object_sheet_browser_source(project_path, Some(sheet_value.as_str()))
+            .unwrap_or(active_source);
+    if !object_source.object_names.iter().any(|name| name == &object_value) {
+        object_value = object_source
+            .object_names
+            .first()
+            .cloned()
+            .unwrap_or_default();
+        changed = true;
+    }
+
+    ui.horizontal(|ui| {
+        ui.label("Object:");
+        egui::ComboBox::from_id_salt("entity_definition_static_object_name")
+            .selected_text(object_value.as_str())
+            .show_ui(ui, |ui| {
+                for object_name in &object_source.object_names {
+                    changed |= ui
+                        .selectable_value(
+                            &mut object_value,
+                            object_name.clone(),
+                            object_name.as_str(),
+                        )
+                        .changed();
+                }
+            });
+    });
+
+    if changed {
+        edit.definition.rendering.static_object = Some(toki_core::entity::StaticObjectRenderDef {
+            sheet: sheet_value.clone(),
+            object_name: object_value.clone(),
+        });
+
+        if let Some(draft) = build_decoration_placement_draft(project_path, &sheet_value, &object_value)
+        {
+            let footprint = draft.grounding.footprint;
+            edit.definition.rendering.size = [draft.size_px.x, draft.size_px.y];
+            edit.definition.rendering.grounding = draft.grounding;
+            edit.definition.collision.enabled = draft.solid;
+            edit.definition.collision.offset = footprint.map(|f| f.offset).unwrap_or([0, 0]);
+            edit.definition.collision.size = footprint
+                .map(|f| f.size)
+                .unwrap_or([draft.size_px.x, draft.size_px.y]);
+            edit.definition.collision.trigger = false;
+        }
+
+        edit.mark_dirty();
+    }
 }
 
 pub fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {

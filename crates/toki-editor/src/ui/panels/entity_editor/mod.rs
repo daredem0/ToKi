@@ -95,7 +95,7 @@ fn render_main_content(
             egui::vec2(editor_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
-                details::render_entity_details(ui, ui_state);
+                details::render_entity_details_with_project(ui, ui_state, project_path);
             },
         );
     });

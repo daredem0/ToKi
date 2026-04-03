@@ -52,10 +52,10 @@ pub fn refresh_entity_list(ui_state: &mut EditorUI, project_path: Option<&Path>)
             .sort();
     }
 
-    // Scan sprites directory for available atlases
+    // Scan sprites directory for available animation sources
     let sprites_dir = path.join("assets/sprites");
     if sprites_dir.exists() {
-        scan_atlas_directory(
+        scan_animation_source_directory(
             &sprites_dir,
             &mut crate::ui::editor_context::entity_editor_state_mut(ui_state).available_atlases,
         );
@@ -104,7 +104,7 @@ fn scan_sfx_directory(dir: &Path, sfx_list: &mut Vec<String>) {
     }
 }
 
-fn scan_atlas_directory(dir: &Path, atlas_list: &mut Vec<String>) {
+fn scan_animation_source_directory(dir: &Path, atlas_list: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -116,9 +116,13 @@ fn scan_atlas_directory(dir: &Path, atlas_list: &mut Vec<String>) {
         }
 
         if path.extension().map(|e| e == "json").unwrap_or(false) {
-            // Use classify_sprite_metadata_file to check if it's an atlas
-            if let Ok(SpriteMetadataFileKind::Atlas) = classify_sprite_metadata_file(&path) {
-                // Include .json extension for consistency with animation editor
+            if let Ok(kind) = classify_sprite_metadata_file(&path) {
+                if !matches!(
+                    kind,
+                    SpriteMetadataFileKind::Atlas | SpriteMetadataFileKind::ObjectSheet
+                ) {
+                    continue;
+                }
                 if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
                     atlas_list.push(filename.to_string());
                 }

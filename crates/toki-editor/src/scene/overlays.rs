@@ -102,7 +102,130 @@ pub fn load_preview_sprite_frame(
         }
     };
 
-    if let Some(static_object) = &entity_def.rendering.static_object {
+    if let Some(clip_def) = entity_def.animations.clips.first() {
+        let source_name = if !entity_def.animations.atlas_name.trim().is_empty() {
+            entity_def.animations.atlas_name.clone()
+        } else {
+            entity_def
+                .rendering
+                .static_object
+                .as_ref()
+                .map(|render| render.sheet.clone())
+                .unwrap_or_default()
+        };
+        let source_name_clean = normalize_asset_name(&source_name);
+
+        if let Some(first_tile_name) = clip_def.frame_tiles.first() {
+            if let Some(atlas_asset) = project_assets.sprite_atlases.get(source_name_clean) {
+                let sprite_atlas =
+                    match toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_asset.path) {
+                        Ok(atlas) => atlas,
+                        Err(error) => {
+                            tracing::warn!("Failed to load sprite atlas for preview: {}", error);
+                            return None;
+                        }
+                    };
+
+                let sprite_texture_size = sprite_atlas
+                    .image_size()
+                    .unwrap_or(glam::UVec2::new(64, 16));
+
+                if let Some(uvs) = sprite_atlas.get_tile_uvs(first_tile_name, sprite_texture_size) {
+                    let texture_path = atlas_asset
+                        .path
+                        .parent()
+                        .map(|parent| parent.join(&sprite_atlas.image));
+                    let (texture_image, texture_cache_key) =
+                        if let Some(texture_path) = texture_path.as_ref() {
+                            match load_texture_preview_image(
+                                texture_path,
+                                sprite_atlas.color_mode,
+                                available_palettes,
+                                indexed_palette_override,
+                                entity_def.rendering.palette_override.as_deref(),
+                                sprite_atlas.palette.as_deref(),
+                            ) {
+                                Ok((image, palette_id)) if sprite_atlas.is_palette_indexed() => (
+                                    Some(image),
+                                    Some(texture_preview_cache_key(
+                                        texture_path,
+                                        sprite_atlas.color_mode,
+                                        palette_id.as_deref(),
+                                    )),
+                                ),
+                                Ok((_image, _)) => (None, None),
+                                Err(error) => {
+                                    tracing::warn!(
+                                        "Failed to recolor indexed preview sprite for '{}': {}",
+                                        entity_def_name,
+                                        error
+                                    );
+                                    (None, None)
+                                }
+                            }
+                        } else {
+                            (None, None)
+                        };
+                    return Some(PlacementPreviewVisual {
+                        frame: toki_core::sprite::SpriteFrame {
+                            u0: uvs[0],
+                            v0: uvs[1],
+                            u1: uvs[2],
+                            v1: uvs[3],
+                        },
+                        texture_path,
+                        texture_image,
+                        texture_cache_key,
+                        size: glam::UVec2::new(
+                            entity_def.rendering.size[0],
+                            entity_def.rendering.size[1],
+                        ),
+                    });
+                }
+            } else if let Some(object_sheet_asset) = project_assets.object_sheets.get(source_name_clean) {
+                let object_sheet = match toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
+                    &object_sheet_asset.path,
+                ) {
+                    Ok(sheet) => sheet,
+                    Err(error) => {
+                        tracing::warn!("Failed to load object sheet for animated preview: {}", error);
+                        return None;
+                    }
+                };
+                let texture_size = object_sheet
+                    .image_size()
+                    .unwrap_or(glam::UVec2::new(16, 16));
+                let Some(uvs) = object_sheet.get_object_uvs(first_tile_name, texture_size) else {
+                    tracing::warn!(
+                        "Failed to get UV coordinates for object '{}' in preview",
+                        first_tile_name
+                    );
+                    return None;
+                };
+
+                return Some(PlacementPreviewVisual {
+                    frame: toki_core::sprite::SpriteFrame {
+                        u0: uvs[0],
+                        v0: uvs[1],
+                        u1: uvs[2],
+                        v1: uvs[3],
+                    },
+                    texture_path: object_sheet_asset
+                        .path
+                        .parent()
+                        .map(|parent| parent.join(&object_sheet.image)),
+                    texture_image: None,
+                    texture_cache_key: None,
+                    size: glam::UVec2::new(
+                        entity_def.rendering.size[0],
+                        entity_def.rendering.size[1],
+                    ),
+                });
+            }
+        } else {
+            tracing::warn!("No frame tiles found in first animation clip for preview");
+        }
+    } else if let Some(static_object) = &entity_def.rendering.static_object {
         let sheet_name = normalize_asset_name(&static_object.sheet);
         let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
         let object_sheet = match toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
@@ -141,87 +264,8 @@ pub fn load_preview_sprite_frame(
             texture_cache_key: None,
             size: glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]),
         });
-    }
-
-    let atlas_name_clean = normalize_asset_name(&entity_def.animations.atlas_name);
-    let atlas_asset = project_assets.sprite_atlases.get(atlas_name_clean)?;
-    let sprite_atlas = match toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_asset.path)
-    {
-        Ok(atlas) => atlas,
-        Err(error) => {
-            tracing::warn!("Failed to load sprite atlas for preview: {}", error);
-            return None;
-        }
-    };
-
-    let sprite_texture_size = sprite_atlas
-        .image_size()
-        .unwrap_or(glam::UVec2::new(64, 16));
-
-    if let Some(clip_def) = entity_def.animations.clips.first() {
-        if let Some(first_tile_name) = clip_def.frame_tiles.first() {
-            if let Some(uvs) = sprite_atlas.get_tile_uvs(first_tile_name, sprite_texture_size) {
-                let texture_path = atlas_asset
-                    .path
-                    .parent()
-                    .map(|parent| parent.join(&sprite_atlas.image));
-                let (texture_image, texture_cache_key) =
-                    if let Some(texture_path) = texture_path.as_ref() {
-                        match load_texture_preview_image(
-                            texture_path,
-                            sprite_atlas.color_mode,
-                            available_palettes,
-                            indexed_palette_override,
-                            entity_def.rendering.palette_override.as_deref(),
-                            sprite_atlas.palette.as_deref(),
-                        ) {
-                            Ok((image, palette_id)) if sprite_atlas.is_palette_indexed() => (
-                                Some(image),
-                                Some(texture_preview_cache_key(
-                                    texture_path,
-                                    sprite_atlas.color_mode,
-                                    palette_id.as_deref(),
-                                )),
-                            ),
-                            Ok((_image, _)) => (None, None),
-                            Err(error) => {
-                                tracing::warn!(
-                                    "Failed to recolor indexed preview sprite for '{}': {}",
-                                    entity_def_name,
-                                    error
-                                );
-                                (None, None)
-                            }
-                        }
-                    } else {
-                        (None, None)
-                    };
-                return Some(PlacementPreviewVisual {
-                    frame: toki_core::sprite::SpriteFrame {
-                        u0: uvs[0],
-                        v0: uvs[1],
-                        u1: uvs[2],
-                        v1: uvs[3],
-                    },
-                    texture_path,
-                    texture_image,
-                    texture_cache_key,
-                    size: glam::UVec2::new(
-                        entity_def.rendering.size[0],
-                        entity_def.rendering.size[1],
-                    ),
-                });
-            }
-
-            tracing::warn!(
-                "Failed to get UV coordinates for tile '{}' in preview",
-                first_tile_name
-            );
-        } else {
-            tracing::warn!("No frame tiles found in first animation clip for preview");
-        }
     } else {
-        tracing::warn!("No animation clips found for preview");
+        tracing::warn!("No animation clips or static object found for preview");
     }
 
     None

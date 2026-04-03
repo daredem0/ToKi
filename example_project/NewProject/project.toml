@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-main = "scenes/main.json"
 "Main Scene" = "scenes/Main Scene.json"
+main = "scenes/main.json"
 "Scene 2" = "scenes/Scene 2.json"
 
 [assets]
@@ -273,60 +273,28 @@ recent_files = []
 [editor.camera_settings]
 
 [editor.graph_layouts."Main Scene"]
-zoom = 0.8088202476501465
+zoom = 0.7765658497810364
 pan = [
     50.0,
     16.0,
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:20" = [
-    60.0,
+"node:21" = [
+    452.296875,
     356.265625,
-]
-"node:16" = [
-    262.625,
-    258.953125,
-]
-"node:12" = [
-    584.375,
-    210.296875,
-]
-"node:6" = [
-    488.640625,
-    112.984375,
-]
-"node:1" = [
-    60.0,
-    64.328125,
 ]
 "node:17" = [
     60.0,
     307.609375,
 ]
-"node:19" = [
-    259.625,
-    307.609375,
-]
-"node:3" = [
-    246.0,
-    64.328125,
-]
-"node:8" = [
+"node:20" = [
     60.0,
-    161.640625,
-]
-"node:2" = [
-    469.625,
-    64.328125,
-]
-"node:7" = [
-    244.359375,
-    112.984375,
-]
-"node:21" = [
-    452.296875,
     356.265625,
+]
+"node:12" = [
+    584.375,
+    210.296875,
 ]
 "node:10" = [
     318.65625,
@@ -336,33 +304,65 @@ pan = [
     293.71875,
     210.296875,
 ]
-"node:4" = [
-    60.0,
-    112.984375,
-]
-"node:18" = [
-    483.578125,
-    307.609375,
-]
-"node:9" = [
-    615.984375,
-    161.640625,
-]
 "node:22" = [
     240.34375,
     356.265625,
 ]
-"node:15" = [
-    522.25,
-    258.953125,
+"node:2" = [
+    469.625,
+    64.328125,
 ]
 "node:5" = [
     758.296875,
     64.328125,
 ]
+"node:18" = [
+    483.578125,
+    307.609375,
+]
+"node:4" = [
+    60.0,
+    112.984375,
+]
+"node:6" = [
+    488.640625,
+    112.984375,
+]
+"node:3" = [
+    246.0,
+    64.328125,
+]
+"node:16" = [
+    262.625,
+    258.953125,
+]
+"node:19" = [
+    259.625,
+    307.609375,
+]
 "node:14" = [
     60.0,
     258.953125,
+]
+"node:7" = [
+    244.359375,
+    112.984375,
+]
+"node:8" = [
+    60.0,
+    161.640625,
+]
+"node:1" = [
+    60.0,
+    64.328125,
+]
+"node:15" = [
+    522.25,
+    258.953125,
+]
+"node:9" = [
+    615.984375,
+    161.640625,
 ]
 "node:11" = [
     60.0,
@@ -370,27 +370,27 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2"]
-zoom = 0.8264462351799011
+zoom = 0.8239601850509644
 pan = [
-    -74.87890625,
-    64.38671875,
+    201.8671875,
+    90.40234375,
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
+"node:3" = [
+    800.0,
+    50.0,
+]
 "node:1" = [
     60.0,
     50.0,
 ]
 "node:4" = [
-    656.8824462890625,
-    177.01071166992188,
-]
-"node:2" = [
-    800.0,
+    430.0,
     50.0,
 ]
-"node:3" = [
-    430.0,
+"node:2" = [
+    1170.0,
     50.0,
 ]
 
@@ -741,6 +741,71 @@ once = false
 log_enabled = true
 trigger_node_id = 20
 
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 1
+position = [
+    60.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind.Trigger.OnInteract]
+mode = "Adjacent"
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind.Trigger.OnInteract.entity]
+Entity = 42
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 2
+position = [
+    1170.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind.Action.SwitchScene]
+scene_name = "Main Scene"
+spawn_point_id = "spawn_point_2"
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 3
+position = [
+    800.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind.Action.PlaySound]
+channel = "Movement"
+sound_id = "sfx_coin"
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 4
+position = [
+    430.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind]
+Condition = "Always"
+
+[[editor.rule_graph_drafts."Scene 2".edges]]
+from = 3
+to = 2
+
+[[editor.rule_graph_drafts."Scene 2".edges]]
+from = 4
+to = 3
+
+[[editor.rule_graph_drafts."Scene 2".edges]]
+from = 1
+to = 4
+
+[[editor.rule_graph_drafts."Scene 2".chains]]
+rule_id = "rule_1"
+enabled = true
+priority = 0
+once = false
+log_enabled = true
+trigger_node_id = 1
+
 [editor.dialog_graph_layouts.dialog_1]
 zoom = 0.683013379573822
 pan = [
@@ -749,16 +814,16 @@ pan = [
 ]
 
 [editor.dialog_graph_layouts.dialog_1.node_positions]
-start = [
-    80.0,
-    80.0,
-]
 line = [
     400.0,
     80.0,
 ]
 end = [
     720.0,
+    80.0,
+]
+start = [
+    80.0,
     80.0,
 ]
 

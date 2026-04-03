@@ -339,6 +339,20 @@ fn apply_rendering_fields(
         definition.rendering.palette_override = definition_palette_override;
         changed = true;
     }
+    let definition_static_object = match (
+        draft.static_object_sheet.as_ref(),
+        draft.static_object_name.as_ref(),
+    ) {
+        (Some(sheet), Some(object_name)) => Some(StaticObjectRenderDef {
+            sheet: sheet.clone(),
+            object_name: object_name.clone(),
+        }),
+        _ => None,
+    };
+    if definition.rendering.static_object != definition_static_object {
+        definition.rendering.static_object = definition_static_object;
+        changed = true;
+    }
 
     changed
 }

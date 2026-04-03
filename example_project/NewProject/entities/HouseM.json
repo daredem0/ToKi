@@ -1,0 +1,65 @@
+{
+  "name": "HouseM",
+  "display_name": "housem",
+  "description": "A house",
+  "rendering": {
+    "size": [
+      64,
+      64
+    ],
+    "render_layer": 0,
+    "visible": true,
+    "has_shadow": true,
+    "palette_override": "",
+    "grounding": {
+      "footprint": {
+        "offset": [
+          8,
+          48
+        ],
+        "size": [
+          48,
+          16
+        ]
+      }
+    }
+  },
+  "solid": true,
+  "active": true,
+  "collision": {
+    "enabled": true,
+    "offset": [
+      8,
+      48
+    ],
+    "size": [
+      48,
+      16
+    ],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 0.0,
+    "hearing_radius": 0,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "HouseM.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": [
+          "object_0",
+          "object_1"
+        ],
+        "frame_duration_ms": 500.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "decoration",
+  "tags": []
+}

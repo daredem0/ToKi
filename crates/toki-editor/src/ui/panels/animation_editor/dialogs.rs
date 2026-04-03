@@ -4,8 +4,9 @@ use crate::ui::EditorUI;
 
 pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
     let available_states = crate::ui::editor_context::animation_state(ui_state)
-        .authoring
-        .available_states();
+        .available_new_clip_states();
+    let decoration_idle_only = crate::ui::editor_context::animation_state(ui_state)
+        .decoration_idle_only;
 
     egui::Window::new("New Animation Clip")
         .collapsible(false)
@@ -16,7 +17,11 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
             // Quick add buttons for common states
             if !available_states.is_empty() {
-                ui.label("Common states:");
+                if decoration_idle_only {
+                    ui.label("Decoration state:");
+                } else {
+                    ui.label("Common states:");
+                }
                 let mut created_state: Option<&str> = None;
 
                 egui::ScrollArea::vertical()
@@ -41,40 +46,44 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                 ui.separator();
             }
 
-            // Custom state input
-            ui.label("Or enter custom state name:");
-            ui.horizontal(|ui| {
-                ui.text_edit_singleline(
-                    &mut crate::ui::editor_context::animation_state_mut(ui_state)
-                        .new_clip_state_input,
-                );
-                let new_clip_state_input = crate::ui::editor_context::animation_state(ui_state)
-                    .new_clip_state_input
-                    .trim()
-                    .to_string();
-                let can_create = !new_clip_state_input.is_empty()
-                    && !crate::ui::editor_context::animation_state(ui_state)
-                        .authoring
-                        .has_clip_for_state(&new_clip_state_input);
-
-                if ui
-                    .add_enabled(can_create, egui::Button::new("Create"))
-                    .clicked()
-                {
-                    let state = crate::ui::editor_context::animation_state_mut(ui_state)
+            if decoration_idle_only {
+                ui.label("Decorations support only one 'idle' animation in v1.");
+            } else {
+                // Custom state input
+                ui.label("Or enter custom state name:");
+                ui.horizontal(|ui| {
+                    ui.text_edit_singleline(
+                        &mut crate::ui::editor_context::animation_state_mut(ui_state)
+                            .new_clip_state_input,
+                    );
+                    let new_clip_state_input = crate::ui::editor_context::animation_state(ui_state)
                         .new_clip_state_input
                         .trim()
                         .to_string();
-                    crate::ui::editor_context::animation_state_mut(ui_state)
-                        .authoring
-                        .create_clip(&state);
-                    crate::ui::editor_context::animation_state_mut(ui_state)
-                        .new_clip_state_input
-                        .clear();
-                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog =
-                        false;
-                }
-            });
+                    let can_create = !new_clip_state_input.is_empty()
+                        && !crate::ui::editor_context::animation_state(ui_state)
+                            .authoring
+                            .has_clip_for_state(&new_clip_state_input);
+
+                    if ui
+                        .add_enabled(can_create, egui::Button::new("Create"))
+                        .clicked()
+                    {
+                        let state = crate::ui::editor_context::animation_state_mut(ui_state)
+                            .new_clip_state_input
+                            .trim()
+                            .to_string();
+                        crate::ui::editor_context::animation_state_mut(ui_state)
+                            .authoring
+                            .create_clip(&state);
+                        crate::ui::editor_context::animation_state_mut(ui_state)
+                            .new_clip_state_input
+                            .clear();
+                        crate::ui::editor_context::animation_state_mut(ui_state)
+                            .show_new_clip_dialog = false;
+                    }
+                });
+            }
 
             ui.separator();
             if ui.button("Cancel").clicked() {

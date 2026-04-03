@@ -64,9 +64,35 @@ fn collect_component_warnings(input: ValidationInput<'_>) -> Vec<String> {
     warnings
 }
 
+fn collect_decoration_animation_warnings(definition: &EntityDefinition) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let clips = &definition.animations.clips;
+
+    if clips.is_empty() {
+        return warnings;
+    }
+
+    if clips.len() != 1 {
+        warnings.push("Animated decoration should define exactly one animation clip".to_string());
+    }
+
+    if definition.animations.default_state != "idle" {
+        warnings.push("Animated decoration default_state should be 'idle'".to_string());
+    }
+
+    for clip in clips {
+        if clip.state != "idle" {
+            warnings.push("Animated decoration clips should use only the 'idle' state".to_string());
+            break;
+        }
+    }
+
+    warnings
+}
+
 pub fn validate_entity_definition_warnings(definition: &EntityDefinition) -> Vec<String> {
     let kind = runtime_entity_kind_for_category(&definition.category);
-    collect_component_warnings(ValidationInput {
+    let mut warnings = collect_component_warnings(ValidationInput {
         kind,
         has_movement: definition.components.movement.is_some(),
         has_ai: definition.components.ai.is_some(),
@@ -84,7 +110,13 @@ pub fn validate_entity_definition_warnings(definition: &EntityDefinition) -> Vec
             .pickup
             .as_ref()
             .map(|pickup| pickup.count),
-    })
+    });
+
+    if kind == EntityKind::Decoration {
+        warnings.extend(collect_decoration_animation_warnings(definition));
+    }
+
+    warnings
 }
 
 pub fn validate_stored_entity_warnings(stored: &StoredEntity) -> Vec<String> {
@@ -113,8 +145,8 @@ pub fn validate_stored_entity_warnings(stored: &StoredEntity) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::entity::{
-        AnimationsDef, AudioDef, CollisionDef, ComponentsDef, EntityDefinition, RenderingDef,
-        StaticObjectRenderDef,
+        AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, ComponentsDef, EntityDefinition,
+        RenderingDef, StaticObjectRenderDef,
     };
 
     fn base_definition(category: &str) -> EntityDefinition {
@@ -202,5 +234,61 @@ mod tests {
         assert!(warnings
             .iter()
             .any(|w| w.contains("Pickup item should use trigger collision")));
+    }
+
+    #[test]
+    fn validation_accepts_static_decoration_without_animation_clips() {
+        let definition = base_definition("decoration");
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(!warnings.iter().any(|w| w.contains("Animated decoration")));
+    }
+
+    #[test]
+    fn validation_accepts_single_idle_decoration_animation() {
+        let mut definition = base_definition("decoration");
+        definition.rendering.static_object = None;
+        definition.animations.clips = vec![AnimationClipDef {
+            state: "idle".to_string(),
+            frame_tiles: vec!["torch/idle_a".to_string()],
+            frame_positions: None,
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: "loop".to_string(),
+        }];
+        definition.animations.default_state = "idle".to_string();
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(!warnings.iter().any(|w| w.contains("Animated decoration")));
+    }
+
+    #[test]
+    fn validation_warns_for_non_idle_or_multiple_decoration_animations() {
+        let mut definition = base_definition("decoration");
+        definition.rendering.static_object = None;
+        definition.animations.clips = vec![
+            AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["torch/idle_a".to_string()],
+                frame_positions: None,
+                frame_duration_ms: 120.0,
+                frame_durations_ms: None,
+                loop_mode: "loop".to_string(),
+            },
+            AnimationClipDef {
+                state: "walk_down".to_string(),
+                frame_tiles: vec!["torch/walk_a".to_string()],
+                frame_positions: None,
+                frame_duration_ms: 120.0,
+                frame_durations_ms: None,
+                loop_mode: "loop".to_string(),
+            },
+        ];
+        definition.animations.default_state = "walk_down".to_string();
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.iter().any(|w| w.contains("exactly one animation clip")));
+        assert!(warnings.iter().any(|w| w.contains("default_state should be 'idle'")));
+        assert!(warnings.iter().any(|w| w.contains("only the 'idle' state")));
     }
 }

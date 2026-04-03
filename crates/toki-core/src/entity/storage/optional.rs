@@ -207,6 +207,10 @@ impl OptionalComponentRegistry {
         self.pickups.ids()
     }
 
+    pub fn interaction_ids(&self) -> impl Iterator<Item = EntityId> + '_ {
+        self.interactions.ids()
+    }
+
     pub fn inventory_ids(&self) -> impl Iterator<Item = EntityId> + '_ {
         self.inventories.ids()
     }
@@ -259,6 +263,7 @@ mod tests {
         );
         assert_eq!(registry.pickup_ids().collect::<Vec<_>>(), vec![7]);
         assert_eq!(registry.inventory_ids().collect::<Vec<_>>(), vec![7]);
+        assert!(registry.interaction_ids().collect::<Vec<_>>().is_empty());
         assert_eq!(
             registry
                 .optional_components(7)

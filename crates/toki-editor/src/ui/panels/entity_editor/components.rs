@@ -1,6 +1,7 @@
 //! Component section rendering for entity editor.
 
 use crate::ui::EditorUI;
+use std::path::Path;
 use toki_core::entity::AiBehavior;
 use toki_core::entity::EntityFootprint;
 
@@ -13,11 +14,15 @@ fn sync_grounding_footprint(edit: &mut crate::ui::editor_ui::EntityEditState) {
     ));
 }
 
-pub fn render_component_toggles(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+pub fn render_component_toggles(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    project_path: Option<&Path>,
+) {
     ui.heading("Components");
     ui.separator();
 
-    super::components_core::render_rendering_section(ui, ui_state);
+    super::components_core::render_rendering_section(ui, ui_state, project_path);
     super::components_core::render_attributes_section(ui, ui_state);
     render_collision_section(ui, ui_state);
     render_health_section(ui, ui_state);

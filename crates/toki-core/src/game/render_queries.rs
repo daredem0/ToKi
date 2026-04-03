@@ -1,6 +1,7 @@
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{EntityId, EntityManager};
+use crate::project_assets::normalize_asset_name;
 use crate::sprite::SpriteFrame;
 use crate::sprite_render::{
     SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteSortKey, SpriteVisualRef,
@@ -266,6 +267,12 @@ impl<'a> RenderQueryService<'a> {
                 let Ok(tile_name) = animation_controller.current_tile_name() else {
                     continue;
                 };
+                let atlas_name_clean = normalize_asset_name(&atlas_name);
+                let object_sheet_source = entity
+                    .rendering
+                    .static_object_render
+                    .as_ref()
+                    .filter(|render| normalize_asset_name(&render.sheet) == atlas_name_clean);
 
                 requests.push(SpriteRenderRequest {
                     origin: SpriteRenderOrigin::AnimatedEntity(entity_id),
@@ -274,9 +281,16 @@ impl<'a> RenderQueryService<'a> {
                         secondary: entity.rendering.render_layer,
                         sequence: animated_sequence,
                     },
-                    visual: SpriteVisualRef::AtlasTile {
-                        atlas_name,
-                        tile_name,
+                    visual: if let Some(static_render) = object_sheet_source {
+                        SpriteVisualRef::ObjectSheetObject {
+                            sheet_name: static_render.sheet.clone(),
+                            object_name: tile_name,
+                        }
+                    } else {
+                        SpriteVisualRef::AtlasTile {
+                            atlas_name,
+                            tile_name,
+                        }
                     },
                     position: entity.position,
                     size: SpriteRenderSize::Explicit(entity.size),
@@ -426,6 +440,7 @@ mod tests {
         CombatComponent, EntityFootprint, EntityGrounding, EntityManager, EntityRendering,
         EntityStats, OptionalEntityComponents, ProjectileState, StaticObjectRenderDef,
     };
+    use crate::sprite_render::SpriteVisualRef;
 
     struct TestEntitySpec {
         entity_kind: crate::entity::EntityKind,
@@ -796,5 +811,153 @@ mod tests {
             crate::sprite_render::SpriteRenderOrigin::StaticEntity(upper_id)
         );
         assert!(requests[0].sort_key.primary < requests[1].sort_key.primary);
+    }
+
+    #[test]
+    fn sprite_render_requests_prefer_animation_when_entity_also_has_static_object_render() {
+        let mut entity_manager = EntityManager::new();
+        let mut controller = crate::animation::AnimationController::new();
+        controller.add_clip(crate::animation::AnimationClip {
+            state: crate::animation::AnimationState::Idle,
+            atlas_name: "decor".to_string(),
+            frame_tile_names: vec!["torch/idle_a".to_string()],
+            frame_positions: None,
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: crate::animation::LoopMode::Loop,
+        });
+        controller.play(crate::animation::AnimationState::Idle);
+
+        let entity_id = spawn_test_entity(
+            &mut entity_manager,
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Decoration,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(16, 32),
+                rendering: EntityRendering {
+                    animation_controller: Some(controller),
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "objects".to_string(),
+                        object_name: "torch".to_string(),
+                    }),
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
+            },
+        );
+
+        let facade = RenderQueryService::new(&entity_manager, None, false);
+        let requests = facade.sprite_render_requests();
+
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            requests[0].origin,
+            crate::sprite_render::SpriteRenderOrigin::AnimatedEntity(entity_id)
+        );
+        assert_eq!(
+            requests[0].visual,
+            SpriteVisualRef::AtlasTile {
+                atlas_name: "decor".to_string(),
+                tile_name: "torch/idle_a".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn sprite_render_requests_use_object_sheet_visual_when_animation_source_matches_static_sheet() {
+        let mut entity_manager = EntityManager::new();
+        let mut controller = crate::animation::AnimationController::new();
+        controller.add_clip(crate::animation::AnimationClip {
+            state: crate::animation::AnimationState::Idle,
+            atlas_name: "HouseM".to_string(),
+            frame_tile_names: vec!["object_1".to_string()],
+            frame_positions: None,
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: crate::animation::LoopMode::Loop,
+        });
+        controller.play(crate::animation::AnimationState::Idle);
+
+        spawn_test_entity(
+            &mut entity_manager,
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Decoration,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(64, 64),
+                rendering: EntityRendering {
+                    animation_controller: Some(controller),
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "HouseM".to_string(),
+                        object_name: "object_0".to_string(),
+                    }),
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
+            },
+        );
+
+        let facade = RenderQueryService::new(&entity_manager, None, false);
+        let requests = facade.sprite_render_requests();
+
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            requests[0].visual,
+            SpriteVisualRef::ObjectSheetObject {
+                sheet_name: "HouseM".to_string(),
+                object_name: "object_1".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn sprite_render_requests_use_object_sheet_visual_when_animation_source_has_json_suffix() {
+        let mut entity_manager = EntityManager::new();
+        let mut controller = crate::animation::AnimationController::new();
+        controller.add_clip(crate::animation::AnimationClip {
+            state: crate::animation::AnimationState::Idle,
+            atlas_name: "HouseM.json".to_string(),
+            frame_tile_names: vec!["object_1".to_string()],
+            frame_positions: None,
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: crate::animation::LoopMode::Loop,
+        });
+        controller.play(crate::animation::AnimationState::Idle);
+
+        spawn_test_entity(
+            &mut entity_manager,
+            TestEntitySpec {
+                entity_kind: crate::entity::EntityKind::Decoration,
+                position: glam::IVec2::new(10, 20),
+                size: glam::UVec2::new(64, 64),
+                rendering: EntityRendering {
+                    animation_controller: Some(controller),
+                    static_object_render: Some(StaticObjectRenderDef {
+                        sheet: "HouseM".to_string(),
+                        object_name: "object_0".to_string(),
+                    }),
+                    ..EntityRendering::default()
+                },
+                solid: true,
+                active: true,
+                components: Default::default(),
+            },
+        );
+
+        let facade = RenderQueryService::new(&entity_manager, None, false);
+        let requests = facade.sprite_render_requests();
+
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            requests[0].visual,
+            SpriteVisualRef::ObjectSheetObject {
+                sheet_name: "HouseM".to_string(),
+                object_name: "object_1".to_string(),
+            }
+        );
     }
 }

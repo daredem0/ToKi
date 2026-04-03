@@ -59,8 +59,8 @@ impl InspectorSystem {
 
         ui.separator();
 
-        // Atlas info
-        ui.label("Atlas:");
+        // Source info
+        ui.label("Animation Source:");
         let atlas_name = &crate::ui::editor_context::animation_state_mut(ui_state)
             .authoring
             .atlas_name;

@@ -2,6 +2,7 @@
 // Provides visual animation editing with preview playback
 
 use super::editor_ui_animation_authoring::{AnimationAuthoringState, AuthoredClip};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::animation::ClipPlayback;
 use toki_core::assets::atlas::ColorMode;
@@ -174,6 +175,10 @@ pub struct AnimationEditorState {
     pub atlas_entity_palette_override: Option<String>,
     /// Atlas default palette from atlas metadata
     pub atlas_default_palette: Option<String>,
+    /// Whether the current animation source is an object sheet.
+    pub source_is_object_sheet: bool,
+    /// Optional object rects keyed by grid position for object-sheet-backed previews.
+    pub source_rects_by_position: HashMap<[u32; 2], [u32; 4]>,
     /// Viewport for the atlas canvas view
     pub atlas_viewport: AtlasViewport,
     /// Preview zoom level
@@ -183,6 +188,8 @@ pub struct AnimationEditorState {
     pub show_new_clip_dialog: bool,
     /// New clip state name input
     pub new_clip_state_input: String,
+    /// Decorations are stationary in v1 and may only author a single idle clip.
+    pub decoration_idle_only: bool,
     // Panel layout sizes (draggable dividers)
     /// Width of the clip list panel (left)
     pub clip_list_width: f32,
@@ -217,6 +224,8 @@ impl std::fmt::Debug for AnimationEditorState {
                 &self.atlas_entity_palette_override,
             )
             .field("atlas_default_palette", &self.atlas_default_palette)
+            .field("source_is_object_sheet", &self.source_is_object_sheet)
+            .field("source_rects_by_position", &self.source_rects_by_position)
             .field("atlas_viewport", &self.atlas_viewport)
             .field("preview_zoom", &self.preview_zoom)
             .field("show_grid", &self.show_grid)
@@ -245,11 +254,14 @@ impl Default for AnimationEditorState {
             atlas_palette_id: None,
             atlas_entity_palette_override: None,
             atlas_default_palette: None,
+            source_is_object_sheet: false,
+            source_rects_by_position: HashMap::new(),
             atlas_viewport: AtlasViewport::default(),
             preview_zoom: 2.0,
             show_grid: true,
             show_new_clip_dialog: false,
             new_clip_state_input: String::new(),
+            decoration_idle_only: false,
             clip_list_width: 180.0,
             frame_sequence_width: 200.0,
             preview_height: 180.0,
@@ -265,12 +277,26 @@ impl AnimationEditorState {
         entity_name: &str,
         file_path: PathBuf,
         authoring: AnimationAuthoringState,
+        decoration_idle_only: bool,
     ) {
         self.active_entity = Some(entity_name.to_string());
         self.entity_file_path = Some(file_path);
         self.authoring = authoring;
+        self.decoration_idle_only = decoration_idle_only;
         self.preview.stop();
         self.clear_atlas_cache();
+    }
+
+    pub fn available_new_clip_states(&self) -> Vec<&'static str> {
+        if self.decoration_idle_only {
+            return if self.authoring.has_clip_for_state("idle") {
+                Vec::new()
+            } else {
+                vec!["idle"]
+            };
+        }
+
+        self.authoring.available_states()
     }
 
     /// Check if an entity is loaded
@@ -494,7 +520,7 @@ mod tests {
         let mut state = AnimationEditorState::default();
         let authoring = AnimationAuthoringState::default();
 
-        state.load_entity("test_entity", PathBuf::from("/test/path"), authoring);
+        state.load_entity("test_entity", PathBuf::from("/test/path"), authoring, false);
 
         assert!(state.has_entity());
         assert_eq!(state.active_entity, Some("test_entity".to_string()));
@@ -503,6 +529,22 @@ mod tests {
         assert_eq!(state.atlas_palette_id, None);
         assert_eq!(state.atlas_entity_palette_override, None);
         assert_eq!(state.atlas_default_palette, None);
+        assert!(!state.decoration_idle_only);
+    }
+
+    #[test]
+    fn editor_restricts_new_clip_states_for_decorations() {
+        let mut state = AnimationEditorState::default();
+        state.load_entity(
+            "torch",
+            PathBuf::from("/test/torch.json"),
+            AnimationAuthoringState::default(),
+            true,
+        );
+
+        assert_eq!(state.available_new_clip_states(), vec!["idle"]);
+        state.authoring.create_clip("idle");
+        assert!(state.available_new_clip_states().is_empty());
     }
 
     #[test]

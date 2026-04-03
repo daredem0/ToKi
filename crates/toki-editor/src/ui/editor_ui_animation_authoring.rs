@@ -5,6 +5,7 @@
 // additional UI features (per-frame duration controls, cell grid picker) are added.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use toki_core::animation::LoopMode;
 use toki_core::entity::{AnimationClipDef, AnimationsDef};
 
@@ -256,6 +257,10 @@ pub struct AnimationAuthoringState {
     pub default_state: String,
     /// Whether the authoring state has unsaved changes
     pub dirty: bool,
+    /// Whether the current source is an object sheet.
+    pub source_is_object_sheet: bool,
+    /// Position-to-name lookup for object-sheet-backed frames.
+    pub source_name_lookup: HashMap<[u32; 2], String>,
 }
 
 impl AnimationAuthoringState {
@@ -286,6 +291,8 @@ impl AnimationAuthoringState {
             atlas_name: def.atlas_name.clone(),
             default_state: def.default_state.clone(),
             dirty: false,
+            source_is_object_sheet: false,
+            source_name_lookup: HashMap::new(),
         }
     }
 

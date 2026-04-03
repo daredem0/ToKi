@@ -20,11 +20,11 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         .atlas_name
         .clone();
     if atlas_name.is_empty() {
-        ui.label("No atlas selected. Select an atlas first.");
+        ui.label("No animation source selected. Select a source first.");
 
-        // Atlas selector
+        // Source selector
         ui.horizontal(|ui| {
-            ui.label("Atlas:");
+            ui.label("Source:");
             let mut atlas = crate::ui::editor_context::animation_state_mut(ui_state)
                 .authoring
                 .atlas_name
@@ -366,7 +366,7 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         atlas_default_palette.as_deref(),
     ) else {
         tracing::error!(
-            "Failed to load animation atlas preview image: {:?}",
+            "Failed to load animation source preview image: {:?}",
             png_path
         );
         return;
@@ -390,7 +390,11 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
     );
     crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture = Some(texture);
 
-    tracing::info!("Loaded atlas texture: {}x{}", decoded.width, decoded.height);
+    tracing::info!(
+        "Loaded animation source texture: {}x{}",
+        decoded.width,
+        decoded.height
+    );
 }
 
 #[cfg(test)]

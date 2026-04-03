@@ -35,12 +35,26 @@ impl InspectorSystem {
         };
 
         let tab = ui_state.scene_viewport_context().toolbox.selected_tab;
+        let definitions = collect_entity_definitions_for_toolbox(ui_state, project_assets);
         match tab {
             ToolboxTab::Decorations => {
-                render_decoration_tab(ui_state, ui, ctx, &project_path, &mut viewport);
+                render_decoration_tab(
+                    ui_state,
+                    ui,
+                    ctx,
+                    &project_path,
+                    definitions.get(&ToolboxTab::Decorations),
+                    &mut viewport,
+                );
             }
             ToolboxTab::Creatures | ToolboxTab::Humans | ToolboxTab::Items => {
-                render_entity_definition_tab(ui_state, ui, project_assets, tab, &mut viewport);
+                render_entity_definition_tab(
+                    ui_state,
+                    ui,
+                    definitions.get(&tab),
+                    tab,
+                    &mut viewport,
+                );
             }
         }
     }
@@ -138,12 +152,11 @@ fn resolve_project_path(
 fn render_entity_definition_tab(
     ui_state: &mut EditorUI,
     ui: &mut egui::Ui,
-    project_assets: Option<&mut ProjectAssets>,
+    definitions: Option<&Vec<crate::ui::hierarchy::ToolboxEntityDefinitionSummary>>,
     tab: ToolboxTab,
     viewport: &mut Option<&mut SceneViewport>,
 ) {
-    let definitions = collect_entity_definitions_for_toolbox(ui_state, project_assets);
-    let names = match definitions.get(&tab) {
+    let names = match definitions {
         Some(names) if !names.is_empty() => names,
         _ => {
             ui.label(format!(
@@ -157,26 +170,39 @@ fn render_entity_definition_tab(
     ui.label(format!("{} ({})", tab.label(), names.len()));
     ui.separator();
 
-    egui::ScrollArea::vertical()
-        .max_height(400.0)
-        .show(ui, |ui| {
-            for definition in names {
-                let label = if definition.display_name == definition.name {
-                    definition.name.as_str().to_string()
-                } else {
-                    format!("{} ({})", definition.display_name, definition.name)
-                };
-                if ui.selectable_label(false, label).clicked() {
-                    enter_definition_placement_mode(ui_state, &definition.name);
-                    if let Some(viewport) = viewport.as_mut() {
-                        viewport.mark_dirty();
-                    }
-                }
-            }
-        });
+    render_entity_definition_entries(ui_state, ui, names, viewport, Some(400.0));
 
     ui.separator();
     ui.small("Click an entity to enter placement mode. Press Enter or Escape to exit.");
+}
+
+fn render_entity_definition_entries(
+    ui_state: &mut EditorUI,
+    ui: &mut egui::Ui,
+    names: &[crate::ui::hierarchy::ToolboxEntityDefinitionSummary],
+    viewport: &mut Option<&mut SceneViewport>,
+    max_height: Option<f32>,
+) {
+    let mut scroll_area = egui::ScrollArea::vertical();
+    if let Some(max_height) = max_height {
+        scroll_area = scroll_area.max_height(max_height);
+    }
+
+    scroll_area.show(ui, |ui| {
+        for definition in names {
+            let label = if definition.display_name == definition.name {
+                definition.name.as_str().to_string()
+            } else {
+                format!("{} ({})", definition.display_name, definition.name)
+            };
+            if ui.selectable_label(false, label).clicked() {
+                enter_definition_placement_mode(ui_state, &definition.name);
+                if let Some(viewport) = viewport.as_mut() {
+                    viewport.mark_dirty();
+                }
+            }
+        }
+    });
 }
 
 fn enter_definition_placement_mode(ui_state: &mut EditorUI, name: &str) {
@@ -193,8 +219,23 @@ fn render_decoration_tab(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
     project_path: &std::path::Path,
+    decoration_definitions: Option<&Vec<crate::ui::hierarchy::ToolboxEntityDefinitionSummary>>,
     viewport: &mut Option<&mut SceneViewport>,
 ) {
+    ui.label("Decoration Definitions");
+    match decoration_definitions {
+        Some(definitions) if !definitions.is_empty() => {
+            render_entity_definition_entries(ui_state, ui, definitions, viewport, Some(180.0));
+            ui.small("Animated decorations are placed from entity definitions.");
+        }
+        _ => {
+            ui.small("No decoration definitions found.");
+        }
+    }
+
+    ui.separator();
+    ui.label("Static Props");
+
     let current_selected_sheet = ui_state
         .scene_viewport_context()
         .toolbox

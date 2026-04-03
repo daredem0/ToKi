@@ -263,6 +263,62 @@ fn apply_entity_property_draft_to_definition_updates_has_shadow() {
 }
 
 #[test]
+fn apply_entity_property_draft_to_definition_updates_static_object_render() {
+    let mut definition = toki_core::entity::EntityDefinition {
+        name: "decor".to_string().into(),
+        display_name: "Decor".to_string(),
+        description: String::new(),
+        rendering: toki_core::entity::RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: None,
+            grounding: Default::default(),
+        },
+        solid: true,
+        active: true,
+        components: toki_core::entity::ComponentsDef::default(),
+        collision: toki_core::entity::CollisionDef {
+            enabled: false,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: toki_core::entity::AudioDef {
+            footstep_trigger_distance: 0.0,
+            hearing_radius: 0,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: toki_core::entity::AnimationsDef {
+            atlas_name: String::new(),
+            clips: vec![],
+            default_state: "idle".to_string(),
+        },
+        category: "decoration".to_string(),
+        tags: vec![],
+    };
+    let mut draft = EntityPropertyDraft::from_entity_definition(&definition);
+    draft.static_object_sheet = Some("fauna".to_string());
+    draft.static_object_name = Some("flower".to_string());
+
+    let changed =
+        InspectorSystem::apply_entity_property_draft_to_definition(&mut definition, &draft);
+
+    assert!(changed);
+    assert_eq!(
+        definition.rendering.static_object,
+        Some(StaticObjectRenderDef {
+            sheet: "fauna".to_string(),
+            object_name: "flower".to_string(),
+        })
+    );
+}
+
+#[test]
 fn apply_entity_property_draft_disables_health_and_collision() {
     let mut entity = sample_entity_with_id(1);
     InspectorSystem::set_optional_runtime_stat(
