@@ -120,7 +120,10 @@ pub fn render_rendering_section(
                 edit.mark_dirty();
             }
             if ui
-                .checkbox(&mut edit.definition.rendering.has_drop_shadow, "Has Drop Shadow")
+                .checkbox(
+                    &mut edit.definition.rendering.has_drop_shadow,
+                    "Has Drop Shadow",
+                )
                 .changed()
             {
                 edit.mark_dirty();

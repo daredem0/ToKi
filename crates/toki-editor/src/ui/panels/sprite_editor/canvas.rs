@@ -43,8 +43,11 @@ pub fn render_canvas_viewport(
     let tool = crate::ui::editor_context::sprite_state(ui_state).tool;
     let right_click_erases = matches!(
         tool,
-        SpriteEditorTool::Brush | SpriteEditorTool::Fill | SpriteEditorTool::Line
-            | SpriteEditorTool::Rectangle | SpriteEditorTool::Ellipse
+        SpriteEditorTool::Brush
+            | SpriteEditorTool::Fill
+            | SpriteEditorTool::Line
+            | SpriteEditorTool::Rectangle
+            | SpriteEditorTool::Ellipse
     );
     if response.dragged_by(egui::PointerButton::Middle)
         || (!right_click_erases && response.dragged_by(egui::PointerButton::Secondary))
@@ -356,7 +359,11 @@ pub fn ensure_floating_texture(ui_state: &mut EditorUI, ctx: &egui::Context, sid
     };
 
     let image = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &pixels);
-    let texture = ctx.load_texture("sprite_editor_floating", image, egui::TextureOptions::NEAREST);
+    let texture = ctx.load_texture(
+        "sprite_editor_floating",
+        image,
+        egui::TextureOptions::NEAREST,
+    );
     crate::ui::editor_context::sprite_state_mut(ui_state)
         .canvas_state_mut(side)
         .floating_texture = Some(texture);
@@ -455,7 +462,11 @@ fn composite_checkerboard_into(pixels: &mut [u8], width: usize) {
         if alpha == 255 {
             continue;
         }
-        let checker: u8 = if (idx % width + idx / width).is_multiple_of(2) { 180 } else { 220 };
+        let checker: u8 = if (idx % width + idx / width).is_multiple_of(2) {
+            180
+        } else {
+            220
+        };
         let a = alpha as u32;
         rgba[0] = ((a * rgba[0] as u32 + (255 - a) * checker as u32) / 255) as u8;
         rgba[1] = ((a * rgba[1] as u32 + (255 - a) * checker as u32) / 255) as u8;
@@ -520,9 +531,14 @@ fn draw_tile_preview(
     let tint = egui::Color32::from_white_alpha(90);
     let full_uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
     let offsets: [(i32, i32); 8] = [
-        (-1, -1), (0, -1), (1, -1),
-        (-1,  0),           (1,  0),
-        (-1,  1), (0,  1), (1,  1),
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, 1),
+        (0, 1),
+        (1, 1),
     ];
 
     for (dx, dy) in offsets {
@@ -872,10 +888,16 @@ fn draw_floating_pixels(
     let pixel_h = display.y as f32 / src_h as f32 * zoom;
     for sy in 0..src_h {
         for sx in 0..src_w {
-            let Some(color) = floating.pixels.get_pixel(sx, sy) else { continue; };
-            if color.a == 0 { continue; }
-            let px = canvas_screen_min.x + (floating.offset.x as f32 + sx as f32 * pixel_w / zoom) * zoom;
-            let py = canvas_screen_min.y + (floating.offset.y as f32 + sy as f32 * pixel_h / zoom) * zoom;
+            let Some(color) = floating.pixels.get_pixel(sx, sy) else {
+                continue;
+            };
+            if color.a == 0 {
+                continue;
+            }
+            let px = canvas_screen_min.x
+                + (floating.offset.x as f32 + sx as f32 * pixel_w / zoom) * zoom;
+            let py = canvas_screen_min.y
+                + (floating.offset.y as f32 + sy as f32 * pixel_h / zoom) * zoom;
             painter.rect_filled(
                 egui::Rect::from_min_size(egui::pos2(px, py), egui::vec2(pixel_w, pixel_h)),
                 0.0,
@@ -1045,7 +1067,10 @@ fn draw_hovered_pixel_highlight(
             rect.left() + (top_left_canvas.x as f32 - pan.x) * zoom,
             rect.top() + (top_left_canvas.y as f32 - pan.y) * zoom,
         );
-        egui::Rect::from_min_size(min, egui::vec2(brush_size as f32 * zoom, brush_size as f32 * zoom))
+        egui::Rect::from_min_size(
+            min,
+            egui::vec2(brush_size as f32 * zoom, brush_size as f32 * zoom),
+        )
     } else {
         let min = egui::pos2(
             rect.left() + (pos.x as f32 - pan.x) * zoom,

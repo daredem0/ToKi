@@ -310,6 +310,8 @@ fn node_title(kind: &RuleGraphNodeKind) -> String {
         RuleGraphNodeKind::Condition(c) => {
             rule_graph_condition_summary(c, RuleGraphSummaryStyle::Compact)
         }
-        RuleGraphNodeKind::Action(a) => rule_graph_action_summary(a, RuleGraphSummaryStyle::Compact),
+        RuleGraphNodeKind::Action(a) => {
+            rule_graph_action_summary(a, RuleGraphSummaryStyle::Compact)
+        }
     }
 }

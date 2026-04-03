@@ -4,8 +4,7 @@ use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{
-    canonical_indexed_color, indexed_slot_for_authored_color, PixelColor, ResizeCorner,
-    ResizeDrag,
+    canonical_indexed_color, indexed_slot_for_authored_color, PixelColor, ResizeCorner, ResizeDrag,
 };
 use crate::ui::EditorUI;
 use glam::UVec2;

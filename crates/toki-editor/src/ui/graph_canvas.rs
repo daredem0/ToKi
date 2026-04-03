@@ -372,7 +372,10 @@ pub(crate) fn render_graph_canvas(
 fn node_canvas_size(painter: &egui::Painter, node: &GraphCanvasNode, scale: f32) -> Vec2 {
     let height =
         BASE_NODE_HEIGHT + node.output_ports.len().saturating_sub(1) as f32 * PORT_ROW_HEIGHT;
-    Vec2::new(measured_title_width(painter, &node.title, scale), height * scale)
+    Vec2::new(
+        measured_title_width(painter, &node.title, scale),
+        height * scale,
+    )
 }
 
 pub(crate) fn measured_title_width(painter: &egui::Painter, title: &str, scale: f32) -> f32 {
@@ -386,8 +389,7 @@ pub(crate) fn measured_title_width(painter: &egui::Painter, title: &str, scale: 
 
 /// Returns the unscaled (scale=1) canvas size for a node with the given number of output ports.
 pub(crate) fn graph_canvas_node_size(num_output_ports: usize, scale: f32) -> Vec2 {
-    let height =
-        BASE_NODE_HEIGHT + num_output_ports.saturating_sub(1) as f32 * PORT_ROW_HEIGHT;
+    let height = BASE_NODE_HEIGHT + num_output_ports.saturating_sub(1) as f32 * PORT_ROW_HEIGHT;
     Vec2::new(NODE_WIDTH * scale, height * scale)
 }
 

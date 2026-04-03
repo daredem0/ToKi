@@ -47,8 +47,9 @@ impl PanelSystem {
         let mut connect_from =
             crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node;
         let mut connect_to = crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node;
-        let mut canvas_state =
-            crate::ui::editor_context::graph_state_mut(ui_state).canvas_state.clone();
+        let mut canvas_state = crate::ui::editor_context::graph_state_mut(ui_state)
+            .canvas_state
+            .clone();
         let (persisted_zoom, persisted_pan) =
             crate::ui::editor_ui::graph_view_for_scene(ui_state, &active_scene_name);
         canvas_state.zoom = persisted_zoom;
@@ -214,8 +215,7 @@ impl PanelSystem {
                     for action in actions {
                         match action {
                             GraphCanvasAction::SelectNode(id) => {
-                                selected_graph_node =
-                                    id.as_deref().and_then(|s| s.parse().ok());
+                                selected_graph_node = id.as_deref().and_then(|s| s.parse().ok());
                             }
                             GraphCanvasAction::MoveNode { node_id, position } => {
                                 if let Ok(id) = node_id.parse::<u64>() {
@@ -231,10 +231,9 @@ impl PanelSystem {
                                 to_node_id,
                                 ..
                             } => {
-                                if let (Ok(from), Ok(to)) = (
-                                    from_node_id.parse::<u64>(),
-                                    to_node_id.parse::<u64>(),
-                                ) {
+                                if let (Ok(from), Ok(to)) =
+                                    (from_node_id.parse::<u64>(), to_node_id.parse::<u64>())
+                                {
                                     pending_command = Some(GraphCommand::Connect(from, to));
                                 }
                             }

@@ -868,7 +868,11 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
 fn render_floating_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let is_sheet = crate::ui::editor_context::sprite_state(ui_state).is_sheet();
-    let label = if is_sheet { "Center to tile" } else { "Center to canvas" };
+    let label = if is_sheet {
+        "Center to tile"
+    } else {
+        "Center to canvas"
+    };
     ui.label("Floating Selection:");
     if ui.button(label).clicked() {
         crate::ui::editor_context::sprite_state_mut(ui_state).center_floating_on_tile();

@@ -18,12 +18,36 @@ pub fn build_quad_vertices(
         (frame.u0, frame.u1)
     };
     [
-        QuadVertex { position: [ox, oy], tex_coords: [u0, frame.v0], tint_alpha },
-        QuadVertex { position: [ox + width, oy], tex_coords: [u1, frame.v0], tint_alpha },
-        QuadVertex { position: [ox + width, oy + height], tex_coords: [u1, frame.v1], tint_alpha },
-        QuadVertex { position: [ox, oy], tex_coords: [u0, frame.v0], tint_alpha },
-        QuadVertex { position: [ox + width, oy + height], tex_coords: [u1, frame.v1], tint_alpha },
-        QuadVertex { position: [ox, oy + height], tex_coords: [u0, frame.v1], tint_alpha },
+        QuadVertex {
+            position: [ox, oy],
+            tex_coords: [u0, frame.v0],
+            tint_alpha,
+        },
+        QuadVertex {
+            position: [ox + width, oy],
+            tex_coords: [u1, frame.v0],
+            tint_alpha,
+        },
+        QuadVertex {
+            position: [ox + width, oy + height],
+            tex_coords: [u1, frame.v1],
+            tint_alpha,
+        },
+        QuadVertex {
+            position: [ox, oy],
+            tex_coords: [u0, frame.v0],
+            tint_alpha,
+        },
+        QuadVertex {
+            position: [ox + width, oy + height],
+            tex_coords: [u1, frame.v1],
+            tint_alpha,
+        },
+        QuadVertex {
+            position: [ox, oy + height],
+            tex_coords: [u0, frame.v1],
+            tint_alpha,
+        },
     ]
 }
 

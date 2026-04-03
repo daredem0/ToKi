@@ -227,7 +227,13 @@ impl<'a> WorldFramePresenter<'a> {
 }
 
 fn ground_shadow_bands(shadow: &GroundShadow) -> Vec<GroundShadowBand> {
-    let band_count = if shadow.size.y >= 8.0 { 11 } else if shadow.size.y >= 5.0 { 7 } else { 5 };
+    let band_count = if shadow.size.y >= 8.0 {
+        11
+    } else if shadow.size.y >= 5.0 {
+        7
+    } else {
+        5
+    };
     let mut bands = Vec::with_capacity(band_count);
     let band_height = (shadow.size.y / band_count as f32).max(0.5);
     let center_x = shadow.position.x + shadow.size.x * 0.5;

@@ -422,7 +422,7 @@ fn load_entity_definition_from_path_reads_definition_json() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
-                has_drop_shadow: false,
+            has_drop_shadow: false,
             palette_override: None,
             static_object: None,
             grounding: Default::default(),

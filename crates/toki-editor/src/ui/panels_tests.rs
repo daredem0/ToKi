@@ -197,7 +197,6 @@ fn graph_zoom_scales_node_visuals() {
         zoomed_out.x < zoomed_in.x && zoomed_out.y < zoomed_in.y,
         "node size should increase with zoom"
     );
-
 }
 
 #[test]

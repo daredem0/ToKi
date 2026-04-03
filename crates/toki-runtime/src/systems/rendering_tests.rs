@@ -634,8 +634,16 @@ fn backend_seam_dispatches_runtime_render_commands() {
     rendering.set_tilemap_render_enabled(false);
     rendering.set_tilemap_render_enabled(true);
     rendering.update_tilemap_vertices(&[
-        QuadVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], tint_alpha: 0.0 },
-        QuadVertex { position: [16.0, 16.0], tex_coords: [1.0, 1.0], tint_alpha: 0.0 },
+        QuadVertex {
+            position: [0.0, 0.0],
+            tex_coords: [0.0, 0.0],
+            tint_alpha: 0.0,
+        },
+        QuadVertex {
+            position: [16.0, 16.0],
+            tex_coords: [1.0, 1.0],
+            tint_alpha: 0.0,
+        },
     ]);
     rendering.clear_sprites();
     rendering.add_sprite(

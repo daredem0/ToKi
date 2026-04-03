@@ -373,8 +373,12 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
             },
         },
     );
-    crate::ui::editor_context::graph_state_mut(&mut ui).canvas_state.zoom = 1.75;
-    crate::ui::editor_context::graph_state_mut(&mut ui).canvas_state.pan = [24.0, 48.0];
+    crate::ui::editor_context::graph_state_mut(&mut ui)
+        .canvas_state
+        .zoom = 1.75;
+    crate::ui::editor_context::graph_state_mut(&mut ui)
+        .canvas_state
+        .pan = [24.0, 48.0];
 
     ui.set_active_tab(super::CenterPanelTab::SpriteEditor);
     ui.set_active_tab(super::CenterPanelTab::MapEditor);
@@ -393,11 +397,15 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
         Some("draft_map")
     );
     assert_eq!(
-        crate::ui::editor_context::graph_state_mut(&mut ui).canvas_state.zoom,
+        crate::ui::editor_context::graph_state_mut(&mut ui)
+            .canvas_state
+            .zoom,
         1.75
     );
     assert_eq!(
-        crate::ui::editor_context::graph_state_mut(&mut ui).canvas_state.pan,
+        crate::ui::editor_context::graph_state_mut(&mut ui)
+            .canvas_state
+            .pan,
         [24.0, 48.0]
     );
 }

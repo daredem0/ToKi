@@ -39,15 +39,20 @@ fn entity_shadow_visual(entity: &Entity) -> Option<SpriteVisualRef> {
                 object_name: tile_name,
             }
         } else {
-            SpriteVisualRef::AtlasTile { atlas_name, tile_name }
+            SpriteVisualRef::AtlasTile {
+                atlas_name,
+                tile_name,
+            }
         });
     }
-    entity.rendering.static_object_render.as_ref().map(|static_render| {
-        SpriteVisualRef::ObjectSheetObject {
+    entity
+        .rendering
+        .static_object_render
+        .as_ref()
+        .map(|static_render| SpriteVisualRef::ObjectSheetObject {
             sheet_name: static_render.sheet.clone(),
             object_name: static_render.object_name.clone(),
-        }
-    })
+        })
 }
 
 impl<'a> RenderQueryService<'a> {
@@ -274,8 +279,12 @@ impl<'a> RenderQueryService<'a> {
     }
 
     pub fn drop_shadow_sprite_requests(&self) -> Vec<SpriteRenderRequest> {
-        let projectile_ids: HashSet<_> =
-            self.entity_manager.storage().components().projectile_ids().collect();
+        let projectile_ids: HashSet<_> = self
+            .entity_manager
+            .storage()
+            .components()
+            .projectile_ids()
+            .collect();
         let mut sequence = 0_u32;
 
         self.entity_manager

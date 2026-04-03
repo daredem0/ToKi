@@ -84,7 +84,9 @@ impl InspectorSystem {
 
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.has_shadow, "Has Shadow").changed();
-        changed |= ui.checkbox(&mut draft.has_drop_shadow, "Has Drop Shadow").changed();
+        changed |= ui
+            .checkbox(&mut draft.has_drop_shadow, "Has Drop Shadow")
+            .changed();
         changed |= render_palette_override_row(ui, draft, available_palettes);
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();

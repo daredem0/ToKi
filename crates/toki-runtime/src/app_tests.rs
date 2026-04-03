@@ -58,7 +58,7 @@ fn write_player_definition(project_path: &std::path::Path, name: &str) {
             render_layer: 1,
             visible: true,
             has_shadow: true,
-                has_drop_shadow: false,
+            has_drop_shadow: false,
             palette_override: None,
             static_object: None,
             grounding: Default::default(),

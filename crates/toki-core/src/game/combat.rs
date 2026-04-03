@@ -45,7 +45,11 @@ impl CombatSystem {
         state.combat_service().process_profile_actions();
     }
 
-    pub(crate) fn update_projectiles(state: &mut GameState, world: WorldContext<'_>, time_scale: f32) {
+    pub(crate) fn update_projectiles(
+        state: &mut GameState,
+        world: WorldContext<'_>,
+        time_scale: f32,
+    ) {
         state
             .combat_service()
             .update_projectiles(world.tilemap, world.atlas, time_scale);
@@ -337,7 +341,15 @@ impl<'a> CombatService<'a> {
         let mut despawn_ids = Vec::new();
 
         for projectile_id in projectile_ids {
-            let Some((current_position, velocity, remaining_ticks, damage, owner_id, pos_acc, tick_acc)) = self
+            let Some((
+                current_position,
+                velocity,
+                remaining_ticks,
+                damage,
+                owner_id,
+                pos_acc,
+                tick_acc,
+            )) = self
                 .world
                 .entity_manager
                 .get_entity(projectile_id)
@@ -399,7 +411,8 @@ impl<'a> CombatService<'a> {
                 {
                     projectile.position_accumulator = new_pos_acc;
                     projectile.tick_accumulator = new_tick_acc;
-                    projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(consumed_ticks);
+                    projectile.remaining_ticks =
+                        projectile.remaining_ticks.saturating_sub(consumed_ticks);
                     tracing::trace!(
                         "Projectile {} moved from {:?} to {:?} remaining_ticks={}",
                         projectile_id,

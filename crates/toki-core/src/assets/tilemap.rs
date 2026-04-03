@@ -120,14 +120,38 @@ impl TileMap {
                 let y = pos.y as f32;
 
                 // Triangle 1
-                vertices.push(QuadVertex { position: [x, y], tex_coords: [u0, v0], tint_alpha: 0.0 });
-                vertices.push(QuadVertex { position: [x + tile_w, y], tex_coords: [u1, v0], tint_alpha: 0.0 });
-                vertices.push(QuadVertex { position: [x, y + tile_h], tex_coords: [u0, v1], tint_alpha: 0.0 });
+                vertices.push(QuadVertex {
+                    position: [x, y],
+                    tex_coords: [u0, v0],
+                    tint_alpha: 0.0,
+                });
+                vertices.push(QuadVertex {
+                    position: [x + tile_w, y],
+                    tex_coords: [u1, v0],
+                    tint_alpha: 0.0,
+                });
+                vertices.push(QuadVertex {
+                    position: [x, y + tile_h],
+                    tex_coords: [u0, v1],
+                    tint_alpha: 0.0,
+                });
 
                 // Triangle 2
-                vertices.push(QuadVertex { position: [x + tile_w, y], tex_coords: [u1, v0], tint_alpha: 0.0 });
-                vertices.push(QuadVertex { position: [x + tile_w, y + tile_h], tex_coords: [u1, v1], tint_alpha: 0.0 });
-                vertices.push(QuadVertex { position: [x, y + tile_h], tex_coords: [u0, v1], tint_alpha: 0.0 });
+                vertices.push(QuadVertex {
+                    position: [x + tile_w, y],
+                    tex_coords: [u1, v0],
+                    tint_alpha: 0.0,
+                });
+                vertices.push(QuadVertex {
+                    position: [x + tile_w, y + tile_h],
+                    tex_coords: [u1, v1],
+                    tint_alpha: 0.0,
+                });
+                vertices.push(QuadVertex {
+                    position: [x, y + tile_h],
+                    tex_coords: [u0, v1],
+                    tint_alpha: 0.0,
+                });
             }
         }
 
@@ -215,13 +239,37 @@ impl TileMap {
 
         let tile_vertices = vec![
             // Triangle 1: top-left, top-right, bottom-left
-            QuadVertex { position: [x, y], tex_coords: [u0, v0], tint_alpha: 0.0 },
-            QuadVertex { position: [x + tile_w, y], tex_coords: [u1, v0], tint_alpha: 0.0 },
-            QuadVertex { position: [x, y + tile_h], tex_coords: [u0, v1], tint_alpha: 0.0 },
+            QuadVertex {
+                position: [x, y],
+                tex_coords: [u0, v0],
+                tint_alpha: 0.0,
+            },
+            QuadVertex {
+                position: [x + tile_w, y],
+                tex_coords: [u1, v0],
+                tint_alpha: 0.0,
+            },
+            QuadVertex {
+                position: [x, y + tile_h],
+                tex_coords: [u0, v1],
+                tint_alpha: 0.0,
+            },
             // Triangle 2: top-right, bottom-right, bottom-left
-            QuadVertex { position: [x + tile_w, y], tex_coords: [u1, v0], tint_alpha: 0.0 },
-            QuadVertex { position: [x + tile_w, y + tile_h], tex_coords: [u1, v1], tint_alpha: 0.0 },
-            QuadVertex { position: [x, y + tile_h], tex_coords: [u0, v1], tint_alpha: 0.0 },
+            QuadVertex {
+                position: [x + tile_w, y],
+                tex_coords: [u1, v0],
+                tint_alpha: 0.0,
+            },
+            QuadVertex {
+                position: [x + tile_w, y + tile_h],
+                tex_coords: [u1, v1],
+                tint_alpha: 0.0,
+            },
+            QuadVertex {
+                position: [x, y + tile_h],
+                tex_coords: [u0, v1],
+                tint_alpha: 0.0,
+            },
         ];
 
         Some(tile_vertices)
