@@ -1,27 +1,10 @@
-use jsonschema::JSONSchema;
-use serde_json::{json, Value};
+use serde_json::json;
 
-fn compile_palette_schema() -> JSONSchema {
-    let schema: Value =
-        serde_json::from_str(toki_schemas::PALETTE_SCHEMA).expect("palette schema should parse");
-    JSONSchema::compile(&schema).expect("palette schema should compile")
-}
+mod common;
+use common::{assert_invalid, assert_valid, compile_schema};
 
-fn assert_valid(schema: &JSONSchema, doc: &Value) {
-    if let Err(errors) = schema.validate(doc) {
-        let details = errors.map(|error| error.to_string()).collect::<Vec<_>>();
-        panic!(
-            "expected schema-valid document, got: {}",
-            details.join(" | ")
-        );
-    }
-}
-
-fn assert_invalid(schema: &JSONSchema, doc: &Value) {
-    assert!(
-        schema.validate(doc).is_err(),
-        "expected schema-invalid document"
-    );
+fn compile_palette_schema() -> jsonschema::JSONSchema {
+    compile_schema(toki_schemas::PALETTE_SCHEMA, "palette")
 }
 
 #[test]

@@ -141,12 +141,10 @@ impl GpuState {
 
     fn ensure_post_process_target(&mut self) -> Result<(), crate::RenderError> {
         let size = (self.config.width.max(1), self.config.height.max(1));
-        let target = self.post_process_target.get_or_insert(OffscreenTarget::new(
-            self.device.clone(),
-            size,
-            self.config.format,
-        )?);
-        target.resize(size)?;
+        let target = self
+            .post_process_target
+            .get_or_insert(OffscreenTarget::new(&self.device, size, self.config.format)?);
+        target.resize(&self.device, size)?;
         self.post_process_pipeline
             .update_source_texture(&self.device, target.get_render_view()?);
         Ok(())
@@ -204,7 +202,7 @@ impl GpuState {
         }
 
         self.debug_pipeline.render(&mut render_pass);
-        self.ui_rect_pipeline.render(&mut render_pass);
+        self.ui_shape_pipeline.render(&mut render_pass);
         self.ui_debug_pipeline.render(&mut render_pass);
         if let Err(error) = self.text_renderer.render(&mut render_pass) {
             tracing::warn!("Failed to render text layer: {error}");

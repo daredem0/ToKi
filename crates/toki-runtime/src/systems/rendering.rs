@@ -11,10 +11,7 @@ use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMaterial};
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
-use toki_render::{
-    FrameLifecycle, GpuState, RenderBackend, SceneClipRect, ShapeRenderer, SpriteRenderer,
-    TextRenderer, TextureLoader,
-};
+use toki_render::{GpuState, Rect, RenderBackend, SceneClipRect};
 use winit::window::Window;
 
 use crate::viewport::presentation::ViewportPresentation;
@@ -157,7 +154,7 @@ impl RenderingSystem {
         if self.loaded_tilemap_texture_path.as_ref() == Some(&texture_path) {
             return Ok(());
         }
-        TextureLoader::load_tilemap_texture(self.backend_mut()?, texture_path.clone())?;
+        self.backend_mut()?.load_tilemap_texture(texture_path.clone())?;
         self.loaded_tilemap_texture_path = Some(texture_path);
         Ok(())
     }
@@ -166,7 +163,7 @@ impl RenderingSystem {
         &mut self,
         image: &DecodedImage,
     ) -> Result<(), toki_render::RenderError> {
-        TextureLoader::load_tilemap_texture_rgba8(self.backend_mut()?, image)?;
+        self.backend_mut()?.load_tilemap_texture_rgba8(image)?;
         self.loaded_tilemap_texture_path = None;
         Ok(())
     }
@@ -179,7 +176,7 @@ impl RenderingSystem {
         if self.loaded_sprite_texture_path.as_ref() == Some(&texture_path) {
             return Ok(());
         }
-        TextureLoader::load_sprite_texture(self.backend_mut()?, texture_path.clone())?;
+        self.backend_mut()?.load_sprite_texture(texture_path.clone())?;
         self.loaded_sprite_texture_path = Some(texture_path);
         Ok(())
     }
@@ -188,7 +185,7 @@ impl RenderingSystem {
         &mut self,
         image: &DecodedImage,
     ) -> Result<(), toki_render::RenderError> {
-        TextureLoader::load_sprite_texture_rgba8(self.backend_mut()?, image)?;
+        self.backend_mut()?.load_sprite_texture_rgba8(image)?;
         self.loaded_sprite_texture_path = None;
         Ok(())
     }
@@ -198,7 +195,7 @@ impl RenderingSystem {
         &mut self,
         font_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
-        TextureLoader::load_font_file(self.backend_mut()?, font_path)
+        self.backend_mut()?.load_font_file(font_path)
     }
 
     /// Helper to load textures from a project assets directory
@@ -292,8 +289,8 @@ impl RenderingSystem {
         let projection = self.calculate_projection();
         let clip_rect = self.scene_clip_rect();
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::set_scene_clip_rect(backend.as_mut(), clip_rect);
-            FrameLifecycle::update_projection(backend.as_mut(), projection * view_matrix);
+            backend.as_mut().set_scene_clip_rect(clip_rect);
+            backend.as_mut().update_projection(projection * view_matrix);
         }
     }
 
@@ -314,26 +311,26 @@ impl RenderingSystem {
     fn update_scene_clip_rect(&mut self) {
         let clip_rect = self.scene_clip_rect();
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::set_scene_clip_rect(backend.as_mut(), clip_rect);
+            backend.as_mut().set_scene_clip_rect(clip_rect);
         }
     }
 
     pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::set_post_process_settings(backend.as_mut(), settings);
+            backend.as_mut().set_post_process_settings(settings);
         }
     }
 
     pub fn set_vsync(&mut self, enabled: bool) {
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::set_vsync(backend.as_mut(), enabled);
+            backend.as_mut().set_vsync(enabled);
         }
     }
 
     /// Resize GPU render targets
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::resize(backend.as_mut(), new_size);
+            backend.as_mut().resize(new_size);
         }
         self.update_window_size(new_size);
     }
@@ -341,7 +338,7 @@ impl RenderingSystem {
     /// Draw the current frame
     pub fn draw(&mut self) {
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::draw(backend.as_mut());
+            backend.as_mut().draw();
         }
     }
 
@@ -352,7 +349,7 @@ impl RenderingSystem {
 
     pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::set_tilemap_render_enabled(backend.as_mut(), enabled);
+            backend.as_mut().set_tilemap_render_enabled(enabled);
         }
     }
 
@@ -363,13 +360,13 @@ impl RenderingSystem {
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         if let Some(backend) = &mut self.backend {
-            FrameLifecycle::update_tilemap_vertices(backend.as_mut(), vertices);
+            backend.as_mut().update_tilemap_vertices(vertices);
         }
     }
 
     pub fn clear_sprites(&mut self) {
         if let Some(backend) = &mut self.backend {
-            SpriteRenderer::clear_sprites(backend.as_mut());
+            backend.as_mut().clear_sprites();
         }
     }
 
@@ -381,7 +378,7 @@ impl RenderingSystem {
         flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            SpriteRenderer::add_sprite(backend.as_mut(), frame, position, size, flip_x);
+            backend.as_mut().add_sprite(frame, position, size, flip_x);
         }
     }
 
@@ -394,14 +391,9 @@ impl RenderingSystem {
         flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            SpriteRenderer::add_sprite_with_texture(
-                backend.as_mut(),
-                texture_path,
-                frame,
-                position,
-                size,
-                flip_x,
-            );
+            backend
+                .as_mut()
+                .add_sprite_with_texture(texture_path, frame, position, size, flip_x);
         }
     }
 
@@ -415,8 +407,7 @@ impl RenderingSystem {
         flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            SpriteRenderer::add_sprite_with_texture_rgba8(
-                backend.as_mut(),
+            backend.as_mut().add_sprite_with_texture_rgba8(
                 texture_key,
                 image,
                 frame,
@@ -499,13 +490,13 @@ impl RenderingSystem {
 
     pub fn clear_text_items(&mut self) {
         if let Some(backend) = &mut self.backend {
-            TextRenderer::clear_text_items(backend.as_mut());
+            backend.as_mut().clear_text_items();
         }
     }
 
     pub fn add_text_item(&mut self, text: TextItem) {
         if let Some(backend) = &mut self.backend {
-            TextRenderer::add_text_item(backend.as_mut(), text);
+            backend.as_mut().add_text_item(text);
         }
     }
 
@@ -516,7 +507,7 @@ impl RenderingSystem {
 
     pub fn clear_world_underlay_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::clear_world_underlay_shapes(backend.as_mut());
+            backend.as_mut().clear_world_underlay_shapes();
         }
     }
 
@@ -529,7 +520,9 @@ impl RenderingSystem {
         color: [f32; 4],
     ) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::add_world_underlay_rect(backend.as_mut(), x, y, width, height, color);
+            backend
+                .as_mut()
+                .add_world_underlay_rect(Rect::new(x, y, width, height), color);
         }
     }
 
@@ -542,20 +535,15 @@ impl RenderingSystem {
         color: [f32; 4],
     ) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::add_filled_world_underlay_rect(
-                backend.as_mut(),
-                x,
-                y,
-                width,
-                height,
-                color,
-            );
+            backend
+                .as_mut()
+                .add_filled_world_underlay_rect(Rect::new(x, y, width, height), color);
         }
     }
 
     pub fn finalize_world_underlay_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::finalize_world_underlay_shapes(backend.as_mut());
+            backend.as_mut().finalize_world_underlay_shapes();
         }
     }
 
@@ -602,13 +590,15 @@ impl RenderingSystem {
 
     pub fn clear_debug_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::clear_debug_shapes(backend.as_mut());
+            backend.as_mut().clear_debug_shapes();
         }
     }
 
     pub fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::add_debug_rect(backend.as_mut(), x, y, width, height, color);
+            backend
+                .as_mut()
+                .add_debug_rect(Rect::new(x, y, width, height), color);
         }
     }
 
@@ -621,37 +611,43 @@ impl RenderingSystem {
         color: [f32; 4],
     ) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::add_filled_debug_rect(backend.as_mut(), x, y, width, height, color);
+            backend
+                .as_mut()
+                .add_filled_debug_rect(Rect::new(x, y, width, height), color);
         }
     }
 
     pub fn finalize_debug_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::finalize_debug_shapes(backend.as_mut());
+            backend.as_mut().finalize_debug_shapes();
         }
     }
 
     pub fn clear_ui_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::clear_ui_shapes(backend.as_mut());
+            backend.as_mut().clear_ui_shapes();
         }
     }
 
     pub fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::add_ui_rect(backend.as_mut(), x, y, width, height, color);
+            backend
+                .as_mut()
+                .add_ui_rect(Rect::new(x, y, width, height), color);
         }
     }
 
     pub fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::add_filled_ui_rect(backend.as_mut(), x, y, width, height, color);
+            backend
+                .as_mut()
+                .add_filled_ui_rect(Rect::new(x, y, width, height), color);
         }
     }
 
     pub fn finalize_ui_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            ShapeRenderer::finalize_ui_shapes(backend.as_mut());
+            backend.as_mut().finalize_ui_shapes();
         }
     }
 }

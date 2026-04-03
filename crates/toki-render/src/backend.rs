@@ -15,6 +15,25 @@ pub struct SceneClipRect {
     pub height: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Rect {
+    pub const fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+}
+
 /// Trait defining the rendering backend interface.
 ///
 /// This trait abstracts GPU rendering operations, allowing for different implementations
@@ -104,15 +123,12 @@ pub trait RenderBackend: std::fmt::Debug {
     fn clear_world_underlay_shapes(&mut self);
 
     /// Add an outline rectangle to the world underlay lane.
-    fn add_world_underlay_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Add a filled rectangle to the world underlay lane.
     fn add_filled_world_underlay_rect(
         &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
+        rect: Rect,
         color: [f32; 4],
     );
 
@@ -123,10 +139,10 @@ pub trait RenderBackend: std::fmt::Debug {
     fn clear_debug_shapes(&mut self);
 
     /// Add a debug rectangle outline
-    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_debug_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Add a filled debug rectangle
-    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_filled_debug_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Finalize debug shapes for rendering
     fn finalize_debug_shapes(&mut self);
@@ -135,203 +151,11 @@ pub trait RenderBackend: std::fmt::Debug {
     fn clear_ui_shapes(&mut self);
 
     /// Add a UI rectangle outline
-    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_ui_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Add a filled UI rectangle
-    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_filled_ui_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Finalize UI shapes for rendering
     fn finalize_ui_shapes(&mut self);
 }
-
-#[allow(dead_code)]
-pub trait TextureLoader: RenderBackend {
-    fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError> {
-        RenderBackend::load_tilemap_texture(self, texture_path)
-    }
-
-    fn load_tilemap_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError> {
-        RenderBackend::load_tilemap_texture_rgba8(self, image)
-    }
-
-    fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError> {
-        RenderBackend::load_sprite_texture(self, texture_path)
-    }
-
-    fn load_sprite_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError> {
-        RenderBackend::load_sprite_texture_rgba8(self, image)
-    }
-
-    fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), RenderError> {
-        RenderBackend::load_font_file(self, font_path)
-    }
-}
-
-impl<T: RenderBackend + ?Sized> TextureLoader for T {}
-
-#[allow(dead_code)]
-pub trait SpriteRenderer: RenderBackend {
-    fn clear_sprites(&mut self) {
-        RenderBackend::clear_sprites(self);
-    }
-
-    fn add_sprite(
-        &mut self,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        RenderBackend::add_sprite(self, frame, position, size, flip_x);
-    }
-
-    fn add_sprite_with_texture(
-        &mut self,
-        texture_path: PathBuf,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        RenderBackend::add_sprite_with_texture(self, texture_path, frame, position, size, flip_x);
-    }
-
-    fn add_sprite_with_texture_rgba8(
-        &mut self,
-        texture_key: PathBuf,
-        image: &DecodedImage,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        RenderBackend::add_sprite_with_texture_rgba8(
-            self,
-            texture_key,
-            image,
-            frame,
-            position,
-            size,
-            flip_x,
-        );
-    }
-}
-
-impl<T: RenderBackend + ?Sized> SpriteRenderer for T {}
-
-#[allow(dead_code)]
-pub trait ShapeRenderer: RenderBackend {
-    fn clear_world_underlay_shapes(&mut self) {
-        RenderBackend::clear_world_underlay_shapes(self);
-    }
-
-    fn add_world_underlay_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
-        RenderBackend::add_world_underlay_rect(self, x, y, width, height, color);
-    }
-
-    fn add_filled_world_underlay_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
-        RenderBackend::add_filled_world_underlay_rect(self, x, y, width, height, color);
-    }
-
-    fn finalize_world_underlay_shapes(&mut self) {
-        RenderBackend::finalize_world_underlay_shapes(self);
-    }
-
-    fn clear_debug_shapes(&mut self) {
-        RenderBackend::clear_debug_shapes(self);
-    }
-
-    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        RenderBackend::add_debug_rect(self, x, y, width, height, color);
-    }
-
-    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        RenderBackend::add_filled_debug_rect(self, x, y, width, height, color);
-    }
-
-    fn finalize_debug_shapes(&mut self) {
-        RenderBackend::finalize_debug_shapes(self);
-    }
-
-    fn clear_ui_shapes(&mut self) {
-        RenderBackend::clear_ui_shapes(self);
-    }
-
-    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        RenderBackend::add_ui_rect(self, x, y, width, height, color);
-    }
-
-    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        RenderBackend::add_filled_ui_rect(self, x, y, width, height, color);
-    }
-
-    fn finalize_ui_shapes(&mut self) {
-        RenderBackend::finalize_ui_shapes(self);
-    }
-}
-
-impl<T: RenderBackend + ?Sized> ShapeRenderer for T {}
-
-#[allow(dead_code)]
-pub trait TextRenderer: RenderBackend {
-    fn clear_text_items(&mut self) {
-        RenderBackend::clear_text_items(self);
-    }
-
-    fn add_text_item(&mut self, text: TextItem) {
-        RenderBackend::add_text_item(self, text);
-    }
-}
-
-impl<T: RenderBackend + ?Sized> TextRenderer for T {}
-
-#[allow(dead_code)]
-pub trait FrameLifecycle: RenderBackend {
-    fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
-        RenderBackend::set_scene_clip_rect(self, rect);
-    }
-
-    fn update_projection(&mut self, mvp: glam::Mat4) {
-        RenderBackend::update_projection(self, mvp);
-    }
-
-    fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
-        RenderBackend::set_post_process_settings(self, settings);
-    }
-
-    fn set_vsync(&mut self, enabled: bool) {
-        RenderBackend::set_vsync(self, enabled);
-    }
-
-    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
-        RenderBackend::set_tilemap_render_enabled(self, enabled);
-    }
-
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        RenderBackend::resize(self, new_size);
-    }
-
-    fn draw(&mut self) {
-        RenderBackend::draw(self);
-    }
-
-    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
-        RenderBackend::update_tilemap_vertices(self, vertices);
-    }
-}
-
-impl<T: RenderBackend + ?Sized> FrameLifecycle for T {}

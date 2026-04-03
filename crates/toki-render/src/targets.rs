@@ -28,7 +28,7 @@ pub trait RenderTarget {
     fn format(&self) -> wgpu::TextureFormat;
 
     /// Handle resize events
-    fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError>;
+    fn resize(&mut self, device: &wgpu::Device, new_size: (u32, u32)) -> Result<(), RenderError>;
 }
 
 /// Render target for offscreen textures (used by toki-editor)
@@ -37,7 +37,6 @@ pub struct OffscreenTarget {
     view: wgpu::TextureView,
     size: (u32, u32),
     format: wgpu::TextureFormat,
-    device: wgpu::Device,
     // For egui integration
     #[cfg(feature = "editor")]
     pub egui_texture_id: Option<egui::TextureId>,
@@ -45,7 +44,7 @@ pub struct OffscreenTarget {
 
 impl OffscreenTarget {
     pub fn new(
-        device: wgpu::Device,
+        device: &wgpu::Device,
         size: (u32, u32),
         format: wgpu::TextureFormat,
     ) -> Result<Self, RenderError> {
@@ -71,7 +70,6 @@ impl OffscreenTarget {
             view,
             size,
             format,
-            device,
             #[cfg(feature = "editor")]
             egui_texture_id: None,
         })
@@ -84,9 +82,13 @@ impl OffscreenTarget {
 
     /// Register this texture with egui renderer
     #[cfg(feature = "editor")]
-    pub fn register_with_egui(&mut self, renderer: &mut egui_wgpu::Renderer) -> egui::TextureId {
+    pub fn register_with_egui(
+        &mut self,
+        device: &wgpu::Device,
+        renderer: &mut egui_wgpu::Renderer,
+    ) -> egui::TextureId {
         let texture_id = renderer.register_native_texture(
-            &self.device,
+            device,
             &self.view,
             wgpu::FilterMode::Nearest, // Use nearest neighbor for sharp pixel art
         );
@@ -122,13 +124,13 @@ impl RenderTarget for OffscreenTarget {
         self.format
     }
 
-    fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError> {
+    fn resize(&mut self, device: &wgpu::Device, new_size: (u32, u32)) -> Result<(), RenderError> {
         if new_size == self.size {
             return Ok(());
         }
 
         // Recreate texture with new size
-        let new_target = Self::new(self.device.clone(), new_size, self.format)?;
+        let new_target = Self::new(device, new_size, self.format)?;
         self.texture = new_target.texture;
         self.view = new_target.view;
         self.size = new_target.size;

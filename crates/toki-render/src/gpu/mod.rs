@@ -20,7 +20,7 @@ use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
-    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, RenderError, SceneClipRect,
+    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, Rect, RenderError, SceneClipRect,
     SpritePipeline, TextBackgroundRect, TilemapPipeline,
 };
 
@@ -37,7 +37,7 @@ pub struct GpuState {
     sprite_draw_batches: Vec<OrderedDrawBatch<GpuSpriteBatchKey>>,
     world_underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
-    ui_rect_pipeline: DebugPipeline,
+    ui_shape_pipeline: DebugPipeline,
     ui_debug_pipeline: DebugPipeline,
     post_process_pipeline: PostProcessPipeline,
     post_process_target: Option<OffscreenTarget>,
@@ -85,7 +85,7 @@ impl GpuState {
         let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_texture)?;
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
-        let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_shape_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
         let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
         let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
@@ -102,7 +102,7 @@ impl GpuState {
             sprite_draw_batches: Vec::new(),
             world_underlay_pipeline,
             debug_pipeline,
-            ui_rect_pipeline,
+            ui_shape_pipeline,
             ui_debug_pipeline,
             post_process_pipeline,
             post_process_target: None,
@@ -307,28 +307,14 @@ impl GpuState {
         self.world_underlay_pipeline.clear();
     }
 
-    pub fn add_world_underlay_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
+    pub fn add_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
         self.world_underlay_pipeline
-            .add_rect(x, y, width, height, color);
+            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
-    pub fn add_filled_world_underlay_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
+    pub fn add_filled_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
         self.world_underlay_pipeline
-            .add_filled_rect(x, y, width, height, color);
+            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     pub fn finalize_world_underlay_shapes(&mut self) {
@@ -345,21 +331,15 @@ impl GpuState {
     }
 
     /// Add a debug rectangle
-    pub fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.debug_pipeline.add_rect(x, y, width, height, color);
+    pub fn add_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        self.debug_pipeline
+            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     /// Add a filled debug rectangle
-    pub fn add_filled_debug_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
+    pub fn add_filled_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
         self.debug_pipeline
-            .add_filled_rect(x, y, width, height, color);
+            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     /// Finalize debug shapes for rendering (call after adding all shapes)
@@ -367,25 +347,26 @@ impl GpuState {
         self.debug_pipeline.update_vertices(&self.device);
     }
 
-    pub fn clear_ui_rects(&mut self) {
-        self.ui_rect_pipeline.clear();
+    pub fn clear_ui_shapes(&mut self) {
+        self.ui_shape_pipeline.clear();
     }
 
-    pub fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.ui_rect_pipeline.add_rect(x, y, width, height, color);
+    pub fn add_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        self.ui_shape_pipeline
+            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
-    pub fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.ui_rect_pipeline
-            .add_filled_rect(x, y, width, height, color);
+    pub fn add_filled_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        self.ui_shape_pipeline
+            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
-    pub fn finalize_ui_rects(&mut self) {
-        self.ui_rect_pipeline.update_camera(
+    pub fn finalize_ui_shapes(&mut self) {
+        self.ui_shape_pipeline.update_camera(
             &self.queue,
             screen_space_projection(self.config.width as f32, self.config.height as f32),
         );
-        self.ui_rect_pipeline.update_vertices(&self.device);
+        self.ui_shape_pipeline.update_vertices(&self.device);
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -394,7 +375,7 @@ impl GpuState {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
             if let Some(target) = &mut self.post_process_target {
-                if let Err(error) = target.resize((new_size.width, new_size.height)) {
+                if let Err(error) = target.resize(&self.device, (new_size.width, new_size.height)) {
                     tracing::warn!("Failed to resize post-process target: {error}");
                 } else if let Ok(view) = target.get_render_view() {
                     self.post_process_pipeline
@@ -597,26 +578,12 @@ impl crate::RenderBackend for GpuState {
         GpuState::clear_world_underlay_shapes(self);
     }
 
-    fn add_world_underlay_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
-        GpuState::add_world_underlay_rect(self, x, y, width, height, color);
+    fn add_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        GpuState::add_world_underlay_rect(self, rect, color);
     }
 
-    fn add_filled_world_underlay_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
-        GpuState::add_filled_world_underlay_rect(self, x, y, width, height, color);
+    fn add_filled_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        GpuState::add_filled_world_underlay_rect(self, rect, color);
     }
 
     fn finalize_world_underlay_shapes(&mut self) {
@@ -627,12 +594,12 @@ impl crate::RenderBackend for GpuState {
         GpuState::clear_debug_shapes(self);
     }
 
-    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        GpuState::add_debug_rect(self, x, y, width, height, color);
+    fn add_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        GpuState::add_debug_rect(self, rect, color);
     }
 
-    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        GpuState::add_filled_debug_rect(self, x, y, width, height, color);
+    fn add_filled_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        GpuState::add_filled_debug_rect(self, rect, color);
     }
 
     fn finalize_debug_shapes(&mut self) {
@@ -640,19 +607,19 @@ impl crate::RenderBackend for GpuState {
     }
 
     fn clear_ui_shapes(&mut self) {
-        GpuState::clear_ui_rects(self);
+        GpuState::clear_ui_shapes(self);
     }
 
-    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        GpuState::add_ui_rect(self, x, y, width, height, color);
+    fn add_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        GpuState::add_ui_rect(self, rect, color);
     }
 
-    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        GpuState::add_filled_ui_rect(self, x, y, width, height, color);
+    fn add_filled_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
+        GpuState::add_filled_ui_rect(self, rect, color);
     }
 
     fn finalize_ui_shapes(&mut self) {
-        GpuState::finalize_ui_rects(self);
+        GpuState::finalize_ui_shapes(self);
     }
 }
 

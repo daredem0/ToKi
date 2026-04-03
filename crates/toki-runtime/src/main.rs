@@ -206,6 +206,12 @@ fn apply_splash_config(
     }
 }
 
+fn apply_option<T>(target: &mut T, value: Option<T>) {
+    if let Some(value) = value {
+        *target = value;
+    }
+}
+
 fn apply_audio_config(
     launch_options: &mut RuntimeLaunchOptions,
     audio: Option<toki_core::project_runtime::RuntimeConfigAudio>,
@@ -213,18 +219,22 @@ fn apply_audio_config(
     let Some(audio) = audio else {
         return;
     };
-    if let Some(master_percent) = audio.master_percent {
-        launch_options.audio_mix.master_percent = master_percent.min(100);
-    }
-    if let Some(music_percent) = audio.music_percent {
-        launch_options.audio_mix.music_percent = music_percent.min(100);
-    }
-    if let Some(movement_percent) = audio.movement_percent {
-        launch_options.audio_mix.movement_percent = movement_percent.min(100);
-    }
-    if let Some(collision_percent) = audio.collision_percent {
-        launch_options.audio_mix.collision_percent = collision_percent.min(100);
-    }
+    apply_option(
+        &mut launch_options.audio_mix.master_percent,
+        audio.master_percent.map(|value| value.min(100)),
+    );
+    apply_option(
+        &mut launch_options.audio_mix.music_percent,
+        audio.music_percent.map(|value| value.min(100)),
+    );
+    apply_option(
+        &mut launch_options.audio_mix.movement_percent,
+        audio.movement_percent.map(|value| value.min(100)),
+    );
+    apply_option(
+        &mut launch_options.audio_mix.collision_percent,
+        audio.collision_percent.map(|value| value.min(100)),
+    );
 }
 
 fn apply_display_config(
@@ -234,39 +244,34 @@ fn apply_display_config(
     let Some(display) = display else {
         return;
     };
-    if let Some(show_entity_health_bars) = display.show_entity_health_bars {
-        launch_options.display.show_entity_health_bars = show_entity_health_bars;
-    }
-    if let Some(show_ground_shadows) = display.show_ground_shadows {
-        launch_options.display.show_ground_shadows = show_ground_shadows;
-    }
+    apply_option(
+        &mut launch_options.display.show_entity_health_bars,
+        display.show_entity_health_bars,
+    );
+    apply_option(
+        &mut launch_options.display.show_ground_shadows,
+        display.show_ground_shadows,
+    );
     if display.indexed_palette_override.is_some() {
         launch_options.display.indexed_palette_override = display.indexed_palette_override;
     }
-    if let Some(post_process) = display.post_process {
-        launch_options.display.post_process = post_process;
-    }
-    if let Some(resolution_width) = display.resolution_width {
-        launch_options.display.resolution_width = resolution_width;
-    }
-    if let Some(resolution_height) = display.resolution_height {
-        launch_options.display.resolution_height = resolution_height;
-    }
-    if let Some(zoom_percent) = display.zoom_percent {
-        launch_options.display.zoom_percent = zoom_percent;
-    }
-    if let Some(viewport) = display.viewport {
-        launch_options.display.viewport = viewport;
-    }
-    if let Some(vsync) = display.vsync {
-        launch_options.display.vsync = vsync;
-    }
-    if let Some(target_fps) = display.target_fps {
-        launch_options.display.target_fps = target_fps;
-    }
-    if let Some(timing_mode) = display.timing_mode {
-        launch_options.display.timing_mode = timing_mode;
-    }
+    apply_option(
+        &mut launch_options.display.post_process,
+        display.post_process,
+    );
+    apply_option(
+        &mut launch_options.display.resolution_width,
+        display.resolution_width,
+    );
+    apply_option(
+        &mut launch_options.display.resolution_height,
+        display.resolution_height,
+    );
+    apply_option(&mut launch_options.display.zoom_percent, display.zoom_percent);
+    apply_option(&mut launch_options.display.viewport, display.viewport);
+    apply_option(&mut launch_options.display.vsync, display.vsync);
+    apply_option(&mut launch_options.display.target_fps, display.target_fps);
+    apply_option(&mut launch_options.display.timing_mode, display.timing_mode);
 }
 
 fn load_runtime_config() -> Option<(RuntimeConfigFile, PathBuf)> {

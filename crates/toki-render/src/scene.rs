@@ -85,6 +85,7 @@ impl Default for SceneData {
 pub struct SceneRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
+    format: wgpu::TextureFormat,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: BTreeMap<String, SpritePipeline>,
@@ -146,6 +147,7 @@ impl SceneRenderer {
         Ok(Self {
             device,
             queue,
+            format: surface_format,
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
@@ -166,7 +168,7 @@ impl SceneRenderer {
         self.tilemap_pipeline = TilemapPipeline::new(
             &self.device,
             &self.queue,
-            wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
+            self.format,
             TextureSource::path(texture_path.clone()),
         )?;
         tracing::info!("Tilemap texture loaded successfully");
@@ -190,7 +192,7 @@ impl SceneRenderer {
         self.sprite_pipeline = SpritePipeline::new(
             &self.device,
             &self.queue,
-            wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
+            self.format,
             TextureSource::path(texture_path.clone()),
         )?;
         self.sprite_pipelines_by_texture.clear();
@@ -267,7 +269,7 @@ impl SceneRenderer {
         match SpritePipeline::new(
             &self.device,
             &self.queue,
-            wgpu::TextureFormat::Bgra8UnormSrgb,
+            self.format,
             texture_source,
         ) {
             Ok(pipeline) => {

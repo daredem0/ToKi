@@ -153,8 +153,9 @@ fn offscreen_target_lifecycle_and_resize_works() {
         eprintln!("Skipping GPU-backed test: no compatible adapter/device available");
         return;
     };
-    let mut target = OffscreenTarget::new(device, (64, 48), wgpu::TextureFormat::Bgra8UnormSrgb)
-        .expect("offscreen target should be created");
+    let mut target =
+        OffscreenTarget::new(&device, (64, 48), wgpu::TextureFormat::Bgra8UnormSrgb)
+            .expect("offscreen target should be created");
 
     assert_eq!(target.size(), (64, 48));
     assert_eq!(target.format(), wgpu::TextureFormat::Bgra8UnormSrgb);
@@ -166,10 +167,10 @@ fn offscreen_target_lifecycle_and_resize_works() {
     target.end_frame().expect("end_frame should succeed");
 
     target
-        .resize((64, 48))
+        .resize(&device, (64, 48))
         .expect("resize with unchanged size should be a no-op");
     target
-        .resize((128, 96))
+        .resize(&device, (128, 96))
         .expect("resize with new size should recreate target");
     assert_eq!(target.size(), (128, 96));
     let _ = target.texture();
@@ -189,8 +190,9 @@ fn scene_renderer_renders_with_and_without_chunking() {
         None,
     )
     .expect("scene renderer should be created");
-    let mut target = OffscreenTarget::new(device, (160, 144), wgpu::TextureFormat::Bgra8UnormSrgb)
-        .expect("offscreen target should be created");
+    let mut target =
+        OffscreenTarget::new(&device, (160, 144), wgpu::TextureFormat::Bgra8UnormSrgb)
+            .expect("offscreen target should be created");
 
     let full_scene = build_scene_data(Vec::new());
     renderer
@@ -239,6 +241,43 @@ fn scene_renderer_texture_reload_paths_are_supported() {
     renderer
         .load_sprite_texture(creatures_png)
         .expect("sprite texture cache fast path should succeed");
+
+    std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+}
+
+#[test]
+fn scene_renderer_reuses_injected_surface_format_for_texture_reload() {
+    let Some((device, queue)) = create_device_and_queue() else {
+        eprintln!("Skipping GPU-backed test: no compatible adapter/device available");
+        return;
+    };
+    let tmp = make_unique_temp_dir();
+    let terrain_png = tmp.join("terrain.png");
+    let creatures_png = tmp.join("creatures.png");
+    write_test_png(&terrain_png, [255, 255, 255, 255]);
+    write_test_png(&creatures_png, [255, 0, 255, 255]);
+
+    let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+    let mut renderer = SceneRenderer::new(
+        device.clone(),
+        queue,
+        format,
+        Some(terrain_png.clone()),
+        Some(creatures_png.clone()),
+    )
+    .expect("scene renderer should be created with a non-default target format");
+    let mut target =
+        OffscreenTarget::new(&device, (160, 144), format).expect("offscreen target should exist");
+
+    renderer
+        .load_tilemap_texture(terrain_png)
+        .expect("tilemap texture reload should succeed");
+    renderer
+        .load_sprite_texture(creatures_png)
+        .expect("sprite texture reload should succeed");
+    renderer
+        .render_scene(&mut target, &SceneData::default())
+        .expect("render should keep using the injected format");
 
     std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
 }

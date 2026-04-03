@@ -65,7 +65,7 @@ pub enum ExpressionError {
 
 impl Expression {
     pub fn parse(source: &str) -> Result<Self, ExpressionError> {
-        let mut parser = Parser::new(source);
+        let mut parser = Parser::new(source)?;
         let root = parser.parse_expression()?;
         parser.expect_end()?;
         Ok(Self { root })
@@ -397,7 +397,7 @@ impl<'a> Lexer<'a> {
                 });
             }
             ch if is_ident_start(ch) => {
-                let ident = self.read_ident(start, ch);
+                let ident = self.read_ident(start, ch)?;
                 let kind = match ident.as_str() {
                     "true" => TokenKind::Bool(true),
                     "false" => TokenKind::Bool(false),
@@ -469,7 +469,7 @@ impl<'a> Lexer<'a> {
     fn read_number(&mut self, start: usize, first: char) -> Result<i32, ExpressionError> {
         let mut number = String::from(first);
         while self.peek_char().is_some_and(|(_, ch)| ch.is_ascii_digit()) {
-            number.push(self.next_char().expect("peeked char should exist").1);
+            number.push(self.next_expected_char(start, "unterminated integer literal")?);
         }
         number
             .parse::<i32>()
@@ -482,15 +482,15 @@ impl<'a> Lexer<'a> {
             })
     }
 
-    fn read_ident(&mut self, _start: usize, first: char) -> String {
+    fn read_ident(&mut self, start: usize, first: char) -> Result<String, ExpressionError> {
         let mut ident = String::from(first);
         while self
             .peek_char()
             .is_some_and(|(_, ch)| is_ident_continue(ch))
         {
-            ident.push(self.next_char().expect("peeked char should exist").1);
+            ident.push(self.next_expected_char(start, "unterminated identifier")?);
         }
-        ident
+        Ok(ident)
     }
 
     fn consume_if(&mut self, expected: char) -> bool {
@@ -511,6 +511,22 @@ impl<'a> Lexer<'a> {
 
     fn next_char(&mut self) -> Option<(usize, char)> {
         self.peeked.take().or_else(|| self.chars.next())
+    }
+
+    fn next_expected_char(
+        &mut self,
+        start: usize,
+        message: &str,
+    ) -> Result<char, ExpressionError> {
+        self.next_char()
+            .map(|(_, ch)| ch)
+            .ok_or_else(|| ExpressionError::Parse {
+                span: TextSpan {
+                    start,
+                    end: self.current_index(),
+                },
+                message: message.to_string(),
+            })
     }
 
     fn current_index(&mut self) -> usize {
@@ -534,12 +550,10 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn new(source: &'a str) -> Self {
+    fn new(source: &'a str) -> Result<Self, ExpressionError> {
         let mut lexer = Lexer::new(source);
-        let current = lexer
-            .next_token()
-            .expect("initial tokenization should not fail");
-        Self { lexer, current }
+        let current = lexer.next_token()?;
+        Ok(Self { lexer, current })
     }
 
     fn parse_expression(&mut self) -> Result<ExprNode, ExpressionError> {
@@ -854,6 +868,19 @@ mod tests {
     fn invalid_parse_reports_error() {
         let error = Expression::parse("1 +").expect_err("invalid expression should fail");
         assert!(matches!(error, super::ExpressionError::Parse { .. }));
+    }
+
+    #[test]
+    fn lexer_next_expected_char_returns_parse_error_instead_of_panicking() {
+        let mut lexer = super::Lexer::new("");
+        let error = lexer
+            .next_expected_char(0, "unterminated identifier")
+            .expect_err("missing char should become a parse error");
+        assert!(matches!(
+            error,
+            super::ExpressionError::Parse { ref message, .. }
+            if message == "unterminated identifier"
+        ));
     }
 
     #[test]

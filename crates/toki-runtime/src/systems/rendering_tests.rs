@@ -16,7 +16,7 @@ use toki_core::sprite_render::{
 };
 use toki_core::text::{TextItem, TextStyle};
 use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
-use toki_render::{RenderBackend, SceneClipRect};
+use toki_render::{Rect, RenderBackend, SceneClipRect};
 
 #[derive(Default, Debug)]
 struct FakeBackend {
@@ -164,26 +164,12 @@ impl RenderBackend for FakeBackend {
         self.world_underlay_rect_count.set(0);
     }
 
-    fn add_world_underlay_rect(
-        &mut self,
-        _x: f32,
-        _y: f32,
-        _width: f32,
-        _height: f32,
-        _color: [f32; 4],
-    ) {
+    fn add_world_underlay_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.world_underlay_rect_count
             .set(self.world_underlay_rect_count.get() + 1);
     }
 
-    fn add_filled_world_underlay_rect(
-        &mut self,
-        _x: f32,
-        _y: f32,
-        _width: f32,
-        _height: f32,
-        _color: [f32; 4],
-    ) {
+    fn add_filled_world_underlay_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.world_underlay_rect_count
             .set(self.world_underlay_rect_count.get() + 1);
     }
@@ -197,18 +183,11 @@ impl RenderBackend for FakeBackend {
         self.debug_rect_count.set(0);
     }
 
-    fn add_debug_rect(&mut self, _x: f32, _y: f32, _width: f32, _height: f32, _color: [f32; 4]) {
+    fn add_debug_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.debug_rect_count.set(self.debug_rect_count.get() + 1);
     }
 
-    fn add_filled_debug_rect(
-        &mut self,
-        _x: f32,
-        _y: f32,
-        _width: f32,
-        _height: f32,
-        _color: [f32; 4],
-    ) {
+    fn add_filled_debug_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.debug_rect_count.set(self.debug_rect_count.get() + 1);
     }
 
@@ -220,18 +199,11 @@ impl RenderBackend for FakeBackend {
         self.ui_rect_count.set(0);
     }
 
-    fn add_ui_rect(&mut self, _x: f32, _y: f32, _width: f32, _height: f32, _color: [f32; 4]) {
+    fn add_ui_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.ui_rect_count.set(self.ui_rect_count.get() + 1);
     }
 
-    fn add_filled_ui_rect(
-        &mut self,
-        _x: f32,
-        _y: f32,
-        _width: f32,
-        _height: f32,
-        _color: [f32; 4],
-    ) {
+    fn add_filled_ui_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.ui_rect_count.set(self.ui_rect_count.get() + 1);
     }
 

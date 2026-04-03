@@ -231,7 +231,7 @@ impl SceneViewport {
 
         // Create offscreen render target
         let offscreen_target = OffscreenTarget::new(
-            device.clone(),
+            &device,
             self.viewport_size,
             wgpu::TextureFormat::Bgra8UnormSrgb, // Match pipeline format
         )
@@ -278,7 +278,11 @@ impl SceneViewport {
 
         self.set_viewport_size_immediate(new_size);
         if let Some(target) = &mut self.offscreen_target {
-            toki_render::RenderTarget::resize(target, new_size)
+            let device = self
+                .device
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Missing device for viewport resize"))?;
+            toki_render::RenderTarget::resize(target, device, new_size)
                 .map_err(|e| anyhow::anyhow!("Failed to resize offscreen target: {}", e))?;
         }
         self.needs_render = true;
@@ -356,7 +360,11 @@ impl SceneViewport {
             scene_renderer.render_scene_with_projection(target, &scene_data, projection)?;
 
             // Register texture with egui for later use
-            let texture_id = target.register_with_egui(renderer);
+            let device = self
+                .device
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Missing device for egui registration"))?;
+            let texture_id = target.register_with_egui(device, renderer);
             tracing::trace!("Registered texture with egui, texture_id: {:?}", texture_id);
 
             tracing::trace!("Scene rendered to texture successfully");
