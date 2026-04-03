@@ -315,8 +315,8 @@ impl crate::RenderFrameControl for GpuState {
         GpuState::resize(self, new_size);
     }
 
-    fn draw(&mut self) {
-        GpuState::draw(self);
+    fn draw(&mut self) -> Result<(), crate::RenderError> {
+        GpuState::draw(self)
     }
 
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {

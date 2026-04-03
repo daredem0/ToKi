@@ -190,7 +190,9 @@ impl App {
                 .with_layer(10),
             );
         }
-        self.rendering.draw();
+        if let Err(error) = self.rendering.draw() {
+            tracing::error!("Failed to render startup splash: {error}");
+        }
         self.platform.request_redraw();
     }
 

@@ -12,7 +12,7 @@ use crate::ui::{entity_editor::EntityEditorState, sprite_editor::SpriteEditorSta
 use std::any::Any;
 use std::collections::HashMap;
 
-pub(crate) struct EditorContextHost<'a> {
+pub(crate) struct CenterPanelHost<'a> {
     pub scene_viewport: Option<&'a mut SceneViewport>,
     pub map_editor_viewport: Option<&'a mut SceneViewport>,
     pub project: Option<&'a mut Project>,
@@ -20,8 +20,21 @@ pub(crate) struct EditorContextHost<'a> {
     pub available_map_names: Option<Vec<String>>,
     pub config: Option<&'a mut EditorConfig>,
     pub config_readonly: Option<&'a EditorConfig>,
-    pub log_capture: Option<&'a crate::logging::LogCapture>,
     pub renderer: Option<&'a mut egui_wgpu::Renderer>,
+}
+
+pub(crate) struct InspectorHost<'a> {
+    pub project: Option<&'a mut Project>,
+    pub project_assets: Option<&'a mut ProjectAssets>,
+    pub config_readonly: Option<&'a EditorConfig>,
+}
+
+pub(crate) struct ToolboxHost<'a> {
+    pub scene_viewport: Option<&'a mut SceneViewport>,
+    pub project: Option<&'a mut Project>,
+    pub project_assets: Option<&'a mut ProjectAssets>,
+    pub config: Option<&'a mut EditorConfig>,
+    pub config_readonly: Option<&'a EditorConfig>,
 }
 
 pub(crate) trait EditorContext: Any {
@@ -30,7 +43,7 @@ pub(crate) trait EditorContext: Any {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     );
 
     fn render_inspector(
@@ -39,7 +52,7 @@ pub(crate) trait EditorContext: Any {
         _ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut InspectorHost<'_>,
     ) -> bool {
         false
     }
@@ -50,7 +63,7 @@ pub(crate) trait EditorContext: Any {
         _ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut ToolboxHost<'_>,
     ) -> bool {
         false
     }
@@ -296,7 +309,7 @@ impl EditorContext for NullEditorContext {
         _shell: &mut EditorUI,
         _ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut CenterPanelHost<'_>,
     ) {
     }
 
@@ -315,9 +328,9 @@ impl EditorContext for SceneViewportContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
-        let EditorContextHost {
+        let CenterPanelHost {
             scene_viewport,
             config,
             renderer,
@@ -346,9 +359,9 @@ impl EditorContext for SceneViewportContext {
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        host: &mut EditorContextHost<'_>,
+        host: &mut ToolboxHost<'_>,
     ) -> bool {
-        let EditorContextHost {
+        let ToolboxHost {
             project,
             project_assets,
             config,
@@ -376,7 +389,7 @@ impl EditorContext for RuleGraphContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         PanelSystem::render_scene_graph(
             ui,
@@ -404,9 +417,9 @@ impl EditorContext for MapEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
-        let EditorContextHost {
+        let CenterPanelHost {
             map_editor_viewport,
             available_map_names,
             config,
@@ -429,13 +442,9 @@ impl EditorContext for MapEditorContext {
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        host: &mut EditorContextHost<'_>,
+        host: &mut InspectorHost<'_>,
     ) -> bool {
-        let config = host
-            .config_readonly
-            .as_ref()
-            .copied()
-            .or(host.config.as_deref());
+        let config = host.config_readonly;
         InspectorSystem::render_map_editor_inspector(shell, ui, egui_ctx, config);
         true
     }
@@ -446,7 +455,7 @@ impl EditorContext for MapEditorContext {
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        host: &mut EditorContextHost<'_>,
+        host: &mut ToolboxHost<'_>,
     ) -> bool {
         let config = host
             .config_readonly
@@ -498,7 +507,7 @@ impl EditorContext for MenuEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         crate::ui::panels::menu_editor::render_menu_editor(ui, shell, host.project.as_deref_mut());
     }
@@ -509,7 +518,7 @@ impl EditorContext for MenuEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        host: &mut EditorContextHost<'_>,
+        host: &mut InspectorHost<'_>,
     ) -> bool {
         InspectorSystem::render_menu_editor_inspector(shell, ui, host.project.as_deref_mut());
         true
@@ -530,7 +539,7 @@ impl EditorContext for DialogEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         crate::ui::panels::dialog_editor::render_dialog_editor(
             ui,
@@ -546,7 +555,7 @@ impl EditorContext for DialogEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        host: &mut EditorContextHost<'_>,
+        host: &mut InspectorHost<'_>,
     ) -> bool {
         InspectorSystem::render_dialog_editor_inspector(
             shell,
@@ -572,7 +581,7 @@ impl EditorContext for UiEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         crate::ui::panels::ui_editor::render_ui_editor(
             ui,
@@ -588,7 +597,7 @@ impl EditorContext for UiEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        host: &mut EditorContextHost<'_>,
+        host: &mut InspectorHost<'_>,
     ) -> bool {
         InspectorSystem::render_ui_editor_inspector(
             shell,
@@ -614,7 +623,7 @@ impl EditorContext for SpriteEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         crate::ui::panels::sprite_editor::render_sprite_editor(
             ui,
@@ -630,7 +639,7 @@ impl EditorContext for SpriteEditorContext {
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut InspectorHost<'_>,
     ) -> bool {
         InspectorSystem::render_sprite_editor_inspector(shell, ui, egui_ctx);
         true
@@ -642,7 +651,7 @@ impl EditorContext for SpriteEditorContext {
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut ToolboxHost<'_>,
     ) -> bool {
         InspectorSystem::render_sprite_editor_toolbox(shell, ui, egui_ctx);
         true
@@ -683,7 +692,7 @@ impl EditorContext for AnimationEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         crate::ui::panels::animation_editor::render_animation_editor(
             ui,
@@ -699,7 +708,7 @@ impl EditorContext for AnimationEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut InspectorHost<'_>,
     ) -> bool {
         InspectorSystem::render_animation_editor_inspector(shell, ui);
         true
@@ -711,7 +720,7 @@ impl EditorContext for AnimationEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut ToolboxHost<'_>,
     ) -> bool {
         InspectorSystem::render_animation_editor_toolbox(shell, ui);
         true
@@ -732,7 +741,7 @@ impl EditorContext for EntityEditorContext {
         shell: &mut EditorUI,
         ui: &mut egui::Ui,
         egui_ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         crate::ui::panels::entity_editor::render_entity_editor(
             ui,
@@ -748,7 +757,7 @@ impl EditorContext for EntityEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut InspectorHost<'_>,
     ) -> bool {
         InspectorSystem::render_entity_editor_inspector(shell, ui);
         true
@@ -760,7 +769,7 @@ impl EditorContext for EntityEditorContext {
         ui: &mut egui::Ui,
         _egui_ctx: &egui::Context,
         _game_state: Option<&toki_core::GameState>,
-        _host: &mut EditorContextHost<'_>,
+        _host: &mut ToolboxHost<'_>,
     ) -> bool {
         InspectorSystem::render_entity_editor_toolbox(shell, ui);
         true

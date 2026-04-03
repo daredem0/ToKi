@@ -356,9 +356,11 @@ impl RenderingSystem {
     }
 
     /// Draw the current frame
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self) -> Result<(), toki_render::RenderError> {
         if let Some(backend) = &mut self.backend {
-            backend.as_mut().draw();
+            backend.as_mut().draw()
+        } else {
+            Ok(())
         }
     }
 

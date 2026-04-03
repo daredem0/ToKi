@@ -6,16 +6,17 @@ use crate::targets::OffscreenTarget;
 use super::*;
 
 impl GpuState {
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self) -> Result<(), crate::RenderError> {
         self.update_render_resources();
-        let text_backgrounds = self.prepare_text_backgrounds();
+        let text_backgrounds = self.prepare_text_backgrounds()?;
         self.refresh_ui_text_backgrounds(&text_backgrounds);
 
         let Some(output) = self.acquire_surface_texture() else {
-            return;
+            return Ok(());
         };
-        self.render_frame_to_surface(&output);
+        self.render_frame_to_surface(&output)?;
         output.present();
+        Ok(())
     }
 
     fn update_render_resources(&mut self) {
@@ -28,7 +29,7 @@ impl GpuState {
         }
     }
 
-    fn prepare_text_backgrounds(&mut self) -> Vec<TextBackgroundRect> {
+    fn prepare_text_backgrounds(&mut self) -> Result<Vec<TextBackgroundRect>, crate::RenderError> {
         self.text_renderer
             .prepare(
                 &self.device,
@@ -38,10 +39,6 @@ impl GpuState {
                 &self.text_items,
                 self.current_mvp,
             )
-            .unwrap_or_else(|error| {
-                tracing::warn!("Failed to prepare text renderer: {error}");
-                Vec::new()
-            })
     }
 
     fn acquire_surface_texture(&mut self) -> Option<wgpu::SurfaceTexture> {
@@ -67,7 +64,10 @@ impl GpuState {
         }
     }
 
-    fn render_frame_to_surface(&mut self, output: &wgpu::SurfaceTexture) {
+    fn render_frame_to_surface(
+        &mut self,
+        output: &wgpu::SurfaceTexture,
+    ) -> Result<(), crate::RenderError> {
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -78,36 +78,35 @@ impl GpuState {
             });
 
         if self.post_process_settings.mode == PostProcessMode::None {
-            self.render_direct_frame(&mut encoder, &view);
+            self.render_direct_frame(&mut encoder, &view)?;
         } else {
-            self.render_post_processed_frame(&mut encoder, &view);
+            self.render_post_processed_frame(&mut encoder, &view)?;
         }
 
         self.queue.submit(Some(encoder.finish()));
+        Ok(())
     }
 
     fn render_direct_frame(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-    ) {
-        self.render_scene_to_view(encoder, view);
+    ) -> Result<(), crate::RenderError> {
+        self.render_scene_to_view(encoder, view)
     }
 
     fn render_post_processed_frame(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         output_view: &wgpu::TextureView,
-    ) {
+    ) -> Result<(), crate::RenderError> {
         if let Err(error) = self.ensure_post_process_target() {
             tracing::warn!("Failed to prepare post-process target: {error}");
-            self.render_scene_to_view(encoder, output_view);
-            return;
+            return self.render_scene_to_view(encoder, output_view);
         }
 
         let Some(target) = &mut self.post_process_target else {
-            self.render_scene_to_view(encoder, output_view);
-            return;
+            return self.render_scene_to_view(encoder, output_view);
         };
 
         self.post_process_pipeline
@@ -115,7 +114,7 @@ impl GpuState {
         match target.get_render_view() {
             Ok(target_view) => {
                 let target_view = target_view.clone();
-                self.render_scene_to_view(encoder, &target_view);
+                self.render_scene_to_view(encoder, &target_view)?;
                 let mut post_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Post Process Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -131,10 +130,11 @@ impl GpuState {
                     occlusion_query_set: None,
                 });
                 self.post_process_pipeline.render(&mut post_pass);
+                Ok(())
             }
             Err(error) => {
                 tracing::warn!("Failed to access post-process target view: {error}");
-                self.render_scene_to_view(encoder, output_view);
+                self.render_scene_to_view(encoder, output_view)
             }
         }
     }
@@ -156,7 +156,7 @@ impl GpuState {
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-    ) {
+    ) -> Result<(), crate::RenderError> {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -206,9 +206,8 @@ impl GpuState {
         self.debug_pipeline.render(&mut render_pass);
         self.ui_shape_pipeline.render(&mut render_pass);
         self.ui_debug_pipeline.render(&mut render_pass);
-        if let Err(error) = self.text_renderer.render(&mut render_pass) {
-            tracing::warn!("Failed to render text layer: {error}");
-        }
+        self.text_renderer.render(&mut render_pass)?;
+        Ok(())
     }
 
     fn refresh_ui_text_backgrounds(&mut self, backgrounds: &[TextBackgroundRect]) {

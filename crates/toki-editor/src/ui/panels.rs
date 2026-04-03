@@ -1,4 +1,4 @@
-use super::editor_context::EditorContextHost;
+use super::editor_context::CenterPanelHost;
 use super::editor_domain::{
     animation_state_label, animation_state_options,
     default_rule_action as shared_default_rule_action,
@@ -159,7 +159,7 @@ impl PanelSystem {
     pub fn render_viewport(
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
-        host: &mut EditorContextHost<'_>,
+        host: &mut CenterPanelHost<'_>,
     ) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut selected_tab = ui_state.active_tab();

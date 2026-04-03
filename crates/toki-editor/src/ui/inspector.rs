@@ -528,9 +528,7 @@ impl InspectorSystem {
         mut project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
     ) {
-        let mut host = super::editor_context::EditorContextHost {
-            scene_viewport: None,
-            map_editor_viewport: None,
+        let mut host = super::editor_context::InspectorHost {
             project: match project.as_mut() {
                 Some(project) => Some(&mut **project),
                 None => None,
@@ -539,11 +537,7 @@ impl InspectorSystem {
                 Some(project_assets) => Some(&mut **project_assets),
                 None => None,
             },
-            available_map_names: None,
-            config: None,
             config_readonly: config,
-            log_capture: None,
-            renderer: None,
         };
         let handled = ui_state.with_active_context(|context, shell| {
             context.render_inspector(shell, ui, ctx, game_state, &mut host)
@@ -577,9 +571,8 @@ impl InspectorSystem {
         mut project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
     ) {
-        let mut host = super::editor_context::EditorContextHost {
+        let mut host = super::editor_context::ToolboxHost {
             scene_viewport: None,
-            map_editor_viewport: None,
             project: match project.as_mut() {
                 Some(project) => Some(&mut **project),
                 None => None,
@@ -588,11 +581,8 @@ impl InspectorSystem {
                 Some(project_assets) => Some(&mut **project_assets),
                 None => None,
             },
-            available_map_names: None,
             config: None,
             config_readonly: config,
-            log_capture: None,
-            renderer: None,
         };
         let handled = ui_state.with_active_context(|context, shell| {
             context.render_toolbox(shell, ui, ctx, game_state, &mut host)

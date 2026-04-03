@@ -236,7 +236,9 @@ impl App {
 
             let cpu_work_time = frame_start.elapsed();
             let draw_start = Instant::now();
-            self.rendering.draw();
+            if let Err(error) = self.rendering.draw() {
+                tracing::error!("Failed to render frame: {error}");
+            }
             let draw_time = draw_start.elapsed();
             let total_frame_time = frame_start.elapsed();
             self.performance.record_performance_breakdown(

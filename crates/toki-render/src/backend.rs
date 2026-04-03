@@ -56,7 +56,7 @@ pub trait RenderFrameControl {
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
 
     /// Draw the current frame
-    fn draw(&mut self);
+    fn draw(&mut self) -> Result<(), RenderError>;
 
     /// Update tilemap vertex data
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);

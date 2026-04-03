@@ -10,7 +10,7 @@ use crate::project::{Project, ProjectSettingsDraft, ProjectTemplateKind};
 use crate::scene::SceneViewport;
 use crate::ui::editor_context::{
     default_active_context, default_parked_contexts, null_context, AnimationEditorContext,
-    DialogEditorContext, EditorContext, EditorContextHost, EntityEditorContext, RuleGraphContext,
+    CenterPanelHost, DialogEditorContext, EditorContext, EntityEditorContext, RuleGraphContext,
     SceneViewportContext, SpriteEditorContext, UiEditorContext,
 };
 use toki_core::palette::{builtin_palettes, Palette4};
@@ -1119,7 +1119,7 @@ impl EditorUI {
             renderer,
             busy_logo_texture,
         } = render_ctx;
-        let mut context_host = EditorContextHost {
+        let mut context_host = CenterPanelHost {
             scene_viewport,
             map_editor_viewport,
             project,
@@ -1127,7 +1127,6 @@ impl EditorUI {
             available_map_names,
             config,
             config_readonly: None,
-            log_capture,
             renderer,
         };
         let config_readonly = context_host.config.as_deref();
@@ -1141,7 +1140,7 @@ impl EditorUI {
 
         // Render log panel first to claim full width at bottom
         if self.visibility.show_console {
-            PanelSystem::render_log_panel(self, ctx, context_host.log_capture);
+            PanelSystem::render_log_panel(self, ctx, log_capture);
         }
 
         // Render hierarchy and inspector panels

@@ -42,6 +42,7 @@ struct FakeBackend {
     finalized_debug: Rc<Cell<usize>>,
     finalized_ui: Rc<Cell<usize>>,
     scene_clip_rect: Rc<RefCell<Option<SceneClipRect>>>,
+    draw_error: Rc<RefCell<Option<String>>>,
 }
 
 impl RenderFrameControl for FakeBackend {
@@ -69,8 +70,12 @@ impl RenderFrameControl for FakeBackend {
         self.resize_calls.set(self.resize_calls.get() + 1);
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self) -> Result<(), toki_render::RenderError> {
+        if let Some(message) = self.draw_error.borrow().clone() {
+            return Err(toki_render::RenderError::Other(message));
+        }
         self.draw_calls.set(self.draw_calls.get() + 1);
+        Ok(())
     }
 
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
@@ -657,7 +662,7 @@ fn backend_seam_dispatches_runtime_render_commands() {
     rendering.add_ui_shape(4.0, 4.0, 12.0, 12.0, [1.0, 1.0, 1.0, 1.0]);
     rendering.add_filled_ui_shape(5.0, 5.0, 10.0, 10.0, [0.0, 0.0, 0.0, 0.5]);
     rendering.finalize_ui_shapes();
-    rendering.draw();
+    rendering.draw().expect("draw should succeed");
 
     assert_eq!(projection_counter.get(), 1);
     assert_eq!(draw_counter.get(), 1);
@@ -679,6 +684,19 @@ fn backend_seam_dispatches_runtime_render_commands() {
     assert_eq!(debug_finalize_counter.get(), 1);
     assert_eq!(ui_rect_count.get(), 2);
     assert_eq!(ui_finalize_counter.get(), 1);
+}
+
+#[test]
+fn rendering_system_draw_propagates_backend_errors() {
+    let fake = FakeBackend::default();
+    let draw_error = fake.draw_error.clone();
+    *draw_error.borrow_mut() = Some("text preparation failed".to_string());
+
+    let mut rendering = RenderingSystem::new();
+    rendering.backend = Some(Box::new(fake));
+
+    let error = rendering.draw().expect_err("draw error should propagate");
+    assert!(error.to_string().contains("text preparation failed"));
 }
 
 #[test]
