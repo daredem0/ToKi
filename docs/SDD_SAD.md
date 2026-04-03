@@ -1,6 +1,6 @@
 # Software Design and Architecture Description (SDD/SAD)
 ## Project: `ToKi`
-> Last updated: 2026-04-03 — reflects completed refactoring (DA1–DA5, ME9–ME17, QW8–QW15).
+> Last updated: 2026-04-04
 
 ## 1. Purpose
 
@@ -17,6 +17,61 @@ Primary readers:
 - engine contributors extending simulation, rendering, or runtime bootstrap
 - editor contributors extending project, scene, or map-authoring workflows
 - maintainers reviewing whether new work respects existing layer boundaries
+
+### 1.1 Conceptual overview
+
+This subsection provides a narrative introduction before the reference tables that follow. If you already know the codebase, skip to Section 2.
+
+ToKi is a local-first 2D game engine for authoring and playing Game Boy-style top-down games. Two applications share a common substrate: the **editor** lets you author content (scenes, maps, entities, sprites, dialogs, rules), and the **runtime** executes that content as a playable game.
+
+#### The data lifecycle
+
+Content flows through five stages:
+
+1. **Author** — the editor writes structured JSON and TOML files to a project directory.
+2. **Persist** — project files (`scenes/*.json`, `entities/*.json`, `assets/tilemaps/*.json`, etc.) are the source of truth for all game content.
+3. **Load** — at startup, the runtime (or the editor's preview viewport) reads project files and instantiates live domain objects: `Entity`, `AnimationController`, `RuleRuntimeState`.
+4. **Simulate** — `GameState` runs the game loop: movement, collision, rules, AI, dialog, and combat services operate on live state each frame.
+5. **Render** — render query services extract sprite requests from live state; these are resolved to UV coordinates, submitted to GPU pipelines, and presented to the screen.
+
+```mermaid
+flowchart LR
+    A[Author in Editor] --> P[Project Files on Disk]
+    P --> L[Load into Domain Objects]
+    L --> S[Simulate per Frame]
+    S --> R[Render to Screen]
+```
+
+Understanding this lifecycle is the key to reading the codebase. Every module participates in one or two of these stages.
+
+#### Why the design-time/runtime split?
+
+Authored data (an `EntityDefinition` on disk) is not the same as live state (an `Entity` in memory). Definitions are reusable templates; entities are mutable instances with position, health, animation progress, and inventory. Keeping them separate means:
+
+- the editor can show a preview without mutating authored data
+- scene transitions can re-instantiate entities from definitions without stale state
+- save/load operates on runtime state without touching project files
+- multiple scenes can reference the same definition with different placements
+
+This split prevents a class of bugs where editing a property in the inspector would silently corrupt the running simulation, or where saving a game would overwrite authored content.
+
+#### Why the service pattern on GameState?
+
+`GameState` is a thin data holder with four focused containers (`WorldState`, `SceneState`, `ProgressState`, `RuntimeState`). Domain logic lives in short-lived services (e.g., `MovementService`, `CombatService`) that borrow only the fields they need. This resolves Rust borrow conflicts — multiple services can borrow disjoint fields simultaneously without `RefCell` or `unsafe` — and keeps each service testable in isolation.
+
+#### Why grouped RuleCommand enums?
+
+Rule actions span many domains (audio, animation, inventory, scene transitions, flags). They are grouped into sub-enums (`AudioCommand`, `EntityCommand`, `ProgressCommand`, etc.) so that adding a new command in one domain requires touching only that domain's sub-enum and its apply function — not the others.
+
+#### Where to start reading code
+
+| Goal | Start here |
+|---|---|
+| Understanding simulation | `toki-core/src/game/mod.rs` (GameState holder), `toki-core/src/game/simulation.rs` (per-frame tick) |
+| Understanding rendering | `toki-core/src/game/render_queries.rs` (what to draw), `toki-render/src/gpu/frame.rs` (how to draw it) |
+| Understanding the editor | `toki-editor/src/ui/panels.rs` (center panel dispatch), `toki-editor/src/ui/editor_ui.rs` (state management) |
+| Understanding rules | `toki-core/src/rules.rs` (data model), `toki-core/src/game/rules/mod.rs` (execution pipeline) |
+| Understanding entities | `toki-core/src/entity/definition.rs` (authored), `toki-core/src/entity/model.rs` (runtime) |
 
 ## 2. System Context
 
@@ -257,7 +312,7 @@ The `src/game/` module is decomposed into focused submodules:
 | `render_queries.rs` | `RenderQueryService<'a>`: health bar queries, ground shadows, visible entity collection, sprite render requests, debug data |
 | `player_defs.rs` | `PlayerDefinitionConfig` and default player entity definition builder |
 
-Service decomposition (DA1): domain logic is implemented as short-lived services that borrow specific fields from `GameState` rather than as `impl GameState` methods. Each service is constructed per-call by borrowing the fields it needs (`&mut WorldState`, `&mut SceneState`, etc.) and dropped immediately after. This keeps `GameState` as a thin data holder and removes the single-coupling point that previously spanned 200+ methods.
+Domain logic is implemented as short-lived services that borrow specific fields from `GameState` rather than as `impl GameState` methods. Each service is constructed per-call by borrowing the fields it needs (`&mut WorldState`, `&mut SceneState`, etc.) and dropped immediately after. This keeps `GameState` as a thin data holder and allows disjoint borrows without `RefCell`.
 
 The `src/game/rules/` submodule is decomposed further:
 
@@ -309,7 +364,7 @@ Key areas:
 | `src/errors.rs` | `RenderError` error type |
 | `src/wgpu_utils.rs` | WGPU helper functions: device/surface creation, texture bindgroups, present mode selection |
 
-Render backend trait surface (split into five focused traits, DA2):
+Render backend trait surface (five focused traits):
 
 `RenderFrameControl` — frame lifecycle:
 - `set_scene_clip_rect`, `update_projection`, `set_post_process_settings`, `set_vsync`, `set_tilemap_render_enabled`, `resize`, `draw`, `update_tilemap_vertices`
@@ -438,7 +493,7 @@ Key areas:
 | `src/ui/editor_ui.rs` | editor UI state, tab management, selection model |
 | `src/ui/editor_ui_*.rs` | UI sub-modules: `animation_authoring`, `animation_editor`, `asset_palette`, `dialog_editor`, `entity_editor`, `graph`, `hierarchy_panel`, `map_editor`, `menu_editor`, `scene_tree`, `sprite_editor` |
 | `src/ui/editor_domain.rs` | shared editor-domain helpers and vocabulary |
-| `src/ui/editor_context.rs` | `EditorContext` trait with domain-focused implementations (DA3/ME14); each context implementation exposes only the references the consumer needs — replacing the former `EditorContextHost` god-object |
+| `src/ui/editor_context.rs` | `EditorContext` trait with domain-focused implementations; each context implementation exposes only the references the consumer needs |
 | `src/ui/inspector_trait.rs` | `Inspector` trait, `InspectorContext` for domain-specific panels |
 | `src/ui/undo_redo.rs` | editor command history for scene, map, and menu mutations |
 | `src/ui/inspector/` | inspector routing across domain-specific inspectors |
@@ -991,7 +1046,7 @@ The service pattern resolves borrow conflicts: multiple services may borrow disj
 
 ### 5.15 RuleCommand group model
 
-`RuleCommand` is structured as a grouped outer enum with eight sub-enums (DA4). Each sub-enum owns one domain of effect. This replaces a flat ~78-variant enum that was dispatched via if-chains.
+`RuleCommand` is structured as a grouped outer enum with eight sub-enums. Each sub-enum owns one domain of effect.
 
 | Outer variant | Sub-enum | Actions |
 |---|---|---|
@@ -1292,6 +1347,140 @@ Key properties:
 - save slots are numbered (u8)
 - runtime display/audio settings are persisted separately in `runtime_config.json`
 
+### 6.11 End-to-end: Entity definition to rendered sprite
+
+This trace follows a single entity from authored JSON through to pixels on screen.
+
+```mermaid
+flowchart TD
+    JSON["entities/guard.json"]
+    DEF["EntityDefinition (serde)"]
+    BUNDLE["EntitySpawnBundle"]
+    ENT["Entity + AnimationController"]
+    TICK["AnimationController::update(delta_ms)"]
+    RQ["sprite_render_requests()"]
+    RESOLVE["resolve_sprite_render_requests()"]
+    RSRI["ResolvedSpriteRenderInstance: UVs + texture"]
+    SUBMIT["add_resolved_sprite() → GpuState"]
+    DRAW["SpritePipeline::render_range() → GPU"]
+
+    JSON -->|deserialize| DEF
+    DEF -->|create_spawn_bundle| BUNDLE
+    BUNDLE -->|EntityManager::spawn| ENT
+    ENT -->|each frame| TICK
+    TICK --> RQ
+    RQ -->|tile name → UV coords| RESOLVE
+    RESOLVE --> RSRI
+    RSRI -->|batch by texture| SUBMIT
+    SUBMIT --> DRAW
+```
+
+**Stage 1 — Deserialize.** `EntityDefinition` is loaded from `entities/*.json` via serde. The definition contains `RenderingDef` (size, shadow, palette), `AnimationsDef` (atlas name, clips per state), `AttributesDef`, and `CollisionDef`.
+
+**Stage 2 — Instantiate.** During scene load, `SceneTransitionPlanner::prepare_scene_load()` calls `EntityDefinition::create_spawn_bundle()` for each scene entity. This builds an `AnimationController` from the definition's clip data, sets the initial animation state, and assembles an `EntitySpawnBundle` containing the `Entity` plus any sparse components (inventory, projectile, pickup). `EntityManager::add_spawn_bundle()` inserts the entity into storage.
+
+**Stage 3 — Animate.** Each frame, `EntityManager::update_animations(delta_ms)` advances every entity's `AnimationController`. The controller accumulates elapsed time against the current frame's duration, advances to the next frame when the duration expires, and respects the clip's loop mode.
+
+**Stage 4 — Collect render requests.** `RenderQueryService::sprite_render_requests()` iterates visible entities and builds a `SpriteRenderRequest` per entity. Each request carries the atlas name, the current tile name from the animation controller, the entity's world position, size, palette override, flip state, and a depth-based sort key.
+
+**Stage 5 — Resolve to GPU-ready data.** `resolve_sprite_render_requests()` maps each tile name to `SpriteFrame` UV coordinates by looking up the tile in `AtlasMeta`. The result is a `ResolvedSpriteRenderInstance` with exact UV bounds, the texture file path, and the render material (true-color or palette-indexed).
+
+**Stage 6 — Submit to GPU.** The runtime's `RenderingSystem` calls `add_resolved_sprite()` on `GpuState`. For true-color sprites, the texture is used directly. For palette-indexed sprites, the base image is recolored against the target palette (cached after first recolor). Each sprite becomes a `SpriteInstance` (position, size, UVs, flip, tint) added to the appropriate `SpritePipeline`.
+
+**Stage 7 — Draw.** During `GpuState::draw()`, `render_scene_to_view()` iterates draw batches in submission order. For each batch, `SpritePipeline::render_range()` binds the texture and instance buffers, and issues an indexed draw call. The GPU's vertex shader positions the quad; the fragment shader samples the atlas texture at the resolved UVs.
+
+Key files in order:
+
+| Stage | File |
+|---|---|
+| Deserialize | `toki-core/src/entity/definition.rs` |
+| Instantiate | `toki-core/src/game/transition.rs`, `toki-core/src/entity/builder.rs`, `toki-core/src/entity/manager.rs` |
+| Animate | `toki-core/src/animation.rs`, `toki-core/src/entity/manager.rs` |
+| Collect | `toki-core/src/game/render_queries.rs` |
+| Resolve | `toki-core/src/sprite_render.rs` |
+| Submit | `toki-runtime/src/systems/rendering.rs`, `toki-render/src/gpu/mod.rs` |
+| Draw | `toki-render/src/gpu/frame.rs`, `toki-render/src/pipelines/sprite.rs` |
+
+### 6.12 End-to-end: Rule authoring to execution
+
+This trace follows a rule from the editor's visual graph through to runtime side effects.
+
+```mermaid
+flowchart TD
+    GRAPH["RuleGraph (editor visual nodes)"]
+    RULESET["RuleSet in Scene JSON"]
+    LOAD["RuleSystem::set_rules() on scene load"]
+    RRS["RuleRuntimeState (live tracking)"]
+    FRAME["Phase A: collect_frame_commands"]
+    EVENTS["Buffered events: collision, damage, interaction"]
+    REACT["Phase B: collect_reactive_commands"]
+    MATCH["Find matching rules by trigger"]
+    EVAL["Evaluate all conditions (AND)"]
+    BUFFER["Buffer actions → RuleCommand variants"]
+    APPLY["apply_rule_commands() per group"]
+    EFFECT["Side effects: audio, spawn, flag, scene switch"]
+
+    GRAPH -->|to_rule_set| RULESET
+    RULESET -->|scene load| LOAD
+    LOAD --> RRS
+    RRS --> FRAME
+    FRAME --> APPLY
+    EVENTS --> REACT
+    REACT --> MATCH
+    MATCH --> EVAL
+    EVAL -->|all pass| BUFFER
+    BUFFER --> APPLY
+    APPLY --> EFFECT
+```
+
+**Stage 1 — Author in editor.** The editor's rule graph represents rules as visual nodes: trigger nodes, condition nodes, and action nodes connected by edges. Each `RuleGraphChain` starts from a trigger node and captures the rule's metadata (ID, priority, enabled, once). `RuleGraph::to_rule_set()` walks the graph and reconstructs `Rule` structs with trigger, conditions, and actions in traversal order.
+
+**Stage 2 — Persist.** Rules are serialized as part of the `Scene` JSON file via the `RuleSet` field. Each `Rule` contains its `RuleTrigger`, `Vec<RuleCondition>`, and `Vec<RuleAction>`, all serialized with serde.
+
+**Stage 3 — Load.** When a scene starts, `SceneTransitionPlanner::prepare_scene_load()` extracts the `RuleSet`. `GameState::apply_prepared_scene_load()` calls `RuleSystem::set_rules()`, which stores the rules in `SceneState::active_rules` and resets `RuleRuntimeState` (clearing fired-once tracking, event buffers, and tile positions).
+
+**Stage 4 — Execute per frame.** The rule pipeline runs in two phases within `GameSimulation::tick()`:
+
+Phase A — frame commands (early in the tick):
+
+1. `RuleSystem::begin_frame()` clears per-frame event buffers.
+2. `RuleSystem::collect_frame_commands()` finds rules matching `OnStart` (once per scene), `OnUpdate` (every frame), and `OnKey` (for each held key).
+3. For each matching rule: evaluate all conditions; if all pass, buffer each action as a `RuleCommand`.
+4. `RuleSystem::apply_commands()` dispatches each `RuleCommand` to its group's apply function.
+
+Phase B — reactive commands (after movement, combat, and AI):
+
+1. Movement, combat, interaction, and AI systems buffer events into `RuleRuntimeState`: `CollisionEvent`, `DamageEvent`, `DeathEvent`, `InteractionEvent`, `DialogCompletionEvent`, `TileTransitionEvent`.
+2. `RuleSystem::collect_reactive_commands()` iterates buffered events and finds rules matching each event's trigger type. Rules are sorted by priority (descending), then by ID for stable ordering.
+3. Condition evaluation, action buffering, and command application proceed as in Phase A.
+
+**Stage 5 — Command application.** Each `RuleCommand` group has a dedicated apply function:
+
+| Group | Apply function | Side effects |
+|---|---|---|
+| `Audio` | `apply_audio_command()` | emits `AudioEvent` to frame result |
+| `Animation` | `apply_animation_command()` | buffers animation state change |
+| `Motion` | `apply_motion_command()` | stores velocity in `RuleRuntimeState` for movement system |
+| `Entity` | `apply_entity_command()` | spawns, despawns, damages, heals, activates, teleports |
+| `Inventory` | `apply_inventory_command()` | adds/removes inventory items |
+| `Ui` | `apply_ui_command()` | queues UI show/hide/binding updates |
+| `Scene` | `apply_scene_command()` | buffers scene switch or dialog start for post-tick |
+| `Progress` | `apply_progress_command()` | mutates game flags, queues save/load |
+
+Deferred effects (scene switches, dialog starts, persistence requests) are processed after the tick completes, ensuring the current frame's state remains consistent.
+
+Key files in order:
+
+| Stage | File |
+|---|---|
+| Author | `toki-editor/src/ui/rule_graph.rs` |
+| Persist | `toki-core/src/rules.rs`, `toki-core/src/scene.rs` |
+| Load | `toki-core/src/game/scene.rs`, `toki-core/src/game/rules/mod.rs` |
+| Frame commands | `toki-core/src/game/rules/collectors.rs`, `toki-core/src/game/rules/evaluation.rs` |
+| Reactive commands | `toki-core/src/game/rules/reactive.rs`, `toki-core/src/game/rules/events.rs` |
+| Action buffering | `toki-core/src/game/rules/actions.rs` |
+| Command application | `toki-core/src/game/rules/commands.rs` |
+
 ## 7. Layering Rules and Architectural Invariants
 
 ### 7.1 Layering rules
@@ -1330,7 +1519,7 @@ There are still two `ResourceManager` implementations in the workspace:
 - `toki-core::resources::ResourceManager`
 - `toki-runtime::systems::resources::ResourceManager`
 
-This is the main remaining resource-loading debt. The runtime manager owns the richer multi-atlas/object-sheet path, while the core manager still exists and is used by editor-facing code. The duplication is narrower than before, but authority is not yet fully unified.
+The runtime manager owns the richer multi-atlas/object-sheet path, while the core manager is used by editor-facing code. Authority is not yet fully unified.
 
 ### 8.2 Render entrypoint split
 
@@ -1339,7 +1528,7 @@ Rendering is still shared across two orchestration styles:
 - `SceneRenderer` for editor/offscreen composition
 - `GpuState` for runtime-direct rendering
 
-Recent refactors reduced duplication by moving sprite extraction into `toki-core::sprite_render` and menu/dialog composition into `toki-core::ui`, but tilemap/offscreen orchestration and some backend-specific state still remain split.
+Sprite extraction lives in `toki-core::sprite_render` and menu/dialog composition in `toki-core::ui`, but tilemap/offscreen orchestration and some backend-specific state remain split between the two entrypoints.
 
 ### 8.3 Validation depth
 
@@ -1352,7 +1541,7 @@ Schema validation exists and is useful, but deeper semantic validation remains l
 
 ### 8.4 Runtime/editor object editing asymmetry
 
-Map objects are fully editable in the map editor and render in runtime, but scene-viewport editing of map objects is still behind scene-entity editing in ergonomics.
+Map objects are fully editable in the map editor and render in runtime. Scene-viewport editing of map objects has fewer affordances than scene-entity editing.
 
 ### 8.5 Scene-path authority mismatch
 
@@ -1377,7 +1566,207 @@ Release structure:
 - build scripts in editor/runtime derive `TOKI_VERSION`
 - derived version displayed in splash screen and startup logs
 
-## 10. Architecture Summary
+## 10. Error Handling Strategy
+
+The codebase follows a layered error strategy: typed errors in libraries, `anyhow` at application boundaries, and graceful degradation throughout.
+
+### 10.1 Error types
+
+Each library crate defines focused error types using `thiserror`:
+
+| Crate | Error type | Scope |
+|---|---|---|
+| `toki-core` | `CoreError` (15 variants) | file/image loading, spatial bounds, entity/asset resolution, animation access |
+| `toki-core` | `SerializationError` (6 variants) | JSON encode/decode, save slot validation, file size limits |
+| `toki-core` | `SceneLoadError` (5 variants) | scene loading failures with `#[source]` chains |
+| `toki-core` | `DialogStartError` | missing or invalid dialog references |
+| `toki-core` | `ProjectAssetError` | I/O, core, and validation failures during asset discovery |
+| `toki-render` | `RenderError` (9 variants) | GPU device/surface creation, texture loading, adapter unavailability |
+
+Error composition: `RenderError` includes `CoreError` via `#[from]`, and `SceneLoadError` chains source errors with `#[source]`. All error variants carry contextual data (file paths, expected vs. actual values, entity IDs).
+
+### 10.2 Propagation strategy
+
+**Library code** (`toki-core`, `toki-render`): uses `Result<T, SpecificError>` with `?` for propagation. No `unwrap()` or `expect()` in production library paths. All fallible operations return typed `Result` values.
+
+**Binary code** (`toki-runtime`, `toki-editor`): catches errors at the application boundary with `anyhow::Result<()>` and logs them via `tracing::error!`. The application continues or exits gracefully rather than panicking.
+
+**Panics**: zero panics in production code. All panics in the codebase are in test assertions.
+
+### 10.3 Fallback and degradation
+
+The codebase uses defensive defaults to keep the application running when non-critical data is missing:
+
+| Pattern | Usage |
+|---|---|
+| `unwrap_or_default()` | configuration loading, UI properties, game state defaults |
+| `unwrap_or(fallback)` | animation frames, menu layout values, optional fields |
+| `if let` / `match` on `Option` | entity lookups, asset resolution, component access |
+
+Examples:
+
+- missing editor config → default window size, grid settings, and camera
+- missing tilemap texture → 1×1 white fallback texture
+- missing animation clip → no animation (entity renders static frame)
+- missing runtime config → default audio mix and display settings
+
+The principle: a missing asset or configuration should degrade the experience, not crash the application.
+
+## 11. Threading and Concurrency Model
+
+### 11.1 Single-threaded simulation
+
+The entire game simulation is single-threaded. `GameState` is owned and mutated in-place on the main thread. There are no concurrent reads or writes to game state, no `Mutex`, no `RwLock`, no `RefCell`. The service pattern (Section 5.14) resolves borrow conflicts at compile time through disjoint field borrowing.
+
+### 11.2 Event loop
+
+Both applications use winit's `ApplicationHandler` trait as the main driver:
+
+**Runtime** (`toki-runtime`):
+
+- `resumed()`: one-time GPU and window initialization
+- `window_event()`: input handling (keyboard, mouse, resize, close)
+- `about_to_wait()`: main game loop — runs fixed or delta ticks, applies frame limiting, requests redraw
+
+**Editor** (`toki-editor`):
+
+- `resumed()`: GPU, window, and egui initialization
+- `window_event()`: input handling and rendering on `RedrawRequested`
+- no `about_to_wait()` override — relies on egui's repaint-on-demand model
+
+### 11.3 GPU integration
+
+GPU work is synchronous within the frame. WGPU device and surface are created via async functions wrapped with `pollster::block_on()` at startup — the only async code in the project. There is no tokio or async runtime. After initialization, all GPU operations (command encoding, buffer writes, draw calls, surface presentation) are synchronous calls on the main thread.
+
+`GpuState` is owned as a plain struct, not wrapped in `Arc` or `Mutex`. Frame rendering follows a strict sequence: update buffers → encode render passes → submit → present.
+
+### 11.4 Background tasks (editor only)
+
+The editor spawns OS threads for long-running tasks (bundle export, asset validation) using `std::thread::spawn()`:
+
+| Mechanism | Purpose |
+|---|---|
+| `std::mpsc::channel()` | worker → main thread message passing |
+| `Arc<AtomicBool>` | cooperative cancellation signaling |
+| `try_recv()` | non-blocking polling from main thread each frame |
+| `JoinHandle::join()` | cleanup after task completion |
+
+No mutable state is shared between threads. The worker thread receives all inputs by value at spawn time and communicates results exclusively through the channel.
+
+### 11.5 Summary
+
+| Aspect | Model |
+|---|---|
+| Game simulation | single-threaded, synchronous |
+| GPU rendering | synchronous after one-time async init |
+| Editor background tasks | OS threads with `mpsc` message passing |
+| Shared mutable state | none — message passing only |
+| Async runtime | none (no tokio) |
+
+## 12. Performance and Resource Management
+
+### 12.1 Frame timing
+
+The runtime separates game logic timing from render timing:
+
+**Game tick**: fixed timestep accumulator at 60 FPS (16.667ms per tick). `TimingSystem` accumulates elapsed time; `TimestepIterator` yields one unit per tick that should be processed. In delta mode, a single tick runs per frame with time-scaled movement.
+
+**Render frame**: decoupled from game tick via `FrameLimiter`. Can be vsync-driven (unlimited), capped to a target FPS, or delta-timed. The frame limiter tracks target time (not actual time) to prevent drift accumulation.
+
+### 12.2 Texture pipeline caching
+
+`PerFrameLruCache<PathBuf, SpritePipeline>` in `toki-render` bounds GPU resource growth:
+
+- **Capacity**: 64 pipelines (one per unique texture)
+- **Lifecycle**: `begin_frame()` increments frame counter → `get_or_try_insert_with()` creates pipelines on first use → `evict_unused_lru()` removes entries not touched in the current frame
+- **Guarantee**: actively used textures are never evicted; unused textures are cleaned up within one frame
+
+### 12.3 Asset caching
+
+**Runtime**: `DecodedProjectCache` (HashMap-based) caches deserialized scenes, tilemaps, atlases, object sheets, entity definitions, dialogs, and UI layouts. Assets are loaded once and cloned for consumers.
+
+**Decoded images**: `BTreeMap` caches for raw RGBA8 images and palette-recolored variants. Two-level caching for indexed sprites: decode base image → recolor against target palette → cache both levels.
+
+**Preloading**: common SFX assets are preloaded at startup. Music is streamed, not preloaded. A load plan determines what to preload per scene/map.
+
+### 12.4 Sprite batching
+
+Sprites are batched by texture to minimize draw calls:
+
+- one `SpritePipeline` for the default atlas, plus per-texture pipelines for custom textures
+- `OrderedDrawBatch` merges consecutive sprite submissions with the same texture key into a single draw range
+- non-consecutive submissions with the same key remain separate batches (no reordering)
+- vertex buffers are updated only when a `needs_buffer_update` flag is set
+
+### 12.5 Tilemap chunk culling
+
+Tilemaps use 16×16-tile chunks for visibility culling:
+
+- `tilemap.visible_chunks(camera_pos, viewport_size)` computes which chunks overlap the viewport (with a half-viewport margin for smoother scrolling)
+- `generate_vertices_for_chunks()` emits geometry only for visible tiles
+- `CameraManager` caches the visible chunk set; vertices are regenerated only when the set changes
+- projection updates also trigger vertex refresh
+
+### 12.6 Entity visibility
+
+Entity visibility is a linear filter (`visible` flag + `active` flag) over entity storage. There is no spatial index — entity counts in typical Game Boy-style games are small enough that linear iteration is not a bottleneck. If entity counts grow significantly, a spatial structure (grid or quadtree) could be added to `EntityStorage` without changing the service interfaces.
+
+## 13. How to Extend the Engine
+
+This section provides step-by-step guides for three common extension patterns. Each lists the files to modify in order.
+
+### 13.1 Adding a new sparse entity component
+
+Example: adding a `Dialogue` component that tracks per-entity conversation state.
+
+1. **Define the component** — `toki-core/src/entity/components.rs`: add a new struct (e.g., `pub struct DialogueComponent { ... }`).
+
+2. **Add to the bundle** — `toki-core/src/entity/storage/bundle.rs`: add `pub dialogue: Option<DialogueComponent>` to `OptionalEntityComponents`.
+
+3. **Add sparse storage** — `toki-core/src/entity/storage/optional.rs`:
+   - Add a `dialogue: SparseComponentMap<DialogueComponent>` field to `OptionalComponentRegistry`.
+   - Add getter/setter methods: `dialogue()`, `dialogue_mut()`, `set_dialogue()`, `remove_dialogue()`.
+   - Update maintenance methods: `is_empty()`, `optional_components()`, `apply_optional_components()`, `remove_all()`.
+
+4. **Builder support** (if needed) — `toki-core/src/entity/builder.rs`: add a `with_dialogue()` method to `EntityBuilder`.
+
+No changes needed to `SparseComponentMap<T>` — it is generic and reusable.
+
+### 13.2 Adding a new rule action
+
+Example: adding a `PlayEffect { target, effect_name }` action that triggers a visual effect on an entity.
+
+1. **Define the action** — `toki-core/src/rules.rs`: add `PlayEffect { target: RuleTarget, effect_name: String }` to the `RuleAction` enum.
+
+2. **Define the command** — `toki-core/src/game/rules/mod.rs`: add `PlayEffect { entity_id: EntityId, effect_name: String }` to the appropriate sub-enum (e.g., `AnimationCommand`).
+
+3. **Buffer the action** — `toki-core/src/game/rules/actions.rs`: add a match arm in `buffer_rule_action()` that resolves the `RuleTarget` to an `EntityId` and pushes the new `RuleCommand` variant.
+
+4. **Apply the command** — `toki-core/src/game/rules/commands.rs`: add a match arm in the relevant apply function (e.g., `apply_animation_command()`) that executes the effect.
+
+5. **Editor — action kind** — `toki-editor/src/ui/editor_domain.rs`:
+   - Add variant to `RuleActionEditorKind`.
+   - Add match arms in `rule_action_kind()`, `rule_action_kind_label()`, and `default_rule_action()`.
+
+6. **Editor — parameter UI** — `toki-editor/src/ui/inspector/rules_graph/action_editor.rs`: add a match arm in `render_action_parameters()` with UI controls for `target` and `effect_name`.
+
+### 13.3 Adding a new editor panel
+
+Example: adding a "Sound Browser" panel.
+
+1. **Define the tab** — `toki-editor/src/ui/editor_ui.rs`: add `SoundBrowser` to the `CenterPanelTab` enum.
+
+2. **Register the tab** — `toki-editor/src/ui/panels.rs`: add an `EditorTabSpec` entry to the `center_panel_tabs()` array and increment the array size.
+
+3. **Create the context** — `toki-editor/src/ui/editor_context.rs`: define a `SoundBrowserContext` struct (implementing `Default`) and implement the `EditorContext` trait for it. The `render_center_panel()` method delegates to the panel's render function.
+
+4. **Implement the panel** — create `toki-editor/src/ui/panels/sound_browser.rs` and implement `PanelSystem::render_sound_browser()` as a public static method taking `&mut egui::Ui`, `&mut EditorUI`, and `&mut CenterPanelHost<'_>`.
+
+5. **Register the context** — `toki-editor/src/ui/editor_ui.rs`: instantiate `SoundBrowserContext` in the workspace initialization code where other contexts are registered.
+
+Pattern reference: `MenuEditorContext` is the simplest existing context (empty default state). `MapEditorContext` wraps a single state struct. `SpriteEditorContext` shows a complex context with substantial state management.
+
+## 14. Architecture Summary
 
 The architecture consists of six layers:
 
