@@ -30,13 +30,24 @@ pub(super) struct PreparedTextEntry {
 pub(super) struct PreparedTextLayout {
     entries: Vec<PreparedTextEntry>,
     backgrounds: Vec<TextBackgroundRect>,
-    used_keys: std::collections::HashSet<TextBufferKey>,
+    used_buffer_indices: Vec<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct TextBufferKey {
     content: String,
     font_family: String,
+    size_px_bits: u32,
+    weight: toki_core::text::TextWeight,
+    slant: TextSlant,
+    max_width_px: u32,
+    layout_height_px: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BorrowedTextBufferKey<'a> {
+    content: &'a str,
+    font_family: &'a str,
     size_px_bits: u32,
     weight: toki_core::text::TextWeight,
     slant: TextSlant,
@@ -105,6 +116,7 @@ impl GlyphonTextRenderer {
     }
 }
 
+#[cfg(test)]
 fn make_buffer_key(item: &TextItem, max_width: f32, layout_height: f32) -> TextBufferKey {
     TextBufferKey {
         content: item.content.clone(),
@@ -115,6 +127,63 @@ fn make_buffer_key(item: &TextItem, max_width: f32, layout_height: f32) -> TextB
         max_width_px: max_width.round().max(1.0) as u32,
         layout_height_px: layout_height.round().max(1.0) as u32,
     }
+}
+
+fn borrowed_buffer_key(
+    item: &TextItem,
+    max_width: f32,
+    layout_height: f32,
+) -> BorrowedTextBufferKey<'_> {
+    BorrowedTextBufferKey {
+        content: item.content.as_str(),
+        font_family: item.style.font_family.as_str(),
+        size_px_bits: item.style.size_px.to_bits(),
+        weight: item.style.weight,
+        slant: item.style.slant,
+        max_width_px: max_width.round().max(1.0) as u32,
+        layout_height_px: layout_height.round().max(1.0) as u32,
+    }
+}
+
+impl<'a> BorrowedTextBufferKey<'a> {
+    fn into_owned(self) -> TextBufferKey {
+        TextBufferKey {
+            content: self.content.to_string(),
+            font_family: self.font_family.to_string(),
+            size_px_bits: self.size_px_bits,
+            weight: self.weight,
+            slant: self.slant,
+            max_width_px: self.max_width_px,
+            layout_height_px: self.layout_height_px,
+        }
+    }
+}
+
+impl TextBufferKey {
+    fn matches(&self, other: BorrowedTextBufferKey<'_>) -> bool {
+        self.content == other.content
+            && self.font_family == other.font_family
+            && self.size_px_bits == other.size_px_bits
+            && self.weight == other.weight
+            && self.slant == other.slant
+            && self.max_width_px == other.max_width_px
+            && self.layout_height_px == other.layout_height_px
+    }
+}
+
+fn prune_cached_buffers(cached_buffers: &mut Vec<CachedTextBuffer>, used_buffer_indices: &[bool]) {
+    let old_buffers = std::mem::take(cached_buffers);
+    *cached_buffers = old_buffers
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, entry)| {
+            used_buffer_indices
+                .get(index)
+                .copied()
+                .unwrap_or(false)
+                .then_some(entry)
+        })
+        .collect();
 }
 
 pub fn to_screen_position(

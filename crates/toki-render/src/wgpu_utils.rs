@@ -18,10 +18,10 @@ pub fn create_texture_bindgroup(
     queue: &wgpu::Queue,
     texture_bind_group_layout: &wgpu::BindGroupLayout,
     uniform_buffer: &wgpu::Buffer,
-    texture_file: std::path::PathBuf,
+    texture_file: &std::path::Path,
     texture_label: Option<&str>,
 ) -> Result<wgpu::BindGroup, RenderError> {
-    let texture_path = texture_file.as_path();
+    let texture_path = texture_file;
 
     if texture_path.as_os_str().is_empty() {
         tracing::trace!(

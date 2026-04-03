@@ -106,7 +106,7 @@ enum SceneSpriteTextureSource<'a> {
     Default,
     File {
         key: String,
-        path: std::path::PathBuf,
+        path: &'a std::path::Path,
     },
     Rgba8 {
         key: String,
@@ -127,6 +127,7 @@ impl SceneRenderer {
         tracing::debug!("Tilemap texture: {:?}", tilemap_texture);
         tracing::debug!("Sprite texture: {:?}", sprite_texture);
         let tilemap_source = tilemap_texture
+            .as_deref()
             .map(TextureSource::path)
             .unwrap_or_else(TextureSource::placeholder);
         let tilemap_pipeline =
@@ -135,6 +136,7 @@ impl SceneRenderer {
         // Clone sprite_texture for caching before moving it
         let sprite_texture_cache = sprite_texture.clone();
         let sprite_source = sprite_texture
+            .as_deref()
             .map(TextureSource::path)
             .unwrap_or_else(TextureSource::placeholder);
         let sprite_pipeline = SpritePipeline::new(&device, &queue, surface_format, sprite_source)?;
@@ -169,7 +171,7 @@ impl SceneRenderer {
             &self.device,
             &self.queue,
             self.format,
-            TextureSource::path(texture_path.clone()),
+            TextureSource::path(texture_path.as_path()),
         )?;
         tracing::info!("Tilemap texture loaded successfully");
         Ok(())
@@ -193,7 +195,7 @@ impl SceneRenderer {
             &self.device,
             &self.queue,
             self.format,
-            TextureSource::path(texture_path.clone()),
+            TextureSource::path(texture_path.as_path()),
         )?;
         self.sprite_pipelines_by_texture.clear();
         self.current_sprite_texture_path = Some(texture_path);
@@ -251,7 +253,7 @@ impl SceneRenderer {
         } else if let Some(texture_path) = &sprite.texture_path {
             SceneSpriteTextureSource::File {
                 key: texture_path.to_string_lossy().to_string(),
-                path: texture_path.clone(),
+                path: texture_path.as_path(),
             }
         } else {
             SceneSpriteTextureSource::Default
@@ -284,23 +286,23 @@ impl SceneRenderer {
 
     fn add_textured_sprite_instance(
         &mut self,
-        texture_key: String,
+        texture_key: &str,
         texture_source: TextureSource<'_>,
         render_instance: SpriteRenderInstance,
     ) {
         let instance_index = self
             .sprite_pipelines_by_texture
-            .get(&texture_key)
+            .get(texture_key)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        if !self.ensure_textured_sprite_pipeline(&texture_key, texture_source) {
+        if !self.ensure_textured_sprite_pipeline(texture_key, texture_source) {
             return;
         }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(texture_key) {
             pipeline.update_projection(&self.queue, self.current_projection);
             pipeline.add_sprite(render_instance);
             self.record_sprite_draw_batch(
-                SceneSpriteBatchKey::Textured(texture_key),
+                SceneSpriteBatchKey::Textured(texture_key.to_string()),
                 instance_index,
             );
         }
@@ -321,11 +323,15 @@ impl SceneRenderer {
                 self.record_sprite_draw_batch(SceneSpriteBatchKey::Default, instance_index);
             }
             SceneSpriteTextureSource::File { key, path } => {
-                self.add_textured_sprite_instance(key, TextureSource::path(path), render_instance);
+                self.add_textured_sprite_instance(
+                    key.as_str(),
+                    TextureSource::path(path),
+                    render_instance,
+                );
             }
             SceneSpriteTextureSource::Rgba8 { key, image } => {
                 self.add_textured_sprite_instance(
-                    key,
+                    key.as_str(),
                     TextureSource::rgba8(image),
                     render_instance,
                 );

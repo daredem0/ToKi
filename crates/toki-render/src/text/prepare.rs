@@ -45,7 +45,7 @@ impl GlyphonTextRenderer {
             )
             .map_err(|error| RenderError::Other(format!("text prepare failed: {error}")))?;
 
-        self.prune_unused_buffers(&prepared.used_keys);
+        self.prune_unused_buffers(&prepared.used_buffer_indices);
         Ok(prepared.backgrounds)
     }
 
@@ -61,7 +61,7 @@ impl GlyphonTextRenderer {
 
         let mut entries = Vec::new();
         let mut backgrounds = Vec::new();
-        let mut used_keys = std::collections::HashSet::new();
+        let mut used_buffer_indices = vec![false; self.cached_buffers.len()];
 
         for item in &sorted_items {
             if item.content.is_empty() {
@@ -79,9 +79,12 @@ impl GlyphonTextRenderer {
             let max_width = item
                 .max_width
                 .unwrap_or_else(|| (surface_width - estimated_anchored_pos.x).max(1.0));
-            let key = make_buffer_key(item, max_width, surface_height);
-            let buffer_index = self.upsert_buffer(item, max_width, surface_height, &key);
-            used_keys.insert(key);
+            let key = borrowed_buffer_key(item, max_width, surface_height);
+            let buffer_index = self.upsert_buffer(item, max_width, surface_height, key);
+            if buffer_index >= used_buffer_indices.len() {
+                used_buffer_indices.resize(self.cached_buffers.len(), false);
+            }
+            used_buffer_indices[buffer_index] = true;
             let actual_size = measure_buffer_size(&self.cached_buffers[buffer_index].buffer);
             let anchored_pos = apply_anchor(base_pos, actual_size, item.anchor);
             entries.push(PreparedTextEntry {
@@ -99,13 +102,12 @@ impl GlyphonTextRenderer {
         PreparedTextLayout {
             entries,
             backgrounds,
-            used_keys,
+            used_buffer_indices,
         }
     }
 
-    fn prune_unused_buffers(&mut self, used_keys: &std::collections::HashSet<TextBufferKey>) {
-        self.cached_buffers
-            .retain(|entry| used_keys.contains(&entry.key));
+    fn prune_unused_buffers(&mut self, used_buffer_indices: &[bool]) {
+        prune_cached_buffers(&mut self.cached_buffers, used_buffer_indices);
     }
 
     fn upsert_buffer(
@@ -113,12 +115,12 @@ impl GlyphonTextRenderer {
         item: &TextItem,
         max_width: f32,
         layout_height: f32,
-        key: &TextBufferKey,
+        key: BorrowedTextBufferKey<'_>,
     ) -> usize {
         if let Some(existing_index) = self
             .cached_buffers
             .iter()
-            .position(|entry| &entry.key == key)
+            .position(|entry| entry.key.matches(key))
         {
             return existing_index;
         }
@@ -142,7 +144,7 @@ impl GlyphonTextRenderer {
         buffer.shape_until_scroll(&mut self.font_system, false);
 
         self.cached_buffers.push(CachedTextBuffer {
-            key: key.clone(),
+            key: key.into_owned(),
             buffer,
         });
         self.cached_buffers.len() - 1

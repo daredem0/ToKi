@@ -173,7 +173,7 @@ impl GpuState {
 
     fn add_textured_sprite(
         &mut self,
-        texture_key: PathBuf,
+        texture_key: &Path,
         texture_source: TextureSource<'_>,
         frame: SpriteFrame,
         pos: glam::IVec2,
@@ -183,16 +183,19 @@ impl GpuState {
         let instance = Self::build_sprite_instance(frame, pos, size, flip_x);
         let instance_index = self
             .sprite_pipelines_by_texture
-            .get(&texture_key)
+            .get(texture_key)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        if !self.ensure_textured_sprite_pipeline(&texture_key, texture_source) {
+        if !self.ensure_textured_sprite_pipeline(texture_key, texture_source) {
             return;
         }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(texture_key) {
             pipeline.update_projection(&self.queue, self.current_mvp);
             pipeline.add_sprite(instance);
-            self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key), instance_index);
+            self.record_sprite_draw_batch(
+                GpuSpriteBatchKey::Textured(texture_key.to_path_buf()),
+                instance_index,
+            );
         }
     }
 
@@ -239,8 +242,8 @@ impl GpuState {
         Self::new_internal(
             window,
             vsync,
-            TextureSource::path(default_texture_path()),
-            TextureSource::path(default_texture_path()),
+            TextureSource::path(default_texture_path().as_path()),
+            TextureSource::path(default_texture_path().as_path()),
         )
     }
 
@@ -257,8 +260,8 @@ impl GpuState {
         Self::new_internal(
             window,
             vsync,
-            TextureSource::path(tilemap_path),
-            TextureSource::path(sprite_path),
+            TextureSource::path(tilemap_path.as_path()),
+            TextureSource::path(sprite_path.as_path()),
         )
     }
 
@@ -377,8 +380,8 @@ impl crate::SpriteBackend for GpuState {
         flip_x: bool,
     ) {
         self.add_textured_sprite(
-            texture_path.clone(),
-            TextureSource::path(texture_path),
+            texture_path.as_path(),
+            TextureSource::path(texture_path.as_path()),
             frame,
             position,
             size,
@@ -396,7 +399,7 @@ impl crate::SpriteBackend for GpuState {
         flip_x: bool,
     ) {
         self.add_textured_sprite(
-            texture_key.clone(),
+            texture_key.as_path(),
             TextureSource::rgba8(image),
             frame,
             position,

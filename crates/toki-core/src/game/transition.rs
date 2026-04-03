@@ -156,14 +156,13 @@ impl<'a> SceneTransitionPlanner<'a> {
     }
 
     fn hydrate_legacy_scene_entity(&self, entity: &Entity) -> Entity {
-        let Some(definition_name) = entity.definition_name.as_deref() else {
-            return entity.clone();
+        let mut hydrated = entity.clone();
+        let Some(definition_name) = hydrated.definition_name.as_deref() else {
+            return hydrated;
         };
         let Some(definition) = self.entity_definitions.get(definition_name) else {
-            return entity.clone();
+            return hydrated;
         };
-
-        let mut hydrated = entity.clone();
         if !hydrated.rendering.grounding.is_empty() {
             return hydrated;
         }
@@ -238,15 +237,15 @@ impl<'a> SceneTransitionPlanner<'a> {
         target_components: &mut OptionalEntityComponents,
         source: &StoredEntity,
     ) {
-        target_components.combat = source
-            .components
-            .combat
-            .clone()
-            .or_else(|| target_components.combat.clone());
-        if source.components.inventory.is_some() {
-            target_components.inventory = source.components.inventory.clone();
+        if let Some(combat) = source.components.combat.as_ref() {
+            target_components.combat = Some(combat.clone());
         }
-        target_components.primary_projectile = source.components.primary_projectile.clone();
+        if let Some(inventory) = source.components.inventory.as_ref() {
+            target_components.inventory = Some(inventory.clone());
+        }
+        if let Some(projectile) = source.components.primary_projectile.as_ref() {
+            target_components.primary_projectile = Some(projectile.clone());
+        }
     }
 
     fn scene_anchor_facing_to_animation_state(facing: SceneAnchorFacing) -> AnimationState {
@@ -423,6 +422,119 @@ mod tests {
             2
         );
         assert_eq!(player.control_role, ControlRole::PlayerCharacter);
+    }
+
+    #[test]
+    fn scene_transition_planner_keeps_definition_defaults_when_preserved_state_is_missing() {
+        let definition = EntityDefinition {
+            name: "player_knight".into(),
+            display_name: "Knight".to_string(),
+            description: String::new(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+                has_shadow: true,
+                palette_override: None,
+                static_object: None,
+                grounding: Default::default(),
+            },
+            solid: true,
+            active: true,
+            components: ComponentsDef {
+                movement: Some(MovementComponent {
+                    speed: 2.0,
+                    movement_profile: MovementProfile::PlayerWasd,
+                    can_move: true,
+                }),
+                combat: Some(CombatComponent {
+                    health: Some(100),
+                    stats: EntityStats::from_legacy_health(Some(100)),
+                }),
+                primary_projectile: None,
+                pickup: None,
+                inventory: Some(Inventory::default()),
+                ..Default::default()
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 32.0,
+                hearing_radius: 192,
+                movement_sound_trigger: MovementSoundTrigger::Distance,
+                movement_sound: "step".to_string(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: "creatures".to_string(),
+                clips: vec![AnimationClipDef {
+                    state: "idle".to_string(),
+                    frame_tiles: vec!["slime/idle_0".to_string()],
+                    frame_positions: None,
+                    frame_duration_ms: 200.0,
+                    frame_durations_ms: None,
+                    loop_mode: "loop".to_string(),
+                }],
+                default_state: "idle".to_string(),
+            },
+            category: "human".to_string(),
+            tags: vec!["player".to_string()],
+        };
+        let definitions = HashMap::from([(definition.name.clone(), definition.clone())]);
+        let planner = SceneTransitionPlanner::new(&definitions);
+        let mut scene = Scene::new("Scene B".to_string());
+        scene.anchors.push(SceneAnchor {
+            id: "gate".to_string(),
+            position: glam::IVec2::new(32, 48),
+            kind: SceneAnchorKind::SpawnPoint,
+            facing: None,
+        });
+        scene.player_entry = Some(ScenePlayerEntry {
+            entity_definition_name: definition.name.clone(),
+            spawn_point_id: "gate".to_string(),
+        });
+
+        let mut preserved = definition
+            .create_entity(glam::IVec2::new(0, 0), 7)
+            .expect("player should instantiate");
+        preserved.control_role = ControlRole::PlayerCharacter;
+
+        let prepared = planner
+            .prepare_scene_load(
+                &scene,
+                Some("gate"),
+                Some(StoredEntity::new(
+                    preserved,
+                    OptionalEntityComponents::default(),
+                )),
+            )
+            .expect("scene load should be prepared");
+
+        let prepared_player_id = prepared
+            .entity_manager
+            .get_player_id()
+            .expect("player should exist");
+        assert_eq!(
+            prepared
+                .entity_manager
+                .combat(prepared_player_id)
+                .and_then(|combat| combat.current_stat("health")),
+            Some(100)
+        );
+        assert_eq!(
+            prepared
+                .entity_manager
+                .storage()
+                .components()
+                .inventory(prepared_player_id)
+                .expect("player inventory should exist")
+                .item_count("coin"),
+            0
+        );
     }
 
     #[test]

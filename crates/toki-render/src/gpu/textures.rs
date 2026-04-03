@@ -18,7 +18,7 @@ impl GpuState {
     ) -> Result<(), crate::RenderError> {
         self.load_texture_pipeline(TextureLoadConfig {
             kind: TexturePipelineKind::Tilemap,
-            source: TextureSource::path(texture_path),
+            source: TextureSource::path(texture_path.as_path()),
         })
     }
 
@@ -35,7 +35,7 @@ impl GpuState {
     pub fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
         self.load_texture_pipeline(TextureLoadConfig {
             kind: TexturePipelineKind::Sprite,
-            source: TextureSource::path(texture_path),
+            source: TextureSource::path(texture_path.as_path()),
         })
     }
 

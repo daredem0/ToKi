@@ -1,5 +1,6 @@
 use super::{
-    apply_anchor, estimate_text_size, make_buffer_key, measure_buffer_size, to_screen_position,
+    apply_anchor, borrowed_buffer_key, estimate_text_size, make_buffer_key, measure_buffer_size,
+    prune_cached_buffers, to_screen_position, CachedTextBuffer,
 };
 use glyphon::{Buffer, FontSystem, Metrics, Shaping};
 use toki_core::text::{TextAnchor, TextItem, TextSpace, TextStyle};
@@ -69,6 +70,41 @@ fn buffer_key_ignores_position_and_color_for_layout_reuse() {
     let key_a = make_buffer_key(&item_a, 180.0, 320.0);
     let key_b = make_buffer_key(&item_b, 180.0, 320.0);
     assert_eq!(key_a, key_b);
+    assert!(key_a.matches(borrowed_buffer_key(&item_b, 180.0, 320.0)));
+}
+
+#[test]
+fn prune_cached_buffers_keeps_only_used_indices() {
+    let style = TextStyle::default();
+    let buffer_style = style.clone();
+    let mut font_system = FontSystem::new();
+
+    let make_buffer = |text: &str, font_system: &mut FontSystem| {
+        let mut buffer = Buffer::new(font_system, Metrics::new(16.0, 20.0));
+        buffer.set_size(font_system, Some(200.0), Some(100.0));
+        let attrs = super::attrs_for_style(&buffer_style);
+        buffer.set_text(font_system, text, &attrs, Shaping::Basic);
+        buffer.shape_until_scroll(font_system, false);
+        buffer
+    };
+
+    let item_a = TextItem::new_screen("A", glam::Vec2::ZERO, style.clone());
+    let item_b = TextItem::new_screen("B", glam::Vec2::ZERO, style);
+    let mut cached_buffers = vec![
+        CachedTextBuffer {
+            key: make_buffer_key(&item_a, 180.0, 320.0),
+            buffer: make_buffer("A", &mut font_system),
+        },
+        CachedTextBuffer {
+            key: make_buffer_key(&item_b, 180.0, 320.0),
+            buffer: make_buffer("B", &mut font_system),
+        },
+    ];
+
+    prune_cached_buffers(&mut cached_buffers, &[true, false]);
+
+    assert_eq!(cached_buffers.len(), 1);
+    assert_eq!(cached_buffers[0].key, make_buffer_key(&item_a, 180.0, 320.0));
 }
 
 #[test]

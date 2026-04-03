@@ -1,4 +1,7 @@
-use crate::value_path::{ResolvedValue, ValuePath, ValuePathContext, ValuePathError};
+use crate::value_path::{
+    ResolvedValue, ResolvedValueRef, ValuePath, ValuePathContext, ValuePathError,
+};
+use std::borrow::Cow;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,23 +78,25 @@ impl Expression {
         &self,
         context: ValuePathContext<'_, '_>,
     ) -> Result<ResolvedValue, ExpressionError> {
-        evaluate_node(&self.root, context)
+        evaluate_node(&self.root, context).map(EvalValue::into_owned)
     }
 }
 
-fn evaluate_node(
-    node: &ExprNode,
-    context: ValuePathContext<'_, '_>,
-) -> Result<ResolvedValue, ExpressionError> {
+type EvalValue<'a> = ResolvedValueRef<'a>;
+
+fn evaluate_node<'a>(
+    node: &'a ExprNode,
+    context: ValuePathContext<'a, '_>,
+) -> Result<EvalValue<'a>, ExpressionError> {
     match node {
-        ExprNode::Literal(value) => Ok(value.clone()),
-        ExprNode::Path(path) => path.resolve(context).map_err(ExpressionError::from),
+        ExprNode::Literal(value) => Ok(borrow_resolved_value(value)),
+        ExprNode::Path(path) => path.resolve_borrowed(context).map_err(ExpressionError::from),
         ExprNode::Unary { op, expr } => {
             let value = evaluate_node(expr, context)?;
             match (op, value) {
-                (UnaryOp::Not, ResolvedValue::Bool(value)) => Ok(ResolvedValue::Bool(!value)),
-                (UnaryOp::Negate, ResolvedValue::Int(value)) => {
-                    Ok(ResolvedValue::Int(value.saturating_neg()))
+                (UnaryOp::Not, EvalValue::Bool(value)) => Ok(EvalValue::Bool(!value)),
+                (UnaryOp::Negate, EvalValue::Int(value)) => {
+                    Ok(EvalValue::Int(value.saturating_neg()))
                 }
                 (UnaryOp::Not, value) => Err(eval_error(format!(
                     "logical not requires a bool, got {:?}",
@@ -114,9 +119,9 @@ fn evaluate_node(
 
 fn evaluate_binary(
     op: BinaryOp,
-    left: ResolvedValue,
-    right: ResolvedValue,
-) -> Result<ResolvedValue, ExpressionError> {
+    left: EvalValue<'_>,
+    right: EvalValue<'_>,
+) -> Result<EvalValue<'static>, ExpressionError> {
     match op {
         BinaryOp::Add => int_bin_op(left, right, i32::saturating_add),
         BinaryOp::Subtract => int_bin_op(left, right, i32::saturating_sub),
@@ -126,42 +131,42 @@ fn evaluate_binary(
             if right == 0 {
                 return Err(eval_error("division by zero"));
             }
-            Ok(ResolvedValue::Int(left / right))
+            Ok(EvalValue::Int(left / right))
         }
-        BinaryOp::Equal => Ok(ResolvedValue::Bool(left == right)),
-        BinaryOp::NotEqual => Ok(ResolvedValue::Bool(left != right)),
+        BinaryOp::Equal => Ok(EvalValue::Bool(left == right)),
+        BinaryOp::NotEqual => Ok(EvalValue::Bool(left != right)),
         BinaryOp::Less => cmp_ints(left, right, |l, r| l < r),
         BinaryOp::LessOrEqual => cmp_ints(left, right, |l, r| l <= r),
         BinaryOp::Greater => cmp_ints(left, right, |l, r| l > r),
         BinaryOp::GreaterOrEqual => cmp_ints(left, right, |l, r| l >= r),
         BinaryOp::And => {
             let (left, right) = expect_bool_pair(left, right, "logical and")?;
-            Ok(ResolvedValue::Bool(left && right))
+            Ok(EvalValue::Bool(left && right))
         }
         BinaryOp::Or => {
             let (left, right) = expect_bool_pair(left, right, "logical or")?;
-            Ok(ResolvedValue::Bool(left || right))
+            Ok(EvalValue::Bool(left || right))
         }
     }
 }
 
-fn evaluate_call(
+fn evaluate_call<'a>(
     name: &str,
-    args: &[ExprNode],
-    context: ValuePathContext<'_, '_>,
-) -> Result<ResolvedValue, ExpressionError> {
+    args: &'a [ExprNode],
+    context: ValuePathContext<'a, '_>,
+) -> Result<EvalValue<'static>, ExpressionError> {
     match name {
         "min" => {
             let values = eval_int_args(args, context, 2, "min")?;
-            Ok(ResolvedValue::Int(values[0].min(values[1])))
+            Ok(EvalValue::Int(values[0].min(values[1])))
         }
         "max" => {
             let values = eval_int_args(args, context, 2, "max")?;
-            Ok(ResolvedValue::Int(values[0].max(values[1])))
+            Ok(EvalValue::Int(values[0].max(values[1])))
         }
         "abs" => {
             let values = eval_int_args(args, context, 1, "abs")?;
-            Ok(ResolvedValue::Int(values[0].abs()))
+            Ok(EvalValue::Int(values[0].abs()))
         }
         "random" => {
             let values = eval_int_args(args, context, 2, "random")?;
@@ -170,15 +175,15 @@ fn evaluate_call(
             if hi < lo {
                 return Err(eval_error("random(lo, hi) requires hi >= lo"));
             }
-            Ok(ResolvedValue::Int(fastrand::i32(lo..=hi)))
+            Ok(EvalValue::Int(fastrand::i32(lo..=hi)))
         }
         other => Err(eval_error(format!("unknown function '{other}'"))),
     }
 }
 
-fn eval_int_args(
-    args: &[ExprNode],
-    context: ValuePathContext<'_, '_>,
+fn eval_int_args<'a>(
+    args: &'a [ExprNode],
+    context: ValuePathContext<'a, '_>,
     expected_len: usize,
     fn_name: &str,
 ) -> Result<Vec<i32>, ExpressionError> {
@@ -190,7 +195,7 @@ fn eval_int_args(
     }
     args.iter()
         .map(|arg| match evaluate_node(arg, context)? {
-            ResolvedValue::Int(value) => Ok(value),
+            EvalValue::Int(value) => Ok(value),
             value => Err(eval_error(format!(
                 "{fn_name} expects int arguments, got {:?}",
                 value
@@ -200,30 +205,30 @@ fn eval_int_args(
 }
 
 fn int_bin_op(
-    left: ResolvedValue,
-    right: ResolvedValue,
+    left: EvalValue<'_>,
+    right: EvalValue<'_>,
     op: impl FnOnce(i32, i32) -> i32,
-) -> Result<ResolvedValue, ExpressionError> {
+) -> Result<EvalValue<'static>, ExpressionError> {
     let (left, right) = expect_int_pair(left, right, "integer operation")?;
-    Ok(ResolvedValue::Int(op(left, right)))
+    Ok(EvalValue::Int(op(left, right)))
 }
 
 fn cmp_ints(
-    left: ResolvedValue,
-    right: ResolvedValue,
+    left: EvalValue<'_>,
+    right: EvalValue<'_>,
     cmp: impl FnOnce(i32, i32) -> bool,
-) -> Result<ResolvedValue, ExpressionError> {
+) -> Result<EvalValue<'static>, ExpressionError> {
     let (left, right) = expect_int_pair(left, right, "comparison")?;
-    Ok(ResolvedValue::Bool(cmp(left, right)))
+    Ok(EvalValue::Bool(cmp(left, right)))
 }
 
 fn expect_int_pair(
-    left: ResolvedValue,
-    right: ResolvedValue,
+    left: EvalValue<'_>,
+    right: EvalValue<'_>,
     op_name: &str,
 ) -> Result<(i32, i32), ExpressionError> {
     match (left, right) {
-        (ResolvedValue::Int(left), ResolvedValue::Int(right)) => Ok((left, right)),
+        (EvalValue::Int(left), EvalValue::Int(right)) => Ok((left, right)),
         (left, right) => Err(eval_error(format!(
             "{op_name} requires ints, got {:?} and {:?}",
             left, right
@@ -232,12 +237,12 @@ fn expect_int_pair(
 }
 
 fn expect_bool_pair(
-    left: ResolvedValue,
-    right: ResolvedValue,
+    left: EvalValue<'_>,
+    right: EvalValue<'_>,
     op_name: &str,
 ) -> Result<(bool, bool), ExpressionError> {
     match (left, right) {
-        (ResolvedValue::Bool(left), ResolvedValue::Bool(right)) => Ok((left, right)),
+        (EvalValue::Bool(left), EvalValue::Bool(right)) => Ok((left, right)),
         (left, right) => Err(eval_error(format!(
             "{op_name} requires bools, got {:?} and {:?}",
             left, right
@@ -249,6 +254,14 @@ fn eval_error(message: impl Into<String>) -> ExpressionError {
     ExpressionError::Evaluation {
         span: TextSpan { start: 0, end: 0 },
         message: message.into(),
+    }
+}
+
+fn borrow_resolved_value(value: &ResolvedValue) -> EvalValue<'_> {
+    match value {
+        ResolvedValue::Bool(value) => EvalValue::Bool(*value),
+        ResolvedValue::Int(value) => EvalValue::Int(*value),
+        ResolvedValue::String(value) => EvalValue::String(Cow::Borrowed(value.as_str())),
     }
 }
 
@@ -830,6 +843,19 @@ mod tests {
         assert_eq!(
             expr.evaluate(context).expect("expression should evaluate"),
             ResolvedValue::Int(17)
+        );
+    }
+
+    #[test]
+    fn string_value_paths_compare_without_losing_semantics() {
+        let mut flags = GameFlags::default();
+        flags.set("region", FlagValue::String("forest".to_string()));
+        let expr =
+            Expression::parse("flags.region == \"forest\"").expect("expression should parse");
+        assert_eq!(
+            expr.evaluate(empty_context(&flags))
+                .expect("expression should evaluate"),
+            ResolvedValue::Bool(true)
         );
     }
 

@@ -1,6 +1,7 @@
 use crate::entity::{EntityId, EntityManager, HEALTH_STAT_ID};
 use crate::flags::GameFlags;
 use crate::rules::TriggerContext;
+use std::borrow::Cow;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +42,23 @@ impl ResolvedValue {
             Self::Bool(value) => crate::FlagValue::Bool(value),
             Self::Int(value) => crate::FlagValue::Int(value),
             Self::String(value) => crate::FlagValue::String(value),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ResolvedValueRef<'a> {
+    Bool(bool),
+    Int(i32),
+    String(Cow<'a, str>),
+}
+
+impl<'a> ResolvedValueRef<'a> {
+    pub(crate) fn into_owned(self) -> ResolvedValue {
+        match self {
+            Self::Bool(value) => ResolvedValue::Bool(value),
+            Self::Int(value) => ResolvedValue::Int(value),
+            Self::String(value) => ResolvedValue::String(value.into_owned()),
         }
     }
 }
@@ -113,15 +131,23 @@ impl ValuePath {
         &self,
         context: ValuePathContext<'_, '_>,
     ) -> Result<ResolvedValue, ValuePathError> {
+        self.resolve_borrowed(context).map(ResolvedValueRef::into_owned)
+    }
+
+    pub(crate) fn resolve_borrowed<'a>(
+        &self,
+        context: ValuePathContext<'a, '_>,
+    ) -> Result<ResolvedValueRef<'a>, ValuePathError> {
         match (&self.root, &self.accessor) {
             (ValuePathRoot::Flags, ValuePathAccessor::Flag(flag)) => context
                 .game_flags
                 .get(flag)
-                .cloned()
                 .map(|value| match value {
-                    crate::FlagValue::Bool(value) => ResolvedValue::Bool(value),
-                    crate::FlagValue::Int(value) => ResolvedValue::Int(value),
-                    crate::FlagValue::String(value) => ResolvedValue::String(value),
+                    crate::FlagValue::Bool(value) => ResolvedValueRef::Bool(*value),
+                    crate::FlagValue::Int(value) => ResolvedValueRef::Int(*value),
+                    crate::FlagValue::String(value) => {
+                        ResolvedValueRef::String(Cow::Borrowed(value.as_str()))
+                    }
                 })
                 .ok_or_else(|| ValuePathError::Unresolved(format!("flags.{flag}"))),
             (root, accessor) => {
@@ -143,7 +169,7 @@ impl ValuePath {
                         .entity_manager
                         .combat(entity_id)
                         .and_then(|combat| combat.current_stat(HEALTH_STAT_ID))
-                        .map(ResolvedValue::Int)
+                        .map(ResolvedValueRef::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
                     ValuePathAccessor::MaxHealth => context
                         .entity_manager
@@ -153,24 +179,27 @@ impl ValuePath {
                                 .base_stat(HEALTH_STAT_ID)
                                 .or_else(|| combat.current_stat(HEALTH_STAT_ID))
                         })
-                        .map(ResolvedValue::Int)
+                        .map(ResolvedValueRef::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
-                    ValuePathAccessor::Active => Ok(ResolvedValue::Bool(entity.active)),
-                    ValuePathAccessor::Kind => {
-                        Ok(ResolvedValue::String(format!("{:?}", entity.entity_kind)))
-                    }
+                    ValuePathAccessor::Active => Ok(ResolvedValueRef::Bool(entity.active)),
+                    ValuePathAccessor::Kind => Ok(ResolvedValueRef::String(Cow::Owned(format!(
+                        "{:?}",
+                        entity.entity_kind
+                    )))),
                     ValuePathAccessor::Stat(stat) => context
                         .entity_manager
                         .combat(entity_id)
                         .and_then(|combat| combat.current_stat(stat))
-                        .map(ResolvedValue::Int)
+                        .map(ResolvedValueRef::Int)
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
                     ValuePathAccessor::InventoryCount(item_id) => context
                         .entity_manager
                         .storage()
                         .components()
                         .inventory(entity_id)
-                        .map(|inventory| ResolvedValue::Int(inventory.item_count(item_id) as i32))
+                        .map(|inventory| {
+                            ResolvedValueRef::Int(inventory.item_count(item_id) as i32)
+                        })
                         .ok_or_else(|| ValuePathError::Unresolved(self.to_string())),
                     ValuePathAccessor::Flag(_) => {
                         unreachable!("flag access only valid on flags root")

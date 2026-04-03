@@ -6,7 +6,7 @@ pub mod sprite;
 pub mod tilemap;
 
 use bytemuck::Pod;
-use std::path::PathBuf;
+use std::path::Path;
 use toki_core::graphics::image::DecodedImage;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue, RenderPass};
@@ -31,12 +31,12 @@ pub trait RenderPipeline {
 }
 
 pub(crate) enum TextureSource<'a> {
-    Path(PathBuf),
+    Path(&'a Path),
     Rgba8(&'a DecodedImage),
 }
 
 impl<'a> TextureSource<'a> {
-    pub(crate) fn path(path: PathBuf) -> Self {
+    pub(crate) fn path(path: &'a Path) -> Self {
         Self::Path(path)
     }
 
@@ -84,15 +84,15 @@ pub(crate) fn create_texture_bindgroup_for_source(
     texture_source: TextureSource<'_>,
     texture_label: Option<&str>,
 ) -> Result<wgpu::BindGroup, RenderError> {
-    match texture_source {
-        TextureSource::Path(texture_path) => create_texture_bindgroup(
-            device,
-            queue,
-            bind_group_layout,
-            uniform_buffer,
-            texture_path,
-            texture_label,
-        ),
+        match texture_source {
+            TextureSource::Path(texture_path) => create_texture_bindgroup(
+                device,
+                queue,
+                bind_group_layout,
+                uniform_buffer,
+                texture_path,
+                texture_label,
+            ),
         TextureSource::Rgba8(image) => create_texture_bindgroup_from_rgba8(
             device,
             queue,
@@ -107,15 +107,15 @@ pub(crate) fn create_texture_bindgroup_for_source(
 #[cfg(test)]
 mod tests {
     use super::TextureSource;
-    use std::path::PathBuf;
     use toki_core::graphics::image::DecodedImage;
 
     #[test]
     fn texture_source_path_variant_preserves_path() {
-        let source = TextureSource::path(PathBuf::from("sprites/test.png"));
+        let path = std::path::Path::new("sprites/test.png");
+        let source = TextureSource::path(path);
 
         match source {
-            TextureSource::Path(path) => assert_eq!(path, PathBuf::from("sprites/test.png")),
+            TextureSource::Path(path) => assert_eq!(path, std::path::Path::new("sprites/test.png")),
             TextureSource::Rgba8(_) => panic!("expected path source"),
         }
     }
