@@ -225,25 +225,58 @@ impl EditorApp {
             Some(ctx.load_texture("toki_busy_logo", color_image, egui::TextureOptions::LINEAR));
     }
 
-    /// Helper method to initialize a viewport with WGPU context
-    fn initialize_viewport(&self, mut viewport: SceneViewport) -> Option<SceneViewport> {
-        if let Some(renderer) = &self.platform.renderer {
-            match pollster::block_on(
-                viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
-            ) {
-                Ok(()) => {
-                    tracing::info!("Scene viewport initialized with unified rendering");
-                    Some(viewport)
-                }
-                Err(e) => {
-                    tracing::error!("Failed to initialize scene viewport with WGPU: {e}");
-                    None
-                }
+    fn init_viewport_with<R, V, Create, Initialize>(
+        renderer: Option<&R>,
+        create_viewport: Create,
+        initialize_viewport: Initialize,
+        viewport_label: &str,
+    ) -> Option<V>
+    where
+        Create: FnOnce() -> Result<V>,
+        Initialize: FnOnce(&R, &mut V) -> Result<()>,
+    {
+        let Some(renderer) = renderer else {
+            tracing::error!("Cannot initialize {viewport_label}: renderer not available");
+            return None;
+        };
+
+        let mut viewport = match create_viewport() {
+            Ok(viewport) => viewport,
+            Err(error) => {
+                tracing::error!("Failed to create {viewport_label}: {error}");
+                return None;
             }
-        } else {
-            tracing::error!("Cannot initialize scene viewport: renderer not available");
-            None
+        };
+
+        match initialize_viewport(renderer, &mut viewport) {
+            Ok(()) => {
+                tracing::info!("{viewport_label} initialized");
+                Some(viewport)
+            }
+            Err(error) => {
+                tracing::error!("Failed to initialize {viewport_label}: {error}");
+                None
+            }
         }
+    }
+
+    /// Helper method to initialize a viewport with WGPU context.
+    fn initialize_viewport(
+        &self,
+        create_viewport: impl FnOnce() -> Result<SceneViewport>,
+        viewport_label: &str,
+    ) -> Option<SceneViewport> {
+        Self::init_viewport_with(
+            self.platform.renderer.as_ref(),
+            create_viewport,
+            |renderer, viewport| {
+                pollster::block_on(
+                    viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
+                )?;
+                Ok(())
+            },
+            viewport_label,
+        )
     }
 
     fn editor_shortcut_action(
@@ -360,59 +393,15 @@ impl ApplicationHandler for EditorApp {
         self.platform.renderer = Some(renderer);
         self.platform.egui_winit = Some(egui_winit);
 
-        // Initialize scene viewport with empty game state and WGPU context
-        let game_state = GameState::new_empty();
-        match SceneViewport::with_game_state(game_state) {
-            Ok(mut viewport) => {
-                // Initialize the scene viewport with WGPU context from renderer
-                if let Some(renderer) = &self.platform.renderer {
-                    match pollster::block_on(
-                        viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
-                    ) {
-                        Ok(()) => {
-                            self.viewports.scene = Some(viewport);
-                            tracing::info!("Scene viewport initialized with unified rendering");
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to initialize scene viewport with WGPU: {e}");
-                        }
-                    }
-                } else {
-                    tracing::error!("Cannot initialize scene viewport: renderer not available");
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to create scene viewport: {e}");
-            }
-        }
+        self.viewports.scene = self.initialize_viewport(
+            || SceneViewport::with_game_state(GameState::new_empty()),
+            "scene viewport",
+        );
 
-        let map_editor_state = GameState::new_empty();
-        match SceneViewport::with_game_state_responsive(map_editor_state) {
-            Ok(mut viewport) => {
-                if let Some(renderer) = &self.platform.renderer {
-                    match pollster::block_on(
-                        viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
-                    ) {
-                        Ok(()) => {
-                            self.viewports.map_editor = Some(viewport);
-                            tracing::info!("Map editor viewport initialized");
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to initialize map editor viewport with WGPU: {e}"
-                            );
-                        }
-                    }
-                } else {
-                    tracing::error!(
-                        "Cannot initialize map editor viewport: renderer not available"
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to create map editor viewport: {e}");
-            }
-        }
+        self.viewports.map_editor = self.initialize_viewport(
+            || SceneViewport::with_game_state_responsive(GameState::new_empty()),
+            "map editor viewport",
+        );
 
         tracing::info!("Editor initialized successfully");
         if !self.session.startup_project_auto_open_done {

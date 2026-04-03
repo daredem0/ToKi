@@ -4,7 +4,9 @@ use super::super::InspectorSystem;
 use super::types::EntityPropertyDraft;
 use crate::editor_services::commands as editor_commands;
 use crate::ui::editor_ui::EditorUI;
-use crate::ui::entity_kind_policy::{effective_kind_for_category, uses_decoration_collision_policy};
+use crate::ui::entity_kind_policy::{
+    effective_kind_for_category, uses_decoration_collision_policy,
+};
 use crate::ui::undo_redo::EditorCommand;
 use toki_core::entity::{
     decoration_collision_box, AiBehavior, AiComponent, CombatComponent, ControlRole, EntityId,

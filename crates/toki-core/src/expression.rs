@@ -513,11 +513,7 @@ impl<'a> Lexer<'a> {
         self.peeked.take().or_else(|| self.chars.next())
     }
 
-    fn next_expected_char(
-        &mut self,
-        start: usize,
-        message: &str,
-    ) -> Result<char, ExpressionError> {
+    fn next_expected_char(&mut self, start: usize, message: &str) -> Result<char, ExpressionError> {
         self.next_char()
             .map(|(_, ch)| ch)
             .ok_or_else(|| ExpressionError::Parse {

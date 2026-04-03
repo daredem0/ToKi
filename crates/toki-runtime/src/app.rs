@@ -213,6 +213,127 @@ struct App {
     runtime_overlay_slider_drag: Option<usize>,
 }
 
+struct BuiltStartupState {
+    resources: ResourceManager,
+    game_state: toki_core::GameState,
+    dialogs: Vec<toki_core::dialog::DialogTree>,
+    ui_layouts: Vec<toki_core::ui_layout::UiLayoutAsset>,
+    pack_mount: Option<tempfile::TempDir>,
+    asset_load_plan: RuntimeAssetLoadPlan,
+    decoded_project_cache: DecodedProjectCache,
+}
+
+struct AppBuilder {
+    launch_options: RuntimeLaunchOptions,
+    splash_policy: SplashPolicy,
+}
+
+impl AppBuilder {
+    fn new(launch_options: RuntimeLaunchOptions) -> Self {
+        Self {
+            launch_options,
+            splash_policy: SplashPolicy::Community,
+        }
+    }
+
+    fn apply_persisted_runtime_settings(&mut self) {
+        App::apply_persisted_runtime_settings_from_disk(&mut self.launch_options);
+    }
+
+    fn resolve_splash_config(&self) -> ResolvedSplashConfig {
+        self.splash_policy.resolve(&self.launch_options.splash)
+    }
+
+    fn build_startup_state(&self) -> BuiltStartupState {
+        let (
+            resources,
+            game_state,
+            dialogs,
+            ui_layouts,
+            pack_mount,
+            asset_load_plan,
+            decoded_project_cache,
+        ) = App::build_startup_state(&self.launch_options);
+        BuiltStartupState {
+            resources,
+            game_state,
+            dialogs,
+            ui_layouts,
+            pack_mount,
+            asset_load_plan,
+            decoded_project_cache,
+        }
+    }
+
+    fn build_rendering_system(&self) -> RenderingSystem {
+        let mut rendering = RenderingSystem::new_with_desired_resolution(
+            self.launch_options.display.resolution_width,
+            self.launch_options.display.resolution_height,
+        );
+        rendering.set_viewport_mode(self.launch_options.display.viewport);
+        rendering
+    }
+
+    fn build(mut self) -> App {
+        self.apply_persisted_runtime_settings();
+        let splash_config = self.resolve_splash_config();
+        let startup = self.build_startup_state();
+        let game_system = GameManager::new(startup.game_state);
+        let camera_system = App::build_camera_system(&self.launch_options, &game_system);
+        let mut audio_system = App::build_audio_system(
+            &self.launch_options,
+            startup.pack_mount.as_ref(),
+            &startup.asset_load_plan,
+        );
+        let menu_system = MenuController::new(self.launch_options.menu.clone());
+        let dialog_system = DialogController::new(startup.dialogs);
+        let ui_controller = UiController::new(startup.ui_layouts);
+        let mut scene_transition =
+            SceneTransitionController::new(self.launch_options.transition.clone());
+        App::prime_initial_scene_music(
+            &game_system,
+            &mut scene_transition,
+            &mut audio_system,
+            &self.launch_options,
+        );
+        let frame_limiter = App::build_frame_limiter(&self.launch_options);
+        let rendering = self.build_rendering_system();
+
+        App {
+            game_system,
+            camera_system,
+            resources: startup.resources,
+            performance: PerformanceMonitor::new(),
+            audio_system,
+            platform: PlatformSystem::new(),
+            rendering,
+            timing: TimingSystem::new(),
+            frame_limiter,
+            launch_options: self.launch_options,
+            menu_system,
+            dialog_system,
+            ui_controller,
+            splash_policy: self.splash_policy,
+            splash_config,
+            splash_active: true,
+            splash_started_at: None,
+            splash_logo_loaded: false,
+            post_splash_sprite_texture_path: None,
+            runtime_overlay: None,
+            exit_requested: false,
+            pending_ui_events: Vec::new(),
+            last_tick_instant: None,
+            asset_load_plan: startup.asset_load_plan,
+            scene_transition,
+            decoded_project_cache: startup.decoded_project_cache,
+            pack_mount: startup.pack_mount,
+            cursor_position: None,
+            left_mouse_down: false,
+            runtime_overlay_slider_drag: None,
+        }
+    }
+}
+
 impl App {
     fn build_camera_system(
         launch_options: &RuntimeLaunchOptions,
@@ -319,76 +440,8 @@ impl App {
             .or(self.launch_options.project_path.as_deref())
     }
 
-    fn new(mut launch_options: RuntimeLaunchOptions) -> Self {
-        Self::apply_persisted_runtime_settings_from_disk(&mut launch_options);
-        let splash_policy = SplashPolicy::Community;
-        let splash_config = splash_policy.resolve(&launch_options.splash);
-        let (
-            resources,
-            game_state,
-            dialogs,
-            ui_layouts,
-            pack_mount,
-            asset_load_plan,
-            decoded_project_cache,
-        ) = Self::build_startup_state(&launch_options);
-        let game_system = GameManager::new(game_state);
-        let camera_system = Self::build_camera_system(&launch_options, &game_system);
-        let mut audio_system =
-            Self::build_audio_system(&launch_options, pack_mount.as_ref(), &asset_load_plan);
-        let menu_system = MenuController::new(launch_options.menu.clone());
-        let dialog_system = DialogController::new(dialogs);
-        let ui_controller = UiController::new(ui_layouts);
-        let mut scene_transition =
-            SceneTransitionController::new(launch_options.transition.clone());
-        Self::prime_initial_scene_music(
-            &game_system,
-            &mut scene_transition,
-            &mut audio_system,
-            &launch_options,
-        );
-        let frame_limiter = Self::build_frame_limiter(&launch_options);
-        let resolution_width = launch_options.display.resolution_width;
-        let resolution_height = launch_options.display.resolution_height;
-        let mut rendering =
-            RenderingSystem::new_with_desired_resolution(resolution_width, resolution_height);
-        rendering.set_viewport_mode(launch_options.display.viewport);
-
-        Self {
-            // Core systems
-            game_system,
-            camera_system,
-            resources,
-            performance: PerformanceMonitor::new(),
-            audio_system,
-
-            // Grouped systems
-            platform: PlatformSystem::new(),
-            rendering,
-            timing: TimingSystem::new(),
-            frame_limiter,
-            launch_options,
-            menu_system,
-            dialog_system,
-            ui_controller,
-            splash_policy,
-            splash_config,
-            splash_active: true,
-            splash_started_at: None,
-            splash_logo_loaded: false,
-            post_splash_sprite_texture_path: None,
-            runtime_overlay: None,
-            exit_requested: false,
-            pending_ui_events: Vec::new(),
-            last_tick_instant: None,
-            asset_load_plan,
-            scene_transition,
-            decoded_project_cache,
-            pack_mount,
-            cursor_position: None,
-            left_mouse_down: false,
-            runtime_overlay_slider_drag: None,
-        }
+    fn new(launch_options: RuntimeLaunchOptions) -> Self {
+        AppBuilder::new(launch_options).build()
     }
 }
 /// Runs a minimal window using the winit library.

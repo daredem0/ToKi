@@ -466,6 +466,73 @@ fn tilemap_to_save_for_map_editor_draft_falls_back_to_original_draft_when_viewpo
     assert_eq!(saved, draft.tilemap);
 }
 
+#[test]
+fn init_viewport_with_returns_none_when_renderer_is_missing() {
+    let mut create_called = false;
+    let viewport = EditorApp::init_viewport_with(
+        Option::<&()>::None,
+        || {
+            create_called = true;
+            Ok(7_u8)
+        },
+        |_renderer: &(), _viewport: &mut u8| Ok(()),
+        "scene viewport",
+    );
+
+    assert!(viewport.is_none());
+    assert!(
+        !create_called,
+        "viewport creation should be skipped without a renderer"
+    );
+}
+
+#[test]
+fn init_viewport_with_returns_none_when_viewport_creation_fails() {
+    let mut initialize_called = false;
+    let viewport = EditorApp::init_viewport_with(
+        Some(&()),
+        || Err(anyhow::anyhow!("creation failed")),
+        |_renderer: &(), _viewport: &mut u8| {
+            initialize_called = true;
+            Ok(())
+        },
+        "scene viewport",
+    );
+
+    assert!(viewport.is_none());
+    assert!(
+        !initialize_called,
+        "viewport initialization should not run after a creation error"
+    );
+}
+
+#[test]
+fn init_viewport_with_returns_none_when_viewport_initialization_fails() {
+    let viewport = EditorApp::init_viewport_with(
+        Some(&()),
+        || Ok(11_u8),
+        |_renderer: &(), _viewport: &mut u8| Err(anyhow::anyhow!("wgpu init failed")),
+        "scene viewport",
+    );
+
+    assert!(viewport.is_none());
+}
+
+#[test]
+fn init_viewport_with_returns_viewport_when_creation_and_initialization_succeed() {
+    let viewport = EditorApp::init_viewport_with(
+        Some(&()),
+        || Ok(13_u8),
+        |_renderer: &(), viewport: &mut u8| {
+            *viewport = 21;
+            Ok(())
+        },
+        "scene viewport",
+    );
+
+    assert_eq!(viewport, Some(21));
+}
+
 fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
     let mut tiles = HashMap::new();
     tiles.insert(

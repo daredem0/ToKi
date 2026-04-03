@@ -2,13 +2,19 @@ use std::time::Instant;
 
 use toki_core::camera::RuntimeState;
 use toki_core::{
-    game::{GameSimulation, RenderQueryService},
+    game::{AudioEvent, GameSimulation, RenderQueryService},
     EventHandler, GameUpdateResult, DEFAULT_TIMESTEP_MS,
 };
 
 use super::app_presenter::{render_scene_transition_overlay, WorldFramePresenter};
 use super::app_scene_runtime::{SceneRuntimeCoordinator, SceneRuntimeRefs, SceneRuntimeSettings};
 use super::App;
+
+pub(super) struct GameUpdatePhase {
+    pub(super) result: GameUpdateResult<AudioEvent>,
+    pub(super) viewport_changed: bool,
+    pub(super) transition_delta_ms: u32,
+}
 
 impl App {
     pub(super) fn current_world_bounds(&self) -> glam::UVec2 {
@@ -68,33 +74,39 @@ impl App {
         self.tick_internal(Some(delta_ms))
     }
 
-    fn tick_internal(&mut self, delta_ms: Option<f32>) {
-        let tick_start = Instant::now();
-        tracing::trace!("TICK @ {:?}", tick_start);
-
+    pub(super) fn compute_game_update(&mut self, delta_ms: Option<f32>) -> GameUpdatePhase {
         let transition_delta_ms = delta_ms.unwrap_or(DEFAULT_TIMESTEP_MS).max(0.0) as u32;
-        let mut world_bounds = self.current_world_bounds();
+        let world_bounds = self.current_world_bounds();
         let viewport_changed = self.sync_runtime_viewport_to_window(world_bounds);
-        let mut game_result =
-            if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active() {
-                GameUpdateResult::new()
-            } else if let Some(delta) = delta_ms {
-                GameSimulation::tick_with_delta(
-                    &mut self.game_system.game_state,
-                    delta,
-                    world_bounds,
-                    self.resources.get_tilemap(),
-                    self.resources.get_terrain_atlas(),
-                )
-            } else {
-                GameSimulation::tick_fixed(
-                    &mut self.game_system.game_state,
-                    world_bounds,
-                    self.resources.get_tilemap(),
-                    self.resources.get_terrain_atlas(),
-                )
-            };
+        let result = if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active() {
+            GameUpdateResult::new()
+        } else if let Some(delta) = delta_ms {
+            GameSimulation::tick_with_delta(
+                &mut self.game_system.game_state,
+                delta,
+                world_bounds,
+                self.resources.get_tilemap(),
+                self.resources.get_terrain_atlas(),
+            )
+        } else {
+            GameSimulation::tick_fixed(
+                &mut self.game_system.game_state,
+                world_bounds,
+                self.resources.get_tilemap(),
+                self.resources.get_terrain_atlas(),
+            )
+        };
+        GameUpdatePhase {
+            result,
+            viewport_changed,
+            transition_delta_ms,
+        }
+    }
 
+    pub(super) fn apply_game_update_side_effects(
+        &mut self,
+        game_result: &mut GameUpdateResult<AudioEvent>,
+    ) {
         let listener_position = self.game_system.player_id().map(|_| {
             RenderQueryService::new(
                 self.game_system.game_state.world().entity_manager(),
@@ -138,21 +150,30 @@ impl App {
         for request in game_result.ui_requests.drain(..) {
             self.ui_controller.apply_request(request);
         }
+    }
 
+    fn advance_scene_runtime(&mut self, transition_delta_ms: u32) -> glam::UVec2 {
         {
             let mut coordinator = self.create_scene_runtime_coordinator();
             coordinator.advance_scene_transition(transition_delta_ms);
         }
-        world_bounds = self.current_world_bounds();
+        self.current_world_bounds()
+    }
 
-        let player_moved = game_result.player_moved;
+    fn update_camera_and_projection(
+        &mut self,
+        world_bounds: glam::UVec2,
+        player_moved: bool,
+        viewport_changed: bool,
+    ) -> bool {
         let entities = self.game_system.entities_for_camera();
         let runtime = RuntimeState {
             entities: &entities,
         };
-        let cam_changed =
-            self.camera_system.update(&runtime, world_bounds) || player_moved || viewport_changed;
+        self.camera_system.update(&runtime, world_bounds) || player_moved || viewport_changed
+    }
 
+    fn render_frame_if_ready(&mut self, cam_changed: bool) {
         if self.rendering.has_gpu() {
             self.rendering
                 .set_post_process_settings(self.resolved_post_process_settings());
@@ -195,6 +216,22 @@ impl App {
             render_scene_transition_overlay(&mut self.rendering, &self.scene_transition);
             self.rendering.finalize_ui_shapes();
         }
+    }
+
+    fn tick_internal(&mut self, delta_ms: Option<f32>) {
+        let tick_start = Instant::now();
+        tracing::trace!("TICK @ {:?}", tick_start);
+
+        let GameUpdatePhase {
+            mut result,
+            viewport_changed,
+            transition_delta_ms,
+        } = self.compute_game_update(delta_ms);
+        self.apply_game_update_side_effects(&mut result);
+        let world_bounds = self.advance_scene_runtime(transition_delta_ms);
+        let cam_changed =
+            self.update_camera_and_projection(world_bounds, result.player_moved, viewport_changed);
+        self.render_frame_if_ready(cam_changed);
 
         self.platform.request_redraw();
     }

@@ -88,7 +88,7 @@ impl EditorApp {
             resolution_height,
         ) {
             Ok(viewport) => {
-                self.viewports.scene = self.initialize_viewport(viewport);
+                self.viewports.scene = self.initialize_viewport(|| Ok(viewport), "scene viewport");
                 self.session.last_loaded_active_scene = None;
                 self.session.loaded_scene_maps.clear();
 

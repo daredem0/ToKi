@@ -31,7 +31,6 @@ fn scene_with_actions(actions: Vec<Value>) -> Value {
     })
 }
 
-
 #[test]
 fn scene_schema_accepts_all_rule_action_payload_variants() {
     let schema = compile_scene_schema();

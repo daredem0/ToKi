@@ -436,8 +436,11 @@ fn render_pickup_section(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> 
     changed |= pickup_toggled;
     if pickup_toggled {
         let kind = effective_kind_for_category(&draft.category);
-        let defaults =
-            default_collision_for_kind(kind, [draft.size_x as u32, draft.size_y as u32], draft.pickup_present);
+        let defaults = default_collision_for_kind(
+            kind,
+            [draft.size_x as u32, draft.size_y as u32],
+            draft.pickup_present,
+        );
         draft.collision.enabled = defaults.enabled;
         draft.collision.trigger = defaults.trigger;
         draft.collision.offset_x = defaults.offset[0];

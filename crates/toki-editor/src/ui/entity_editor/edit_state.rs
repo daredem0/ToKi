@@ -104,7 +104,9 @@ impl EntityEditState {
             None
         };
         let kind = effective_kind_for_category(&self.definition.category);
-        if kind == toki_core::entity::EntityKind::Item && self.definition.components.pickup.is_some() {
+        if kind == toki_core::entity::EntityKind::Item
+            && self.definition.components.pickup.is_some()
+        {
             self.definition.solid = false;
         }
         self.definition.collision = default_collision_for_kind(

@@ -1,6 +1,4 @@
-use super::{
-    runtime_entity_kind_for_category, EntityDefinition, EntityKind, StoredEntity,
-};
+use super::{runtime_entity_kind_for_category, EntityDefinition, EntityKind, StoredEntity};
 
 struct ValidationInput<'a> {
     kind: EntityKind,
@@ -81,7 +79,11 @@ pub fn validate_entity_definition_warnings(definition: &EntityDefinition) -> Vec
             .pickup
             .as_ref()
             .map(|pickup| pickup.item_id.as_str()),
-        item_count: definition.components.pickup.as_ref().map(|pickup| pickup.count),
+        item_count: definition
+            .components
+            .pickup
+            .as_ref()
+            .map(|pickup| pickup.count),
     })
 }
 
@@ -182,7 +184,9 @@ mod tests {
         });
 
         let warnings = validate_entity_definition_warnings(&definition);
-        assert!(warnings.iter().any(|w| w.contains("only valid on EntityKind::Item")));
+        assert!(warnings
+            .iter()
+            .any(|w| w.contains("only valid on EntityKind::Item")));
     }
 
     #[test]

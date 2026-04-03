@@ -322,7 +322,6 @@ impl crate::RenderFrameControl for GpuState {
 }
 
 impl crate::TextureBackend for GpuState {
-
     fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
         GpuState::load_tilemap_texture(self, texture_path)
     }
@@ -351,7 +350,6 @@ impl crate::TextureBackend for GpuState {
 }
 
 impl crate::SpriteBackend for GpuState {
-
     fn clear_sprites(&mut self) {
         self.sprite_pipeline.clear_sprites();
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
@@ -429,8 +427,13 @@ impl crate::ShapeBackend for GpuState {
     }
 
     fn add_filled_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.world_underlay_pipeline
-            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
+        self.world_underlay_pipeline.add_filled_rect(
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height,
+            color,
+        );
     }
 
     fn finalize_world_underlay_shapes(&mut self) {

@@ -134,11 +134,7 @@ pub trait ShapeBackend {
     fn add_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Add a filled rectangle to the world underlay lane.
-    fn add_filled_world_underlay_rect(
-        &mut self,
-        rect: Rect,
-        color: [f32; 4],
-    );
+    fn add_filled_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Finalize world underlay shapes for rendering.
     fn finalize_world_underlay_shapes(&mut self);

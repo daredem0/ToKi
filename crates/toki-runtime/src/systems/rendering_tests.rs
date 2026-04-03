@@ -79,7 +79,6 @@ impl RenderFrameControl for FakeBackend {
 }
 
 impl TextureBackend for FakeBackend {
-
     fn load_tilemap_texture(
         &mut self,
         texture_path: std::path::PathBuf,
@@ -123,7 +122,6 @@ impl TextureBackend for FakeBackend {
 }
 
 impl SpriteBackend for FakeBackend {
-
     fn clear_sprites(&mut self) {
         self.sprite_count.set(0);
     }

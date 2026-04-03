@@ -23,12 +23,7 @@ use crate::viewport::runtime_state::{
 };
 
 trait RuntimeRenderBackend:
-    std::fmt::Debug
-    + RenderFrameControl
-    + TextureBackend
-    + SpriteBackend
-    + TextBackend
-    + ShapeBackend
+    std::fmt::Debug + RenderFrameControl + TextureBackend + SpriteBackend + TextBackend + ShapeBackend
 {
 }
 
@@ -177,7 +172,8 @@ impl RenderingSystem {
         if self.loaded_tilemap_texture_path.as_ref() == Some(&texture_path) {
             return Ok(());
         }
-        self.backend_mut()?.load_tilemap_texture(texture_path.clone())?;
+        self.backend_mut()?
+            .load_tilemap_texture(texture_path.clone())?;
         self.loaded_tilemap_texture_path = Some(texture_path);
         Ok(())
     }
@@ -199,7 +195,8 @@ impl RenderingSystem {
         if self.loaded_sprite_texture_path.as_ref() == Some(&texture_path) {
             return Ok(());
         }
-        self.backend_mut()?.load_sprite_texture(texture_path.clone())?;
+        self.backend_mut()?
+            .load_sprite_texture(texture_path.clone())?;
         self.loaded_sprite_texture_path = Some(texture_path);
         Ok(())
     }
@@ -660,7 +657,14 @@ impl RenderingSystem {
         }
     }
 
-    pub fn add_filled_ui_shape(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+    pub fn add_filled_ui_shape(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
         if let Some(backend) = &mut self.backend {
             backend
                 .as_mut()

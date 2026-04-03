@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::io::{read_text_file_with_limit, DEFAULT_TEXT_FILE_SIZE_LIMIT};
 use crate::project::ProjectAssets;
 use toki_core::entity::validate_entity_definition_warnings;
-use toki_core::{Scene};
+use toki_core::Scene;
 
 pub struct AssetValidator {
     schemas: HashMap<String, JSONSchema>,
@@ -161,9 +161,9 @@ impl AssetValidator {
     fn log_phase7_warnings(&self, schema_type: &str, asset_name: &str, json_value: &Value) {
         match schema_type {
             "entity" => {
-                if let Ok(definition) =
-                    serde_json::from_value::<toki_core::entity::EntityDefinition>(json_value.clone())
-                {
+                if let Ok(definition) = serde_json::from_value::<toki_core::entity::EntityDefinition>(
+                    json_value.clone(),
+                ) {
                     for warning in validate_entity_definition_warnings(&definition) {
                         tracing::warn!("⚠ entity '{}': {}", asset_name, warning);
                     }

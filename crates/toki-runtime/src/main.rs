@@ -267,7 +267,10 @@ fn apply_display_config(
         &mut launch_options.display.resolution_height,
         display.resolution_height,
     );
-    apply_option(&mut launch_options.display.zoom_percent, display.zoom_percent);
+    apply_option(
+        &mut launch_options.display.zoom_percent,
+        display.zoom_percent,
+    );
     apply_option(&mut launch_options.display.viewport, display.viewport);
     apply_option(&mut launch_options.display.vsync, display.vsync);
     apply_option(&mut launch_options.display.target_fps, display.target_fps);

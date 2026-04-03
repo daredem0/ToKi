@@ -141,9 +141,11 @@ impl GpuState {
 
     fn ensure_post_process_target(&mut self) -> Result<(), crate::RenderError> {
         let size = (self.config.width.max(1), self.config.height.max(1));
-        let target = self
-            .post_process_target
-            .get_or_insert(OffscreenTarget::new(&self.device, size, self.config.format)?);
+        let target = self.post_process_target.get_or_insert(OffscreenTarget::new(
+            &self.device,
+            size,
+            self.config.format,
+        )?);
         target.resize(&self.device, size)?;
         self.post_process_pipeline
             .update_source_texture(&self.device, target.get_render_view()?);

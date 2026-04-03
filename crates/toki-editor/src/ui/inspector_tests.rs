@@ -11,8 +11,8 @@ use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     build_decoration_entity, decoration_collision_box, AiComponent, CombatComponent, ControlRole,
     DecorationSpec, EntityKind, EntityManager, EntityRendering, EntityStats, MovementComponent,
-    MovementSoundTrigger, OptionalEntityComponents, PickupDef, StaticObjectRenderDef,
-    StoredEntity, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    MovementSoundTrigger, OptionalEntityComponents, PickupDef, StaticObjectRenderDef, StoredEntity,
+    ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{

@@ -804,38 +804,75 @@ impl EditorUI {
             .expect("scene viewport context should always exist")
     }
 
-    #[cfg(test)]
-    #[cfg(test)]
-    pub(crate) fn rule_graph_context(&self) -> &RuleGraphContext {
+    fn existing_rule_graph_context_tab(&self) -> Option<CenterPanelTab> {
         if self.active_tab == CenterPanelTab::SceneGraph
-            || self.active_tab == CenterPanelTab::SceneRules
+            && self.active_context.as_any().is::<RuleGraphContext>()
         {
-            self.context::<RuleGraphContext>(self.active_tab)
-                .expect("rule graph context should always exist")
-        } else if let Some(context) = self.context::<RuleGraphContext>(CenterPanelTab::SceneGraph) {
-            context
-        } else {
-            self.context::<RuleGraphContext>(CenterPanelTab::SceneRules)
-                .expect("rule graph context should always exist")
-        }
-    }
-
-    pub(crate) fn rule_graph_context_mut(&mut self) -> &mut RuleGraphContext {
-        if self.active_tab == CenterPanelTab::SceneGraph
-            || self.active_tab == CenterPanelTab::SceneRules
+            Some(CenterPanelTab::SceneGraph)
+        } else if self.active_tab == CenterPanelTab::SceneRules
+            && self.active_context.as_any().is::<RuleGraphContext>()
         {
-            self.context_mut::<RuleGraphContext>(self.active_tab)
-                .expect("rule graph context should always exist")
+            Some(CenterPanelTab::SceneRules)
         } else if self
             .context::<RuleGraphContext>(CenterPanelTab::SceneGraph)
             .is_some()
         {
-            self.context_mut::<RuleGraphContext>(CenterPanelTab::SceneGraph)
-                .expect("rule graph context should always exist")
+            Some(CenterPanelTab::SceneGraph)
+        } else if self
+            .context::<RuleGraphContext>(CenterPanelTab::SceneRules)
+            .is_some()
+        {
+            Some(CenterPanelTab::SceneRules)
         } else {
-            self.context_mut::<RuleGraphContext>(CenterPanelTab::SceneRules)
-                .expect("rule graph context should always exist")
+            None
         }
+    }
+
+    fn preferred_rule_graph_context_tab(&self) -> CenterPanelTab {
+        if matches!(
+            self.active_tab,
+            CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules
+        ) {
+            self.active_tab
+        } else {
+            self.existing_rule_graph_context_tab()
+                .unwrap_or(CenterPanelTab::SceneGraph)
+        }
+    }
+
+    pub(crate) fn rule_graph_context_tab(&self) -> CenterPanelTab {
+        self.preferred_rule_graph_context_tab()
+    }
+
+    fn ensure_rule_graph_context(&mut self) -> CenterPanelTab {
+        if let Some(tab) = self.existing_rule_graph_context_tab() {
+            return if matches!(
+                self.active_tab,
+                CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules
+            ) {
+                self.active_tab
+            } else {
+                tab
+            };
+        }
+
+        let tab = self.preferred_rule_graph_context_tab();
+        self.parked_contexts
+            .entry(tab)
+            .or_insert_with(|| default_active_context(tab));
+        tab
+    }
+
+    #[cfg(test)]
+    pub(crate) fn rule_graph_context(&self) -> &RuleGraphContext {
+        self.context::<RuleGraphContext>(self.rule_graph_context_tab())
+            .expect("rule graph context should always exist")
+    }
+
+    pub(crate) fn rule_graph_context_mut(&mut self) -> &mut RuleGraphContext {
+        let tab = self.ensure_rule_graph_context();
+        self.context_mut::<RuleGraphContext>(tab)
+            .expect("rule graph context should always exist")
     }
 
     pub(crate) fn dialog_editor_context(&self) -> &DialogEditorContext {

@@ -403,6 +403,74 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
 }
 
 #[test]
+fn switching_between_scene_graph_tabs_preserves_shared_rule_graph_context() {
+    let mut ui = EditorUI::new();
+    ui.set_active_tab(super::CenterPanelTab::SceneGraph);
+    ui.rule_graph_context_mut().graph.canvas_zoom = 2.25;
+    ui.rule_graph_context_mut().graph.canvas_pan = [12.0, 34.0];
+
+    ui.set_active_tab(super::CenterPanelTab::SceneRules);
+
+    assert_eq!(ui.rule_graph_context().graph.canvas_zoom, 2.25);
+    assert_eq!(ui.rule_graph_context().graph.canvas_pan, [12.0, 34.0]);
+}
+
+#[test]
+fn rule_graph_context_resolves_deterministically_when_graph_tabs_are_inactive() {
+    let mut ui = EditorUI::new();
+    ui.set_active_tab(super::CenterPanelTab::SceneGraph);
+    ui.rule_graph_context_mut().graph.canvas_zoom = 1.5;
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+
+    assert_eq!(
+        ui.rule_graph_context_tab(),
+        super::CenterPanelTab::SceneGraph
+    );
+    assert_eq!(ui.rule_graph_context().graph.canvas_zoom, 1.5);
+}
+
+#[test]
+fn rule_graph_context_handles_missing_paired_tab_without_panicking() {
+    let mut ui = EditorUI::new();
+    ui.set_active_tab(super::CenterPanelTab::SceneGraph);
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+    ui.parked_contexts
+        .remove(&super::CenterPanelTab::SceneRules);
+    ui.parked_contexts
+        .get_mut(&super::CenterPanelTab::SceneGraph)
+        .expect("scene graph context should remain parked")
+        .as_any_mut()
+        .downcast_mut::<crate::ui::editor_context::RuleGraphContext>()
+        .expect("scene graph context should still be a rule graph context")
+        .graph
+        .canvas_zoom = 3.0;
+
+    assert_eq!(
+        ui.rule_graph_context_tab(),
+        super::CenterPanelTab::SceneGraph
+    );
+    assert_eq!(ui.rule_graph_context().graph.canvas_zoom, 3.0);
+}
+
+#[test]
+fn rule_graph_context_mut_recreates_missing_graph_context_when_neither_tab_is_active() {
+    let mut ui = EditorUI::new();
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+    ui.parked_contexts
+        .remove(&super::CenterPanelTab::SceneGraph);
+    ui.parked_contexts
+        .remove(&super::CenterPanelTab::SceneRules);
+
+    ui.rule_graph_context_mut().graph.canvas_zoom = 4.0;
+
+    assert_eq!(
+        ui.rule_graph_context_tab(),
+        super::CenterPanelTab::SceneGraph
+    );
+    assert_eq!(ui.rule_graph_context().graph.canvas_zoom, 4.0);
+}
+
+#[test]
 fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
     let mut ui = EditorUI::new();
     crate::ui::editor_ui::set_map_editor_draft(

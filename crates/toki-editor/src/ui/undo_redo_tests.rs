@@ -5,7 +5,9 @@ use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
 use glam::IVec2;
 use tempfile::tempdir;
-use toki_core::entity::{Entity, EntityRendering, OptionalEntityComponents, PickupDef, StoredEntity};
+use toki_core::entity::{
+    Entity, EntityRendering, OptionalEntityComponents, PickupDef, StoredEntity,
+};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 

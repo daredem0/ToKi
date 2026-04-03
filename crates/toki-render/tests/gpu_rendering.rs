@@ -153,9 +153,8 @@ fn offscreen_target_lifecycle_and_resize_works() {
         eprintln!("Skipping GPU-backed test: no compatible adapter/device available");
         return;
     };
-    let mut target =
-        OffscreenTarget::new(&device, (64, 48), wgpu::TextureFormat::Bgra8UnormSrgb)
-            .expect("offscreen target should be created");
+    let mut target = OffscreenTarget::new(&device, (64, 48), wgpu::TextureFormat::Bgra8UnormSrgb)
+        .expect("offscreen target should be created");
 
     assert_eq!(target.size(), (64, 48));
     assert_eq!(target.format(), wgpu::TextureFormat::Bgra8UnormSrgb);
@@ -190,9 +189,8 @@ fn scene_renderer_renders_with_and_without_chunking() {
         None,
     )
     .expect("scene renderer should be created");
-    let mut target =
-        OffscreenTarget::new(&device, (160, 144), wgpu::TextureFormat::Bgra8UnormSrgb)
-            .expect("offscreen target should be created");
+    let mut target = OffscreenTarget::new(&device, (160, 144), wgpu::TextureFormat::Bgra8UnormSrgb)
+        .expect("offscreen target should be created");
 
     let full_scene = build_scene_data(Vec::new());
     renderer

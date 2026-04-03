@@ -143,24 +143,12 @@ impl SceneViewportContext {
 
 impl RuleGraphContext {
     pub(crate) fn state(ui: &EditorUI) -> &Self {
-        ui.context::<Self>(CenterPanelTab::SceneGraph)
-            .or_else(|| ui.context::<Self>(CenterPanelTab::SceneRules))
+        ui.context::<Self>(ui.rule_graph_context_tab())
             .expect("rule graph context should always exist")
     }
 
     pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
-        if ui.active_tab() == CenterPanelTab::SceneGraph
-            || ui.active_tab() == CenterPanelTab::SceneRules
-        {
-            ui.context_mut::<Self>(ui.active_tab())
-                .expect("rule graph context should always exist")
-        } else if ui.context::<Self>(CenterPanelTab::SceneGraph).is_some() {
-            ui.context_mut::<Self>(CenterPanelTab::SceneGraph)
-                .expect("rule graph context should always exist")
-        } else {
-            ui.context_mut::<Self>(CenterPanelTab::SceneRules)
-                .expect("rule graph context should always exist")
-        }
+        ui.rule_graph_context_mut()
     }
 }
 

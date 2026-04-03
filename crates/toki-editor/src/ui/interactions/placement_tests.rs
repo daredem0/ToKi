@@ -323,7 +323,10 @@ fn create_entity_in_scene_preserves_item_kind_and_pickup_components() {
     let stored = scene
         .stored_entity(scene.entities()[0].id)
         .expect("stored entity should exist");
-    assert_eq!(stored.entity.entity_kind, toki_core::entity::EntityKind::Item);
+    assert_eq!(
+        stored.entity.entity_kind,
+        toki_core::entity::EntityKind::Item
+    );
     assert_eq!(stored.entity.category, "item");
     let pickup = stored.components.pickup.expect("pickup should be present");
     assert_eq!(pickup.item_id, "coin");

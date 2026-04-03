@@ -266,12 +266,7 @@ impl SceneRenderer {
         if self.sprite_pipelines_by_texture.contains_key(texture_key) {
             return true;
         }
-        match SpritePipeline::new(
-            &self.device,
-            &self.queue,
-            self.format,
-            texture_source,
-        ) {
+        match SpritePipeline::new(&self.device, &self.queue, self.format, texture_source) {
             Ok(pipeline) => {
                 self.sprite_pipelines_by_texture
                     .insert(texture_key.to_string(), pipeline);

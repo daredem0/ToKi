@@ -11,6 +11,7 @@ use std::time::Duration;
 use toki_core::game::{GameSimulation, RenderQueryService, SceneSystem};
 use toki_core::math::projection::ProjectionParameter;
 use toki_core::menu::MenuSettings;
+use toki_core::project_runtime::{IntegerScaleFactor, RuntimeViewportMode};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::text::{TextStyle, TextWeight};
 use toki_core::{
@@ -216,6 +217,25 @@ fn project_texture_paths_falls_back_to_assets_root() {
     let (tilemap_texture, sprite_texture) = App::project_texture_paths(&project_dir);
     assert_eq!(tilemap_texture, Some(terrain));
     assert_eq!(sprite_texture, Some(creatures));
+}
+
+#[test]
+fn app_builder_build_rendering_system_uses_display_resolution_and_viewport_mode() {
+    let mut options = RuntimeLaunchOptions::default();
+    options.display.resolution_width = 320;
+    options.display.resolution_height = 180;
+    options.display.viewport = RuntimeViewportMode::IntegerScale {
+        factor: IntegerScaleFactor::Fixed(2),
+    };
+
+    let builder = super::AppBuilder::new(options.clone());
+    let rendering = builder.build_rendering_system();
+
+    assert_eq!(rendering.viewport_logical_size(), glam::vec2(320.0, 180.0));
+    assert_eq!(
+        rendering.effective_runtime_viewport().mode,
+        options.display.viewport
+    );
 }
 
 #[test]
