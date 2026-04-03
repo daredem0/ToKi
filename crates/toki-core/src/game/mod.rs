@@ -36,13 +36,13 @@ mod world_context;
 mod rules_tests;
 
 // Re-export event types for external use
-pub use combat::CombatSystem;
+pub use combat::{CombatService, CombatSystem};
 pub use input::InputSystem;
-pub use interaction::InteractionSystem;
-pub use movement::MovementSystem;
+pub use interaction::{InteractionService, InteractionSystem};
+pub use movement::{MovementService, MovementSystem};
 pub use render_queries::GroundShadow;
 pub use render_queries::RenderQueryService;
-pub use rules::RuleSystem;
+pub use rules::{RuleEvaluationService, RuleSystem};
 pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,
@@ -345,41 +345,6 @@ impl GameState {
         keys
     }
 
-    /// Helper to update player animation based on movement intent.
-    fn update_player_animation(
-        &mut self,
-        initial_player_position: glam::IVec2,
-        intended_player_delta: glam::IVec2,
-    ) {
-        let Some(player_entity) = self.world.entity_manager.get_player_mut() else {
-            return;
-        };
-        let Some(animation_controller) = &mut player_entity.rendering.animation_controller else {
-            return;
-        };
-        if Self::action_animation_locks_locomotion(animation_controller) {
-            return;
-        }
-
-        let actual_player_delta = player_entity.position - initial_player_position;
-        let player_delta = if actual_player_delta == glam::IVec2::ZERO {
-            intended_player_delta
-        } else {
-            actual_player_delta
-        };
-        let is_trying_to_move = intended_player_delta != glam::IVec2::ZERO;
-        let desired_player_animation =
-            Self::resolve_animation_state(animation_controller, is_trying_to_move, player_delta);
-        if animation_controller.current_clip_state != desired_player_animation {
-            tracing::debug!(
-                "Changing clip from  {:?} to {:?}",
-                animation_controller.current_clip_state,
-                desired_player_animation
-            );
-            animation_controller.play(desired_player_animation);
-        }
-    }
-
     /// Update NPC AI using the AI system
     fn update_npc_ai_fixed(
         &mut self,
@@ -406,7 +371,7 @@ impl GameState {
                 continue;
             };
 
-            self.apply_accumulated_movement_scaled(
+            self.movement_service().apply_accumulated_movement_scaled(
                 ai_result.entity_id,
                 direction,
                 movement::MovementStepContext {
@@ -426,9 +391,9 @@ impl GameState {
             else {
                 continue;
             };
-            self.emit_entity_movement_audio(
+            self.movement_service().emit_entity_movement_audio(
                 ai_result.entity_id,
-                Self::movement_distance(initial_position, final_position),
+                movement::MovementService::movement_distance(initial_position, final_position),
                 result,
             );
         }

@@ -1,11 +1,10 @@
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::game::GameState;
 use crate::rules::RuleTrigger;
 
-use super::RuleCommand;
+use super::{RuleCommand, RuleEvaluationService};
 
-impl GameState {
+impl RuleEvaluationService<'_> {
     /// Collect reactive rule commands based on frame events and post-movement world state.
     pub(in crate::game) fn collect_reactive_rule_commands(
         &mut self,
@@ -69,6 +68,7 @@ mod tests {
     use crate::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
     use super::RuleCommand;
+    use crate::game::rules::AudioCommand;
     use crate::game::RuleSystem;
 
     trait GameStateReactiveRuleTestExt {
@@ -122,7 +122,7 @@ mod tests {
             victim: self_id,
             attacker: Some(other_id),
         });
-        let commands = state.collect_reactive_rule_commands(
+        let commands = state.rule_evaluation_service().collect_reactive_rule_commands(
             true,
             &TileMap {
                 size: glam::UVec2::new(1, 1),
@@ -141,12 +141,18 @@ mod tests {
 
         assert!(commands.iter().any(|command| matches!(
             command,
-            RuleCommand::PlaySound { channel: AudioChannel::Movement, sound_id }
+            RuleCommand::Audio(AudioCommand::PlaySound {
+                channel: AudioChannel::Movement,
+                sound_id
+            })
                 if sound_id == "player_move"
         )));
         assert!(commands.iter().any(|command| matches!(
             command,
-            RuleCommand::PlaySound { channel: AudioChannel::Collision, sound_id }
+            RuleCommand::Audio(AudioCommand::PlaySound {
+                channel: AudioChannel::Collision,
+                sound_id
+            })
                 if sound_id == "damage_taken"
         )));
     }

@@ -116,7 +116,9 @@ mod tests {
 
         assert!(matches!(
             commands.as_slice(),
-            [crate::game::rules::RuleCommand::StartDialog { dialog_id, .. }]
+            [crate::game::rules::RuleCommand::Scene(
+                crate::game::rules::SceneCommand::StartDialog { dialog_id, .. }
+            )]
                 if dialog_id.as_str() == "intro"
         ));
     }

@@ -48,13 +48,20 @@ pub use events::{
     InteractionSpatial, TileTransitionEvent,
 };
 
-use super::{AudioChannel, AudioEvent, GameState};
+use super::{AudioChannel, AudioEvent, GameState, ProgressState, RuntimeState, SceneState, WorldState};
 
 pub(super) struct AppliedRuleCommandResult {
     pub(super) pending_animations: Vec<(EntityId, AnimationState)>,
     pub(super) pending_scene_switch: Option<PendingSceneSwitch>,
     pub(super) pending_persistence: Option<crate::events::PersistenceRequest>,
     pub(super) pending_ui_requests: Vec<crate::ui_layout::UiRequest>,
+}
+
+pub struct RuleEvaluationService<'a> {
+    world: &'a mut WorldState,
+    scene: &'a mut SceneState,
+    progress: &'a mut ProgressState,
+    runtime: &'a mut RuntimeState,
 }
 
 pub struct RuleSystem;
@@ -73,15 +80,17 @@ impl RuleSystem {
         command_buffer: &mut Vec<RuleCommand>,
     ) {
         if !state.runtime.rules.started {
-            state.collect_rule_commands_for_trigger(
-                crate::rules::RuleTrigger::OnStart,
-                command_buffer,
-            );
+            state
+                .rule_evaluation_service()
+                .collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnStart, command_buffer);
             state.runtime.rules.started = true;
         }
         state
+            .rule_evaluation_service()
             .collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnUpdate, command_buffer);
-        state.collect_rule_commands_for_key_triggers(command_buffer);
+        state
+            .rule_evaluation_service()
+            .collect_rule_commands_for_key_triggers(command_buffer);
     }
 
     pub(in crate::game) fn apply_commands(
@@ -90,7 +99,9 @@ impl RuleSystem {
         result: &mut crate::events::GameUpdateResult<AudioEvent>,
         tilemap: &crate::assets::tilemap::TileMap,
     ) -> AppliedRuleCommandResult {
-        state.apply_rule_commands(commands, result, tilemap)
+        state
+            .rule_evaluation_service()
+            .apply_rule_commands(commands, result, tilemap)
     }
 
     pub(in crate::game) fn collect_reactive_commands(
@@ -99,7 +110,9 @@ impl RuleSystem {
         tilemap: &crate::assets::tilemap::TileMap,
         atlas: &crate::assets::atlas::AtlasMeta,
     ) -> Vec<RuleCommand> {
-        state.collect_reactive_rule_commands(player_moved, tilemap, atlas)
+        state
+            .rule_evaluation_service()
+            .collect_reactive_rule_commands(player_moved, tilemap, atlas)
     }
 
     pub fn set_rules(state: &mut GameState, rules: RuleSet) {
@@ -131,6 +144,22 @@ impl RuleSystem {
     }
 }
 
+impl<'a> RuleEvaluationService<'a> {
+    pub(crate) fn new(
+        world: &'a mut WorldState,
+        scene: &'a mut SceneState,
+        progress: &'a mut ProgressState,
+        runtime: &'a mut RuntimeState,
+    ) -> Self {
+        Self {
+            world,
+            scene,
+            progress,
+            runtime,
+        }
+    }
+}
+
 /// Runtime state for the rule system.
 #[derive(Debug, Default)]
 pub(super) struct RuleRuntimeState {
@@ -157,6 +186,18 @@ pub(super) struct RuleRuntimeState {
 /// A buffered command to be executed by the rule system.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum RuleCommand {
+    Audio(AudioCommand),
+    Animation(AnimationCommand),
+    Motion(MotionCommand),
+    Entity(EntityCommand),
+    Inventory(InventoryCommand),
+    Ui(UiCommand),
+    Scene(SceneCommand),
+    Progress(ProgressCommand),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum AudioCommand {
     PlaySound {
         channel: AudioChannel,
         sound_id: String,
@@ -164,14 +205,26 @@ pub(super) enum RuleCommand {
     PlayMusic {
         track_id: String,
     },
-    SetVelocity {
-        entity_id: EntityId,
-        velocity: glam::IVec2,
-    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum AnimationCommand {
     PlayAnimation {
         entity_id: EntityId,
         state: AnimationState,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum MotionCommand {
+    SetVelocity {
+        entity_id: EntityId,
+        velocity: glam::IVec2,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum EntityCommand {
     Spawn {
         entity_type: RuleSpawnEntityType,
         position: glam::IVec2,
@@ -179,16 +232,41 @@ pub(super) enum RuleCommand {
     DestroySelf {
         entity_id: EntityId,
     },
-    SwitchScene {
-        scene_name: SceneId,
-        spawn_point_id: String,
-        transition: Option<SceneTransitionEffect>,
-        duration_ms: Option<u32>,
+    DamageEntity {
+        entity_id: EntityId,
+        amount: i32,
     },
-    StartDialog {
-        dialog_id: DialogId,
-        context: crate::dialog::DialogRuntimeContext,
+    HealEntity {
+        entity_id: EntityId,
+        amount: i32,
     },
+    SetEntityActive {
+        entity_id: EntityId,
+        active: bool,
+    },
+    TeleportEntity {
+        entity_id: EntityId,
+        tile_x: u32,
+        tile_y: u32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum InventoryCommand {
+    AddInventoryItem {
+        entity_id: EntityId,
+        item_id: String,
+        count: u32,
+    },
+    RemoveInventoryItem {
+        entity_id: EntityId,
+        item_id: String,
+        count: u32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum UiCommand {
     ShowUi {
         ui_id: UiLayoutId,
     },
@@ -200,33 +278,24 @@ pub(super) enum RuleCommand {
         binding_key: String,
         value: FlagValue,
     },
-    DamageEntity {
-        entity_id: EntityId,
-        amount: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum SceneCommand {
+    SwitchScene {
+        scene_name: SceneId,
+        spawn_point_id: String,
+        transition: Option<SceneTransitionEffect>,
+        duration_ms: Option<u32>,
     },
-    HealEntity {
-        entity_id: EntityId,
-        amount: i32,
+    StartDialog {
+        dialog_id: DialogId,
+        context: crate::dialog::DialogRuntimeContext,
     },
-    AddInventoryItem {
-        entity_id: EntityId,
-        item_id: String,
-        count: u32,
-    },
-    RemoveInventoryItem {
-        entity_id: EntityId,
-        item_id: String,
-        count: u32,
-    },
-    SetEntityActive {
-        entity_id: EntityId,
-        active: bool,
-    },
-    TeleportEntity {
-        entity_id: EntityId,
-        tile_x: u32,
-        tile_y: u32,
-    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum ProgressCommand {
     SetFlag {
         flag: String,
         value: FlagValue,
@@ -251,12 +320,9 @@ pub(super) type PendingSceneSwitch = crate::events::SceneSwitchRequest;
 /// A pending dialog start request.
 pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 
-impl GameState {
-    pub(super) fn with_rule_engine<R>(
-        &mut self,
-        build: impl FnOnce(&mut RuleEngine<'_>) -> R,
-    ) -> R {
-        let held_keys = self.all_held_keys();
+impl RuleEvaluationService<'_> {
+    pub(super) fn with_rule_engine<R>(&mut self, build: impl FnOnce(&mut RuleEngine<'_>) -> R) -> R {
+        let held_keys = self.runtime.input.all_held_keys();
         let mut engine = RuleEngine::new(
             RuleEngineContext {
                 entity_manager: &self.world.entity_manager,
@@ -268,5 +334,25 @@ impl GameState {
             &mut self.runtime.rules,
         );
         build(&mut engine)
+    }
+}
+
+impl GameState {
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(super) fn with_rule_engine<R>(
+        &mut self,
+        build: impl FnOnce(&mut RuleEngine<'_>) -> R,
+    ) -> R {
+        self.rule_evaluation_service().with_rule_engine(build)
+    }
+
+    pub fn rule_evaluation_service(&mut self) -> RuleEvaluationService<'_> {
+        RuleEvaluationService::new(
+            &mut self.world,
+            &mut self.scene,
+            &mut self.progress,
+            &mut self.runtime,
+        )
     }
 }

@@ -4,8 +4,8 @@
 //! before and after extracting the common pattern into a unified helper.
 
 use super::rules::{
-    CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial, RuleCommand,
-    RuleSystem,
+    AudioCommand, CollisionEvent, DamageEvent, DeathEvent, EntityCommand, InteractionEvent,
+    InteractionSpatial, RuleCommand, RuleSystem,
 };
 use super::GameState;
 use crate::entity::{EntityId, EntityKind, EntityRendering, OptionalEntityComponents};
@@ -131,7 +131,10 @@ fn collision_rules_fire_for_matching_trigger() {
     game_state.collect_rule_commands_for_collision(&event, &mut commands);
 
     assert_eq!(commands.len(), 1);
-    assert!(matches!(commands[0], RuleCommand::PlaySound { .. }));
+    assert!(matches!(
+        commands[0],
+        RuleCommand::Audio(AudioCommand::PlaySound { .. })
+    ));
 }
 
 #[test]
@@ -159,7 +162,9 @@ fn collision_rules_respect_priority_ordering() {
     assert_eq!(commands.len(), 2);
     // High priority should execute first
     match &commands[0] {
-        RuleCommand::PlaySound { sound_id, .. } => assert_eq!(sound_id, "high_sound"),
+        RuleCommand::Audio(AudioCommand::PlaySound { sound_id, .. }) => {
+            assert_eq!(sound_id, "high_sound")
+        }
         _ => panic!("Expected PlaySound command"),
     }
 }
@@ -289,7 +294,9 @@ fn damage_rules_respect_priority_ordering() {
 
     assert_eq!(commands.len(), 2);
     match &commands[0] {
-        RuleCommand::PlaySound { sound_id, .. } => assert_eq!(sound_id, "high_sound"),
+        RuleCommand::Audio(AudioCommand::PlaySound { sound_id, .. }) => {
+            assert_eq!(sound_id, "high_sound")
+        }
         _ => panic!("Expected PlaySound command"),
     }
 }
@@ -373,7 +380,9 @@ fn death_rules_respect_priority_ordering() {
 
     assert_eq!(commands.len(), 2);
     match &commands[0] {
-        RuleCommand::PlaySound { sound_id, .. } => assert_eq!(sound_id, "high_sound"),
+        RuleCommand::Audio(AudioCommand::PlaySound { sound_id, .. }) => {
+            assert_eq!(sound_id, "high_sound")
+        }
         _ => panic!("Expected PlaySound command"),
     }
 }
@@ -592,11 +601,15 @@ fn unified_collect_matches_collision_behavior() {
 
     // Verify priority ordering
     match &commands[0] {
-        RuleCommand::PlaySound { sound_id, .. } => assert_eq!(sound_id, "p10_sound"),
+        RuleCommand::Audio(AudioCommand::PlaySound { sound_id, .. }) => {
+            assert_eq!(sound_id, "p10_sound")
+        }
         _ => panic!("Expected PlaySound"),
     }
     match &commands[1] {
-        RuleCommand::PlaySound { sound_id, .. } => assert_eq!(sound_id, "p5_sound"),
+        RuleCommand::Audio(AudioCommand::PlaySound { sound_id, .. }) => {
+            assert_eq!(sound_id, "p5_sound")
+        }
         _ => panic!("Expected PlaySound"),
     }
 }
@@ -631,7 +644,9 @@ fn trigger_self_resolves_in_collision_context() {
 
     assert_eq!(commands.len(), 1);
     match &commands[0] {
-        RuleCommand::DestroySelf { entity_id } => assert_eq!(*entity_id, entity_a),
+        RuleCommand::Entity(EntityCommand::DestroySelf { entity_id }) => {
+            assert_eq!(*entity_id, entity_a)
+        }
         _ => panic!("Expected DestroySelf command"),
     }
 }
@@ -666,7 +681,9 @@ fn trigger_other_resolves_in_collision_context() {
 
     assert_eq!(commands.len(), 1);
     match &commands[0] {
-        RuleCommand::DestroySelf { entity_id } => assert_eq!(*entity_id, entity_b),
+        RuleCommand::Entity(EntityCommand::DestroySelf { entity_id }) => {
+            assert_eq!(*entity_id, entity_b)
+        }
         _ => panic!("Expected DestroySelf command"),
     }
 }

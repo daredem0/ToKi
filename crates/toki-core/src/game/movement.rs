@@ -1,5 +1,7 @@
 use super::rules::CollisionEvent;
-use super::{AudioChannel, AudioEvent, GameState, InputKey, WorldContext};
+use super::{
+    AudioChannel, AudioEvent, GameState, InputKey, RuntimeState, WorldContext, WorldState,
+};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
@@ -8,6 +10,11 @@ use crate::events::GameUpdateResult;
 use std::collections::HashMap;
 
 pub struct MovementSystem;
+
+pub struct MovementService<'a> {
+    world: &'a mut WorldState,
+    runtime: &'a mut RuntimeState,
+}
 
 /// Result of checking movement collision.
 struct MovementCollisionResult {
@@ -32,9 +39,16 @@ impl MovementSystem {
         time_scale: f32,
     ) -> GameUpdateResult<AudioEvent> {
         if time_scale == 1.0 {
-            state.process_input(world.bounds, world.tilemap, world.atlas)
+            state
+                .movement_service()
+                .process_input(world.bounds, world.tilemap, world.atlas)
         } else {
-            state.process_input_scaled(world.bounds, world.tilemap, world.atlas, time_scale)
+            state.movement_service().process_input_scaled(
+                world.bounds,
+                world.tilemap,
+                world.atlas,
+                time_scale,
+            )
         }
     }
 
@@ -43,7 +57,12 @@ impl MovementSystem {
         world: WorldContext<'_>,
         result: &mut GameUpdateResult<AudioEvent>,
     ) -> bool {
-        state.apply_rule_velocities(world.bounds, world.tilemap, world.atlas, result)
+        state.movement_service().apply_rule_velocities(
+            world.bounds,
+            world.tilemap,
+            world.atlas,
+            result,
+        )
     }
 
     pub fn update_player_animation(
@@ -51,7 +70,9 @@ impl MovementSystem {
         initial_player_position: glam::IVec2,
         intended_player_delta: glam::IVec2,
     ) {
-        state.update_player_animation(initial_player_position, intended_player_delta);
+        state
+            .movement_service()
+            .update_player_animation(initial_player_position, intended_player_delta);
     }
 
     pub fn emit_animation_loop_audio(
@@ -60,11 +81,39 @@ impl MovementSystem {
         completed_loops: u32,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
-        state.emit_animation_loop_movement_audio(entity_id, completed_loops, result);
+        state
+            .movement_service()
+            .emit_animation_loop_movement_audio(entity_id, completed_loops, result);
     }
 }
 
-impl GameState {
+impl<'a> MovementService<'a> {
+    pub(crate) fn new(world: &'a mut WorldState, runtime: &'a mut RuntimeState) -> Self {
+        Self { world, runtime }
+    }
+
+    fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
+        let mut entity_ids = self
+            .world
+            .entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                let entity = self.world.entity_manager.get_entity(entity_id)?;
+                if matches!(
+                    entity.effective_movement_profile(self.world.entity_manager.movement(entity_id)),
+                    crate::entity::MovementProfile::PlayerWasd
+                ) {
+                    Some(entity_id)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        entity_ids.sort_unstable();
+        entity_ids
+    }
+
     fn clamp_entity_position_to_world_bounds(
         entity: &crate::entity::Entity,
         candidate_position: glam::IVec2,
@@ -298,24 +347,6 @@ impl GameState {
         entity_audio.last_collision_state = true;
     }
 
-    pub(super) fn can_entity_move_to_position(
-        &self,
-        entity_id: EntityId,
-        new_position: glam::IVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> bool {
-        let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
-            return false;
-        };
-
-        collision::can_entity_move_to_position(entity, new_position, tilemap, atlas)
-            && !self
-                .world
-                .entity_manager
-                .would_collide_with_solid_entity(entity_id, new_position)
-    }
-
     pub(super) fn movement_distance(from: glam::IVec2, to: glam::IVec2) -> f32 {
         let delta = to - from;
         ((delta.x.pow(2) + delta.y.pow(2)) as f32).sqrt()
@@ -480,7 +511,7 @@ impl GameState {
             let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
-            let held_keys = self.held_keys_for_profile(
+            let held_keys = self.runtime.input.held_keys_for_profile(
                 entity.effective_movement_profile(self.world.entity_manager.movement(entity.id)),
             );
             let direction = Self::movement_delta_from_keys(&held_keys);
@@ -518,7 +549,7 @@ impl GameState {
                 .get_entity_mut(entity_id)
                 .and_then(|entity| entity.rendering.animation_controller.as_mut())
             {
-                if !Self::action_animation_locks_locomotion(animation_controller) {
+                if !GameState::action_animation_locks_locomotion(animation_controller) {
                     let actual_delta = final_position - initial_position;
                     let intended_delta = intended_deltas
                         .get(&entity_id)
@@ -531,7 +562,7 @@ impl GameState {
                     };
                     // Use intent for animation, not actual pixel movement (sub-pixel accumulation)
                     let is_trying_to_move = intended_delta != glam::IVec2::ZERO;
-                    let desired_animation = Self::resolve_animation_state(
+                    let desired_animation = GameState::resolve_animation_state(
                         animation_controller,
                         is_trying_to_move,
                         delta,
@@ -552,6 +583,40 @@ impl GameState {
         }
 
         result
+    }
+
+    pub(super) fn update_player_animation(
+        &mut self,
+        initial_player_position: glam::IVec2,
+        intended_player_delta: glam::IVec2,
+    ) {
+        let Some(player_entity) = self.world.entity_manager.get_player_mut() else {
+            return;
+        };
+        let Some(animation_controller) = &mut player_entity.rendering.animation_controller else {
+            return;
+        };
+        if GameState::action_animation_locks_locomotion(animation_controller) {
+            return;
+        }
+
+        let actual_player_delta = player_entity.position - initial_player_position;
+        let player_delta = if actual_player_delta == glam::IVec2::ZERO {
+            intended_player_delta
+        } else {
+            actual_player_delta
+        };
+        let is_trying_to_move = intended_player_delta != glam::IVec2::ZERO;
+        let desired_player_animation =
+            GameState::resolve_animation_state(animation_controller, is_trying_to_move, player_delta);
+        if animation_controller.current_clip_state != desired_player_animation {
+            tracing::debug!(
+                "Changing clip from  {:?} to {:?}",
+                animation_controller.current_clip_state,
+                desired_player_animation
+            );
+            animation_controller.play(desired_player_animation);
+        }
     }
 
     pub(super) fn apply_rule_velocities(
@@ -626,5 +691,11 @@ impl GameState {
         }
 
         moved_player
+    }
+}
+
+impl GameState {
+    pub fn movement_service(&mut self) -> MovementService<'_> {
+        MovementService::new(&mut self.world, &mut self.runtime)
     }
 }

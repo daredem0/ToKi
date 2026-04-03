@@ -1,25 +1,145 @@
-use super::GameState;
+use super::{GameState, RuntimeState, WorldState};
 use crate::collision;
 use crate::game::rules::{InteractionEvent, InteractionSpatial};
 
 pub struct InteractionSystem;
 
+pub struct InteractionService<'a> {
+    world: &'a mut WorldState,
+    runtime: &'a mut RuntimeState,
+}
+
 impl InteractionSystem {
     pub fn collect_overlapping_pickups(state: &mut GameState) {
-        state.collect_overlapping_pickups();
+        state.interaction_service().collect_overlapping_pickups();
     }
 
     pub fn collect_interaction_events(state: &mut GameState) {
-        state.collect_interaction_events();
+        state.interaction_service().collect_interaction_events();
     }
 }
 
-impl GameState {
+impl<'a> InteractionService<'a> {
+    pub(crate) fn new(world: &'a mut WorldState, runtime: &'a mut RuntimeState) -> Self {
+        Self { world, runtime }
+    }
+
+    pub(super) fn collect_overlapping_pickups(&mut self) {
+        let mut collector_ids = self
+            .world
+            .entity_manager
+            .active_entities()
+            .into_iter()
+            .filter(|&entity_id| {
+                self.world
+                    .entity_manager
+                    .storage()
+                    .components()
+                    .inventory(entity_id)
+                    .is_some()
+            })
+            .collect::<Vec<_>>();
+        collector_ids.sort_unstable();
+
+        let mut pickup_ids = self
+            .world
+            .entity_manager
+            .storage()
+            .components()
+            .pickup_ids()
+            .filter(|&entity_id| {
+                self.world
+                    .entity_manager
+                    .get_entity(entity_id)
+                    .is_some_and(|entity| entity.active)
+            })
+            .collect::<Vec<_>>();
+        pickup_ids.sort_unstable();
+
+        let mut collected = Vec::new();
+        for collector_id in collector_ids {
+            let Some(collector) = self.world.entity_manager.get_entity(collector_id) else {
+                continue;
+            };
+            let (collector_pos, collector_size) = collector.interaction_bounds();
+
+            for &pickup_id in &pickup_ids {
+                let Some(pickup_entity) = self.world.entity_manager.get_entity(pickup_id) else {
+                    continue;
+                };
+                let Some(pickup) = self
+                    .world
+                    .entity_manager
+                    .storage()
+                    .components()
+                    .pickup(pickup_id)
+                else {
+                    continue;
+                };
+                if pickup.count == 0 || pickup.item_id.is_empty() {
+                    continue;
+                }
+
+                let (pickup_pos, pickup_size) = pickup_entity.interaction_bounds();
+                if !collision::aabb_overlap(collector_pos, collector_size, pickup_pos, pickup_size)
+                {
+                    continue;
+                }
+
+                collected.push((
+                    collector_id,
+                    pickup_id,
+                    pickup.item_id.clone(),
+                    pickup.count,
+                ));
+            }
+        }
+
+        collected.sort_unstable_by_key(|(_, pickup_id, _, _)| *pickup_id);
+        collected.dedup_by_key(|(_, pickup_id, _, _)| *pickup_id);
+
+        for (collector_id, pickup_id, item_id, count) in collected {
+            if self
+                .world
+                .entity_manager
+                .storage()
+                .components()
+                .inventory(collector_id)
+                .is_none()
+            {
+                continue;
+            }
+
+            self.world
+                .entity_manager
+                .storage_mut()
+                .components_mut()
+                .ensure_inventory(collector_id)
+                .add_item(&item_id, count);
+            tracing::debug!(
+                "Entity {} collected pickup {} item_id={} count={} new_count={}",
+                collector_id,
+                pickup_id,
+                item_id,
+                count,
+                self.world
+                    .entity_manager
+                    .storage()
+                    .components()
+                    .inventory(collector_id)
+                    .map(|inventory| inventory.item_count(&item_id))
+                    .unwrap_or(0)
+            );
+
+            self.world.entity_manager.despawn_entity(pickup_id);
+        }
+    }
+
     /// Collects interaction events when the player presses interact while overlapping
     /// or adjacent to interactable entities.
     pub(super) fn collect_interaction_events(&mut self) {
         // Check if interact key is held
-        let held_keys = self.all_held_keys();
+        let held_keys = self.runtime.input.all_held_keys();
         if !held_keys.contains(&super::InputKey::Interact) {
             return;
         }
@@ -38,7 +158,7 @@ impl GameState {
             .rendering
             .animation_controller
             .as_ref()
-            .map(|ac| Self::facing_from_animation_state(ac.current_clip_state))
+            .map(|ac| GameState::facing_from_animation_state(ac.current_clip_state))
             .unwrap_or(super::animation::FacingDirection::Down);
 
         // Find all interactable entities
@@ -85,14 +205,11 @@ impl GameState {
             );
 
             if let Some(spatial) = spatial {
-                self.runtime
-                    .rules
-                    .frame_interactions
-                    .push(InteractionEvent {
-                        interactor: player_id,
-                        interactable: interactable_id,
-                        spatial,
-                    });
+                self.runtime.rules.frame_interactions.push(InteractionEvent {
+                    interactor: player_id,
+                    interactable: interactable_id,
+                    spatial,
+                });
 
                 tracing::debug!(
                     "Player {} interacting with entity {} (spatial: {:?})",
@@ -171,5 +288,11 @@ impl GameState {
             player_facing.reach_bounds(player_pos, player_size, interaction_reach);
 
         collision::aabb_overlap(reach_pos, reach_size, interactable_pos, interactable_size)
+    }
+}
+
+impl GameState {
+    pub fn interaction_service(&mut self) -> InteractionService<'_> {
+        InteractionService::new(&mut self.world, &mut self.runtime)
     }
 }

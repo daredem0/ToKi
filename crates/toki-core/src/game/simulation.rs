@@ -1,6 +1,6 @@
 use super::{
     AudioEvent, CombatSystem, GameSimulation, GameState, GameUpdateResult, InteractionSystem,
-    MovementSystem, RuleSystem, UpdateContext, WorldContext, DEFAULT_TIMESTEP_MS,
+    MovementService, MovementSystem, RuleSystem, UpdateContext, WorldContext, DEFAULT_TIMESTEP_MS,
 };
 
 struct TickPhaseState {
@@ -137,7 +137,7 @@ impl GameSimulation {
                         ))
                     })
             })
-            .map(|keys| GameState::movement_delta_from_keys(&keys))
+            .map(|keys| MovementService::movement_delta_from_keys(&keys))
             .unwrap_or(glam::IVec2::ZERO);
 
         MovementSystem::update_player_animation(

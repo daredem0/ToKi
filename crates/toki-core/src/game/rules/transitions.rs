@@ -10,7 +10,7 @@ use crate::entity::EntityId;
 use crate::rules::{RuleTrigger, TriggerContext};
 
 use super::events::TileTransitionEvent;
-use super::{GameState, RuleCommand};
+use super::{GameState, RuleCommand, RuleEvaluationService};
 
 /// Entity tile position data collected for transition processing.
 struct EntityTileData {
@@ -158,6 +158,84 @@ impl GameState {
     ///
     /// Validates tile coordinates against the active tilemap bounds.
     /// Rules with out-of-bounds coordinates are skipped with a warning.
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(in crate::game) fn collect_rule_commands_for_tile_transitions(
+        &mut self,
+        tilemap: &TileMap,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        let tile_events = std::mem::take(&mut self.runtime.rules.frame_tile_transitions);
+        let map_width = tilemap.size.x;
+        let map_height = tilemap.size.y;
+        self.with_rule_engine(|engine| {
+            for event in tile_events {
+                let trigger = if event.is_enter {
+                    RuleTrigger::OnTileEnter {
+                        x: event.tile_x,
+                        y: event.tile_y,
+                    }
+                } else {
+                    RuleTrigger::OnTileExit {
+                        x: event.tile_x,
+                        y: event.tile_y,
+                    }
+                };
+
+                let context = TriggerContext::with_self_only(event.entity_id);
+
+                let mut sorted_indices = engine
+                    .rules
+                    .rules
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, rule)| engine.rule_is_collectible(rule) && rule.trigger == trigger)
+                    .map(|(i, _)| i)
+                    .collect::<Vec<_>>();
+                engine.sort_rule_indices(&mut sorted_indices);
+                sorted_indices.retain(|&idx| {
+                    let rule = &engine.rules.rules[idx];
+                    if let Some((tile_x, tile_y)) = rule.trigger.tile_coordinates() {
+                        if tile_x >= map_width || tile_y >= map_height {
+                            warn!(
+                                rule_id = %rule.id,
+                                tile_x = tile_x,
+                                tile_y = tile_y,
+                                map_width = map_width,
+                                map_height = map_height,
+                                "Skipping tile trigger rule with out-of-bounds coordinates"
+                            );
+                            return false;
+                        }
+                    }
+                    true
+                });
+                engine.execute_sorted_rule_indices(
+                    &sorted_indices,
+                    &context,
+                    command_buffer,
+                    |rule, conditions_result| {
+                        debug!(
+                            rule_id = %rule.id,
+                            trigger = ?trigger,
+                            entity = ?event.entity_id,
+                            tile_x = event.tile_x,
+                            tile_y = event.tile_y,
+                            is_enter = event.is_enter,
+                            conditions_passed = conditions_result,
+                            "Tile transition rule evaluated"
+                        );
+                    },
+                    |rule_id, action| {
+                        debug!(rule_id = %rule_id, action = ?action, "Executing tile transition action");
+                    },
+                );
+            }
+        });
+    }
+}
+
+impl RuleEvaluationService<'_> {
     pub(in crate::game) fn collect_rule_commands_for_tile_transitions(
         &mut self,
         tilemap: &TileMap,

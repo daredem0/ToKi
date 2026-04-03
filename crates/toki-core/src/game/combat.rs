@@ -7,22 +7,60 @@ use crate::entity::{
 };
 
 use super::animation::FacingDirection;
-use super::stat_effects::StatChangeRequest;
-use super::{GameState, InputAction, WorldContext};
+use super::stat_effects::{StatChangeRequest, StatEffectService};
+use super::{GameState, InputAction, RuntimeState, WorldContext, WorldState};
 
 pub struct CombatSystem;
 
+pub struct CombatService<'a> {
+    world: &'a mut WorldState,
+    runtime: &'a mut RuntimeState,
+}
+
 impl CombatSystem {
     pub fn process_profile_actions(state: &mut GameState) {
-        state.process_profile_actions();
+        state.combat_service().process_profile_actions();
     }
 
     pub(crate) fn update_projectiles(state: &mut GameState, world: WorldContext<'_>) {
-        state.update_projectiles(world.tilemap, world.atlas);
+        state
+            .combat_service()
+            .update_projectiles(world.tilemap, world.atlas);
     }
 }
 
-impl GameState {
+impl<'a> CombatService<'a> {
+    pub(crate) fn new(world: &'a mut WorldState, runtime: &'a mut RuntimeState) -> Self {
+        Self { world, runtime }
+    }
+
+    fn stat_effect_service(&mut self) -> StatEffectService<'_> {
+        StatEffectService::new(
+            &mut self.world.entity_manager,
+            &mut self.runtime.rules,
+            &mut self.runtime.effects.pending_stat_changes,
+            &mut self.runtime.effects.pending_despawns,
+        )
+    }
+
+    fn can_entity_move_to_position(
+        &self,
+        entity_id: EntityId,
+        new_position: glam::IVec2,
+        tilemap: &crate::assets::tilemap::TileMap,
+        atlas: &crate::assets::atlas::AtlasMeta,
+    ) -> bool {
+        let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
+            return false;
+        };
+
+        collision::can_entity_move_to_position(entity, new_position, tilemap, atlas)
+            && !self
+                .world
+                .entity_manager
+                .would_collide_with_solid_entity(entity_id, new_position)
+    }
+
     fn facing_vector(facing: FacingDirection) -> glam::IVec2 {
         facing.to_ivec2()
     }
@@ -394,8 +432,8 @@ impl GameState {
                 return false;
             };
 
-            let facing = Self::facing_from_animation_state(animation_controller.current_clip_state);
-            let directional_attack = Self::directional_attack_state(facing);
+            let facing = GameState::facing_from_animation_state(animation_controller.current_clip_state);
+            let directional_attack = GameState::directional_attack_state(facing);
             let next_state = if animation_controller.has_clip(directional_attack) {
                 directional_attack
             } else if animation_controller.has_clip(AnimationState::Attack) {
@@ -430,12 +468,29 @@ impl GameState {
     }
 
     pub(super) fn process_profile_actions(&mut self) {
-        let pending_actions = self.take_pending_profile_actions();
+        let pending_actions = self.runtime.input.take_pending_profile_actions();
         if pending_actions.is_empty() {
             return;
         }
 
-        let controlled_entity_ids = self.controlled_input_entity_ids();
+        let mut controlled_entity_ids = self
+            .world
+            .entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                let entity = self.world.entity_manager.get_entity(entity_id)?;
+                if matches!(
+                    entity.effective_movement_profile(self.world.entity_manager.movement(entity_id)),
+                    crate::entity::MovementProfile::PlayerWasd
+                ) {
+                    Some(entity_id)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        controlled_entity_ids.sort_unstable();
         if controlled_entity_ids.is_empty() {
             return;
         }
@@ -468,5 +523,21 @@ impl GameState {
     ) {
         self.stat_effect_service()
             .queue_damage(target_id, damage, attacker_id);
+    }
+}
+
+impl GameState {
+    pub fn combat_service(&mut self) -> CombatService<'_> {
+        CombatService::new(&mut self.world, &mut self.runtime)
+    }
+
+    pub fn deal_damage_to_entity(
+        &mut self,
+        target_id: EntityId,
+        damage: i32,
+        attacker_id: Option<EntityId>,
+    ) {
+        self.combat_service()
+            .deal_damage_to_entity(target_id, damage, attacker_id);
     }
 }

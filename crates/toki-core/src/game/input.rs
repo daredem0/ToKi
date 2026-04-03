@@ -1,6 +1,6 @@
 use super::input_state::InputStateEffect;
 use super::{GameState, InputAction, InputKey, RuntimeState};
-use crate::entity::{EntityId, MovementProfile};
+use crate::entity::MovementProfile;
 use crate::rules::RuleKey;
 
 pub struct InputSystem;
@@ -61,41 +61,8 @@ impl InputSystem {
 }
 
 impl GameState {
-    pub(super) fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
-        let mut entity_ids = self
-            .world
-            .entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&entity_id| {
-                let entity = self.world.entity_manager.get_entity(entity_id)?;
-                if matches!(
-                    entity
-                        .effective_movement_profile(self.world.entity_manager.movement(entity_id)),
-                    MovementProfile::PlayerWasd
-                ) {
-                    Some(entity_id)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        entity_ids.sort_unstable();
-        entity_ids
-    }
-
     pub(super) fn held_keys_for_profile(&self, movement_profile: MovementProfile) -> Vec<InputKey> {
         self.runtime.input.held_keys_for_profile(movement_profile)
-    }
-
-    pub(super) fn all_held_keys(&self) -> Vec<InputKey> {
-        self.runtime.input.all_held_keys()
-    }
-
-    pub(super) fn take_pending_profile_actions(
-        &mut self,
-    ) -> std::collections::HashMap<MovementProfile, std::collections::HashSet<InputAction>> {
-        self.runtime.input.take_pending_profile_actions()
     }
     pub(super) fn to_rule_key(key: InputKey) -> RuleKey {
         match key {

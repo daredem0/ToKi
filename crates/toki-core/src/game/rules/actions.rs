@@ -6,7 +6,10 @@ use crate::animation::AnimationState;
 use crate::rules::{RuleAction, RuleSoundChannel, TriggerContext};
 use tracing::info;
 
-use super::{AudioChannel, RuleCommand, RuleEngine};
+use super::{
+    AnimationCommand, AudioChannel, AudioCommand, EntityCommand, InventoryCommand,
+    MotionCommand, ProgressCommand, RuleCommand, RuleEngine, SceneCommand, UiCommand,
+};
 
 impl RuleEngine<'_> {
     fn resolve_and_push(
@@ -108,37 +111,37 @@ impl RuleEngine<'_> {
                     spawn_point_id = %spawn_point_id,
                     "Scene switch triggered"
                 );
-                command_buffer.push(RuleCommand::SwitchScene {
+                command_buffer.push(RuleCommand::Scene(SceneCommand::SwitchScene {
                     scene_name: scene_name.clone(),
                     spawn_point_id: spawn_point_id.clone(),
                     transition: *transition,
                     duration_ms: *duration_ms,
-                });
+                }));
             }
             RuleAction::StartDialog { dialog_id } => {
                 let dialog_id = dialog_id.trim();
                 if !dialog_id.is_empty() {
-                    command_buffer.push(RuleCommand::StartDialog {
+                    command_buffer.push(RuleCommand::Scene(SceneCommand::StartDialog {
                         dialog_id: dialog_id.into(),
                         context: crate::dialog::DialogRuntimeContext {
                             interactor: context.trigger_self,
                             speaker: context.trigger_other,
                         },
-                    });
+                    }));
                 }
             }
             RuleAction::ShowUi { ui_id } => {
                 if !ui_id.as_str().trim().is_empty() {
-                    command_buffer.push(RuleCommand::ShowUi {
+                    command_buffer.push(RuleCommand::Ui(UiCommand::ShowUi {
                         ui_id: ui_id.clone(),
-                    });
+                    }));
                 }
             }
             RuleAction::HideUi { ui_id } => {
                 if !ui_id.as_str().trim().is_empty() {
-                    command_buffer.push(RuleCommand::HideUi {
+                    command_buffer.push(RuleCommand::Ui(UiCommand::HideUi {
                         ui_id: ui_id.clone(),
-                    });
+                    }));
                 }
             }
             RuleAction::UpdateUiBinding {
@@ -149,11 +152,11 @@ impl RuleEngine<'_> {
                 let binding_key = binding_key.trim();
                 if !ui_id.as_str().trim().is_empty() && !binding_key.is_empty() {
                     match value.resolve(self.value_path_context(context)) {
-                        Ok(value) => command_buffer.push(RuleCommand::UpdateUiBinding {
+                        Ok(value) => command_buffer.push(RuleCommand::Ui(UiCommand::UpdateUiBinding {
                             ui_id: ui_id.clone(),
                             binding_key: binding_key.to_string(),
                             value,
-                        }),
+                        })),
                         Err(error) => tracing::warn!(
                             error = %error,
                             action = ?action,
@@ -163,10 +166,10 @@ impl RuleEngine<'_> {
                 }
             }
             RuleAction::SaveGame { slot } => {
-                command_buffer.push(RuleCommand::SaveGame { slot: *slot });
+                command_buffer.push(RuleCommand::Progress(ProgressCommand::SaveGame { slot: *slot }));
             }
             RuleAction::LoadGame { slot } => {
-                command_buffer.push(RuleCommand::LoadGame { slot: *slot });
+                command_buffer.push(RuleCommand::Progress(ProgressCommand::LoadGame { slot: *slot }));
             }
             _ => unreachable!("scene, dialog, or persistence helper only handles matching actions"),
         }
@@ -183,10 +186,10 @@ impl RuleEngine<'_> {
                 entity_type,
                 position,
             } => match position.resolve(self.value_path_context(context)) {
-                Ok(position) => command_buffer.push(RuleCommand::Spawn {
+                Ok(position) => command_buffer.push(RuleCommand::Entity(EntityCommand::Spawn {
                     entity_type: *entity_type,
                     position: glam::IVec2::new(position[0], position[1]),
-                }),
+                })),
                 Err(error) => tracing::warn!(
                     error = %error,
                     action = ?action,
@@ -195,14 +198,14 @@ impl RuleEngine<'_> {
             },
             RuleAction::DestroySelf { target } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::DestroySelf { entity_id }
+                    RuleCommand::Entity(EntityCommand::DestroySelf { entity_id })
                 });
             }
             RuleAction::DamageEntity { target, amount } => {
                 match amount.resolve(self.value_path_context(context)) {
                     Ok(amount) => {
                         self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                            RuleCommand::DamageEntity { entity_id, amount }
+                            RuleCommand::Entity(EntityCommand::DamageEntity { entity_id, amount })
                         })
                     }
                     Err(error) => tracing::warn!(
@@ -216,7 +219,7 @@ impl RuleEngine<'_> {
                 match amount.resolve(self.value_path_context(context)) {
                     Ok(amount) => {
                         self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                            RuleCommand::HealEntity { entity_id, amount }
+                            RuleCommand::Entity(EntityCommand::HealEntity { entity_id, amount })
                         })
                     }
                     Err(error) => tracing::warn!(
@@ -228,10 +231,10 @@ impl RuleEngine<'_> {
             }
             RuleAction::SetEntityActive { target, active } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::SetEntityActive {
+                    RuleCommand::Entity(EntityCommand::SetEntityActive {
                         entity_id,
                         active: *active,
-                    }
+                    })
                 });
             }
             RuleAction::TeleportEntity {
@@ -244,11 +247,11 @@ impl RuleEngine<'_> {
                 match (resolved_x, resolved_y) {
                     (Ok(tile_x), Ok(tile_y)) if tile_x >= 0 && tile_y >= 0 => {
                         self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                            RuleCommand::TeleportEntity {
+                            RuleCommand::Entity(EntityCommand::TeleportEntity {
                                 entity_id,
                                 tile_x: tile_x as u32,
                                 tile_y: tile_y as u32,
-                            }
+                            })
                         });
                     }
                     (Ok(_), Ok(_)) => tracing::warn!(
@@ -279,11 +282,11 @@ impl RuleEngine<'_> {
                 count,
             } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::AddInventoryItem {
+                    RuleCommand::Inventory(InventoryCommand::AddInventoryItem {
                         entity_id,
                         item_id: item_id.clone(),
                         count: *count,
-                    }
+                    })
                 });
             }
             RuleAction::RemoveInventoryItem {
@@ -292,21 +295,21 @@ impl RuleEngine<'_> {
                 count,
             } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::RemoveInventoryItem {
+                    RuleCommand::Inventory(InventoryCommand::RemoveInventoryItem {
                         entity_id,
                         item_id: item_id.clone(),
                         count: *count,
-                    }
+                    })
                 });
             }
             RuleAction::SetFlag { flag, value } => {
                 let flag = flag.trim();
                 if !flag.is_empty() {
                     match value.resolve(self.value_path_context(context)) {
-                        Ok(value) => command_buffer.push(RuleCommand::SetFlag {
+                        Ok(value) => command_buffer.push(RuleCommand::Progress(ProgressCommand::SetFlag {
                             flag: flag.to_string(),
                             value,
-                        }),
+                        })),
                         Err(error) => tracing::warn!(
                             error = %error,
                             action = ?action,
@@ -319,10 +322,10 @@ impl RuleEngine<'_> {
                 let flag = flag.trim();
                 if !flag.is_empty() {
                     match amount.resolve(self.value_path_context(context)) {
-                        Ok(amount) => command_buffer.push(RuleCommand::IncrementFlag {
+                        Ok(amount) => command_buffer.push(RuleCommand::Progress(ProgressCommand::IncrementFlag {
                             flag: flag.to_string(),
                             amount,
-                        }),
+                        })),
                         Err(error) => tracing::warn!(
                             error = %error,
                             action = ?action,
@@ -334,9 +337,9 @@ impl RuleEngine<'_> {
             RuleAction::ClearFlag { flag } => {
                 let flag = flag.trim();
                 if !flag.is_empty() {
-                    command_buffer.push(RuleCommand::ClearFlag {
+                    command_buffer.push(RuleCommand::Progress(ProgressCommand::ClearFlag {
                         flag: flag.to_string(),
-                    });
+                    }));
                 }
             }
             _ => unreachable!("inventory or flag helper only handles inventory or flag actions"),
@@ -359,10 +362,10 @@ impl RuleEngine<'_> {
             RuleSoundChannel::Collision => AudioChannel::Collision,
         };
 
-        command_buffer.push(RuleCommand::PlaySound {
+        command_buffer.push(RuleCommand::Audio(AudioCommand::PlaySound {
             channel,
             sound_id: sound_id.to_string(),
-        });
+        }));
     }
 
     fn buffer_play_music(&self, track_id: &str, command_buffer: &mut Vec<RuleCommand>) {
@@ -370,9 +373,9 @@ impl RuleEngine<'_> {
         if track_id.is_empty() {
             return;
         }
-        command_buffer.push(RuleCommand::PlayMusic {
+        command_buffer.push(RuleCommand::Audio(AudioCommand::PlayMusic {
             track_id: track_id.to_string(),
-        });
+        }));
     }
 
     fn buffer_play_animation(
@@ -383,7 +386,7 @@ impl RuleEngine<'_> {
         command_buffer: &mut Vec<RuleCommand>,
     ) {
         self.resolve_and_push(target, context, command_buffer, |entity_id| {
-            RuleCommand::PlayAnimation { entity_id, state }
+            RuleCommand::Animation(AnimationCommand::PlayAnimation { entity_id, state })
         });
     }
 
@@ -396,10 +399,10 @@ impl RuleEngine<'_> {
     ) {
         match velocity.resolve(self.value_path_context(context)) {
             Ok(velocity) => self.resolve_and_push(target, context, command_buffer, |entity_id| {
-                RuleCommand::SetVelocity {
+                RuleCommand::Motion(MotionCommand::SetVelocity {
                     entity_id,
                     velocity: glam::IVec2::new(velocity[0], velocity[1]),
-                }
+                })
             }),
             Err(error) => tracing::warn!(
                 error = %error,

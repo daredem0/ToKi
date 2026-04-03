@@ -6,9 +6,11 @@ use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::Entity;
 
+#[cfg(test)]
 use super::GameState;
+use super::RuleEvaluationService;
 
-impl GameState {
+impl RuleEvaluationService<'_> {
     pub(in crate::game) fn any_entity_overlaps_trigger_tile(
         &self,
         tilemap: &TileMap,
@@ -59,6 +61,19 @@ impl GameState {
         }
 
         false
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+impl GameState {
+    pub(in crate::game) fn any_entity_overlaps_trigger_tile(
+        &mut self,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> bool {
+        self.rule_evaluation_service()
+            .any_entity_overlaps_trigger_tile(tilemap, atlas)
     }
 }
 
