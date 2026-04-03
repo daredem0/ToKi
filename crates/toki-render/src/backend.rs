@@ -150,11 +150,11 @@ pub trait RenderBackend: std::fmt::Debug {
     /// Clear all UI shapes
     fn clear_ui_shapes(&mut self);
 
-    /// Add a UI rectangle outline
-    fn add_ui_rect(&mut self, rect: Rect, color: [f32; 4]);
+    /// Add a UI shape outline
+    fn add_ui_shape(&mut self, rect: Rect, color: [f32; 4]);
 
-    /// Add a filled UI rectangle
-    fn add_filled_ui_rect(&mut self, rect: Rect, color: [f32; 4]);
+    /// Add a filled UI shape
+    fn add_filled_ui_shape(&mut self, rect: Rect, color: [f32; 4]);
 
     /// Finalize UI shapes for rendering
     fn finalize_ui_shapes(&mut self);

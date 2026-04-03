@@ -199,11 +199,11 @@ impl RenderBackend for FakeBackend {
         self.ui_rect_count.set(0);
     }
 
-    fn add_ui_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
+    fn add_ui_shape(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.ui_rect_count.set(self.ui_rect_count.get() + 1);
     }
 
-    fn add_filled_ui_rect(&mut self, _rect: Rect, _color: [f32; 4]) {
+    fn add_filled_ui_shape(&mut self, _rect: Rect, _color: [f32; 4]) {
         self.ui_rect_count.set(self.ui_rect_count.get() + 1);
     }
 
@@ -643,8 +643,8 @@ fn backend_seam_dispatches_runtime_render_commands() {
     rendering.add_filled_debug_rect(1.0, 1.0, 14.0, 14.0, [0.0, 1.0, 0.0, 1.0]);
     rendering.finalize_debug_shapes();
     rendering.clear_ui_shapes();
-    rendering.add_ui_rect(4.0, 4.0, 12.0, 12.0, [1.0, 1.0, 1.0, 1.0]);
-    rendering.add_filled_ui_rect(5.0, 5.0, 10.0, 10.0, [0.0, 0.0, 0.0, 0.5]);
+    rendering.add_ui_shape(4.0, 4.0, 12.0, 12.0, [1.0, 1.0, 1.0, 1.0]);
+    rendering.add_filled_ui_shape(5.0, 5.0, 10.0, 10.0, [0.0, 0.0, 0.0, 0.5]);
     rendering.finalize_ui_shapes();
     rendering.draw();
 

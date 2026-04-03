@@ -270,7 +270,7 @@ pub(super) fn render_scene_transition_overlay(
     }
 
     let projection = rendering.projection_params();
-    rendering.add_filled_ui_rect(
+    rendering.add_filled_ui_shape(
         0.0,
         0.0,
         projection.width as f32,

@@ -219,156 +219,6 @@ impl GpuState {
         append_ordered_draw_batch(&mut self.sprite_draw_batches, key, start);
     }
 
-    pub fn add_sprite(&mut self, frame: SpriteFrame, pos: glam::IVec2, size: glam::UVec2) {
-        self.add_default_sprite(frame, pos, size, false);
-    }
-
-    pub fn add_sprite_flipped(
-        &mut self,
-        frame: SpriteFrame,
-        pos: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        self.add_default_sprite(frame, pos, size, flip_x);
-    }
-
-    pub fn add_sprite_with_texture(
-        &mut self,
-        texture_path: PathBuf,
-        frame: SpriteFrame,
-        pos: glam::IVec2,
-        size: glam::UVec2,
-    ) {
-        self.add_textured_sprite(
-            texture_path.clone(),
-            TextureSource::path(texture_path),
-            frame,
-            pos,
-            size,
-            false,
-        );
-    }
-
-    pub fn add_sprite_with_texture_flipped(
-        &mut self,
-        texture_path: PathBuf,
-        frame: SpriteFrame,
-        pos: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        self.add_textured_sprite(
-            texture_path.clone(),
-            TextureSource::path(texture_path),
-            frame,
-            pos,
-            size,
-            flip_x,
-        );
-    }
-
-    pub fn add_sprite_with_texture_rgba8(
-        &mut self,
-        texture_key: PathBuf,
-        image: &DecodedImage,
-        frame: SpriteFrame,
-        pos: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        self.add_textured_sprite(
-            texture_key.clone(),
-            TextureSource::rgba8(image),
-            frame,
-            pos,
-            size,
-            flip_x,
-        );
-    }
-
-    pub fn clear_sprites(&mut self) {
-        self.sprite_pipeline.clear_sprites();
-        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
-            pipeline.clear_sprites();
-        }
-        self.sprite_draw_batches.clear();
-    }
-
-    pub fn clear_text_items(&mut self) {
-        self.text_items.clear();
-    }
-
-    pub fn add_text_item(&mut self, text: TextItem) {
-        self.text_items.push(text);
-    }
-
-    pub fn clear_world_underlay_shapes(&mut self) {
-        self.world_underlay_pipeline.clear();
-    }
-
-    pub fn add_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.world_underlay_pipeline
-            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
-    }
-
-    pub fn add_filled_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.world_underlay_pipeline
-            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
-    }
-
-    pub fn finalize_world_underlay_shapes(&mut self) {
-        self.world_underlay_pipeline.update_vertices(&self.device);
-    }
-
-    pub fn load_font_file(&mut self, path: &Path) -> Result<(), crate::RenderError> {
-        self.text_renderer.load_font_file(path)
-    }
-
-    /// Clear all debug shapes
-    pub fn clear_debug_shapes(&mut self) {
-        self.debug_pipeline.clear();
-    }
-
-    /// Add a debug rectangle
-    pub fn add_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.debug_pipeline
-            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
-    }
-
-    /// Add a filled debug rectangle
-    pub fn add_filled_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.debug_pipeline
-            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
-    }
-
-    /// Finalize debug shapes for rendering (call after adding all shapes)
-    pub fn finalize_debug_shapes(&mut self) {
-        self.debug_pipeline.update_vertices(&self.device);
-    }
-
-    pub fn clear_ui_shapes(&mut self) {
-        self.ui_shape_pipeline.clear();
-    }
-
-    pub fn add_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.ui_shape_pipeline
-            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
-    }
-
-    pub fn add_filled_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        self.ui_shape_pipeline
-            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
-    }
-
-    pub fn finalize_ui_shapes(&mut self) {
-        self.ui_shape_pipeline.update_camera(
-            &self.queue,
-            screen_space_projection(self.config.width as f32, self.config.height as f32),
-        );
-        self.ui_shape_pipeline.update_vertices(&self.device);
-    }
-
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.config.width = new_size.width;
@@ -412,18 +262,6 @@ impl GpuState {
         )
     }
 
-    pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
-        self.tilemap_render_enabled = enabled;
-    }
-
-    pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
-        self.post_process_settings = settings;
-    }
-
-    pub fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
-        self.scene_clip_rect = rect;
-    }
-
     pub fn set_vsync(&mut self, enabled: bool) {
         let next_mode = choose_present_mode(&self.supported_present_modes, enabled);
         if self.config.present_mode != next_mode {
@@ -451,13 +289,10 @@ impl GpuState {
 
 impl crate::RenderBackend for GpuState {
     fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
-        GpuState::set_scene_clip_rect(self, rect);
+        self.scene_clip_rect = rect;
     }
 
-    fn load_tilemap_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-    ) -> Result<(), crate::RenderError> {
+    fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
         GpuState::load_tilemap_texture(self, texture_path)
     }
 
@@ -468,10 +303,7 @@ impl crate::RenderBackend for GpuState {
         GpuState::load_tilemap_texture_rgba8(self, image)
     }
 
-    fn load_sprite_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-    ) -> Result<(), crate::RenderError> {
+    fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
         GpuState::load_sprite_texture(self, texture_path)
     }
 
@@ -491,10 +323,9 @@ impl crate::RenderBackend for GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        GpuState::add_sprite_with_texture_rgba8(
-            self,
-            texture_key,
-            image,
+        self.add_textured_sprite(
+            texture_key.clone(),
+            TextureSource::rgba8(image),
             frame,
             position,
             size,
@@ -502,24 +333,24 @@ impl crate::RenderBackend for GpuState {
         );
     }
 
-    fn load_font_file(&mut self, font_path: std::path::PathBuf) -> Result<(), crate::RenderError> {
-        GpuState::load_font_file(self, &font_path)
+    fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), crate::RenderError> {
+        self.text_renderer.load_font_file(&font_path)
     }
 
     fn update_projection(&mut self, mvp: glam::Mat4) {
         GpuState::update_projection(self, mvp);
     }
 
-    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
-        GpuState::set_tilemap_render_enabled(self, enabled);
-    }
-
     fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
-        GpuState::set_post_process_settings(self, settings);
+        self.post_process_settings = settings;
     }
 
     fn set_vsync(&mut self, enabled: bool) {
         GpuState::set_vsync(self, enabled);
+    }
+
+    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+        self.tilemap_render_enabled = enabled;
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -535,7 +366,11 @@ impl crate::RenderBackend for GpuState {
     }
 
     fn clear_sprites(&mut self) {
-        GpuState::clear_sprites(self);
+        self.sprite_pipeline.clear_sprites();
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.clear_sprites();
+        }
+        self.sprite_draw_batches.clear();
     }
 
     fn add_sprite(
@@ -545,20 +380,20 @@ impl crate::RenderBackend for GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        GpuState::add_sprite_flipped(self, frame, position, size, flip_x);
+        self.add_default_sprite(frame, position, size, flip_x);
     }
 
     fn add_sprite_with_texture(
         &mut self,
-        texture_path: std::path::PathBuf,
+        texture_path: PathBuf,
         frame: SpriteFrame,
         position: glam::IVec2,
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        GpuState::add_sprite_with_texture_flipped(
-            self,
-            texture_path,
+        self.add_textured_sprite(
+            texture_path.clone(),
+            TextureSource::path(texture_path),
             frame,
             position,
             size,
@@ -567,59 +402,69 @@ impl crate::RenderBackend for GpuState {
     }
 
     fn clear_text_items(&mut self) {
-        GpuState::clear_text_items(self);
+        self.text_items.clear();
     }
 
     fn add_text_item(&mut self, text: TextItem) {
-        GpuState::add_text_item(self, text);
+        self.text_items.push(text);
     }
 
     fn clear_world_underlay_shapes(&mut self) {
-        GpuState::clear_world_underlay_shapes(self);
+        self.world_underlay_pipeline.clear();
     }
 
     fn add_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        GpuState::add_world_underlay_rect(self, rect, color);
+        self.world_underlay_pipeline
+            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     fn add_filled_world_underlay_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        GpuState::add_filled_world_underlay_rect(self, rect, color);
+        self.world_underlay_pipeline
+            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     fn finalize_world_underlay_shapes(&mut self) {
-        GpuState::finalize_world_underlay_shapes(self);
+        self.world_underlay_pipeline.update_vertices(&self.device);
     }
 
     fn clear_debug_shapes(&mut self) {
-        GpuState::clear_debug_shapes(self);
+        self.debug_pipeline.clear();
     }
 
     fn add_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        GpuState::add_debug_rect(self, rect, color);
+        self.debug_pipeline
+            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     fn add_filled_debug_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        GpuState::add_filled_debug_rect(self, rect, color);
+        self.debug_pipeline
+            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     fn finalize_debug_shapes(&mut self) {
-        GpuState::finalize_debug_shapes(self);
+        self.debug_pipeline.update_vertices(&self.device);
     }
 
     fn clear_ui_shapes(&mut self) {
-        GpuState::clear_ui_shapes(self);
+        self.ui_shape_pipeline.clear();
     }
 
-    fn add_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        GpuState::add_ui_rect(self, rect, color);
+    fn add_ui_shape(&mut self, rect: Rect, color: [f32; 4]) {
+        self.ui_shape_pipeline
+            .add_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
-    fn add_filled_ui_rect(&mut self, rect: Rect, color: [f32; 4]) {
-        GpuState::add_filled_ui_rect(self, rect, color);
+    fn add_filled_ui_shape(&mut self, rect: Rect, color: [f32; 4]) {
+        self.ui_shape_pipeline
+            .add_filled_rect(rect.x, rect.y, rect.width, rect.height, color);
     }
 
     fn finalize_ui_shapes(&mut self) {
-        GpuState::finalize_ui_shapes(self);
+        self.ui_shape_pipeline.update_camera(
+            &self.queue,
+            screen_space_projection(self.config.width as f32, self.config.height as f32),
+        );
+        self.ui_shape_pipeline.update_vertices(&self.device);
     }
 }
 

@@ -550,7 +550,7 @@ impl RenderingSystem {
     pub fn render_ui_composition(&mut self, composition: &UiComposition) {
         for block in &composition.blocks {
             if let Some(fill) = block.fill_color {
-                self.add_filled_ui_rect(
+                self.add_filled_ui_shape(
                     block.rect.x,
                     block.rect.y,
                     block.rect.width,
@@ -565,7 +565,7 @@ impl RenderingSystem {
                     if rect.width <= 0.0 || rect.height <= 0.0 {
                         break;
                     }
-                    self.add_ui_rect(rect.x, rect.y, rect.width, rect.height, border);
+                    self.add_ui_shape(rect.x, rect.y, rect.width, rect.height, border);
                 }
             }
             if let Some(text) = &block.text {
@@ -629,19 +629,19 @@ impl RenderingSystem {
         }
     }
 
-    pub fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+    pub fn add_ui_shape(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
             backend
                 .as_mut()
-                .add_ui_rect(Rect::new(x, y, width, height), color);
+                .add_ui_shape(Rect::new(x, y, width, height), color);
         }
     }
 
-    pub fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+    pub fn add_filled_ui_shape(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
             backend
                 .as_mut()
-                .add_filled_ui_rect(Rect::new(x, y, width, height), color);
+                .add_filled_ui_shape(Rect::new(x, y, width, height), color);
         }
     }
 
