@@ -27,8 +27,8 @@
     "trigger": true
   },
   "audio": {
-    "footstep_trigger_distance": 16.0,
-    "hearing_radius": 64,
+    "footstep_trigger_distance": 0.0,
+    "hearing_radius": 0,
     "movement_sound_trigger": "distance",
     "movement_sound": "",
     "collision_sound": null
