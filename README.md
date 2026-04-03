@@ -1,6 +1,6 @@
 # 🎮 ToKi — Top-down Kit for Game Boy–Style Games
 
-[![CI](https://github.com/daredem0/toki/actions/workflows/rust.yml/badge.svg)](https://github.com/daredem0/toki/actions/workflows/rust.yml)
+[![CI](https://github.com/daredem0/toki/actions/workflows/ci.yml/badge.svg)](https://github.com/daredem0/toki/actions/workflows/rust.yml)
 [![Coverage](https://codecov.io/gh/daredem0/toki/graph/badge.svg?branch=main)](https://codecov.io/gh/daredem0/toki)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-2ea44f?logo=github)](https://daredem0.github.io/toki/)
 [![Release](https://img.shields.io/github/v/release/daredem0/toki)](https://github.com/daredem0/toki/releases)
