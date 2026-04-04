@@ -1,8 +1,8 @@
 //! File I/O operations for SpriteEditorState.
 
 use super::{
-    canonical_indexed_color, DiscoveredSpriteAsset, PixelColor, SpriteAssetKind, SpriteCanvas,
-    SpriteCanvasViewport, SpriteEditorState,
+    canonical_indexed_color_for_size, DiscoveredSpriteAsset, PixelColor, SpriteAssetKind,
+    SpriteCanvas, SpriteCanvasViewport, SpriteEditorState,
 };
 
 struct SaveAssetRequest<'a> {
@@ -223,7 +223,10 @@ impl SpriteEditorState {
         self.color_mode = color_mode;
         self.selected_palette_id = selected_palette_id;
         if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-            self.foreground_color = canonical_indexed_color(3);
+            // Default to the last canonical shade (white) for the palette size.
+            // The palette size isn't available here, so we use Pal4 as a safe default.
+            self.foreground_color =
+                canonical_indexed_color_for_size(3, toki_core::palette::PaletteSize::Pal4);
         }
         let cs = self.active_mut();
         cs.active_sprite = Some(asset.json_path.to_string_lossy().to_string());

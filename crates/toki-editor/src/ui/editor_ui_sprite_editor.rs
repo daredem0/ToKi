@@ -9,10 +9,11 @@ use super::EditorUI;
 // Re-export types from sprite_editor module for backward compatibility
 #[allow(unused_imports)]
 pub(crate) use crate::ui::sprite_editor::{
-    canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot, CanvasSide,
-    CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, FloatingOrigin, FloatingSelection,
-    PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
-    SpriteEditCommand, SpriteEditorHistory, SpriteEditorState, SpriteEditorTool, SpriteSelection,
+    canonical_indexed_color_for_size, indexed_slot_for_authored_color, nearest_palette_slot,
+    CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, FloatingOrigin,
+    FloatingSelection, PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind, SpriteCanvas,
+    SpriteCanvasViewport, SpriteEditCommand, SpriteEditorHistory, SpriteEditorState,
+    SpriteEditorTool, SpriteSelection,
 };
 
 /// Begin showing the new canvas dialog

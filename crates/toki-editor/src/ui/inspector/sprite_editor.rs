@@ -1,5 +1,5 @@
 use super::*;
-use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
+use crate::ui::sprite_editor::{canonical_indexed_color_for_size, indexed_slot_for_authored_color};
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::{validate_indexed_rgba8, PaletteSize};
 
@@ -496,7 +496,8 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                         );
                         if response.clicked() {
                             crate::ui::editor_context::sprite_state_mut(ui_state)
-                                .foreground_color = canonical_indexed_color(slot);
+                                .foreground_color =
+                                canonical_indexed_color_for_size(slot, palette.size());
                         }
                     }
                 });
@@ -538,6 +539,13 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let palette_size = ui_state
+        .sprite_editor_context()
+        .sprite
+        .selected_palette_id
+        .as_ref()
+        .and_then(|id| ui_state.project.available_palettes.get(id))
+        .map_or(PaletteSize::Pal4, |p| p.size());
     let Some(canvas) = crate::ui::editor_context::sprite_state_mut(ui_state)
         .active()
         .canvas
@@ -545,7 +553,7 @@ fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     else {
         return;
     };
-    let validation = validate_indexed_rgba8(canvas.pixels(), PaletteSize::Pal4);
+    let validation = validate_indexed_rgba8(canvas.pixels(), palette_size);
     ui.add_space(4.0);
     if validation.invalid_colors.is_empty() {
         ui.label(format!(
@@ -579,8 +587,9 @@ fn ensure_valid_indexed_foreground_color(ui_state: &mut EditorUI) {
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id));
 
     if indexed_slot_for_authored_color(foreground_color, selected_palette).is_none() {
+        let size = selected_palette.map_or(PaletteSize::Pal4, |p| p.size());
         crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color =
-            canonical_indexed_color(3);
+            canonical_indexed_color_for_size(size.color_count() - 1, size);
     }
 }
 

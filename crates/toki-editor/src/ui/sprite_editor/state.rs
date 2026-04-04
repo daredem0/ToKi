@@ -1,7 +1,7 @@
 //! Sprite editor state - the main container for sprite editing state.
 
 use super::{
-    canonical_indexed_color, indexed_slot_for_authored_color, CanvasSide, CanvasState,
+    canonical_indexed_color_for_size, indexed_slot_for_authored_color, CanvasSide, CanvasState,
     DiscoveredSpriteAsset, DitherPattern, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
     SpriteEditorTool,
 };
@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::Palette;
+use toki_core::palette::PaletteSize;
 
 /// Sprite editor state
 pub struct SpriteEditorState {
@@ -171,7 +172,10 @@ impl SpriteEditorState {
         if indexed_slot_for_authored_color(self.foreground_color, selected_palette.as_ref())
             .is_none()
         {
-            self.foreground_color = canonical_indexed_color(3);
+            let size = selected_palette
+                .as_ref()
+                .map_or(PaletteSize::Pal4, |p| p.size());
+            self.foreground_color = canonical_indexed_color_for_size(size.color_count() - 1, size);
         }
     }
 }

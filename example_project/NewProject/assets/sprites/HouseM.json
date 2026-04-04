@@ -6,9 +6,9 @@
     64
   ],
   "objects": {
-    "object_0": {
+    "object_1": {
       "position": [
-        0,
+        1,
         0
       ],
       "size_tiles": [
@@ -16,9 +16,9 @@
         1
       ]
     },
-    "object_1": {
+    "object_0": {
       "position": [
-        1,
+        0,
         0
       ],
       "size_tiles": [

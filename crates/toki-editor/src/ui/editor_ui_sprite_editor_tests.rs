@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::sprite_editor::canonical_indexed_color;
 
 // ============================================================================
 // PixelColor Tests

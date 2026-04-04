@@ -26,8 +26,10 @@ pub use history::{SpriteEditCommand, SpriteEditorHistory};
 pub use selection::{clear_masked_pixels, extract_masked_selection};
 pub use selection::{SelectionMask, SpriteSelection};
 pub use state::SpriteEditorState;
+#[cfg(test)]
+pub use types::canonical_indexed_color;
 pub use types::{
-    canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot,
+    canonical_indexed_color_for_size, indexed_slot_for_authored_color, nearest_palette_slot,
     preview_indexed_color, DiscoveredSpriteAsset, DitherPattern, PixelColor, ResizeAnchor,
     ResizeCorner, ResizeDrag, SpriteAssetKind, SpriteEditorTool,
 };

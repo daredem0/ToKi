@@ -4,7 +4,8 @@ use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{
-    canonical_indexed_color, indexed_slot_for_authored_color, PixelColor, ResizeCorner, ResizeDrag,
+    canonical_indexed_color_for_size, indexed_slot_for_authored_color, PixelColor, ResizeCorner,
+    ResizeDrag,
 };
 use crate::ui::EditorUI;
 use glam::UVec2;
@@ -228,11 +229,11 @@ fn handle_eyedropper_tool(
                 if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode
                     == ColorMode::PaletteIndexed
                 {
-                    if let Some(slot) =
-                        indexed_slot_for_authored_color(color, selected_palette(ui_state))
-                    {
+                    let pal = selected_palette(ui_state);
+                    if let Some(slot) = indexed_slot_for_authored_color(color, pal) {
+                        let size = pal.map_or(toki_core::palette::PaletteSize::Pal4, |p| p.size());
                         crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color =
-                            canonical_indexed_color(slot);
+                            canonical_indexed_color_for_size(slot, size);
                     }
                 } else {
                     crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color = color;
@@ -1009,9 +1010,10 @@ fn effective_paint_color(
         return foreground_color;
     }
 
+    let size = palette.map_or(toki_core::palette::PaletteSize::Pal4, |p| p.size());
     indexed_slot_for_authored_color(foreground_color, palette)
-        .map(canonical_indexed_color)
-        .unwrap_or_else(|| canonical_indexed_color(3))
+        .map(|slot| canonical_indexed_color_for_size(slot, size))
+        .unwrap_or_else(|| canonical_indexed_color_for_size(size.color_count() - 1, size))
 }
 
 fn symmetry_config(ui_state: &EditorUI) -> SymmetryConfig {
@@ -1095,6 +1097,7 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
 mod tests {
     use super::*;
     use crate::ui::editor_ui::PixelColor;
+    use crate::ui::sprite_editor::canonical_indexed_color;
     use toki_core::palette::Palette;
 
     #[test]

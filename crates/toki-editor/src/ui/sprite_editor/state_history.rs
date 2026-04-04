@@ -1,8 +1,8 @@
 //! Undo/redo and clipboard operations for SpriteEditorState.
 
 use super::{
-    canonical_indexed_color, nearest_palette_slot, preview_indexed_color, CanvasSide, SpriteCanvas,
-    SpriteEditCommand, SpriteEditorState,
+    canonical_indexed_color_for_size, nearest_palette_slot, preview_indexed_color, CanvasSide,
+    SpriteCanvas, SpriteEditCommand, SpriteEditorState,
 };
 use toki_core::palette::Palette;
 
@@ -178,7 +178,7 @@ impl SpriteEditorState {
 
                     let visible = preview_indexed_color(color, palette);
                     let slot = nearest_palette_slot(visible, palette);
-                    let mut canonical = canonical_indexed_color(slot);
+                    let mut canonical = canonical_indexed_color_for_size(slot, palette.size());
                     canonical.a = color.a;
                     if canonical != color {
                         canvas.set_pixel(x, y, canonical);

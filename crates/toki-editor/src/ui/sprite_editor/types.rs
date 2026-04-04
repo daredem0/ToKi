@@ -3,7 +3,7 @@
 //! Contains fundamental types like colors, tools, and asset kinds.
 
 use std::path::PathBuf;
-use toki_core::palette::Palette;
+use toki_core::palette::{Palette, PaletteSize};
 
 /// Tool for sprite/pixel editing operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -107,34 +107,51 @@ impl PixelColor {
     }
 }
 
-pub const fn canonical_indexed_color(slot: usize) -> PixelColor {
-    match slot {
-        0 => PixelColor::rgb(0x00, 0x00, 0x00),
-        1 => PixelColor::rgb(0x55, 0x55, 0x55),
-        2 => PixelColor::rgb(0xAA, 0xAA, 0xAA),
-        _ => PixelColor::rgb(0xFF, 0xFF, 0xFF),
-    }
+/// Returns the canonical grayscale color for a given palette slot (Pal4 only).
+#[cfg(test)]
+pub fn canonical_indexed_color(slot: usize) -> PixelColor {
+    canonical_indexed_color_for_size(slot, PaletteSize::Pal4)
 }
 
+/// Returns the canonical grayscale color for a given palette slot and size.
+///
+/// The shade is computed as `slot * 255 / (N - 1)` where N is the color count,
+/// matching the formula in `PaletteSize::canonical_shades()`.
+pub fn canonical_indexed_color_for_size(slot: usize, size: PaletteSize) -> PixelColor {
+    let n = size.color_count();
+    let clamped = slot.min(n - 1);
+    let v = (clamped * 255 / (n - 1)) as u8;
+    PixelColor::rgb(v, v, v)
+}
+
+/// Finds the palette slot for a canonical Pal4 grayscale color.
+#[cfg(test)]
 pub fn indexed_slot_for_canonical_color(color: PixelColor) -> Option<usize> {
+    indexed_slot_for_canonical_color_with_size(color, PaletteSize::Pal4)
+}
+
+pub fn indexed_slot_for_canonical_color_with_size(
+    color: PixelColor,
+    size: PaletteSize,
+) -> Option<usize> {
     if color.a == 0 {
         return None;
     }
-
-    match [color.r, color.g, color.b] {
-        [0x00, 0x00, 0x00] => Some(0),
-        [0x55, 0x55, 0x55] => Some(1),
-        [0xAA, 0xAA, 0xAA] => Some(2),
-        [0xFF, 0xFF, 0xFF] => Some(3),
-        _ => None,
+    if color.r != color.g || color.g != color.b {
+        return None;
     }
+    let v = color.r;
+    let n = size.color_count();
+    // Check if v matches any canonical shade: shade[i] = i * 255 / (n - 1)
+    (0..n).find(|&i| (i * 255 / (n - 1)) as u8 == v)
 }
 
 pub fn indexed_slot_for_authored_color(
     color: PixelColor,
     palette: Option<&Palette>,
 ) -> Option<usize> {
-    indexed_slot_for_canonical_color(color).or_else(|| {
+    let size = palette.map_or(PaletteSize::Pal4, |p| p.size());
+    indexed_slot_for_canonical_color_with_size(color, size).or_else(|| {
         palette.and_then(|palette| {
             palette.colors().iter().position(|candidate| {
                 color.a != 0
@@ -149,9 +166,12 @@ pub fn preview_indexed_color(color: PixelColor, palette: &Palette) -> PixelColor
         return PixelColor::transparent();
     }
 
-    let Some(slot) = indexed_slot_for_canonical_color(color) else {
+    let Some(slot) = indexed_slot_for_canonical_color_with_size(color, palette.size()) else {
         return color;
     };
+    if slot >= palette.size().color_count() {
+        return color;
+    }
     let target = palette.color(slot);
     PixelColor::new(
         target[0],
