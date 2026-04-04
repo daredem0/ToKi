@@ -6,7 +6,7 @@ use crate::ui::editor_ui::{
 use crate::ui::sprite_editor::{preview_indexed_color, FloatingOrigin, FloatingSelection};
 use crate::ui::EditorUI;
 use toki_core::assets::atlas::ColorMode;
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 
 use super::shortcuts::handle_undo_redo_shortcuts;
 use super::tools::{handle_tool_interaction, handle_tool_shortcuts};
@@ -308,8 +308,7 @@ pub fn ensure_canvas_texture_for_side(
         .sprite
         .selected_palette_id
         .as_ref()
-        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
-        .copied();
+        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id));
 
     let display_pixels = canvas_display_pixels(&canvas, color_mode, selected_palette);
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
@@ -424,7 +423,7 @@ fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
 fn canvas_display_pixels(
     canvas: &SpriteCanvas,
     color_mode: ColorMode,
-    palette: Option<Palette4>,
+    palette: Option<&Palette>,
 ) -> Vec<u8> {
     let mut pixels = apply_palette_conversion(canvas, color_mode, palette);
     composite_checkerboard_into(&mut pixels, canvas.width as usize);
@@ -434,7 +433,7 @@ fn canvas_display_pixels(
 fn apply_palette_conversion(
     canvas: &SpriteCanvas,
     color_mode: ColorMode,
-    palette: Option<Palette4>,
+    palette: Option<&Palette>,
 ) -> Vec<u8> {
     if color_mode != ColorMode::PaletteIndexed {
         return canvas.pixels().to_vec();
@@ -1189,14 +1188,18 @@ mod tests {
         let canvas =
             SpriteCanvas::from_rgba(2, 1, vec![0x00, 0x00, 0x00, 0xFF, 0xAA, 0xAA, 0xAA, 0x80])
                 .unwrap();
-        let palette = Palette4::new([
-            [10, 20, 30, 255],
-            [40, 50, 60, 255],
-            [70, 80, 90, 255],
-            [100, 110, 120, 255],
-        ]);
+        let palette = Palette::new(
+            toki_core::palette::PaletteSize::Pal4,
+            vec![
+                [10, 20, 30, 255],
+                [40, 50, 60, 255],
+                [70, 80, 90, 255],
+                [100, 110, 120, 255],
+            ],
+        )
+        .unwrap();
 
-        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(palette));
+        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(&palette));
 
         // Pixel 0: fully opaque (A=255) — checkerboard not applied, palette colour unchanged.
         // Pixel 1: semi-transparent (A=128) — composited against checker square (180/220 grey),
@@ -1208,9 +1211,13 @@ mod tests {
     #[test]
     fn canvas_display_pixels_leaves_noncanonical_indexed_pixels_unchanged() {
         let canvas = SpriteCanvas::filled(1, 1, PixelColor::rgb(12, 34, 56));
-        let palette = Palette4::new([[1, 2, 3, 255]; 4]);
+        let palette = Palette::new(
+            toki_core::palette::PaletteSize::Pal4,
+            vec![[1, 2, 3, 255]; 4],
+        )
+        .unwrap();
 
-        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(palette));
+        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(&palette));
 
         assert_eq!(pixels, canvas.pixels());
     }

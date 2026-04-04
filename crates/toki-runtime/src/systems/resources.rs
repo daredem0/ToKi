@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
-use toki_core::palette::{resolve_palette, Palette4};
+use toki_core::palette::{resolve_palette, Palette, PaletteMismatchStrategy};
 pub use toki_core::project_assets::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
     load_project_palettes, normalize_asset_name, resolve_atlas_texture_path,
@@ -37,8 +37,9 @@ pub struct ResourceManager {
     object_sheets: ObjectSheetRegistry,
     object_texture_paths: ObjectTextureRegistry,
     tilemap: TileMap,
-    project_palettes: BTreeMap<String, Palette4>,
+    project_palettes: BTreeMap<String, Palette>,
     indexed_palette_override: Option<String>,
+    palette_mismatch_strategy: PaletteMismatchStrategy,
 }
 
 pub struct PreloadedResources {
@@ -48,8 +49,9 @@ pub struct PreloadedResources {
     pub object_sheets: ObjectSheetRegistry,
     pub object_texture_paths: ObjectTextureRegistry,
     pub tilemap: TileMap,
-    pub project_palettes: BTreeMap<String, Palette4>,
+    pub project_palettes: BTreeMap<String, Palette>,
     pub indexed_palette_override: Option<String>,
+    pub palette_mismatch_strategy: PaletteMismatchStrategy,
 }
 
 impl ResourceManager {
@@ -81,6 +83,7 @@ impl ResourceManager {
             tilemap,
             project_palettes: BTreeMap::new(),
             indexed_palette_override: None,
+            palette_mismatch_strategy: PaletteMismatchStrategy::default(),
         })
     }
 
@@ -115,15 +118,18 @@ impl ResourceManager {
             &resolved_paths.object_sheet_paths,
             decoded_project_cache,
         )?;
-        let (project_palettes, indexed_palette_override) = load_palette_settings(project_path)
-            .unwrap_or_else(|error| {
-                tracing::warn!(
-                    "Failed to load palette settings from '{}': {}",
-                    project_path.display(),
-                    error
-                );
-                (BTreeMap::new(), None)
-            });
+        let palette_settings = load_palette_settings(project_path).unwrap_or_else(|error| {
+            tracing::warn!(
+                "Failed to load palette settings from '{}': {}",
+                project_path.display(),
+                error
+            );
+            LoadedPaletteSettings {
+                palettes: BTreeMap::new(),
+                override_id: None,
+                mismatch_strategy: PaletteMismatchStrategy::default(),
+            }
+        });
 
         Ok((
             Self {
@@ -133,8 +139,9 @@ impl ResourceManager {
                 object_sheets,
                 object_texture_paths,
                 tilemap,
-                project_palettes,
-                indexed_palette_override,
+                project_palettes: palette_settings.palettes,
+                indexed_palette_override: palette_settings.override_id,
+                palette_mismatch_strategy: palette_settings.mismatch_strategy,
             },
             resolved_paths,
         ))
@@ -150,6 +157,7 @@ impl ResourceManager {
             tilemap: preloaded.tilemap,
             project_palettes: preloaded.project_palettes,
             indexed_palette_override: preloaded.indexed_palette_override,
+            palette_mismatch_strategy: preloaded.palette_mismatch_strategy,
         }
     }
 
@@ -221,7 +229,7 @@ impl ResourceManager {
         self.tilemap.tile_size
     }
 
-    pub fn project_palettes(&self) -> &BTreeMap<String, Palette4> {
+    pub fn project_palettes(&self) -> &BTreeMap<String, Palette> {
         &self.project_palettes
     }
 
@@ -233,11 +241,15 @@ impl ResourceManager {
         self.indexed_palette_override = palette_id;
     }
 
+    pub fn palette_mismatch_strategy(&self) -> PaletteMismatchStrategy {
+        self.palette_mismatch_strategy
+    }
+
     pub fn resolve_indexed_palette(
         &self,
         atlas: &AtlasMeta,
         palette_override: Option<&str>,
-    ) -> Result<(String, Palette4), SpriteResolveError> {
+    ) -> Result<(String, Palette), SpriteResolveError> {
         for palette_id in [
             self.indexed_palette_override.as_deref(),
             palette_override,
@@ -319,14 +331,22 @@ impl SpriteAssetResolver for ResourceManager {
     }
 }
 
-fn load_palette_settings(
-    project_path: &std::path::Path,
-) -> Result<(BTreeMap<String, Palette4>, Option<String>), String> {
+struct LoadedPaletteSettings {
+    palettes: BTreeMap<String, Palette>,
+    override_id: Option<String>,
+    mismatch_strategy: PaletteMismatchStrategy,
+}
+
+fn load_palette_settings(project_path: &std::path::Path) -> Result<LoadedPaletteSettings, String> {
     let project_palettes =
         load_project_palettes(project_path).map_err(|error| error.to_string())?;
     let project_file = project_path.join("project.toml");
     if !project_file.exists() {
-        return Ok((project_palettes, None));
+        return Ok(LoadedPaletteSettings {
+            palettes: project_palettes,
+            override_id: None,
+            mismatch_strategy: PaletteMismatchStrategy::default(),
+        });
     }
 
     let metadata = std::fs::metadata(&project_file).map_err(|error| error.to_string())?;
@@ -341,10 +361,11 @@ fn load_palette_settings(
     let content = std::fs::read_to_string(&project_file).map_err(|error| error.to_string())?;
     let metadata =
         toml::from_str::<ProjectRuntimeMetadata>(&content).map_err(|error| error.to_string())?;
-    Ok((
-        project_palettes,
-        metadata.runtime.display.indexed_palette_override,
-    ))
+    Ok(LoadedPaletteSettings {
+        palettes: project_palettes,
+        override_id: metadata.runtime.display.indexed_palette_override,
+        mismatch_strategy: metadata.runtime.display.palette_mismatch_strategy,
+    })
 }
 
 fn register_sprite_atlas(

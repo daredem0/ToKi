@@ -14,7 +14,7 @@ use crate::ui::editor_context::{
     CenterPanelHost, DialogEditorContext, EditorContext, EntityEditorContext, RuleGraphContext,
     SceneViewportContext, SpriteEditorContext, UiEditorContext,
 };
-use toki_core::palette::{builtin_palettes, Palette4};
+use toki_core::palette::{builtin_palettes, Palette};
 
 #[path = "editor_ui_animation_authoring.rs"]
 mod editor_ui_animation_authoring;
@@ -114,6 +114,7 @@ pub enum Selection {
         scene_name: String,
         node_key: String,
     },
+    Palette(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -249,7 +250,7 @@ pub struct ProjectEditorState {
     // Window state
     pub window_title: Option<String>,
     pub pending_confirmation: Option<EditorConfirmation>,
-    pub available_palettes: BTreeMap<String, Palette4>,
+    pub available_palettes: BTreeMap<String, Palette>,
     pub available_dialog_outcomes: BTreeMap<String, Vec<String>>,
     pub indexed_palette_override: Option<String>,
 }
@@ -309,12 +310,12 @@ impl ProjectEditorState {
         }
     }
 
-    pub fn set_available_palettes(&mut self, project_palettes: &BTreeMap<String, Palette4>) {
+    pub fn set_available_palettes(&mut self, project_palettes: &BTreeMap<String, Palette>) {
         let mut palettes = builtin_palettes();
         palettes.extend(
             project_palettes
                 .iter()
-                .map(|(id, palette)| (id.clone(), *palette)),
+                .map(|(id, palette)| (id.clone(), palette.clone())),
         );
         self.available_palettes = palettes;
     }

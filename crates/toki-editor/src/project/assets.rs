@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use toki_core::dialog::DialogTree;
-use toki_core::palette::{load_palette_asset_from_path, Palette4};
+use toki_core::palette::{load_palette_asset_from_path, Palette};
 use toki_core::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
     discover_project_dialog_paths, discover_project_ui_paths,
@@ -99,7 +99,7 @@ pub struct UiAsset {
 #[derive(Debug, Clone)]
 pub struct PaletteAsset {
     pub path: PathBuf,
-    pub palette: Option<Palette4>,
+    pub palette: Option<Palette>,
 }
 
 impl ProjectAssets {
@@ -500,7 +500,7 @@ impl ProjectAssets {
         }
     }
 
-    pub fn load_project_palettes(&mut self) -> Result<BTreeMap<String, Palette4>> {
+    pub fn load_project_palettes(&mut self) -> Result<BTreeMap<String, Palette>> {
         if self.palettes.values().any(|asset| asset.palette.is_none()) {
             for asset in self.palettes.values_mut() {
                 if asset.palette.is_none() {
@@ -512,7 +512,12 @@ impl ProjectAssets {
         Ok(self
             .palettes
             .iter()
-            .filter_map(|(name, asset)| asset.palette.map(|palette| (name.clone(), palette)))
+            .filter_map(|(name, asset)| {
+                asset
+                    .palette
+                    .as_ref()
+                    .map(|palette| (name.clone(), palette.clone()))
+            })
             .collect())
     }
 

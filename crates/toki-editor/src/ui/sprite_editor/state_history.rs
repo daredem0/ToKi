@@ -4,7 +4,7 @@ use super::{
     canonical_indexed_color, nearest_palette_slot, preview_indexed_color, CanvasSide, SpriteCanvas,
     SpriteEditCommand, SpriteEditorState,
 };
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 
 impl SpriteEditorState {
     /// Push current canvas state for undo
@@ -159,7 +159,7 @@ impl SpriteEditorState {
         true
     }
 
-    pub fn convert_active_canvas_to_palette(&mut self, palette: Palette4) -> bool {
+    pub fn convert_active_canvas_to_palette(&mut self, palette: &Palette) -> bool {
         let before = match self.active().canvas.clone() {
             Some(canvas) => canvas,
             None => return false,

@@ -242,7 +242,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             let tilemap_result = if terrain_atlas.is_palette_indexed() {
                 match self.resources.resolve_indexed_palette(terrain_atlas, None) {
                     Ok((palette_id, palette)) => match load_image_rgba8(&tilemap_texture_path) {
-                        Ok(image) => match recolor_indexed_image(&image, palette) {
+                        Ok(image) => match recolor_indexed_image(&image, &palette) {
                             Ok(recolored) => self.rendering.load_tilemap_texture_rgba8(&recolored),
                             Err(error) => Err(toki_render::RenderError::Other(format!(
                                 "Indexed tilemap texture '{}' failed validation for palette '{}': {}",

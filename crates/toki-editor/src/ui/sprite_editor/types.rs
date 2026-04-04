@@ -3,7 +3,7 @@
 //! Contains fundamental types like colors, tools, and asset kinds.
 
 use std::path::PathBuf;
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 
 /// Tool for sprite/pixel editing operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -132,11 +132,11 @@ pub fn indexed_slot_for_canonical_color(color: PixelColor) -> Option<usize> {
 
 pub fn indexed_slot_for_authored_color(
     color: PixelColor,
-    palette: Option<Palette4>,
+    palette: Option<&Palette>,
 ) -> Option<usize> {
     indexed_slot_for_canonical_color(color).or_else(|| {
         palette.and_then(|palette| {
-            palette.colors.iter().position(|candidate| {
+            palette.colors().iter().position(|candidate| {
                 color.a != 0
                     && [color.r, color.g, color.b] == [candidate[0], candidate[1], candidate[2]]
             })
@@ -144,7 +144,7 @@ pub fn indexed_slot_for_authored_color(
     })
 }
 
-pub fn preview_indexed_color(color: PixelColor, palette: Palette4) -> PixelColor {
+pub fn preview_indexed_color(color: PixelColor, palette: &Palette) -> PixelColor {
     if color.a == 0 {
         return PixelColor::transparent();
     }
@@ -152,7 +152,7 @@ pub fn preview_indexed_color(color: PixelColor, palette: Palette4) -> PixelColor
     let Some(slot) = indexed_slot_for_canonical_color(color) else {
         return color;
     };
-    let target = palette.colors[slot];
+    let target = palette.color(slot);
     PixelColor::new(
         target[0],
         target[1],
@@ -161,10 +161,10 @@ pub fn preview_indexed_color(color: PixelColor, palette: Palette4) -> PixelColor
     )
 }
 
-pub fn nearest_palette_slot(color: PixelColor, palette: Palette4) -> usize {
+pub fn nearest_palette_slot(color: PixelColor, palette: &Palette) -> usize {
     let [r, g, b, _a] = color.to_rgba_array();
     palette
-        .colors
+        .colors()
         .iter()
         .enumerate()
         .min_by_key(|(_, candidate)| {

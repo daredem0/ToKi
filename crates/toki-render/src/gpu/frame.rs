@@ -111,7 +111,7 @@ impl GpuState {
         };
 
         self.post_process_pipeline
-            .update_settings(&self.queue, self.post_process_settings);
+            .update_settings(&self.queue, &self.post_process_settings);
         match target.get_render_view() {
             Ok(target_view) => {
                 let target_view = target_view.clone();

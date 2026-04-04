@@ -111,6 +111,7 @@ fn atlas_image_size_with_scattered_tiles() {
         tile_size: UVec2::new(8, 8),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     };
 
@@ -126,6 +127,7 @@ fn atlas_image_size_empty_atlas() {
         tile_size: UVec2::new(16, 16),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles: HashMap::new(),
     };
 
@@ -149,6 +151,7 @@ fn atlas_get_tile_rect_with_different_tile_sizes() {
         tile_size: UVec2::new(32, 24),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     };
 
@@ -204,6 +207,7 @@ fn atlas_with_special_characters_in_tile_names() {
         tile_size: UVec2::new(16, 16),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     };
 
@@ -303,6 +307,7 @@ fn create_test_atlas() -> AtlasMeta {
         tile_size: UVec2::new(16, 16),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     }
 }

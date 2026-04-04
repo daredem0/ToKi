@@ -1,7 +1,7 @@
 use super::*;
 use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
 use toki_core::assets::atlas::ColorMode;
-use toki_core::palette::validate_indexed_rgba8;
+use toki_core::palette::{validate_indexed_rgba8, PaletteSize};
 
 impl InspectorSystem {
     pub(crate) fn render_sprite_editor_toolbox(
@@ -377,10 +377,10 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     .selected_palette_id
                     .as_ref()
                     .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
-                    .copied()
+                    .cloned()
                 {
                     crate::ui::editor_context::sprite_state_mut(ui_state)
-                        .convert_active_canvas_to_palette(palette);
+                        .convert_active_canvas_to_palette(&palette);
                 }
             }
         }
@@ -467,14 +467,14 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 .project
                 .available_palettes
                 .get(&palette_id)
-                .copied()
+                .cloned()
             {
                 let selected_slot = indexed_slot_for_authored_color(
                     crate::ui::editor_context::sprite_state(ui_state).foreground_color,
-                    Some(palette),
+                    Some(&palette),
                 );
                 ui.horizontal_wrapped(|ui| {
-                    for (slot, color) in palette.colors.iter().copied().enumerate() {
+                    for (slot, color) in palette.colors().iter().copied().enumerate() {
                         let pixel_color = PixelColor::from_rgba_array(color);
                         let is_selected = selected_slot == Some(slot);
                         let (rect, response) =
@@ -545,7 +545,7 @@ fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     else {
         return;
     };
-    let validation = validate_indexed_rgba8(canvas.pixels());
+    let validation = validate_indexed_rgba8(canvas.pixels(), PaletteSize::Pal4);
     ui.add_space(4.0);
     if validation.invalid_colors.is_empty() {
         ui.label(format!(
@@ -570,20 +570,15 @@ fn ensure_valid_indexed_foreground_color(ui_state: &mut EditorUI) {
         return;
     }
 
+    let foreground_color = crate::ui::editor_context::sprite_state(ui_state).foreground_color;
     let selected_palette = ui_state
         .sprite_editor_context()
         .sprite
         .selected_palette_id
         .as_ref()
-        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
-        .copied();
+        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id));
 
-    if indexed_slot_for_authored_color(
-        crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color,
-        selected_palette,
-    )
-    .is_none()
-    {
+    if indexed_slot_for_authored_color(foreground_color, selected_palette).is_none() {
         crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color =
             canonical_indexed_color(3);
     }

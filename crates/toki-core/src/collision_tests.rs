@@ -34,6 +34,7 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
         tile_size: UVec2::new(16, 16),
         color_mode: crate::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     };
 

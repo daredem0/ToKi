@@ -20,7 +20,7 @@ use crate::ui::object_sheet_browser::{
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 
 /// Whether the movement section (speed, can_move, movement_profile, control_role) is relevant.
 pub fn should_show_movement_section(draft: &EntityPropertyDraft) -> bool {
@@ -55,7 +55,7 @@ impl InspectorSystem {
     pub(in super::super) fn render_entity_property_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
-        available_palettes: &BTreeMap<String, Palette4>,
+        available_palettes: &BTreeMap<String, Palette>,
         config: Option<&EditorConfig>,
         show_position: bool,
         allow_control_role_edit: bool,
@@ -145,7 +145,7 @@ impl InspectorSystem {
     pub(in super::super) fn render_scene_entity_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
-        available_palettes: &BTreeMap<String, Palette4>,
+        available_palettes: &BTreeMap<String, Palette>,
         config: Option<&EditorConfig>,
     ) -> bool {
         Self::render_entity_property_editor(
@@ -312,7 +312,7 @@ impl InspectorSystem {
     pub(in super::super) fn render_entity_definition_property_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
-        available_palettes: &BTreeMap<String, Palette4>,
+        available_palettes: &BTreeMap<String, Palette>,
         config: Option<&EditorConfig>,
     ) -> bool {
         Self::render_entity_property_editor(
@@ -330,7 +330,7 @@ impl InspectorSystem {
 fn render_palette_override_row(
     ui: &mut egui::Ui,
     draft: &mut EntityPropertyDraft,
-    available_palettes: &BTreeMap<String, Palette4>,
+    available_palettes: &BTreeMap<String, Palette>,
 ) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {

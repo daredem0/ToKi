@@ -2,7 +2,7 @@ use super::*;
 use crate::editor_sprite_preview::resolve_indexed_preview_palette;
 use toki_core::cache_utils::clone_cached_or_load;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
-use toki_core::palette::{recolor_indexed_image, Palette4};
+use toki_core::palette::{recolor_indexed_image, Palette};
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
@@ -41,7 +41,7 @@ impl SceneViewport {
         &mut self,
         texture_path: &std::path::Path,
         cache_key: &str,
-        palette: Palette4,
+        palette: &Palette,
     ) -> Result<DecodedImage, SpriteResolveError> {
         if let Some(image) = self.recolored_sprite_images.get(cache_key) {
             return Ok(image.clone());
@@ -221,7 +221,7 @@ impl SceneViewport {
                     };
 
                     let cache_key = format!("{}#palette={}", texture_path.display(), palette_id);
-                    match self.recolored_sprite_image(&texture_path, &cache_key, palette) {
+                    match self.recolored_sprite_image(&texture_path, &cache_key, &palette) {
                         Ok(image) => (Some(texture_path), Some(image), Some(cache_key)),
                         Err(error) => {
                             failures.push(SpriteResolveFailure {

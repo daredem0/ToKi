@@ -1,6 +1,7 @@
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
 };
+use crate::palette::PaletteSize;
 use crate::CoreError;
 use glam::UVec2;
 use serde::{Deserialize, Serialize};
@@ -55,6 +56,8 @@ pub struct AtlasMeta {
     pub color_mode: ColorMode,
     #[serde(default)]
     pub palette: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette_size: Option<PaletteSize>,
     pub tiles: HashMap<String, TileInfo>,
 }
 
@@ -73,6 +76,12 @@ impl AtlasMeta {
 
     pub fn is_palette_indexed(&self) -> bool {
         self.color_mode == ColorMode::PaletteIndexed
+    }
+
+    /// Returns the palette size this atlas expects, defaulting to `Pal4`
+    /// when not explicitly specified (backward compatibility).
+    pub fn effective_palette_size(&self) -> PaletteSize {
+        self.palette_size.unwrap_or(PaletteSize::Pal4)
     }
 
     pub fn image_size(&self) -> Option<UVec2> {
@@ -140,6 +149,7 @@ impl AtlasMeta {
             tile_size,
             color_mode: ColorMode::TrueColor,
             palette: None,
+            palette_size: None,
             tiles,
         }
     }
@@ -169,6 +179,7 @@ impl AtlasMeta {
             tile_size,
             color_mode: ColorMode::TrueColor,
             palette: None,
+            palette_size: None,
             tiles,
         }
     }

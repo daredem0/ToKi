@@ -9,7 +9,7 @@ use crate::ui::sprite_editor::{
 use crate::ui::EditorUI;
 use glam::UVec2;
 use toki_core::assets::atlas::ColorMode;
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 
 use super::canvas::invalidate_canvas_texture;
 
@@ -991,20 +991,19 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
     }
 }
 
-fn selected_palette(ui_state: &EditorUI) -> Option<Palette4> {
+fn selected_palette(ui_state: &EditorUI) -> Option<&Palette> {
     ui_state
         .sprite_editor_context()
         .sprite
         .selected_palette_id
         .as_ref()
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
-        .copied()
 }
 
 fn effective_paint_color(
     color_mode: ColorMode,
     foreground_color: crate::ui::editor_ui::PixelColor,
-    palette: Option<Palette4>,
+    palette: Option<&Palette>,
 ) -> crate::ui::editor_ui::PixelColor {
     if color_mode != ColorMode::PaletteIndexed {
         return foreground_color;
@@ -1096,7 +1095,7 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
 mod tests {
     use super::*;
     use crate::ui::editor_ui::PixelColor;
-    use toki_core::palette::Palette4;
+    use toki_core::palette::Palette;
 
     #[test]
     fn create_selection_includes_both_start_and_end_pixels() {
@@ -1130,18 +1129,22 @@ mod tests {
 
     #[test]
     fn effective_paint_color_maps_palette_display_color_back_to_canonical_slot() {
-        let palette = Palette4::new([
-            [10, 20, 30, 255],
-            [40, 50, 60, 255],
-            [70, 80, 90, 255],
-            [100, 110, 120, 255],
-        ]);
+        let palette = Palette::new(
+            toki_core::palette::PaletteSize::Pal4,
+            vec![
+                [10, 20, 30, 255],
+                [40, 50, 60, 255],
+                [70, 80, 90, 255],
+                [100, 110, 120, 255],
+            ],
+        )
+        .unwrap();
 
         assert_eq!(
             effective_paint_color(
                 ColorMode::PaletteIndexed,
                 PixelColor::rgb(70, 80, 90),
-                Some(palette),
+                Some(&palette),
             ),
             canonical_indexed_color(2)
         );

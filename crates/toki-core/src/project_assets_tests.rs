@@ -1,6 +1,6 @@
 use crate::assets::atlas::ColorMode;
 use crate::graphics::image::{load_image_rgba8, save_image_rgba8};
-use crate::palette::{save_palette_asset_to_path, validate_indexed_rgba8, Palette4};
+use crate::palette::{save_palette_asset_to_path, validate_indexed_rgba8, Palette, PaletteSize};
 use crate::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
     discover_project_scene_paths, discover_sprite_metadata, load_entity_definition_from_path,
@@ -151,12 +151,16 @@ fn discover_palette_assets_loads_palette_json_files() {
     let tmp = tempfile::tempdir().expect("tempdir");
     save_palette_asset_to_path(
         &tmp.path().join("forest.json"),
-        Palette4::new([
-            [1, 2, 3, 255],
-            [4, 5, 6, 255],
-            [7, 8, 9, 255],
-            [10, 11, 12, 255],
-        ]),
+        &Palette::new(
+            PaletteSize::Pal4,
+            vec![
+                [1, 2, 3, 255],
+                [4, 5, 6, 255],
+                [7, 8, 9, 255],
+                [10, 11, 12, 255],
+            ],
+        )
+        .unwrap(),
     )
     .expect("save palette");
 
@@ -164,7 +168,7 @@ fn discover_palette_assets_loads_palette_json_files() {
 
     assert_eq!(palettes.len(), 1);
     assert_eq!(palettes[0].name, "forest");
-    assert_eq!(palettes[0].palette.colors[0], [1, 2, 3, 255]);
+    assert_eq!(palettes[0].palette.color(0), [1, 2, 3, 255]);
 }
 
 #[test]
@@ -174,12 +178,16 @@ fn load_project_palettes_reads_palette_folder() {
     fs::create_dir_all(&palette_dir).expect("palette dir");
     save_palette_asset_to_path(
         &palette_dir.join("swamp.json"),
-        Palette4::new([
-            [8, 24, 8, 255],
-            [32, 72, 24, 255],
-            [96, 144, 56, 255],
-            [184, 216, 104, 255],
-        ]),
+        &Palette::new(
+            PaletteSize::Pal4,
+            vec![
+                [8, 24, 8, 255],
+                [32, 72, 24, 255],
+                [96, 144, 56, 255],
+                [184, 216, 104, 255],
+            ],
+        )
+        .unwrap(),
     )
     .expect("save palette");
 
@@ -570,12 +578,16 @@ indexed_palette_override = "gb_default"
 
     save_palette_asset_to_path(
         &project_root.join("palettes").join("sunset.json"),
-        Palette4::new([
-            [36, 18, 18, 255],
-            [120, 52, 36, 255],
-            [224, 120, 56, 255],
-            [255, 220, 140, 255],
-        ]),
+        &Palette::new(
+            PaletteSize::Pal4,
+            vec![
+                [36, 18, 18, 255],
+                [120, 52, 36, 255],
+                [224, 120, 56, 255],
+                [255, 220, 140, 255],
+            ],
+        )
+        .unwrap(),
     )
     .expect("palette write");
 
@@ -1032,7 +1044,7 @@ indexed_palette_override = "gb_default"
             .join("indexed_demo.png"),
     )
     .expect("indexed image should load");
-    let validation = validate_indexed_rgba8(&image.data);
+    let validation = validate_indexed_rgba8(&image.data, PaletteSize::Pal4);
     assert!(
         validation.is_valid(),
         "indexed example should only use canonical shades, got invalid colors: {:?}",

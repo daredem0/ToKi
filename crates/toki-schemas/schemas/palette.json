@@ -5,10 +5,16 @@
   "additionalProperties": false,
   "required": ["colors"],
   "properties": {
+    "size": {
+      "type": "integer",
+      "enum": [4, 8, 16, 32, 64, 256],
+      "default": 4,
+      "description": "Number of colors in the palette. Defaults to 4 when absent (backward compatibility)."
+    },
     "colors": {
       "type": "array",
       "minItems": 4,
-      "maxItems": 4,
+      "maxItems": 256,
       "items": {
         "type": "array",
         "minItems": 4,
@@ -18,7 +24,8 @@
           "minimum": 0,
           "maximum": 255
         }
-      }
+      },
+      "description": "Array of RGBA colors. Length must match the 'size' field."
     }
   }
 }

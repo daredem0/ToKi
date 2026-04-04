@@ -534,6 +534,7 @@ impl SpriteEditorState {
             } else {
                 None
             },
+            palette_size: None,
             tiles,
         }
     }

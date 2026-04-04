@@ -4,7 +4,7 @@ use crate::entity::{build_decoration_entity, DecorationSpec, EntityDefinition, E
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
 };
-use crate::palette::{load_palette_asset_from_path, Palette4};
+use crate::palette::{load_palette_asset_from_path, Palette};
 use crate::scene::Scene;
 use crate::ui_layout::UiLayoutAsset;
 use crate::CoreError;
@@ -88,7 +88,7 @@ pub struct DiscoveredSpriteMetadata {
 pub struct DiscoveredPaletteAsset {
     pub name: String,
     pub path: PathBuf,
-    pub palette: Palette4,
+    pub palette: Palette,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -503,7 +503,7 @@ pub fn discover_palette_assets(
 
 pub fn load_project_palettes(
     project_path: &Path,
-) -> Result<BTreeMap<String, Palette4>, ProjectAssetError> {
+) -> Result<BTreeMap<String, Palette>, ProjectAssetError> {
     let palette_dir = project_path.join("palettes");
     let discovered = discover_palette_assets(&palette_dir)?;
     Ok(discovered

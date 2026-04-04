@@ -103,6 +103,9 @@ pub fn export_hybrid_bundle(
                     .display
                     .indexed_palette_override
                     .clone(),
+                palette_mismatch_strategy: Some(
+                    project.metadata.runtime.display.palette_mismatch_strategy,
+                ),
                 post_process: Some(project.metadata.runtime.display.post_process.clone()),
                 resolution_width: Some(project.metadata.runtime.display.resolution_width),
                 resolution_height: Some(project.metadata.runtime.display.resolution_height),

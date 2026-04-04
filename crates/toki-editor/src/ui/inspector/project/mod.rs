@@ -16,7 +16,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use toki_core::dialog::{DialogCondition, DialogNodeKind};
-use toki_core::palette::{save_palette_asset_to_path, Palette4};
+use toki_core::palette::{
+    save_palette_asset_to_path, Palette, PaletteMismatchStrategy, PaletteSize,
+};
 use toki_core::project_assets::load_project_palettes;
 
 impl InspectorSystem {
@@ -87,7 +89,7 @@ impl InspectorSystem {
     }
 }
 
-fn load_project_palette_files(project: &Project) -> BTreeMap<String, Palette4> {
+fn load_project_palette_files(project: &Project) -> BTreeMap<String, Palette> {
     load_project_palettes(&project.path).unwrap_or_else(|error| {
         tracing::warn!(
             "Failed to load project palettes from '{}': {}",
@@ -108,7 +110,7 @@ fn project_palette_file_path(project: &Project, palette_id: &str) -> PathBuf {
 fn save_project_palette_file(
     project: &Project,
     palette_id: &str,
-    palette: Palette4,
+    palette: &Palette,
 ) -> anyhow::Result<()> {
     let path = project_palette_file_path(project, palette_id);
     save_palette_asset_to_path(&path, palette).map_err(anyhow::Error::from)

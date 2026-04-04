@@ -46,6 +46,7 @@ impl EditorUI {
                         }
 
                         self.render_entity_palette_section(ui, config);
+                        self.render_palette_assets_section(ui);
                     });
             });
     }

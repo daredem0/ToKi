@@ -198,12 +198,16 @@ impl GpuState {
             tint_strength_percent: 0,
             brightness_percent: 0,
             saturation_percent: 100,
-            quantize_palette: toki_core::palette::Palette4::new([
-                [0x11, 0x11, 0x11, 0xFF],
-                [0x55, 0x55, 0x55, 0xFF],
-                [0xAA, 0xAA, 0xAA, 0xFF],
-                [0xF0, 0xF0, 0xF0, 0xFF],
-            ]),
+            quantize_palette: toki_core::palette::Palette::new(
+                toki_core::palette::PaletteSize::Pal4,
+                vec![
+                    [0x11, 0x11, 0x11, 0xFF],
+                    [0x55, 0x55, 0x55, 0xFF],
+                    [0xAA, 0xAA, 0xAA, 0xFF],
+                    [0xF0, 0xF0, 0xF0, 0xFF],
+                ],
+            )
+            .expect("hard-coded default palette"),
             gb_contrast_percent: 0,
             vignette_strength_percent: 60,
         }

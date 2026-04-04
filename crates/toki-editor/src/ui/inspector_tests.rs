@@ -549,6 +549,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         movement_mix_percent: 55,
         collision_mix_percent: 35,
         indexed_palette_override: None,
+        palette_mismatch_strategy: toki_core::palette::PaletteMismatchStrategy::Lenient,
         post_process_mode: toki_core::project_runtime::PostProcessMode::None,
         post_process_quantize_strategy: toki_core::project_runtime::QuantizeStrategy::Luminance,
         post_process_tint_color: [32, 64, 96, 255],
@@ -1451,6 +1452,7 @@ fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
         tile_size: UVec2::new(8, 8),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     };
 

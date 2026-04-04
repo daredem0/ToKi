@@ -8,7 +8,7 @@ use super::{
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use toki_core::assets::atlas::ColorMode;
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 
 /// Sprite editor state
 pub struct SpriteEditorState {
@@ -148,7 +148,7 @@ impl Default for SpriteEditorState {
 }
 
 impl SpriteEditorState {
-    pub fn sync_palette_selection(&mut self, available_palettes: &BTreeMap<String, Palette4>) {
+    pub fn sync_palette_selection(&mut self, available_palettes: &BTreeMap<String, Palette>) {
         if self.color_mode != ColorMode::PaletteIndexed {
             self.selected_palette_id = None;
             return;
@@ -166,9 +166,11 @@ impl SpriteEditorState {
             .selected_palette_id
             .as_ref()
             .and_then(|palette_id| available_palettes.get(palette_id))
-            .copied();
+            .cloned();
 
-        if indexed_slot_for_authored_color(self.foreground_color, selected_palette).is_none() {
+        if indexed_slot_for_authored_color(self.foreground_color, selected_palette.as_ref())
+            .is_none()
+        {
             self.foreground_color = canonical_indexed_color(3);
         }
     }

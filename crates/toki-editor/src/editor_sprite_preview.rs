@@ -3,15 +3,15 @@ use std::path::Path;
 
 use toki_core::assets::atlas::ColorMode;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
-use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette4};
+use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette};
 
 pub fn resolve_indexed_preview_palette(
     color_mode: ColorMode,
-    available_palettes: &BTreeMap<String, Palette4>,
+    available_palettes: &BTreeMap<String, Palette>,
     global_override: Option<&str>,
     local_override: Option<&str>,
     atlas_palette: Option<&str>,
-) -> Result<Option<(String, Palette4)>, String> {
+) -> Result<Option<(String, Palette)>, String> {
     if color_mode != ColorMode::PaletteIndexed {
         return Ok(None);
     }
@@ -49,7 +49,7 @@ pub fn texture_preview_cache_key(
 pub fn load_texture_preview_image(
     texture_path: &Path,
     color_mode: ColorMode,
-    available_palettes: &BTreeMap<String, Palette4>,
+    available_palettes: &BTreeMap<String, Palette>,
     global_override: Option<&str>,
     local_override: Option<&str>,
     atlas_palette: Option<&str>,
@@ -66,7 +66,7 @@ pub fn load_texture_preview_image(
         return Ok((decoded, None));
     };
 
-    let recolored = recolor_indexed_image(&decoded, palette).map_err(|error| error.to_string())?;
+    let recolored = recolor_indexed_image(&decoded, &palette).map_err(|error| error.to_string())?;
     Ok((recolored, Some(palette_id)))
 }
 
@@ -74,11 +74,15 @@ pub fn load_texture_preview_image(
 mod tests {
     use super::*;
     use toki_core::graphics::image::save_image_rgba8;
+    use toki_core::palette::PaletteSize;
 
     #[test]
     fn resolve_indexed_preview_palette_prefers_global_override() {
         let mut palettes = toki_core::palette::builtin_palettes();
-        palettes.insert("custom".to_string(), Palette4::new([[1, 2, 3, 255]; 4]));
+        palettes.insert(
+            "custom".to_string(),
+            Palette::new(PaletteSize::Pal4, vec![[1, 2, 3, 255]; 4]).unwrap(),
+        );
 
         let resolved = resolve_indexed_preview_palette(
             ColorMode::PaletteIndexed,
@@ -91,7 +95,7 @@ mod tests {
         .expect("indexed preview should need a palette");
 
         assert_eq!(resolved.0, "custom");
-        assert_eq!(resolved.1.colors, [[1, 2, 3, 255]; 4]);
+        assert_eq!(resolved.1.colors(), &[[1, 2, 3, 255]; 4]);
     }
 
     #[test]

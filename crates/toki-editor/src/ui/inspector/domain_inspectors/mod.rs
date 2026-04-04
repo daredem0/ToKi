@@ -6,6 +6,7 @@ mod entity;
 mod entity_definition;
 mod map;
 mod menu;
+mod palette;
 mod rule_graph_node;
 mod scene;
 mod scene_anchor;
@@ -20,6 +21,7 @@ pub use entity::EntityInspector;
 pub use entity_definition::EntityDefinitionInspector;
 pub use map::MapInspector;
 pub use menu::MenuSelectionInspector;
+pub use palette::PaletteInspector;
 pub use rule_graph_node::RuleGraphNodeInspector;
 pub use scene::SceneInspector;
 pub use scene_anchor::SceneAnchorInspector;
@@ -61,6 +63,7 @@ pub fn create_inspector_for_selection(selection: Option<&Selection>) -> Box<dyn 
         Some(Selection::MenuScreen(_))
         | Some(Selection::MenuDialog(_))
         | Some(Selection::MenuEntry { .. }) => Box::new(MenuSelectionInspector),
+        Some(Selection::Palette(palette_id)) => Box::new(PaletteInspector::new(palette_id.clone())),
         None => Box::new(NoSelectionInspector),
     }
 }

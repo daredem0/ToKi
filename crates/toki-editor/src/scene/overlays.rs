@@ -7,7 +7,7 @@ use crate::scene::viewport::{DragPreviewSprite, OverlayLineInstance, OverlaySpri
 use std::collections::BTreeMap;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::entity::{ControlRole, Entity};
-use toki_core::palette::Palette4;
+use toki_core::palette::Palette;
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::Scene;
 
@@ -28,7 +28,7 @@ pub fn cached_preview_sprite_frame(
     entity_def_name: &str,
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
-    available_palettes: &BTreeMap<String, Palette4>,
+    available_palettes: &BTreeMap<String, Palette>,
     indexed_palette_override: Option<&str>,
 ) -> Option<PlacementPreviewVisual> {
     let cache_key = (
@@ -72,7 +72,7 @@ pub fn load_preview_sprite_frame(
     entity_def_name: &str,
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
-    available_palettes: &BTreeMap<String, Palette4>,
+    available_palettes: &BTreeMap<String, Palette>,
     indexed_palette_override: Option<&str>,
 ) -> Option<PlacementPreviewVisual> {
     tracing::info!(
@@ -325,7 +325,7 @@ pub fn build_scene_player_overlay_sprites(
         (std::path::PathBuf, String, Option<String>),
         Option<PlacementPreviewVisual>,
     >,
-    available_palettes: &BTreeMap<String, Palette4>,
+    available_palettes: &BTreeMap<String, Palette>,
     indexed_palette_override: Option<&str>,
 ) -> Vec<OverlaySpriteInstance> {
     let Some(active_scene_name) = active_scene_name else {

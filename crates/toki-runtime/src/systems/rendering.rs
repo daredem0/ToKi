@@ -483,7 +483,7 @@ impl RenderingSystem {
                                 error
                             );
                         })?;
-                        recolor_indexed_image(&decoded, *palette).map_err(|error| {
+                        recolor_indexed_image(&decoded, palette).map_err(|error| {
                             tracing::warn!(
                                 "Indexed sprite texture '{}' failed validation for palette '{}': {}",
                                 texture_path.display(),

@@ -61,30 +61,38 @@ fn canonical_indexed_color_returns_expected_shades() {
 
 #[test]
 fn indexed_slot_for_authored_color_matches_palette_display_colors() {
-    let palette = toki_core::palette::Palette4::new([
-        [10, 20, 30, 255],
-        [40, 50, 60, 255],
-        [70, 80, 90, 255],
-        [100, 110, 120, 255],
-    ]);
+    let palette = toki_core::palette::Palette::new(
+        toki_core::palette::PaletteSize::Pal4,
+        vec![
+            [10, 20, 30, 255],
+            [40, 50, 60, 255],
+            [70, 80, 90, 255],
+            [100, 110, 120, 255],
+        ],
+    )
+    .unwrap();
 
     assert_eq!(
-        indexed_slot_for_authored_color(PixelColor::rgb(70, 80, 90), Some(palette)),
+        indexed_slot_for_authored_color(PixelColor::rgb(70, 80, 90), Some(&palette)),
         Some(2)
     );
 }
 
 #[test]
 fn nearest_palette_slot_prefers_closest_palette_color() {
-    let palette = toki_core::palette::Palette4::new([
-        [0, 0, 0, 255],
-        [32, 32, 32, 255],
-        [128, 128, 128, 255],
-        [255, 255, 255, 255],
-    ]);
+    let palette = toki_core::palette::Palette::new(
+        toki_core::palette::PaletteSize::Pal4,
+        vec![
+            [0, 0, 0, 255],
+            [32, 32, 32, 255],
+            [128, 128, 128, 255],
+            [255, 255, 255, 255],
+        ],
+    )
+    .unwrap();
 
     assert_eq!(
-        nearest_palette_slot(PixelColor::rgb(120, 130, 125), palette),
+        nearest_palette_slot(PixelColor::rgb(120, 130, 125), &palette),
         2
     );
 }
@@ -618,18 +626,22 @@ fn sprite_editor_state_push_undo_state_ignores_no_op_edits() {
 fn sprite_editor_state_convert_active_canvas_to_palette_maps_pixels_and_records_undo() {
     let mut state = SpriteEditorState::default();
     state.new_canvas(2, 1);
-    let palette = toki_core::palette::Palette4::new([
-        [0, 0, 0, 255],
-        [64, 64, 64, 255],
-        [128, 128, 128, 255],
-        [255, 255, 255, 255],
-    ]);
+    let palette = toki_core::palette::Palette::new(
+        toki_core::palette::PaletteSize::Pal4,
+        vec![
+            [0, 0, 0, 255],
+            [64, 64, 64, 255],
+            [128, 128, 128, 255],
+            [255, 255, 255, 255],
+        ],
+    )
+    .unwrap();
 
     let canvas = state.active_mut().canvas.as_mut().unwrap();
     canvas.set_pixel(0, 0, PixelColor::rgb(70, 70, 70));
     canvas.set_pixel(1, 0, PixelColor::new(250, 250, 250, 128));
 
-    assert!(state.convert_active_canvas_to_palette(palette));
+    assert!(state.convert_active_canvas_to_palette(&palette));
     assert_eq!(
         state.active().canvas.as_ref().unwrap().get_pixel(0, 0),
         Some(canonical_indexed_color(1))
@@ -651,12 +663,16 @@ fn sprite_editor_state_convert_active_canvas_to_palette_maps_pixels_and_records_
 fn sprite_editor_state_convert_active_canvas_to_palette_is_no_op_when_already_canonical() {
     let mut state = SpriteEditorState::default();
     state.new_canvas(1, 1);
-    let palette = toki_core::palette::Palette4::new([
-        [10, 20, 30, 255],
-        [40, 50, 60, 255],
-        [70, 80, 90, 255],
-        [100, 110, 120, 255],
-    ]);
+    let palette = toki_core::palette::Palette::new(
+        toki_core::palette::PaletteSize::Pal4,
+        vec![
+            [10, 20, 30, 255],
+            [40, 50, 60, 255],
+            [70, 80, 90, 255],
+            [100, 110, 120, 255],
+        ],
+    )
+    .unwrap();
 
     state
         .active_mut()
@@ -665,7 +681,7 @@ fn sprite_editor_state_convert_active_canvas_to_palette_is_no_op_when_already_ca
         .unwrap()
         .set_pixel(0, 0, canonical_indexed_color(2));
 
-    assert!(!state.convert_active_canvas_to_palette(palette));
+    assert!(!state.convert_active_canvas_to_palette(&palette));
     assert!(!state.active().history.can_undo());
 }
 
@@ -1009,15 +1025,10 @@ fn sprite_editor_state_sync_palette_selection_keeps_valid_loaded_palette() {
         ..Default::default()
     };
 
+    let builtins = toki_core::palette::builtin_palettes();
     let palettes = std::collections::BTreeMap::from([
-        (
-            "gb_default".to_string(),
-            toki_core::palette::builtin_palettes()["gb_default"],
-        ),
-        (
-            "sepia".to_string(),
-            toki_core::palette::builtin_palettes()["sepia"],
-        ),
+        ("gb_default".to_string(), builtins["gb_default"].clone()),
+        ("sepia".to_string(), builtins["sepia"].clone()),
     ]);
 
     state.sync_palette_selection(&palettes);
@@ -1033,15 +1044,10 @@ fn sprite_editor_state_sync_palette_selection_falls_back_to_first_available_pale
         ..Default::default()
     };
 
+    let builtins = toki_core::palette::builtin_palettes();
     let palettes = std::collections::BTreeMap::from([
-        (
-            "gb_default".to_string(),
-            toki_core::palette::builtin_palettes()["gb_default"],
-        ),
-        (
-            "sepia".to_string(),
-            toki_core::palette::builtin_palettes()["sepia"],
-        ),
+        ("gb_default".to_string(), builtins["gb_default"].clone()),
+        ("sepia".to_string(), builtins["sepia"].clone()),
     ]);
 
     state.sync_palette_selection(&palettes);

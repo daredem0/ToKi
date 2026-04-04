@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use toki_core::palette::Palette4;
+use toki_core::palette::{Palette, PaletteSize};
 use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 use wgpu::util::DeviceExt;
 
@@ -50,11 +50,17 @@ fn color_to_vec4(color: [u8; 4]) -> [f32; 4] {
     ]
 }
 
-fn palette_to_uniform(palette: Palette4) -> [[f32; 4]; 4] {
-    palette.colors.map(color_to_vec4)
+fn palette_to_uniform(palette: &Palette) -> [[f32; 4]; 4] {
+    let colors = palette.colors();
+    [
+        color_to_vec4(colors[0]),
+        color_to_vec4(colors[1]),
+        color_to_vec4(colors[2]),
+        color_to_vec4(colors[3]),
+    ]
 }
 
-fn build_uniforms(settings: ResolvedPostProcessSettings) -> PostProcessUniforms {
+fn build_uniforms(settings: &ResolvedPostProcessSettings) -> PostProcessUniforms {
     PostProcessUniforms {
         mode: shader_mode(settings.mode),
         quantize_strategy: shader_quantize_strategy(settings.quantize_strategy),
@@ -69,7 +75,7 @@ fn build_uniforms(settings: ResolvedPostProcessSettings) -> PostProcessUniforms 
         _padding3: 0.0,
         _padding4: 0.0,
         _padding5: 0.0,
-        quantize_palette: palette_to_uniform(settings.quantize_palette),
+        quantize_palette: palette_to_uniform(&settings.quantize_palette),
     }
 }
 
@@ -105,10 +111,10 @@ fn rgb_distance_sq(lhs: [f32; 3], rhs: [f32; 3]) -> f32 {
 }
 
 #[cfg(test)]
-fn nearest_palette_color(rgb: [f32; 3], palette: Palette4) -> [u8; 4] {
-    let mut best = palette.colors[0];
+fn nearest_palette_color(rgb: [f32; 3], palette: &Palette) -> [u8; 4] {
+    let mut best = palette.color(0);
     let mut best_distance = f32::MAX;
-    for color in palette.colors {
+    for &color in palette.colors() {
         let candidate_rgb = [
             color[0] as f32 / 255.0,
             color[1] as f32 / 255.0,
@@ -170,7 +176,7 @@ fn apply_vignette(rgb: [f32; 3], uv: [f32; 2], strength: f32) -> [f32; 3] {
 
 #[cfg(test)]
 pub(crate) fn apply_post_process_pixel(
-    settings: ResolvedPostProcessSettings,
+    settings: &ResolvedPostProcessSettings,
     color: [u8; 4],
 ) -> [u8; 4] {
     apply_post_process_pixel_at(settings, color, [0, 0], [0.5, 0.5])
@@ -178,7 +184,7 @@ pub(crate) fn apply_post_process_pixel(
 
 #[cfg(test)]
 pub(crate) fn apply_post_process_pixel_at(
-    settings: ResolvedPostProcessSettings,
+    settings: &ResolvedPostProcessSettings,
     color: [u8; 4],
     pixel: [u32; 2],
     uv: [f32; 2],
@@ -228,36 +234,40 @@ pub(crate) fn apply_post_process_pixel_at(
             let target = match settings.quantize_strategy {
                 QuantizeStrategy::Luminance => {
                     let index = quantize_index(luminance(rgb));
-                    settings.quantize_palette.colors[index]
+                    settings.quantize_palette.color(index)
                 }
                 QuantizeStrategy::RgbDistance => {
-                    nearest_palette_color(rgb, settings.quantize_palette)
+                    nearest_palette_color(rgb, &settings.quantize_palette)
                 }
             };
             [target[0], target[1], target[2], alpha]
         }
         PostProcessMode::OrderedDitherQuantize => {
             let index = ordered_dither_quantize_index(luminance(rgb), pixel);
-            let target = settings.quantize_palette.colors[index];
+            let target = settings.quantize_palette.color(index);
             [target[0], target[1], target[2], alpha]
         }
         PostProcessMode::GbPalette => {
-            let gb_palette = Palette4::new([
-                [0x0F, 0x38, 0x0F, 0xFF],
-                [0x30, 0x62, 0x30, 0xFF],
-                [0x8B, 0xAC, 0x0F, 0xFF],
-                [0x9B, 0xBC, 0x0F, 0xFF],
-            ]);
+            let gb_palette = Palette::new(
+                PaletteSize::Pal4,
+                vec![
+                    [0x0F, 0x38, 0x0F, 0xFF],
+                    [0x30, 0x62, 0x30, 0xFF],
+                    [0x8B, 0xAC, 0x0F, 0xFF],
+                    [0x9B, 0xBC, 0x0F, 0xFF],
+                ],
+            )
+            .expect("hard-coded GB palette");
             let contrast = settings.gb_contrast_percent.clamp(-100, 100) as f32 / 100.0;
             let target = match settings.quantize_strategy {
                 QuantizeStrategy::Luminance => {
                     let lum = apply_contrast(luminance(rgb), contrast);
                     let index = quantize_index(lum);
-                    gb_palette.colors[index]
+                    gb_palette.color(index)
                 }
                 QuantizeStrategy::RgbDistance => {
                     let adjusted = apply_contrast_rgb(rgb, contrast);
-                    nearest_palette_color(adjusted, gb_palette)
+                    nearest_palette_color(adjusted, &gb_palette)
                 }
             };
             [target[0], target[1], target[2], alpha]
@@ -361,19 +371,23 @@ impl PostProcessPipeline {
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Post Process Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[build_uniforms(ResolvedPostProcessSettings {
+            contents: bytemuck::cast_slice(&[build_uniforms(&ResolvedPostProcessSettings {
                 mode: PostProcessMode::None,
                 quantize_strategy: QuantizeStrategy::Luminance,
                 tint_color: [0, 0, 0, 255],
                 tint_strength_percent: 0,
                 brightness_percent: 0,
                 saturation_percent: 100,
-                quantize_palette: Palette4::new([
-                    [0, 0, 0, 255],
-                    [85, 85, 85, 255],
-                    [170, 170, 170, 255],
-                    [255, 255, 255, 255],
-                ]),
+                quantize_palette: Palette::new(
+                    PaletteSize::Pal4,
+                    vec![
+                        [0, 0, 0, 255],
+                        [85, 85, 85, 255],
+                        [170, 170, 170, 255],
+                        [255, 255, 255, 255],
+                    ],
+                )
+                .expect("hard-coded default palette"),
                 gb_contrast_percent: 0,
                 vignette_strength_percent: 60,
             })]),
@@ -397,7 +411,7 @@ impl PostProcessPipeline {
         }
     }
 
-    pub fn update_settings(&mut self, queue: &wgpu::Queue, settings: ResolvedPostProcessSettings) {
+    pub fn update_settings(&mut self, queue: &wgpu::Queue, settings: &ResolvedPostProcessSettings) {
         queue.write_buffer(
             &self.uniform_buffer,
             0,
@@ -445,7 +459,7 @@ mod tests {
     use super::{
         apply_post_process_pixel, apply_post_process_pixel_at, quantize_index, PostProcessUniforms,
     };
-    use toki_core::palette::Palette4;
+    use toki_core::palette::{Palette, PaletteSize};
     use toki_core::project_runtime::{
         PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings,
     };
@@ -458,12 +472,16 @@ mod tests {
             tint_strength_percent: 50,
             brightness_percent: 0,
             saturation_percent: 100,
-            quantize_palette: Palette4::new([
-                [10, 10, 10, 255],
-                [80, 80, 80, 255],
-                [160, 160, 160, 255],
-                [240, 240, 240, 255],
-            ]),
+            quantize_palette: Palette::new(
+                PaletteSize::Pal4,
+                vec![
+                    [10, 10, 10, 255],
+                    [80, 80, 80, 255],
+                    [160, 160, 160, 255],
+                    [240, 240, 240, 255],
+                ],
+            )
+            .expect("test palette"),
             gb_contrast_percent: 10,
             vignette_strength_percent: 60,
         }
@@ -480,7 +498,7 @@ mod tests {
     #[test]
     fn tint_post_process_blends_toward_tint_color() {
         let output =
-            apply_post_process_pixel(settings(PostProcessMode::Tint), [100, 100, 100, 255]);
+            apply_post_process_pixel(&settings(PostProcessMode::Tint), [100, 100, 100, 255]);
         assert!(output[2] > output[0]);
         assert_eq!(output[3], 255);
     }
@@ -488,7 +506,7 @@ mod tests {
     #[test]
     fn quantize_post_process_maps_to_palette_colors() {
         let output =
-            apply_post_process_pixel(settings(PostProcessMode::Quantize4), [220, 220, 220, 255]);
+            apply_post_process_pixel(&settings(PostProcessMode::Quantize4), [220, 220, 220, 255]);
         assert_eq!(output, [240, 240, 240, 255]);
     }
 
@@ -497,7 +515,7 @@ mod tests {
         let mut post = settings(PostProcessMode::BrightnessSaturation);
         post.brightness_percent = 20;
         post.saturation_percent = 150;
-        let output = apply_post_process_pixel(post, [120, 90, 60, 255]);
+        let output = apply_post_process_pixel(&post, [120, 90, 60, 255]);
         assert!(output[0] > 120);
         assert!(output[0] > output[1]);
         assert!(output[1] > output[2]);
@@ -507,13 +525,13 @@ mod tests {
     fn ordered_dither_quantize_uses_pixel_position() {
         let color = [125, 125, 125, 255];
         let low = apply_post_process_pixel_at(
-            settings(PostProcessMode::OrderedDitherQuantize),
+            &settings(PostProcessMode::OrderedDitherQuantize),
             color,
             [0, 0],
             [0.2, 0.2],
         );
         let high = apply_post_process_pixel_at(
-            settings(PostProcessMode::OrderedDitherQuantize),
+            &settings(PostProcessMode::OrderedDitherQuantize),
             color,
             [0, 1],
             [0.2, 0.2],
@@ -524,20 +542,20 @@ mod tests {
     #[test]
     fn gb_post_process_preserves_alpha() {
         let output =
-            apply_post_process_pixel(settings(PostProcessMode::GbPalette), [150, 100, 60, 120]);
+            apply_post_process_pixel(&settings(PostProcessMode::GbPalette), [150, 100, 60, 120]);
         assert_eq!(output[3], 120);
     }
 
     #[test]
     fn vignette_darkens_edges_more_than_center() {
         let center = apply_post_process_pixel_at(
-            settings(PostProcessMode::Vignette),
+            &settings(PostProcessMode::Vignette),
             [180, 180, 180, 255],
             [0, 0],
             [0.5, 0.5],
         );
         let edge = apply_post_process_pixel_at(
-            settings(PostProcessMode::Vignette),
+            &settings(PostProcessMode::Vignette),
             [180, 180, 180, 255],
             [0, 0],
             [0.0, 0.0],
@@ -549,8 +567,8 @@ mod tests {
     fn quantize_rgb_distance_keeps_exact_palette_color_stable() {
         let mut post = settings(PostProcessMode::Quantize4);
         post.quantize_strategy = QuantizeStrategy::RgbDistance;
-        let color = post.quantize_palette.colors[2];
-        let output = apply_post_process_pixel(post, color);
+        let color = post.quantize_palette.color(2);
+        let output = apply_post_process_pixel(&post, color);
         assert_eq!(output, color);
     }
 
@@ -559,7 +577,7 @@ mod tests {
         let mut post = settings(PostProcessMode::GbPalette);
         post.quantize_strategy = QuantizeStrategy::RgbDistance;
         let color = [0x8B, 0xAC, 0x0F, 0xFF];
-        let output = apply_post_process_pixel(post, color);
+        let output = apply_post_process_pixel(&post, color);
         assert_eq!(output, color);
     }
 

@@ -1,5 +1,5 @@
 use crate::menu::{DialogThemeOverride, MenuSettings};
-use crate::palette::{resolve_palette, Palette4};
+use crate::palette::{resolve_palette, Palette, PaletteMismatchStrategy, PaletteSize};
 use crate::ui_layout::UiTheme;
 use crate::FlagValue;
 use serde::{Deserialize, Serialize};
@@ -161,7 +161,7 @@ pub enum QuantizeStrategy {
     RgbDistance,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedPostProcessSettings {
     pub mode: PostProcessMode,
     pub quantize_strategy: QuantizeStrategy,
@@ -169,7 +169,7 @@ pub struct ResolvedPostProcessSettings {
     pub tint_strength_percent: u8,
     pub brightness_percent: i16,
     pub saturation_percent: u8,
-    pub quantize_palette: Palette4,
+    pub quantize_palette: Palette,
     pub gb_contrast_percent: i16,
     pub vignette_strength_percent: u8,
 }
@@ -215,16 +215,11 @@ impl Default for RuntimePostProcessSettings {
 impl RuntimePostProcessSettings {
     pub fn resolve(
         &self,
-        project_palettes: &BTreeMap<String, Palette4>,
+        project_palettes: &BTreeMap<String, Palette>,
     ) -> ResolvedPostProcessSettings {
         let quantize_palette = resolve_palette(&self.quantize_palette_id, project_palettes)
             .or_else(|| resolve_palette("gray", project_palettes))
-            .unwrap_or(Palette4::new([
-                [0x11, 0x11, 0x11, 0xFF],
-                [0x55, 0x55, 0x55, 0xFF],
-                [0xAA, 0xAA, 0xAA, 0xFF],
-                [0xF0, 0xF0, 0xF0, 0xFF],
-            ]));
+            .unwrap_or_else(|| Palette::grayscale(PaletteSize::Pal4));
 
         ResolvedPostProcessSettings {
             mode: self.mode,
@@ -286,6 +281,8 @@ pub struct RuntimeDisplaySettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub indexed_palette_override: Option<String>,
     #[serde(default)]
+    pub palette_mismatch_strategy: PaletteMismatchStrategy,
+    #[serde(default)]
     pub post_process: RuntimePostProcessSettings,
     /// Viewport width in pixels (defaults to preset resolution)
     #[serde(default = "default_resolution_width")]
@@ -316,6 +313,7 @@ impl Default for RuntimeDisplaySettings {
             show_entity_health_bars: false,
             show_ground_shadows: default_show_ground_shadows(),
             indexed_palette_override: None,
+            palette_mismatch_strategy: PaletteMismatchStrategy::default(),
             post_process: RuntimePostProcessSettings::default(),
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
@@ -402,6 +400,8 @@ pub struct RuntimeConfigDisplay {
     pub show_ground_shadows: Option<bool>,
     #[serde(default)]
     pub indexed_palette_override: Option<String>,
+    #[serde(default)]
+    pub palette_mismatch_strategy: Option<PaletteMismatchStrategy>,
     #[serde(default)]
     pub post_process: Option<RuntimePostProcessSettings>,
     #[serde(default)]

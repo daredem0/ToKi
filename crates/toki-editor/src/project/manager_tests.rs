@@ -639,6 +639,7 @@ fn test_atlas() -> AtlasMeta {
         tile_size: glam::UVec2::new(16, 16),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     }
 }

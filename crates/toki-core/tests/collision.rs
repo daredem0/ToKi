@@ -88,6 +88,7 @@ fn create_collision_test_atlas() -> AtlasMeta {
         tile_size: UVec2::new(16, 16),
         color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     }
 }

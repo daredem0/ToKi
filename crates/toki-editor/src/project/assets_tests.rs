@@ -1,7 +1,7 @@
 use super::{ProjectAssets, ProjectAudioAssetKind};
 use std::fs;
 use tempfile::tempdir;
-use toki_core::palette::{save_palette_asset_to_path, Palette4};
+use toki_core::palette::{save_palette_asset_to_path, Palette, PaletteSize};
 use toki_core::ui_layout::{UiLayoutAsset, UiWidgetNode};
 
 #[test]
@@ -115,22 +115,30 @@ fn load_project_palettes_reads_palette_json_files() {
 
     save_palette_asset_to_path(
         &palettes_dir.join("forest.json"),
-        Palette4::new([
-            [1, 2, 3, 255],
-            [4, 5, 6, 255],
-            [7, 8, 9, 255],
-            [10, 11, 12, 255],
-        ]),
+        &Palette::new(
+            PaletteSize::Pal4,
+            vec![
+                [1, 2, 3, 255],
+                [4, 5, 6, 255],
+                [7, 8, 9, 255],
+                [10, 11, 12, 255],
+            ],
+        )
+        .unwrap(),
     )
     .expect("palette write");
     save_palette_asset_to_path(
         &palettes_dir.join("night.json"),
-        Palette4::new([
-            [11, 12, 13, 255],
-            [14, 15, 16, 255],
-            [17, 18, 19, 255],
-            [20, 21, 22, 255],
-        ]),
+        &Palette::new(
+            PaletteSize::Pal4,
+            vec![
+                [11, 12, 13, 255],
+                [14, 15, 16, 255],
+                [17, 18, 19, 255],
+                [20, 21, 22, 255],
+            ],
+        )
+        .unwrap(),
     )
     .expect("palette write");
 
@@ -153,12 +161,16 @@ fn scan_assets_discovers_palette_files() {
     fs::create_dir_all(&palettes_dir).expect("palettes dir should be created");
     save_palette_asset_to_path(
         &palettes_dir.join("swamp.json"),
-        Palette4::new([
-            [8, 24, 8, 255],
-            [32, 72, 24, 255],
-            [96, 144, 56, 255],
-            [184, 216, 104, 255],
-        ]),
+        &Palette::new(
+            PaletteSize::Pal4,
+            vec![
+                [8, 24, 8, 255],
+                [32, 72, 24, 255],
+                [96, 144, 56, 255],
+                [184, 216, 104, 255],
+            ],
+        )
+        .unwrap(),
     )
     .expect("palette write");
 

@@ -200,6 +200,7 @@ fn test_atlas() -> AtlasMeta {
         tile_size: UVec2::new(8, 8),
         color_mode: ColorMode::TrueColor,
         palette: None,
+        palette_size: None,
         tiles,
     }
 }

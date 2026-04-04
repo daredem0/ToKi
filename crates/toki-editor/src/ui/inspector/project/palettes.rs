@@ -51,6 +51,35 @@ pub(super) fn render_palettes_section(
                 });
         });
 
+        ui.horizontal(|ui| {
+            ui.label("Size Mismatch:");
+            egui::ComboBox::from_id_salt("palette_mismatch_strategy")
+                .selected_text(match draft.palette_mismatch_strategy {
+                    PaletteMismatchStrategy::Lenient => "Lenient",
+                    PaletteMismatchStrategy::Interpolate => "Interpolate",
+                })
+                .show_ui(ui, |ui| {
+                    outcome.changed |= ui
+                        .selectable_value(
+                            &mut draft.palette_mismatch_strategy,
+                            PaletteMismatchStrategy::Lenient,
+                            "Lenient",
+                        )
+                        .on_hover_text("Use palette as-is; unmapped shades keep canonical gray.")
+                        .changed();
+                    outcome.changed |= ui
+                        .selectable_value(
+                            &mut draft.palette_mismatch_strategy,
+                            PaletteMismatchStrategy::Interpolate,
+                            "Interpolate",
+                        )
+                        .on_hover_text(
+                            "Stretch palette to target size by interpolating the color ramp.",
+                        )
+                        .changed();
+                });
+        });
+
         ui.separator();
         ui.label("Built-in palettes are always available.");
         ui.separator();
@@ -61,17 +90,17 @@ pub(super) fn render_palettes_section(
         for palette_id in project_palettes.keys().cloned().collect::<Vec<_>>() {
             let mut palette = project_palettes
                 .get(&palette_id)
-                .copied()
-                .unwrap_or(Palette4::new([[0, 0, 0, 255]; 4]));
+                .cloned()
+                .unwrap_or_else(|| Palette::grayscale(PaletteSize::Pal4));
             ui.group(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(&palette_id);
+                    ui.label(format!("{} ({})", &palette_id, palette.size()));
                     if ui.button("Remove").clicked() {
                         remove_palette_id = Some(palette_id.clone());
                     }
                 });
-                ui.horizontal(|ui| {
-                    for color in &mut palette.colors {
+                ui.horizontal_wrapped(|ui| {
+                    for color in palette.colors_mut() {
                         let mut color32 = egui::Color32::from_rgba_unmultiplied(
                             color[0], color[1], color[2], color[3],
                         );
@@ -82,8 +111,8 @@ pub(super) fn render_palettes_section(
                     }
                 });
             });
-            if project_palettes.get(&palette_id).copied() != Some(palette) {
-                match save_project_palette_file(project, &palette_id, palette) {
+            if project_palettes.get(&palette_id) != Some(&palette) {
+                match save_project_palette_file(project, &palette_id, &palette) {
                     Ok(()) => {
                         project_palettes.insert(palette_id.clone(), palette);
                         outcome.palette_files_changed = true;
@@ -121,33 +150,65 @@ pub(super) fn render_palettes_section(
             }
         }
 
-        if ui.button("Add Project Palette").clicked() {
-            let palette_id = next_custom_palette_id(ui_state, project_palettes.len() + 1);
-            match save_project_palette_file(
-                project,
-                &palette_id,
-                Palette4::new([
-                    [0x00, 0x00, 0x00, 0xFF],
-                    [0x55, 0x55, 0x55, 0xFF],
-                    [0xAA, 0xAA, 0xAA, 0xFF],
-                    [0xFF, 0xFF, 0xFF, 0xFF],
-                ]),
-            ) {
-                Ok(()) => {
-                    outcome.palette_files_changed = true;
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        "Failed to create project palette '{}' in '{}': {}",
-                        palette_id,
-                        project.path.display(),
-                        error
-                    );
-                }
-            }
-        }
+        ui.horizontal(|ui| {
+            render_add_palette_controls(ui, ui_state, project, &project_palettes, &mut outcome);
+        });
     });
     outcome
+}
+
+const PALETTE_SIZE_OPTIONS: [PaletteSize; 6] = [
+    PaletteSize::Pal4,
+    PaletteSize::Pal8,
+    PaletteSize::Pal16,
+    PaletteSize::Pal32,
+    PaletteSize::Pal64,
+    PaletteSize::Pal256,
+];
+
+fn render_add_palette_controls(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    project: &Project,
+    project_palettes: &BTreeMap<String, Palette>,
+    outcome: &mut PaletteSectionOutcome,
+) {
+    let selected_size = ui.data_mut(|data| {
+        *data.get_temp_mut_or_insert_with(egui::Id::new("new_palette_size"), || 0usize)
+    });
+    let palette_size = PALETTE_SIZE_OPTIONS[selected_size.min(PALETTE_SIZE_OPTIONS.len() - 1)];
+
+    egui::ComboBox::from_id_salt("new_palette_size_combo")
+        .selected_text(format!("{} colors", palette_size))
+        .width(90.0)
+        .show_ui(ui, |ui| {
+            for (i, size) in PALETTE_SIZE_OPTIONS.iter().enumerate() {
+                let label = format!("{} colors", size);
+                if ui.selectable_label(selected_size == i, label).clicked() {
+                    ui.data_mut(|data| {
+                        data.insert_temp(egui::Id::new("new_palette_size"), i);
+                    });
+                }
+            }
+        });
+
+    if ui.button("Add Project Palette").clicked() {
+        let palette_id = next_custom_palette_id(ui_state, project_palettes.len() + 1);
+        let new_palette = Palette::grayscale(palette_size);
+        match save_project_palette_file(project, &palette_id, &new_palette) {
+            Ok(()) => {
+                outcome.palette_files_changed = true;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to create project palette '{}' in '{}': {}",
+                    palette_id,
+                    project.path.display(),
+                    error
+                );
+            }
+        }
+    }
 }
 
 fn next_custom_palette_id(ui_state: &EditorUI, starting_index: usize) -> String {

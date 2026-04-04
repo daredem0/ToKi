@@ -7,7 +7,7 @@ use std::path::Path;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
 use toki_core::graphics::image::DecodedImage;
-use toki_core::palette::{builtin_palettes, Palette4};
+use toki_core::palette::{builtin_palettes, Palette};
 use toki_core::project_runtime::{default_resolution_height, default_resolution_width};
 use toki_core::{Camera, GameState, ResourceManager};
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
@@ -101,7 +101,7 @@ pub struct SceneViewport {
         std::collections::HashMap<String, toki_core::assets::object_sheet::ObjectSheetMeta>,
     decoded_sprite_images: std::collections::HashMap<std::path::PathBuf, DecodedImage>,
     recolored_sprite_images: std::collections::HashMap<String, DecodedImage>,
-    available_palettes: BTreeMap<String, Palette4>,
+    available_palettes: BTreeMap<String, Palette>,
     indexed_palette_override: Option<String>,
 }
 
@@ -605,7 +605,7 @@ impl SceneViewport {
         self.mark_dirty();
     }
 
-    pub fn set_available_palettes(&mut self, palettes: &BTreeMap<String, Palette4>) {
+    pub fn set_available_palettes(&mut self, palettes: &BTreeMap<String, Palette>) {
         self.available_palettes = palettes.clone();
         self.mark_dirty();
     }

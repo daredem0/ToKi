@@ -132,4 +132,95 @@ impl EditorUI {
                 }
             });
     }
+
+    pub(super) fn render_palette_assets_section(&mut self, ui: &mut egui::Ui) {
+        ui.add_space(10.0);
+        egui::CollapsingHeader::new("Palettes")
+            .id_salt("asset_palette_palettes_section")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.separator();
+                self.render_palette_list(ui);
+            });
+    }
+
+    fn render_palette_list(&mut self, ui: &mut egui::Ui) {
+        let all_palettes = collect_all_palettes(&self.project.available_palettes);
+
+        if all_palettes.is_empty() {
+            ui.label("No palettes available.");
+            return;
+        }
+
+        let grouped = group_palettes_by_size(&all_palettes);
+        let mut selected_palette_id = None;
+
+        for (size_label, entries) in &grouped {
+            egui::CollapsingHeader::new(size_label.as_str())
+                .id_salt(format!("palette_group_{size_label}"))
+                .default_open(true)
+                .show(ui, |ui| {
+                    for (palette_id, is_builtin) in entries {
+                        let label = if *is_builtin {
+                            format!("{palette_id} (built-in)")
+                        } else {
+                            palette_id.clone()
+                        };
+                        let is_selected = matches!(
+                            &self.selection,
+                            Some(super::Selection::Palette(id)) if id == palette_id
+                        );
+                        if ui.selectable_label(is_selected, label).clicked() {
+                            selected_palette_id = Some(palette_id.clone());
+                        }
+                    }
+                });
+            ui.add_space(5.0);
+        }
+
+        if let Some(palette_id) = selected_palette_id {
+            self.set_selection(super::Selection::Palette(palette_id));
+        }
+    }
+}
+
+/// Collects all palettes (builtins + project) into a unified list with a
+/// builtin flag.
+fn collect_all_palettes(
+    project_palettes: &std::collections::BTreeMap<String, toki_core::palette::Palette>,
+) -> Vec<(String, toki_core::palette::Palette, bool)> {
+    let builtins = toki_core::palette::builtin_palettes();
+    let mut all: Vec<(String, toki_core::palette::Palette, bool)> = Vec::new();
+
+    for (id, palette) in &builtins {
+        all.push((id.clone(), palette.clone(), true));
+    }
+    for (id, palette) in project_palettes {
+        if !builtins.contains_key(id) {
+            all.push((id.clone(), palette.clone(), false));
+        }
+    }
+    all.sort_by(|a, b| a.0.cmp(&b.0));
+    all
+}
+
+/// Groups palettes by color count, returning sorted groups with a label like
+/// "4 Colors", "16 Colors".
+fn group_palettes_by_size(
+    palettes: &[(String, toki_core::palette::Palette, bool)],
+) -> Vec<(String, Vec<(String, bool)>)> {
+    let mut groups: std::collections::BTreeMap<usize, Vec<(String, bool)>> =
+        std::collections::BTreeMap::new();
+
+    for (id, palette, is_builtin) in palettes {
+        groups
+            .entry(palette.size().color_count())
+            .or_default()
+            .push((id.clone(), *is_builtin));
+    }
+
+    groups
+        .into_iter()
+        .map(|(count, entries)| (format!("{count} Colors"), entries))
+        .collect()
 }

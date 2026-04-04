@@ -420,10 +420,7 @@ fn runtime_post_process_settings_resolve_quantize_palette_from_registry() {
     let resolved = settings.resolve(&std::collections::BTreeMap::new());
 
     assert_eq!(resolved.mode, PostProcessMode::Quantize4);
-    assert_eq!(
-        resolved.quantize_palette.colors[0],
-        [0x10, 0x18, 0x2B, 0xFF]
-    );
+    assert_eq!(resolved.quantize_palette.color(0), [0x10, 0x18, 0x2B, 0xFF]);
 }
 
 #[test]

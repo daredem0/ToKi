@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::object_sheet::ObjectSheetMeta;
 use crate::entity::EntityId;
-use crate::palette::Palette4;
+use crate::palette::Palette;
 use crate::sprite::SpriteFrame;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +54,7 @@ pub enum SpriteRenderMaterial {
     TrueColor,
     PaletteIndexed {
         palette_id: String,
-        palette: Palette4,
+        palette: Palette,
     },
 }
 

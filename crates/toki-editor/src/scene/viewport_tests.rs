@@ -412,12 +412,16 @@ fn viewport_recolors_palette_indexed_sprites_and_applies_palette_override() {
 
     palettes.insert(
         "override_green".to_string(),
-        toki_core::palette::Palette4::new([
-            [1, 2, 3, 255],
-            [4, 5, 6, 255],
-            [7, 8, 9, 255],
-            [10, 11, 12, 255],
-        ]),
+        toki_core::palette::Palette::new(
+            toki_core::palette::PaletteSize::Pal4,
+            vec![
+                [1, 2, 3, 255],
+                [4, 5, 6, 255],
+                [7, 8, 9, 255],
+                [10, 11, 12, 255],
+            ],
+        )
+        .unwrap(),
     );
     viewport.set_available_palettes(&palettes);
     let mut override_request = request;

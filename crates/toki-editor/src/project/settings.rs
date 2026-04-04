@@ -1,4 +1,5 @@
 use chrono::Utc;
+use toki_core::palette::PaletteMismatchStrategy;
 use toki_core::project_runtime::{
     IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition, ProjectUiEventDefinition,
     QuantizeStrategy, RuntimeViewportMode,
@@ -30,6 +31,7 @@ pub struct ProjectSettingsDraft {
     pub movement_mix_percent: u8,
     pub collision_mix_percent: u8,
     pub indexed_palette_override: Option<String>,
+    pub palette_mismatch_strategy: PaletteMismatchStrategy,
     pub post_process_mode: PostProcessMode,
     pub post_process_quantize_strategy: QuantizeStrategy,
     pub post_process_tint_color: [u8; 4],
@@ -118,6 +120,7 @@ impl ProjectSettingsDraft {
                 .display
                 .indexed_palette_override
                 .clone(),
+            palette_mismatch_strategy: project.metadata.runtime.display.palette_mismatch_strategy,
             post_process_mode: project.metadata.runtime.display.post_process.mode,
             post_process_quantize_strategy: project
                 .metadata
@@ -256,6 +259,12 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     if project.metadata.runtime.display.indexed_palette_override != draft.indexed_palette_override {
         project.metadata.runtime.display.indexed_palette_override =
             draft.indexed_palette_override.clone();
+        changed = true;
+    }
+    if project.metadata.runtime.display.palette_mismatch_strategy != draft.palette_mismatch_strategy
+    {
+        project.metadata.runtime.display.palette_mismatch_strategy =
+            draft.palette_mismatch_strategy;
         changed = true;
     }
     if project.metadata.runtime.display.post_process.mode != draft.post_process_mode {
@@ -486,6 +495,7 @@ mod tests {
             movement_mix_percent: 55,
             collision_mix_percent: 35,
             indexed_palette_override: Some("gb_swamp".to_string()),
+            palette_mismatch_strategy: PaletteMismatchStrategy::Lenient,
             post_process_mode: PostProcessMode::Tint,
             post_process_quantize_strategy: QuantizeStrategy::RgbDistance,
             post_process_tint_color: [12, 34, 56, 255],

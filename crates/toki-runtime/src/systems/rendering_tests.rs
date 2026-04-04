@@ -5,7 +5,7 @@ use std::rc::Rc;
 use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
-use toki_core::palette::Palette4;
+use toki_core::palette::{Palette, PaletteSize};
 use toki_core::project_runtime::{
     IntegerScaleFactor, PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings,
     RuntimeViewportMode,
@@ -450,7 +450,7 @@ fn rendering_system_forwards_post_process_settings_to_backend() {
         tint_strength_percent: 50,
         brightness_percent: 0,
         saturation_percent: 100,
-        quantize_palette: Palette4::new([[0, 0, 0, 255]; 4]),
+        quantize_palette: Palette::grayscale(PaletteSize::Pal4),
         gb_contrast_percent: 0,
         vignette_strength_percent: 60,
     });
@@ -534,12 +534,16 @@ fn palette_indexed_resolved_sprites_use_rgba8_backend_path() {
         texture_path: Some(texture_path),
         material: SpriteRenderMaterial::PaletteIndexed {
             palette_id: "gb_default".to_string(),
-            palette: Palette4::new([
-                [1, 2, 3, 255],
-                [4, 5, 6, 255],
-                [7, 8, 9, 255],
-                [10, 11, 12, 255],
-            ]),
+            palette: Palette::new(
+                PaletteSize::Pal4,
+                vec![
+                    [1, 2, 3, 255],
+                    [4, 5, 6, 255],
+                    [7, 8, 9, 255],
+                    [10, 11, 12, 255],
+                ],
+            )
+            .unwrap(),
         },
         flip_x: false,
     });
