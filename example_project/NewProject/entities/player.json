@@ -10,7 +10,6 @@
     "render_layer": 1,
     "visible": true,
     "has_shadow": true,
-    "palette_override": "",
     "grounding": {
       "footprint": {
         "offset": [
@@ -23,6 +22,44 @@
         ]
       }
     }
+  },
+  "solid": true,
+  "active": true,
+  "components": {
+    "movement": {
+      "speed": 0.8,
+      "movement_profile": "player_wasd",
+      "can_move": true
+    },
+    "combat": {
+      "health": 100,
+      "stats": {
+        "base": {
+          "attack_power": 8,
+          "health": 100
+        },
+        "current": {
+          "attack_power": 8,
+          "health": 100
+        }
+      }
+    },
+    "primary_projectile": {
+      "sheet": "fauna",
+      "object_name": "rock",
+      "size": [
+        16,
+        16
+      ],
+      "speed": 4,
+      "damage": 8,
+      "lifetime_ticks": 20,
+      "spawn_offset": [
+        0,
+        0
+      ]
+    },
+    "inventory": {}
   },
   "collision": {
     "enabled": true,
@@ -159,43 +196,5 @@
     "hero",
     "controllable",
     "attack_prototype_row"
-  ],
-  "solid": true,
-  "active": true,
-  "components": {
-    "movement": {
-      "speed": 1.0,
-      "movement_profile": "player_wasd",
-      "can_move": true
-    },
-    "combat": {
-      "health": 100,
-      "stats": {
-        "base": {
-          "attack_power": 8,
-          "health": 100
-        },
-        "current": {
-          "attack_power": 8,
-          "health": 100
-        }
-      }
-    },
-    "primary_projectile": {
-      "sheet": "fauna",
-      "object_name": "rock",
-      "size": [
-        16,
-        16
-      ],
-      "speed": 4,
-      "damage": 8,
-      "lifetime_ticks": 20,
-      "spawn_offset": [
-        0,
-        0
-      ]
-    },
-    "inventory": {}
-  }
+  ]
 }

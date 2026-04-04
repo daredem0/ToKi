@@ -81,14 +81,23 @@ impl InspectorSystem {
                         ui.label("Position:");
                         ui.label(format!("{}, {}", tile_info.tile_x, tile_info.tile_y));
                     });
+                    let mut solid = tile_info.solid;
+                    let mut trigger = tile_info.trigger;
+                    let tile_name_for_edit = tile_info.tile_name.clone();
+                    let mut changed = false;
                     ui.horizontal(|ui| {
-                        ui.label("Solid:");
-                        ui.label(if tile_info.solid { "Yes" } else { "No" });
+                        changed |= ui.checkbox(&mut solid, "Solid").changed();
+                        changed |= ui.checkbox(&mut trigger, "Trigger").changed();
                     });
-                    ui.horizontal(|ui| {
-                        ui.label("Trigger:");
-                        ui.label(if tile_info.trigger { "Yes" } else { "No" });
-                    });
+                    if changed {
+                        Self::update_tile_property(
+                            ui_state,
+                            config,
+                            &tile_name_for_edit,
+                            solid,
+                            trigger,
+                        );
+                    }
                 } else {
                     ui.label("Click a tile or object to inspect it.");
                 }
@@ -177,16 +186,23 @@ impl InspectorSystem {
                                 &tile_name,
                             );
                         });
-                        if let Some((solid, trigger)) =
-                            Self::selected_map_editor_tile_metadata(&atlas, &tile_name)
-                        {
+                        if let Some(props) = atlas.get_tile_properties(&tile_name).cloned() {
+                            let mut solid = props.solid;
+                            let mut trigger = props.trigger;
+                            let mut changed = false;
                             ui.horizontal(|ui| {
-                                ui.label("Solid:");
-                                ui.label(if solid { "Yes" } else { "No" });
-                                ui.separator();
-                                ui.label("Trigger:");
-                                ui.label(if trigger { "Yes" } else { "No" });
+                                changed |= ui.checkbox(&mut solid, "Solid").changed();
+                                changed |= ui.checkbox(&mut trigger, "Trigger").changed();
                             });
+                            if changed {
+                                let mut atlas_mut = atlas.clone();
+                                if let Some(tile_info) = atlas_mut.tiles.get_mut(&tile_name) {
+                                    tile_info.properties.solid = solid;
+                                    tile_info.properties.trigger = trigger;
+                                }
+                                crate::ui::editor_context::map_state_mut(ui_state).modified_atlas =
+                                    Some(atlas_mut);
+                            }
                         }
                     } else {
                         ui.label("Selected Tile: none");
@@ -396,6 +412,32 @@ impl InspectorSystem {
         }
     }
 
+    fn update_tile_property(
+        ui_state: &mut EditorUI,
+        config: Option<&EditorConfig>,
+        tile_name: &str,
+        solid: bool,
+        trigger: bool,
+    ) {
+        let Some((_, atlas, _)) = Self::load_map_editor_brush_source(ui_state, config) else {
+            return;
+        };
+        let mut atlas_mut = atlas;
+        if let Some(tile_info) = atlas_mut.tiles.get_mut(tile_name) {
+            tile_info.properties.solid = solid;
+            tile_info.properties.trigger = trigger;
+        }
+        let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+        map_state.modified_atlas = Some(atlas_mut);
+        // Update cached tile info to reflect the change immediately
+        if let Some(info) = &mut map_state.selected_tile_info {
+            if info.tile_name == tile_name {
+                info.solid = solid;
+                info.trigger = trigger;
+            }
+        }
+    }
+
     pub(super) fn load_map_editor_brush_source(
         ui_state: &EditorUI,
         config: Option<&EditorConfig>,
@@ -435,7 +477,12 @@ impl InspectorSystem {
                     .join(&tilemap.atlas)
             }
         };
-        let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
+        let atlas =
+            if let Some(cached) = &crate::ui::editor_context::map_state(ui_state).modified_atlas {
+                cached.clone()
+            } else {
+                toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?
+            };
         let texture_path = atlas_path.parent()?.join(&atlas.image);
         let mut tile_names: Vec<String> = atlas.tiles.keys().cloned().collect();
         for group_name in atlas.auto_tile_groups.keys() {
@@ -500,13 +547,6 @@ impl InspectorSystem {
         response.on_hover_text(tile_name);
     }
 
-    pub(super) fn selected_map_editor_tile_metadata(
-        atlas: &toki_core::assets::atlas::AtlasMeta,
-        tile_name: &str,
-    ) -> Option<(bool, bool)> {
-        let properties = atlas.get_tile_properties(tile_name)?;
-        Some((properties.solid, properties.trigger))
-    }
 
     pub(super) fn set_optional_runtime_stat(
         combat: &mut toki_core::entity::CombatComponent,

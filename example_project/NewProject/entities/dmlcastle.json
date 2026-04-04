@@ -1,0 +1,72 @@
+{
+  "name": "dmlcastle",
+  "display_name": "DemonLordCastle",
+  "description": "",
+  "rendering": {
+    "size": [
+      128,
+      128
+    ],
+    "render_layer": 0,
+    "visible": true,
+    "has_shadow": false,
+    "has_drop_shadow": true,
+    "palette_override": "",
+    "static_object": {
+      "sheet": "DemonLordCastle",
+      "object_name": "object_0"
+    },
+    "grounding": {
+      "footprint": {
+        "offset": [
+          12,
+          81
+        ],
+        "size": [
+          104,
+          47
+        ]
+      }
+    }
+  },
+  "solid": true,
+  "active": true,
+  "collision": {
+    "enabled": true,
+    "offset": [
+      12,
+      81
+    ],
+    "size": [
+      104,
+      47
+    ],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 0.0,
+    "hearing_radius": 0,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "DemonLordCastle.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": [
+          "object_0",
+          "object_1",
+          "object_2",
+          "object_3"
+        ],
+        "frame_duration_ms": 500.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "decoration",
+  "tags": []
+}

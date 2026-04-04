@@ -350,7 +350,8 @@ impl EditorUI {
 
             if scene_header_response.header_response.clicked() {
                 selection_changes.push(super::Selection::Scene(scene.name.clone()));
-                tracing::debug!("Selected scene: {}", scene.name);
+                active_scene_change = Some(scene.name.clone());
+                tracing::debug!("Selected and activated scene: {}", scene.name);
             }
 
             scene_header_response.header_response.context_menu(|ui| {

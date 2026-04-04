@@ -329,6 +329,7 @@ pub fn save_current_entity(ui_state: &mut EditorUI) {
                     .clone(),
                 &mut definition.animations,
             );
+            sync_static_object_from_animation(&mut definition);
         } else {
             sync_atlas_tile_names(project_path, &definition.name, &mut definition.animations);
         }
@@ -349,6 +350,27 @@ pub fn save_current_entity(ui_state: &mut EditorUI) {
         .authoring
         .dirty = false;
     tracing::info!("Saved animation changes to {:?}", file_path);
+}
+
+/// Populates `rendering.static_object` from animation data when the source is an object sheet.
+/// The renderer needs this field to use the object-sheet lookup path.
+fn sync_static_object_from_animation(definition: &mut toki_core::entity::EntityDefinition) {
+    let atlas_name = &definition.animations.atlas_name;
+    let first_frame = definition
+        .animations
+        .clips
+        .first()
+        .and_then(|clip| clip.frame_tiles.first());
+
+    let Some(first_frame) = first_frame else {
+        return;
+    };
+
+    let sheet = toki_core::project_assets::normalize_asset_name(atlas_name).to_owned();
+    definition.rendering.static_object = Some(toki_core::entity::StaticObjectRenderDef {
+        sheet,
+        object_name: first_frame.clone(),
+    });
 }
 
 /// Sync atlas metadata to have proper tile names for all frame positions used in animations.

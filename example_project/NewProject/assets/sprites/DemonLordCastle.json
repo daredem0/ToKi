@@ -1,0 +1,52 @@
+{
+  "sheet_type": "objects",
+  "image": "DemonLordCastle.png",
+  "tile_size": [
+    128,
+    128
+  ],
+  "color_mode": "palette_indexed",
+  "palette": "demon_castle_16",
+  "objects": {
+    "object_1": {
+      "position": [
+        1,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    },
+    "object_2": {
+      "position": [
+        2,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    },
+    "object_0": {
+      "position": [
+        0,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    },
+    "object_3": {
+      "position": [
+        3,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    }
+  }
+}

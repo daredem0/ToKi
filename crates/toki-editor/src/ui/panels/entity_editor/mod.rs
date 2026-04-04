@@ -1,6 +1,7 @@
 //! Entity editor panel - dedicated tab for creating and editing entity definitions.
 
 mod browser;
+pub mod collision_preview;
 mod components;
 mod components_core;
 mod details;
@@ -56,13 +57,14 @@ pub fn render_entity_editor(
     ui.separator();
 
     // Main content: Browser + Editor split
-    render_main_content(ui, ui_state, project_path.as_deref());
+    render_main_content(ui, ui_state, project_path.as_deref(), ctx);
 }
 
 fn render_main_content(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
     project_path: Option<&std::path::Path>,
+    ctx: &egui::Context,
 ) {
     let available_width = ui.available_width();
     let available_height = ui.available_height();
@@ -95,7 +97,7 @@ fn render_main_content(
             egui::vec2(editor_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
-                details::render_entity_details_with_project(ui, ui_state, project_path);
+                details::render_entity_details_with_project(ui, ui_state, project_path, ctx);
             },
         );
     });

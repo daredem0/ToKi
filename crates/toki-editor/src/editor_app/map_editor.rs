@@ -248,6 +248,7 @@ impl EditorApp {
         {
             Ok(_) => {
                 tracing::info!("Saved map editor asset '{}'", active_map_name);
+                Self::save_modified_atlas(&mut self.tabs.ui);
                 crate::ui::editor_ui::finalize_saved_existing_map(&mut self.tabs.ui);
             }
             Err(error) => {
@@ -301,11 +302,15 @@ impl EditorApp {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
                 if let Ok(tilemap) = toki_core::assets::tilemap::TileMap::load_from_file(&map_file)
                 {
+                    let atlas_path = Self::resolve_atlas_path(&project_path, &tilemap);
                     let draft = crate::ui::editor_ui::MapEditorDraft {
                         name: map_name.clone(),
                         tilemap,
                     };
-                    crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).draft = Some(draft);
+                    let state = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui);
+                    state.draft = Some(draft);
+                    state.atlas_path = atlas_path;
+                    state.modified_atlas = None;
                 }
                 crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).active_map =
                     Some(map_name);
@@ -321,6 +326,51 @@ impl EditorApp {
                 );
             }
         }
+    }
+
+    fn save_modified_atlas(ui: &mut crate::ui::EditorUI) {
+        let state = crate::ui::editor_context::map_state_mut(ui);
+        let Some(atlas) = state.modified_atlas.take() else {
+            return;
+        };
+        let Some(atlas_path) = &state.atlas_path else {
+            tracing::warn!("Modified atlas exists but no atlas_path set; cannot save");
+            return;
+        };
+        let json = match serde_json::to_string_pretty(&atlas) {
+            Ok(json) => json,
+            Err(e) => {
+                tracing::error!("Failed to serialize modified atlas: {e}");
+                return;
+            }
+        };
+        let path = atlas_path.clone();
+        if let Err(e) = std::fs::write(&path, json) {
+            tracing::error!("Failed to write atlas to {}: {e}", path.display());
+        } else {
+            tracing::info!("Saved modified atlas to {}", path.display());
+        }
+    }
+
+    fn resolve_atlas_path(
+        project_path: &std::path::Path,
+        tilemap: &toki_core::assets::tilemap::TileMap,
+    ) -> Option<std::path::PathBuf> {
+        let tilemaps_path = project_path
+            .join("assets")
+            .join("tilemaps")
+            .join(&tilemap.atlas);
+        if tilemaps_path.exists() {
+            return Some(tilemaps_path);
+        }
+        let sprites_path = project_path
+            .join("assets")
+            .join("sprites")
+            .join(&tilemap.atlas);
+        if sprites_path.exists() {
+            return Some(sprites_path);
+        }
+        None
     }
 
     pub(super) fn handle_pending_map_editor_tilemap_sync(&mut self) {

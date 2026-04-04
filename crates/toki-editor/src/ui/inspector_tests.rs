@@ -1435,7 +1435,7 @@ fn scene_switch_spawn_point_ids_returns_sorted_scene_spawn_ids() {
 }
 
 #[test]
-fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
+fn atlas_tile_properties_readable_for_solid_and_trigger() {
     let mut tiles = std::collections::HashMap::new();
     tiles.insert(
         "grass".to_string(),
@@ -1458,14 +1458,10 @@ fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
         animated_tiles: std::collections::HashMap::new(),
     };
 
-    assert_eq!(
-        InspectorSystem::selected_map_editor_tile_metadata(&atlas, "grass"),
-        Some((true, false))
-    );
-    assert_eq!(
-        InspectorSystem::selected_map_editor_tile_metadata(&atlas, "missing"),
-        None
-    );
+    let props = atlas.get_tile_properties("grass").unwrap();
+    assert!(props.solid);
+    assert!(!props.trigger);
+    assert!(atlas.get_tile_properties("missing").is_none());
 }
 
 #[test]

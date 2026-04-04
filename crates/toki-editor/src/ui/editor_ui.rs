@@ -607,6 +607,8 @@ pub struct MapEditorState {
     pub pending_tilemap_sync: Option<TileMap>,
     pub edit_before: Option<TileMap>,
     pub active_layer: usize,
+    pub modified_atlas: Option<toki_core::assets::atlas::AtlasMeta>,
+    pub atlas_path: Option<PathBuf>,
 }
 
 impl Default for MapEditorState {
@@ -635,6 +637,8 @@ impl Default for MapEditorState {
             pending_tilemap_sync: None,
             edit_before: None,
             active_layer: 0,
+            modified_atlas: None,
+            atlas_path: None,
         }
     }
 }
@@ -667,6 +671,9 @@ pub struct EditorUI {
     // Multi-entity inspector draft state
     pub multi_entity: MultiEntityInspectorState,
     pub menu_preview_font_families: Vec<String>,
+
+    // Collision box visual editor state
+    pub collision_preview: crate::ui::panels::entity_editor::collision_preview::CollisionPreviewState,
 }
 
 pub struct EditorRenderContext<'a> {
@@ -922,6 +929,7 @@ impl EditorUI {
                 "Serif".to_string(),
                 "Mono".to_string(),
             ],
+            collision_preview: Default::default(),
         }
     }
 

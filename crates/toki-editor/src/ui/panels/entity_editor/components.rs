@@ -18,13 +18,14 @@ pub fn render_component_toggles(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
     project_path: Option<&Path>,
+    ctx: &egui::Context,
 ) {
     ui.heading("Components");
     ui.separator();
 
     super::components_core::render_rendering_section(ui, ui_state, project_path);
     super::components_core::render_attributes_section(ui, ui_state);
-    render_collision_section(ui, ui_state);
+    render_collision_section(ui, ui_state, project_path, ctx);
     render_health_section(ui, ui_state);
     render_ai_section(ui, ui_state);
     render_inventory_section(ui, ui_state);
@@ -33,7 +34,12 @@ pub fn render_component_toggles(
     render_audio_section(ui, ui_state);
 }
 
-fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+fn render_collision_section(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    project_path: Option<&Path>,
+    ctx: &egui::Context,
+) {
     let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
         .edit_state
         .as_mut()
@@ -55,6 +61,15 @@ fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         egui::CollapsingHeader::new("  Collision Settings")
             .default_open(false)
             .show(ui, |ui| {
+                if let Some(project_path) = project_path {
+                    super::collision_preview::render_collision_preview(
+                        ui, ui_state, project_path, ctx,
+                    );
+                }
+                let edit = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                    .edit_state
+                    .as_mut()
+                    .unwrap();
                 render_collision_settings(ui, edit);
             });
     }

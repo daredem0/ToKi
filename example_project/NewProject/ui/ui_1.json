@@ -1,7 +1,7 @@
 {
   "id": "ui_1",
   "title": "New UI Layout",
-  "startup_visible": true,
+  "startup_visible": false,
   "z_order": 0,
   "root": {
     "id": "root",
