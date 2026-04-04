@@ -33,22 +33,22 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     return output;
 }
 
-/// Sample the average alpha of the 3x3 neighbourhood around `uv`.
-/// This softens the silhouette edges for drop shadows.
+/// Average alpha of a 3x3 neighbourhood for soft drop-shadow edges.
+/// Uses textureLoad (direct texel fetch) to avoid implicit-derivative issues
+/// that textureSample has inside conditional branches and loops.
 fn soft_shadow_alpha(uv: vec2<f32>, tint_alpha: f32) -> f32 {
-    let tex_size = vec2<f32>(textureDimensions(sprite_texture, 0));
-    let texel = 1.0 / tex_size;
+    let tex_size = textureDimensions(sprite_texture, 0);
+    let center = vec2<i32>(vec2<f32>(tex_size) * uv);
+    let max_coord = vec2<i32>(tex_size) - vec2<i32>(1, 1);
 
     var total = 0.0;
     for (var dy = -1; dy <= 1; dy = dy + 1) {
         for (var dx = -1; dx <= 1; dx = dx + 1) {
-            let offset = vec2<f32>(f32(dx), f32(dy)) * texel;
-            let sample = textureSample(sprite_texture, sprite_sampler, uv + offset);
-            total = total + sample.a;
+            let coord = clamp(center + vec2<i32>(dx, dy), vec2<i32>(0, 0), max_coord);
+            total = total + textureLoad(sprite_texture, coord, 0).a;
         }
     }
-    let avg_alpha = total / 9.0;
-    return avg_alpha * tint_alpha;
+    return (total / 9.0) * tint_alpha;
 }
 
 @fragment
