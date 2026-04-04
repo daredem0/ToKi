@@ -213,8 +213,8 @@ impl SpriteEditorState {
                         meta.tile_size,
                         is_sheet,
                         aliases,
-                        toki_core::assets::atlas::ColorMode::TrueColor,
-                        None,
+                        meta.color_mode,
+                        meta.palette.clone(),
                     )
                 }
             };
@@ -472,7 +472,7 @@ impl SpriteEditorState {
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
             }
             SpriteAssetKind::ObjectSheet => {
-                let meta = if self.is_sheet() {
+                let mut meta = if self.is_sheet() {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
                     self.create_object_sheet_with_names(
                         png_filename,
@@ -483,6 +483,13 @@ impl SpriteEditorState {
                 } else {
                     self.create_object_sheet_with_names(png_filename, 1, 1, source_metadata_path)
                 };
+                meta.color_mode = self.color_mode;
+                meta.palette =
+                    if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+                        self.selected_palette_id.clone()
+                    } else {
+                        None
+                    };
                 meta.save_to_file(json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
             }
@@ -594,6 +601,13 @@ impl SpriteEditorState {
             sheet_type: ObjectSheetType::Objects,
             image: png_filename.into(),
             tile_size: cs.cell_size,
+            color_mode: self.color_mode,
+            palette: if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+                self.selected_palette_id.clone()
+            } else {
+                None
+            },
+            palette_size: None,
             objects,
         }
     }

@@ -363,6 +363,27 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
         let (frame, intrinsic_size) =
             resolve_object_sheet_frame(&object_sheet, sheet_name, object_name)?;
 
+        let material = if object_sheet.is_palette_indexed() {
+            resolve_indexed_preview_palette(
+                toki_core::assets::atlas::ColorMode::PaletteIndexed,
+                &self.viewport.available_palettes,
+                self.viewport.indexed_palette_override.as_deref(),
+                None,
+                object_sheet.palette.as_deref(),
+            )
+            .ok()
+            .flatten()
+            .map(
+                |(palette_id, palette)| SpriteRenderMaterial::PaletteIndexed {
+                    palette_id,
+                    palette,
+                },
+            )
+            .unwrap_or(SpriteRenderMaterial::TrueColor)
+        } else {
+            SpriteRenderMaterial::TrueColor
+        };
+
         Ok(ResolvedSpriteVisual {
             frame,
             intrinsic_size,
@@ -370,7 +391,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 .path
                 .parent()
                 .map(|parent| parent.join(&object_sheet.image)),
-            material: SpriteRenderMaterial::TrueColor,
+            material,
         })
     }
 }

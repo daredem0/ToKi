@@ -17,6 +17,8 @@ type AtlasPreviewInfo = (
 type ObjectSheetPreviewInfo = (
     glam::UVec2,
     PathBuf,
+    ColorMode,
+    Option<String>,
     std::collections::HashMap<String, [u32; 2]>,
     std::collections::HashMap<[u32; 2], [u32; 4]>,
 );
@@ -67,7 +69,7 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
     let tile_lookup = tile_lookup.or_else(|| {
         object_sheet_info
             .as_ref()
-            .map(|(_, _, tile_lookup, _)| tile_lookup.clone())
+            .map(|(_, _, _, _, tile_lookup, _)| tile_lookup.clone())
     });
 
     let authoring = AnimationAuthoringState::from_animations_def_with_tile_lookup(
@@ -130,17 +132,31 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
         crate::ui::editor_context::animation_state_mut(ui_state).source_is_object_sheet = false;
         crate::ui::editor_context::animation_state_mut(ui_state).source_rects_by_position =
             std::collections::HashMap::new();
-    } else if let Some((cell_size, png_path, tile_lookup, rect_lookup)) = object_sheet_info {
+    } else if let Some((cell_size, png_path, color_mode, palette_id, tile_lookup, rect_lookup)) =
+        object_sheet_info
+    {
+        let effective_palette_id = definition
+            .rendering
+            .palette_override
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| palette_id.clone());
         crate::ui::editor_context::animation_state_mut(ui_state).atlas_cell_size =
             Some((cell_size.x, cell_size.y));
         crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_path =
             Some(png_path);
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_color_mode =
-            ColorMode::TrueColor;
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_palette_id = None;
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_color_mode = color_mode;
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_palette_id =
+            effective_palette_id;
         crate::ui::editor_context::animation_state_mut(ui_state).atlas_entity_palette_override =
-            None;
-        crate::ui::editor_context::animation_state_mut(ui_state).atlas_default_palette = None;
+            definition
+                .rendering
+                .palette_override
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
+        crate::ui::editor_context::animation_state_mut(ui_state).atlas_default_palette = palette_id;
         crate::ui::editor_context::animation_state_mut(ui_state).source_is_object_sheet = true;
         crate::ui::editor_context::animation_state_mut(ui_state).source_rects_by_position =
             rect_lookup;
@@ -263,7 +279,14 @@ fn load_object_sheet_info(project_path: &Path, sheet_name: &str) -> Option<Objec
         );
     }
 
-    Some((object_sheet.tile_size, png_path, name_lookup, rect_lookup))
+    Some((
+        object_sheet.tile_size,
+        png_path,
+        object_sheet.color_mode,
+        object_sheet.palette.clone(),
+        name_lookup,
+        rect_lookup,
+    ))
 }
 
 pub fn save_current_entity(ui_state: &mut EditorUI) {

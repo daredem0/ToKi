@@ -307,6 +307,9 @@ fn resolve_object_sheet_frame_returns_frame_and_object_size() {
         sheet_type: ObjectSheetType::Objects,
         image: PathBuf::from("items.png"),
         tile_size: glam::UVec2::new(16, 16),
+        color_mode: crate::assets::atlas::ColorMode::TrueColor,
+        palette: None,
+        palette_size: None,
         objects,
     };
 
@@ -326,6 +329,9 @@ fn resolve_object_sheet_frame_returns_error_for_missing_object() {
         sheet_type: ObjectSheetType::Objects,
         image: PathBuf::from("items.png"),
         tile_size: glam::UVec2::new(16, 16),
+        color_mode: crate::assets::atlas::ColorMode::TrueColor,
+        palette: None,
+        palette_size: None,
         objects: std::collections::HashMap::new(),
     };
 

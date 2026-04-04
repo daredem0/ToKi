@@ -124,12 +124,6 @@ pub fn canonical_indexed_color_for_size(slot: usize, size: PaletteSize) -> Pixel
     PixelColor::rgb(v, v, v)
 }
 
-/// Finds the palette slot for a canonical Pal4 grayscale color.
-#[cfg(test)]
-pub fn indexed_slot_for_canonical_color(color: PixelColor) -> Option<usize> {
-    indexed_slot_for_canonical_color_with_size(color, PaletteSize::Pal4)
-}
-
 pub fn indexed_slot_for_canonical_color_with_size(
     color: PixelColor,
     size: PaletteSize,

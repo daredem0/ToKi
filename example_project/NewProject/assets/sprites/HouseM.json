@@ -5,10 +5,12 @@
     64,
     64
   ],
+  "color_mode": "palette_indexed",
+  "palette": "general_16",
   "objects": {
-    "object_1": {
+    "object_0": {
       "position": [
-        1,
+        0,
         0
       ],
       "size_tiles": [
@@ -16,9 +18,9 @@
         1
       ]
     },
-    "object_0": {
+    "object_1": {
       "position": [
-        0,
+        1,
         0
       ],
       "size_tiles": [

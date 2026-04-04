@@ -250,10 +250,18 @@ impl ResourceManager {
         atlas: &AtlasMeta,
         palette_override: Option<&str>,
     ) -> Result<(String, Palette), SpriteResolveError> {
+        self.resolve_indexed_palette_by_id(atlas.palette.as_deref(), palette_override)
+    }
+
+    fn resolve_indexed_palette_by_id(
+        &self,
+        asset_palette: Option<&str>,
+        palette_override: Option<&str>,
+    ) -> Result<(String, Palette), SpriteResolveError> {
         for palette_id in [
             self.indexed_palette_override.as_deref(),
             palette_override,
-            atlas.palette.as_deref(),
+            asset_palette,
             Some("gb_default"),
         ]
         .into_iter()
@@ -270,7 +278,7 @@ impl ResourceManager {
                 .indexed_palette_override
                 .as_deref()
                 .or(palette_override)
-                .or(atlas.palette.as_deref())
+                .or(asset_palette)
                 .unwrap_or("gb_default")
                 .to_string(),
             message: "palette id could not be resolved".to_string(),
@@ -321,12 +329,22 @@ impl SpriteAssetResolver for ResourceManager {
         })?;
         let (frame, intrinsic_size) =
             resolve_object_sheet_frame(object_sheet, sheet_name, object_name)?;
+        let material = if object_sheet.is_palette_indexed() {
+            let atlas_palette = object_sheet.palette.as_deref();
+            let (palette_id, palette) = self.resolve_indexed_palette_by_id(atlas_palette, None)?;
+            SpriteRenderMaterial::PaletteIndexed {
+                palette_id,
+                palette,
+            }
+        } else {
+            SpriteRenderMaterial::TrueColor
+        };
 
         Ok(ResolvedSpriteVisual {
             frame,
             intrinsic_size,
             texture_path: self.get_object_texture_path(sheet_name).cloned(),
-            material: SpriteRenderMaterial::TrueColor,
+            material,
         })
     }
 }

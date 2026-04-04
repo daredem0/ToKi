@@ -183,7 +183,7 @@ fn render_entity_definition_entries(
     viewport: &mut Option<&mut SceneViewport>,
     max_height: Option<f32>,
 ) {
-    let mut scroll_area = egui::ScrollArea::vertical();
+    let mut scroll_area = egui::ScrollArea::vertical().id_salt("entity_definition_entries");
     if let Some(max_height) = max_height {
         scroll_area = scroll_area.max_height(max_height);
     }
@@ -492,6 +492,7 @@ fn render_object_gallery_grid(
     const COLUMNS: usize = 4;
 
     egui::ScrollArea::vertical()
+        .id_salt("object_gallery_grid")
         .max_height(280.0)
         .show(ui, |ui| {
             egui::Grid::new("scene_toolbox_object_gallery")
