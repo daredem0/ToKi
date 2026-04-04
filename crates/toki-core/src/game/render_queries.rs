@@ -314,7 +314,7 @@ impl<'a> RenderQueryService<'a> {
                         sequence: seq,
                     },
                     visual,
-                    position: entity.position + glam::IVec2::new(0, 4),
+                    position: entity.position + glam::IVec2::new(2, 4),
                     size: SpriteRenderSize::Explicit(entity.size),
                     palette_override: None,
                     flip_x,
