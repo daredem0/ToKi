@@ -561,7 +561,7 @@ pub(crate) enum SceneEditorSubView {
 }
 
 /// Scene graph editor state: connection mode, view state, and persistent layouts
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GraphEditorState {
     pub connect_from_node: Option<u64>,
     pub connect_to_node: Option<u64>,
@@ -570,20 +570,6 @@ pub struct GraphEditorState {
     pub layouts_by_scene: HashMap<String, SceneGraphLayout>,
     pub layout_dirty: bool,
     pub rule_graphs_by_scene: HashMap<String, RuleGraph>,
-}
-
-impl Default for GraphEditorState {
-    fn default() -> Self {
-        Self {
-            connect_from_node: None,
-            connect_to_node: None,
-            canvas_state: GraphCanvasState::default(),
-            sub_view: SceneEditorSubView::default(),
-            layouts_by_scene: HashMap::new(),
-            layout_dirty: false,
-            rule_graphs_by_scene: HashMap::new(),
-        }
-    }
 }
 
 /// Request to load a map from a specific scene
@@ -800,14 +786,12 @@ impl EditorUI {
     }
 
     fn existing_rule_graph_context_tab(&self) -> Option<CenterPanelTab> {
-        if self.active_tab == CenterPanelTab::SceneGraph
-            && self.active_context.as_any().is::<RuleGraphContext>()
-        {
-            Some(CenterPanelTab::SceneGraph)
-        } else if self
+        let is_active_rule_graph = self.active_tab == CenterPanelTab::SceneGraph
+            && self.active_context.as_any().is::<RuleGraphContext>();
+        let has_stored_rule_graph = self
             .context::<RuleGraphContext>(CenterPanelTab::SceneGraph)
-            .is_some()
-        {
+            .is_some();
+        if is_active_rule_graph || has_stored_rule_graph {
             Some(CenterPanelTab::SceneGraph)
         } else {
             None

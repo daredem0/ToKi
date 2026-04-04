@@ -116,10 +116,8 @@ impl PanelSystem {
                 if ui.button("➕ Add Action").clicked() {
                     pending_command = Some(GraphCommand::AddActionNode);
                 }
-                if !show_scene_rules {
-                    if ui.button("↺ Reset Auto Layout").clicked() {
-                        pending_command = Some(GraphCommand::ResetLayout);
-                    }
+                if !show_scene_rules && ui.button("↺ Reset Auto Layout").clicked() {
+                    pending_command = Some(GraphCommand::ResetLayout);
                 }
             });
 
