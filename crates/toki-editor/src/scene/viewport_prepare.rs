@@ -122,7 +122,7 @@ impl SceneViewport {
         );
 
         if requests.is_empty() {
-            tracing::warn!("No sprite render requests found - no sprites will be rendered");
+            tracing::trace!("No sprite render requests found - no sprites will be rendered");
             return;
         }
 
