@@ -2,7 +2,7 @@ use super::GameManager;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::game::{GameSimulation, RenderQueryService, SceneSystem};
 use toki_core::sprite_render::{SpriteRenderOrigin, SpriteVisualRef};
 use toki_core::GameState;
@@ -59,7 +59,10 @@ fn sample_tilemap() -> TileMap {
         size: glam::UVec2::new(2, 1),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["solid".to_string(), "trigger".to_string()],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["solid".to_string(), "trigger".to_string()],
+        )],
     }
 }
 
@@ -68,7 +71,10 @@ fn walkable_tilemap() -> TileMap {
         size: glam::UVec2::new(2, 1),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["trigger".to_string(), "trigger".to_string()],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["trigger".to_string(), "trigger".to_string()],
+        )],
     }
 }
 

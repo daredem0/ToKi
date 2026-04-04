@@ -4,7 +4,10 @@ use glam::IVec2;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::assets::{
+    atlas::AtlasMeta,
+    tilemap::{TileLayer, TileMap},
+};
 use toki_core::game::SceneSystem;
 use toki_core::GameState;
 use winit::application::ApplicationHandler;

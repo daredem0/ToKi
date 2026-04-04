@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use glam::{IVec2, Mat4, UVec2, Vec2};
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::sprite::SpriteFrame;
 use toki_render::{
     DebugShape, DebugShapeType, OffscreenTarget, RenderTarget, SceneData, SceneRenderer,
@@ -85,12 +85,15 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec![
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+            ],
+        )],
     };
     let atlas = AtlasMeta {
         image: PathBuf::from("terrain.png"),

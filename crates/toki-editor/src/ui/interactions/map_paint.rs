@@ -37,21 +37,25 @@ impl MapPaintInteraction {
         Some(tile_index.as_uvec2())
     }
 
-    pub fn paint_tile(tilemap: &mut TileMap, tile_pos: UVec2, tile_name: &str) -> bool {
+    pub fn paint_tile(
+        tilemap: &mut TileMap,
+        layer: usize,
+        tile_pos: UVec2,
+        tile_name: &str,
+    ) -> bool {
         if tile_pos.x >= tilemap.size.x || tile_pos.y >= tilemap.size.y {
             return false;
         }
 
         let index = (tile_pos.y * tilemap.size.x + tile_pos.x) as usize;
-        if tilemap
-            .tiles
-            .get(index)
-            .is_some_and(|current| current == tile_name)
-        {
+        let Some(tiles) = tilemap.layer_tiles_mut(layer) else {
+            return false;
+        };
+        if tiles.get(index).is_some_and(|current| current == tile_name) {
             return false;
         }
 
-        if let Some(slot) = tilemap.tiles.get_mut(index) {
+        if let Some(slot) = tiles.get_mut(index) {
             *slot = tile_name.to_string();
             return true;
         }
@@ -61,6 +65,7 @@ impl MapPaintInteraction {
 
     pub fn paint_brush(
         tilemap: &mut TileMap,
+        layer: usize,
         center_tile_pos: UVec2,
         tile_name: &str,
         brush_size_tiles: u32,
@@ -74,16 +79,19 @@ impl MapPaintInteraction {
         let mut changed = false;
         for y in start.y..end.y {
             for x in start.x..end.x {
-                changed |= Self::paint_tile(tilemap, UVec2::new(x, y), tile_name);
+                changed |= Self::paint_tile(tilemap, layer, UVec2::new(x, y), tile_name);
             }
         }
 
         changed
     }
 
-    pub fn fill_all(tilemap: &mut TileMap, tile_name: &str) -> bool {
+    pub fn fill_all(tilemap: &mut TileMap, layer: usize, tile_name: &str) -> bool {
+        let Some(tiles) = tilemap.layer_tiles_mut(layer) else {
+            return false;
+        };
         let mut changed = false;
-        for slot in &mut tilemap.tiles {
+        for slot in tiles {
             if slot != tile_name {
                 *slot = tile_name.to_string();
                 changed = true;

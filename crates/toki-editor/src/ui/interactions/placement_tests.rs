@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
     EntityDefinition, EntityStats, PickupDef, RenderingDef, StaticObjectRenderDef,
@@ -145,12 +145,15 @@ fn placement_collision_assets() -> (TileMap, AtlasMeta) {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         // top-left is solid, others are floor
-        tiles: vec![
-            "solid".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "solid".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+            ],
+        )],
     };
 
     (tilemap, atlas)

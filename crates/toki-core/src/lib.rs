@@ -45,6 +45,10 @@ pub mod assets {
     pub mod atlas;
     pub mod object_sheet;
     pub mod tilemap;
+
+    #[cfg(test)]
+    #[path = "tilemap_tests.rs"]
+    mod tilemap_tests;
 }
 
 pub mod camera;

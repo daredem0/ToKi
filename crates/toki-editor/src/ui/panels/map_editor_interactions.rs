@@ -67,7 +67,14 @@ impl PanelSystem {
             return false;
         };
 
-        if MapPaintInteraction::paint_brush(tilemap, tile_pos, selected_tile, brush_size_tiles) {
+        let active_layer = crate::ui::editor_context::map_state(ui_state).active_layer;
+        if MapPaintInteraction::paint_brush(
+            tilemap,
+            active_layer,
+            tile_pos,
+            selected_tile,
+            brush_size_tiles,
+        ) {
             viewport.mark_dirty();
             return true;
         }
@@ -92,7 +99,8 @@ impl PanelSystem {
         };
         crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
 
-        if MapPaintInteraction::fill_all(tilemap, selected_tile) {
+        let active_layer = crate::ui::editor_context::map_state(ui_state).active_layer;
+        if MapPaintInteraction::fill_all(tilemap, active_layer, selected_tile) {
             crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
             viewport.mark_dirty();
             return true;

@@ -1,5 +1,5 @@
 use super::CameraManager;
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
 use toki_core::entity::{Entity, EntityKind, EntityRendering};
 
@@ -20,7 +20,7 @@ fn sample_tilemap() -> TileMap {
         size: glam::UVec2::new(4, 4),
         tile_size: glam::UVec2::new(16, 16),
         atlas: std::path::PathBuf::from("atlas.json"),
-        tiles: vec!["floor".to_string(); 16],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 16])],
     }
 }
 
@@ -29,7 +29,7 @@ fn multi_chunk_tilemap() -> TileMap {
         size: glam::UVec2::new(48, 16),
         tile_size: glam::UVec2::new(16, 16),
         atlas: std::path::PathBuf::from("atlas.json"),
-        tiles: vec!["floor".to_string(); 48 * 16],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 48 * 16])],
     }
 }
 

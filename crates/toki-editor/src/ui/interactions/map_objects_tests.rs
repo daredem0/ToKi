@@ -1,7 +1,7 @@
 use super::MapObjectInteraction;
 use glam::{IVec2, UVec2};
 use std::path::PathBuf;
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::entity::{build_decoration_entity, DecorationSpec};
 
 fn sample_tilemap() -> TileMap {
@@ -9,7 +9,7 @@ fn sample_tilemap() -> TileMap {
         size: UVec2::new(4, 4),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string(); 16],
+        layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 16])],
     }
 }
 

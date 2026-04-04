@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
-    tilemap::TileMap,
+    tilemap::{TileLayer, TileMap},
 };
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
 use toki_core::game::{GameSimulation, InputSystem, RenderQueryService};
@@ -43,7 +43,7 @@ fn create_collision_test_tilemap() -> TileMap {
         size: UVec2::new(4, 4),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles,
+        layers: vec![TileLayer::new("ground", tiles)],
     }
 }
 

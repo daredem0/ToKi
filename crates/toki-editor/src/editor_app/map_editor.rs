@@ -54,7 +54,10 @@ impl EditorApp {
                     .file_name()
                     .ok_or_else(|| anyhow::anyhow!("Atlas path has no file name"))?,
             ),
-            tiles: vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
+            layers: vec![TileLayer::new(
+                "ground",
+                vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
+            )],
         };
 
         Ok(MapEditorDraft {

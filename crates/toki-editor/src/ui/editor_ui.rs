@@ -617,6 +617,7 @@ pub struct MapEditorState {
     pub history: MapEditorHistory,
     pub pending_tilemap_sync: Option<TileMap>,
     pub edit_before: Option<TileMap>,
+    pub active_layer: usize,
 }
 
 impl Default for MapEditorState {
@@ -644,6 +645,7 @@ impl Default for MapEditorState {
             history: MapEditorHistory::default(),
             pending_tilemap_sync: None,
             edit_before: None,
+            active_layer: 0,
         }
     }
 }

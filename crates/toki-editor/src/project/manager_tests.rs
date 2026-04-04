@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
 use toki_core::game::{
     AudioChannel, AudioEvent, GameSimulation, InputSystem, RuleSystem, SceneSystem,
@@ -419,7 +419,7 @@ fn movement_test_tilemap() -> TileMap {
         size: glam::UVec2::new(8, 8),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("atlas.json"),
-        tiles: vec!["floor".to_string(); 64],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 64])],
     }
 }
 
@@ -428,7 +428,7 @@ fn test_tilemap() -> TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("atlas.json"),
-        tiles: vec!["floor".to_string()],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
     }
 }
 
@@ -446,7 +446,7 @@ fn save_tilemap_asset_writes_map_and_rescans_assets() {
         size: glam::UVec2::new(4, 3),
         tile_size: glam::UVec2::new(8, 8),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string(); 12],
+        layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 12])],
     };
 
     let saved_path = manager
@@ -486,18 +486,20 @@ fn save_tilemap_asset_persists_painted_brush_and_fill_changes() {
         size: glam::UVec2::new(3, 3),
         tile_size: glam::UVec2::new(8, 8),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string(); 9],
+        layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 9])],
     };
 
     assert!(MapPaintInteraction::paint_brush(
         &mut tilemap,
+        0,
         glam::UVec2::new(1, 1),
         "water",
         1,
     ));
-    assert!(MapPaintInteraction::fill_all(&mut tilemap, "stone"));
+    assert!(MapPaintInteraction::fill_all(&mut tilemap, 0, "stone"));
     assert!(MapPaintInteraction::paint_brush(
         &mut tilemap,
+        0,
         glam::UVec2::new(0, 0),
         "water",
         2,
@@ -509,11 +511,11 @@ fn save_tilemap_asset_persists_painted_brush_and_fill_changes() {
 
     let reloaded = TileMap::load_from_file(&saved_path).expect("saved tilemap should reload");
     assert_eq!(reloaded, tilemap);
-    assert_eq!(reloaded.tiles[0], "water");
-    assert_eq!(reloaded.tiles[1], "water");
-    assert_eq!(reloaded.tiles[3], "water");
-    assert_eq!(reloaded.tiles[4], "water");
-    assert_eq!(reloaded.tiles[8], "stone");
+    assert_eq!(reloaded.tiles()[0], "water");
+    assert_eq!(reloaded.tiles()[1], "water");
+    assert_eq!(reloaded.tiles()[3], "water");
+    assert_eq!(reloaded.tiles()[4], "water");
+    assert_eq!(reloaded.tiles()[8], "stone");
 }
 
 #[test]
@@ -545,20 +547,25 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
         size: glam::UVec2::new(3, 1),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec![
-            "grass".to_string(),
-            "grass".to_string(),
-            "grass".to_string(),
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "grass".to_string(),
+                "grass".to_string(),
+                "grass".to_string(),
+            ],
+        )],
     };
 
     assert!(MapPaintInteraction::paint_tile(
         &mut tilemap,
+        0,
         glam::UVec2::new(1, 0),
         "wall",
     ));
     assert!(MapPaintInteraction::paint_tile(
         &mut tilemap,
+        0,
         glam::UVec2::new(2, 0),
         "switch",
     ));
@@ -576,8 +583,8 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
     )
     .expect("terrain atlas should load");
 
-    assert_eq!(reloaded_map.tiles[1], "wall");
-    assert_eq!(reloaded_map.tiles[2], "switch");
+    assert_eq!(reloaded_map.tiles()[1], "wall");
+    assert_eq!(reloaded_map.tiles()[2], "switch");
     assert_eq!(
         reloaded_atlas.get_tile_properties("wall"),
         Some(&TileProperties {

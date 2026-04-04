@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
-    tilemap::TileMap,
+    tilemap::{TileLayer, TileMap},
 };
 use toki_core::CoreError;
 
@@ -13,12 +13,15 @@ fn create_test_tilemap() -> TileMap {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles: vec![
-            "grass".to_string(),
-            "stone".to_string(),
-            "water".to_string(),
-            "dirt".to_string(),
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "grass".to_string(),
+                "stone".to_string(),
+                "water".to_string(),
+                "dirt".to_string(),
+            ],
+        )],
     }
 }
 
@@ -98,7 +101,7 @@ fn tilemap_validate_correct_size_passes() {
 #[test]
 fn tilemap_validate_incorrect_size_fails() {
     let mut tilemap = create_test_tilemap();
-    tilemap.tiles.push("extra".to_string()); // Now we have 5 tiles but expect 4
+    tilemap.tiles_mut().push("extra".to_string()); // Now we have 5 tiles but expect 4
 
     let result = tilemap.validate();
     assert!(result.is_err());
@@ -114,7 +117,7 @@ fn tilemap_validate_incorrect_size_fails() {
 #[test]
 fn tilemap_validate_too_few_tiles_fails() {
     let mut tilemap = create_test_tilemap();
-    tilemap.tiles.pop(); // Now we have 3 tiles but expect 4
+    tilemap.tiles_mut().pop(); // Now we have 3 tiles but expect 4
 
     let result = tilemap.validate();
     assert!(result.is_err());
@@ -133,7 +136,7 @@ fn tilemap_validate_empty_map_passes() {
         size: UVec2::new(0, 0),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test.json"),
-        tiles: vec![],
+        layers: vec![TileLayer::new("ground", vec![])],
     };
 
     assert!(tilemap.validate().is_ok());
@@ -243,7 +246,7 @@ fn tilemap_generate_vertices_empty_map() {
         size: UVec2::new(0, 0),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test.json"),
-        tiles: vec![],
+        layers: vec![TileLayer::new("ground", vec![])],
     };
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32);
@@ -258,14 +261,17 @@ fn tilemap_generate_vertices_with_larger_map() {
         size: UVec2::new(3, 2), // 3x2 map
         tile_size: UVec2::new(8, 8),
         atlas: PathBuf::from("test.json"),
-        tiles: vec![
-            "grass".to_string(),
-            "stone".to_string(),
-            "water".to_string(),
-            "dirt".to_string(),
-            "grass".to_string(),
-            "stone".to_string(),
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "grass".to_string(),
+                "stone".to_string(),
+                "water".to_string(),
+                "dirt".to_string(),
+                "grass".to_string(),
+                "stone".to_string(),
+            ],
+        )],
     };
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32);
@@ -302,14 +308,17 @@ fn tilemap_row_major_indexing() {
         size: UVec2::new(3, 2), // 3 wide, 2 tall
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test.json"),
-        tiles: vec![
-            "a".to_string(),
-            "b".to_string(),
-            "c".to_string(), // Row 0
-            "d".to_string(),
-            "e".to_string(),
-            "f".to_string(), // Row 1
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(), // Row 0
+                "d".to_string(),
+                "e".to_string(),
+                "f".to_string(), // Row 1
+            ],
+        )],
     };
 
     // First row
@@ -329,7 +338,7 @@ fn tilemap_single_tile_map() {
         size: UVec2::new(1, 1),
         tile_size: UVec2::new(32, 32),
         atlas: PathBuf::from("test.json"),
-        tiles: vec!["single".to_string()],
+        layers: vec![TileLayer::new("ground", vec!["single".to_string()])],
     };
 
     assert!(tilemap.validate().is_ok());
@@ -347,7 +356,7 @@ fn tilemap_chunk_calculations() {
         size: UVec2::new(64, 64),    // Your actual map size
         tile_size: UVec2::new(8, 8), // 8x8 pixel tiles
         atlas: PathBuf::from("test.json"),
-        tiles: vec![], // Empty for this test
+        layers: vec![TileLayer::new("ground", vec![])], // Empty for this test
     };
 
     // Test chunk count calculation
@@ -384,7 +393,7 @@ fn tilemap_deserialization_ignores_legacy_object_storage() {
     )
     .expect("legacy tilemap json should parse even with deprecated objects");
 
-    assert_eq!(tilemap.tiles, vec!["grass".to_string()]);
+    assert_eq!(tilemap.tiles(), vec!["grass".to_string()]);
 }
 
 #[test]
@@ -393,7 +402,7 @@ fn tilemap_serialization_round_trips_without_object_storage() {
         size: UVec2::new(1, 1),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["grass".to_string()],
+        layers: vec![TileLayer::new("ground", vec!["grass".to_string()])],
     };
 
     let json = serde_json::to_string(&tilemap).expect("tilemap should serialize");

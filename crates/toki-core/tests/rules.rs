@@ -32,7 +32,7 @@ fn create_test_atlas() -> AtlasMeta {
 fn create_collision_test_tilemap() -> TileMap {
     let mut tilemap = create_test_tilemap();
     // Place a solid wall tile directly to the right of the player spawn.
-    tilemap.tiles[1] = "wall".to_string();
+    tilemap.tiles_mut()[1] = "wall".to_string();
     tilemap
 }
 
@@ -53,7 +53,7 @@ fn create_collision_test_atlas() -> AtlasMeta {
 
 fn create_trigger_test_tilemap() -> TileMap {
     let mut tilemap = create_test_tilemap();
-    tilemap.tiles[0] = "trigger".to_string();
+    tilemap.tiles_mut()[0] = "trigger".to_string();
     tilemap
 }
 

@@ -1,6 +1,6 @@
 use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-use crate::assets::tilemap::TileMap;
+use crate::assets::tilemap::{TileLayer, TileMap};
 use crate::entity::{Entity, EntityKind, EntityRendering};
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
@@ -42,17 +42,20 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
         size: UVec2::new(3, 3),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles: vec![
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-            "solid".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-            "floor".to_string(),
-        ],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec![
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "solid".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+            ],
+        )],
     };
 
     (tilemap, atlas)

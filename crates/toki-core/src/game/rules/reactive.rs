@@ -63,7 +63,7 @@ impl RuleEvaluationService<'_> {
 #[cfg(test)]
 mod tests {
     use crate::assets::atlas::AtlasMeta;
-    use crate::assets::tilemap::TileMap;
+    use crate::assets::tilemap::{TileLayer, TileMap};
     use crate::game::{AudioChannel, DamageEvent, GameState, SceneSystem};
     use crate::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
@@ -130,7 +130,7 @@ mod tests {
                     size: glam::UVec2::new(1, 1),
                     tile_size: glam::UVec2::new(16, 16),
                     atlas: std::path::PathBuf::new(),
-                    tiles: vec!["default".to_string()],
+                    layers: vec![TileLayer::new("ground", vec!["default".to_string()])],
                 },
                 &AtlasMeta {
                     image: std::path::PathBuf::new(),

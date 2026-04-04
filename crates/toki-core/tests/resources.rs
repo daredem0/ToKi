@@ -74,8 +74,8 @@ fn test_resource_manager_load_with_paths() {
     assert!(creature_atlas.tiles.contains_key("grass"));
 
     let tilemap = resources.get_tilemap();
-    assert_eq!(tilemap.tiles.len(), 16); // 4x4 tiles
-    assert_eq!(tilemap.tiles[0], "grass");
+    assert_eq!(tilemap.tiles().len(), 16); // 4x4 tiles
+    assert_eq!(tilemap.tiles()[0], "grass");
 }
 
 #[test]

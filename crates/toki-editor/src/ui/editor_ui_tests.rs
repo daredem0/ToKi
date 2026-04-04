@@ -286,7 +286,10 @@ fn sync_map_editor_selection_preserves_unsaved_draft() {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
-                tiles: vec!["grass".to_string(); 4],
+                layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                    "ground",
+                    vec!["grass".to_string(); 4],
+                )],
             },
         },
     );
@@ -319,7 +322,10 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
-                tiles: vec!["grass".to_string(); 4],
+                layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                    "ground",
+                    vec!["grass".to_string(); 4],
+                )],
             },
         },
     );
@@ -369,7 +375,10 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
-                tiles: vec!["grass".to_string(); 4],
+                layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                    "ground",
+                    vec!["grass".to_string(); 4],
+                )],
             },
         },
     );
@@ -492,7 +501,10 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
-                tiles: vec!["grass".to_string(); 4],
+                layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                    "ground",
+                    vec!["grass".to_string(); 4],
+                )],
             },
         },
     );
@@ -503,7 +515,7 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
         .tilemap
         .clone();
     let mut after = before.clone();
-    after.tiles[0] = "water".to_string();
+    after.tiles_mut()[0] = "water".to_string();
     crate::ui::editor_context::map_state_mut(&mut ui)
         .history
         .push(MapEditorEditCommand {
@@ -521,8 +533,8 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
             .as_ref()
             .expect("draft should remain")
             .tilemap
-            .tiles[0],
-        before.tiles[0]
+            .tiles()[0],
+        before.tiles()[0]
     );
 }
 
@@ -722,7 +734,10 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
-                tiles: vec!["grass".to_string(); 4],
+                layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                    "ground",
+                    vec!["grass".to_string(); 4],
+                )],
             },
         },
     );
@@ -734,7 +749,7 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
         .tilemap
         .clone();
     let mut after = before.clone();
-    after.tiles[0] = "water".to_string();
+    after.tiles_mut()[0] = "water".to_string();
 
     crate::ui::editor_ui::begin_map_editor_edit(&mut ui, &before);
     assert!(crate::ui::editor_ui::finish_map_editor_edit(
@@ -745,12 +760,12 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     assert!(ui.undo());
     let undone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
         .expect("undo should queue a tilemap sync");
-    assert_eq!(undone.tiles[0], "grass");
+    assert_eq!(undone.tiles()[0], "grass");
 
     assert!(ui.redo());
     let redone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
         .expect("redo should queue a tilemap sync");
-    assert_eq!(redone.tiles[0], "water");
+    assert_eq!(redone.tiles()[0], "water");
 }
 
 #[test]
@@ -771,7 +786,10 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
                 size: glam::UVec2::new(1, 1),
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
-                tiles: vec!["grass".to_string()],
+                layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                    "ground",
+                    vec!["grass".to_string()],
+                )],
             },
         },
     );
@@ -782,7 +800,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
         .tilemap
         .clone();
     let mut after = before.clone();
-    after.tiles[0] = "water".to_string();
+    after.tiles_mut()[0] = "water".to_string();
     crate::ui::editor_ui::begin_map_editor_edit(&mut ui, &before);
     assert!(crate::ui::editor_ui::finish_map_editor_edit(
         &mut ui, &after

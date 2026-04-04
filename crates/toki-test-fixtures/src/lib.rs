@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::assets::{
     atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties},
-    tilemap::TileMap,
+    tilemap::{TileLayer, TileMap},
 };
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
@@ -20,7 +20,7 @@ pub fn test_tilemap() -> TileMap {
         size: UVec2::new(10, 10),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles: vec!["floor".to_string(); 100],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 100])],
     }
 }
 

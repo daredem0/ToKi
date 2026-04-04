@@ -1,7 +1,7 @@
 use super::*;
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-use crate::assets::tilemap::TileMap;
+use crate::assets::tilemap::{TileLayer, TileMap};
 use crate::collision::CollisionBox;
 use crate::entity::{
     AiBehavior, AiComponent, AiConfig, CombatComponent, ControlRole, Entity, EntityId, EntityKind,
@@ -225,7 +225,7 @@ fn create_test_tilemap() -> TileMap {
         size: UVec2::new(16, 16),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles: vec!["grass".to_string(); 256], // 16x16 passable tiles
+        layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 256])],
     }
 }
 
@@ -273,7 +273,7 @@ fn create_tilemap_with_vertical_wall() -> TileMap {
         size: UVec2::new(16, 16),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles,
+        layers: vec![TileLayer::new("ground", tiles)],
     }
 }
 
@@ -289,7 +289,7 @@ fn create_tilemap_with_horizontal_wall() -> TileMap {
         size: UVec2::new(16, 16),
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
-        tiles,
+        layers: vec![TileLayer::new("ground", tiles)],
     }
 }
 

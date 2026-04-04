@@ -2,14 +2,14 @@ use super::GridInteraction;
 use crate::config::{EditorConfig, GridSettings};
 use glam::{UVec2, Vec2};
 use std::path::PathBuf;
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 
 fn sample_tilemap(tile_size: UVec2) -> TileMap {
     TileMap {
         size: UVec2::new(1, 1),
         tile_size,
         atlas: PathBuf::from("test_atlas.json"),
-        tiles: vec!["floor".to_string()],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
     }
 }
 

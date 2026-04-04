@@ -4,7 +4,11 @@
   "title": "ToKi Tilemap",
   "description": "A tilemap definition containing tile layout and metadata for the ToKi game engine",
   "type": "object",
-  "required": ["size", "tile_size", "atlas", "tiles"],
+  "required": ["size", "tile_size", "atlas"],
+  "oneOf": [
+    {"required": ["tiles"]},
+    {"required": ["layers"]}
+  ],
   "properties": {
     "size": {
       "type": "array",
@@ -22,12 +26,43 @@
     },
     "atlas": {
       "type": "string",
-      "description": "Name of the atlas file containing the tiles (without extension)"
+      "description": "Name of the atlas file containing the tiles"
     },
     "tiles": {
       "type": "array",
       "items": {"type": "string"},
-      "description": "Flat array of tile names arranged row by row from top-left to bottom-right"
+      "description": "Legacy: flat array of tile names (single layer). Use 'layers' for multi-layer maps."
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered list of tile layers, rendered bottom-to-top",
+      "items": {
+        "type": "object",
+        "required": ["name", "tiles"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Layer name (e.g. 'ground', 'detail', 'above')"
+          },
+          "tiles": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Row-major flat array of tile names for this layer"
+          },
+          "visible": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this layer is rendered"
+          },
+          "collision_enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this layer participates in collision checks"
+          }
+        }
+      }
     },
     "objects": {
       "type": "array",

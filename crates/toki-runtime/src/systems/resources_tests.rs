@@ -5,7 +5,7 @@ use super::{
 };
 use std::fs;
 use std::path::PathBuf;
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::sprite_render::{SpriteAssetResolver, SpriteRenderMaterial};
 
 fn make_unique_temp_dir() -> std::path::PathBuf {
@@ -112,7 +112,7 @@ fn resolve_tilemap_atlas_path_prefers_map_directory_relative_atlas() {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["floor".to_string()],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
     };
 
     let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
@@ -136,7 +136,7 @@ fn resolve_tilemap_atlas_path_falls_back_to_project_sprites_dir() {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         atlas: PathBuf::from("terrain.json"),
-        tiles: vec!["floor".to_string()],
+        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
     };
 
     let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
