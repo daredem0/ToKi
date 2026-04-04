@@ -299,6 +299,14 @@ impl EditorApp {
         match viewport.load_tilemap(&map_file) {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
+                if let Ok(tilemap) = toki_core::assets::tilemap::TileMap::load_from_file(&map_file)
+                {
+                    let draft = crate::ui::editor_ui::MapEditorDraft {
+                        name: map_name.clone(),
+                        tilemap,
+                    };
+                    crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).draft = Some(draft);
+                }
                 crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).active_map =
                     Some(map_name);
                 crate::ui::editor_ui::clear_map_editor_dirty(&mut self.tabs.ui);

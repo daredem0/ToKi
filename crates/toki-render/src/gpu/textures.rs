@@ -19,7 +19,14 @@ impl GpuState {
         self.load_texture_pipeline(TextureLoadConfig {
             kind: TexturePipelineKind::Tilemap,
             source: TextureSource::path(texture_path.as_path()),
-        })
+        })?;
+        self.overlay_tilemap_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            TextureSource::path(texture_path.as_path()),
+        )?;
+        Ok(())
     }
 
     pub fn load_tilemap_texture_rgba8(
@@ -29,7 +36,14 @@ impl GpuState {
         self.load_texture_pipeline(TextureLoadConfig {
             kind: TexturePipelineKind::Tilemap,
             source: TextureSource::rgba8(image),
-        })
+        })?;
+        self.overlay_tilemap_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            TextureSource::rgba8(image),
+        )?;
+        Ok(())
     }
 
     pub fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {

@@ -31,38 +31,6 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_right_a",
-                "goblin/walk_right_b",
-                "goblin/walk_right_c",
-                "goblin/walk_right_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "goblin.json",
@@ -85,6 +53,30 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_down_a",
+                "goblin/walk_down_b",
+                "goblin/walk_down_c",
+                "goblin/walk_down_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_left_a",
+                "goblin/walk_left_b",
+                "goblin/walk_left_c",
+                "goblin/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "WalkUp": {
               "state": "WalkUp",
               "atlas_name": "goblin.json",
@@ -97,14 +89,34 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "WalkDown": {
-              "state": "WalkDown",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/walk_down_a",
-                "goblin/walk_down_b",
-                "goblin/walk_down_c",
-                "goblin/walk_down_d"
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_a",
+                "goblin/idle_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_right_a",
+                "goblin/walk_right_b",
+                "goblin/walk_right_c",
+                "goblin/walk_right_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -125,18 +137,6 @@
               "frame_tile_names": [
                 "goblin/idle_down_a",
                 "goblin/idle_down_b"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_left_a",
-                "goblin/walk_left_b",
-                "goblin/walk_left_c",
-                "goblin/walk_left_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -232,38 +232,24 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/idle_a",
-                "slime/idle_b"
+                "slime/idle_up_a",
+                "slime/idle_up_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkLeft": {
-              "state": "WalkLeft",
+            "IdleDown": {
+              "state": "IdleDown",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/walk_left_a",
-                "slime/walk_left_b",
-                "slime/walk_left_c",
-                "slime/walk_left_d"
+                "slime/idle_down_a",
+                "slime/idle_down_b"
               ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "WalkDown": {
-              "state": "WalkDown",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/walk_down_a",
-                "slime/walk_down_b",
-                "slime/walk_down_c",
-                "slime/walk_down_d"
-              ],
-              "frame_duration_ms": 150.0,
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
             "WalkUp": {
@@ -290,34 +276,28 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "WalkLeft": {
+              "state": "WalkLeft",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/idle_left_a",
-                "slime/idle_left_b"
+                "slime/walk_left_a",
+                "slime/walk_left_b",
+                "slime/walk_left_c",
+                "slime/walk_left_d"
               ],
-              "frame_duration_ms": 300.0,
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleRight": {
-              "state": "IdleRight",
+            "WalkDown": {
+              "state": "WalkDown",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/idle_right_a",
-                "slime/idle_right_b"
+                "slime/walk_down_a",
+                "slime/walk_down_b",
+                "slime/walk_down_c",
+                "slime/walk_down_d"
               ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "creatures_palette4.json",
-              "frame_tile_names": [
-                "slime/idle_up_a",
-                "slime/idle_up_b"
-              ],
-              "frame_duration_ms": 300.0,
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
             "Walk": {
@@ -332,12 +312,32 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "IdleRight": {
+              "state": "IdleRight",
               "atlas_name": "creatures_palette4.json",
               "frame_tile_names": [
-                "slime/idle_down_a",
-                "slime/idle_down_b"
+                "slime/idle_right_a",
+                "slime/idle_right_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/idle_left_a",
+                "slime/idle_left_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures_palette4.json",
+              "frame_tile_names": [
+                "slime/idle_a",
+                "slime/idle_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -431,62 +431,6 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_up_a",
-                "goblin/walk_up_b",
-                "goblin/walk_up_c",
-                "goblin/walk_up_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_left_a",
-                "goblin/walk_left_b",
-                "goblin/walk_left_c",
-                "goblin/walk_left_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkDown": {
-              "state": "WalkDown",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_down_a",
-                "goblin/walk_down_b",
-                "goblin/walk_down_c",
-                "goblin/walk_down_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleDown": {
-              "state": "IdleDown",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_down_a",
-                "goblin/idle_down_b"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "WalkRight": {
               "state": "WalkRight",
               "atlas_name": "goblin.json",
@@ -509,6 +453,16 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_down_a",
+                "goblin/idle_down_b"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "goblin.json",
@@ -517,6 +471,52 @@
                 "goblin/walk_b",
                 "goblin/walk_c",
                 "goblin/walk_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_down_a",
+                "goblin/walk_down_b",
+                "goblin/walk_down_c",
+                "goblin/walk_down_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_left_a",
+                "goblin/walk_left_b",
+                "goblin/walk_left_c",
+                "goblin/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkUp": {
+              "state": "WalkUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_up_a",
+                "goblin/walk_up_b",
+                "goblin/walk_up_c",
+                "goblin/walk_up_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -531,12 +531,12 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "IdleUp": {
-              "state": "IdleUp",
+            "Idle": {
+              "state": "Idle",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
+                "goblin/idle_a",
+                "goblin/idle_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -632,6 +632,18 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_right_a",
+                "goblin/walk_right_b",
+                "goblin/walk_right_c",
+                "goblin/walk_right_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "IdleDown": {
               "state": "IdleDown",
               "atlas_name": "goblin.json",
@@ -654,18 +666,6 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_up_a",
-                "goblin/walk_up_b",
-                "goblin/walk_up_c",
-                "goblin/walk_up_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "goblin.json",
@@ -678,14 +678,26 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleUp": {
-              "state": "IdleUp",
+            "Idle": {
+              "state": "Idle",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
+                "goblin/idle_a",
+                "goblin/idle_b"
               ],
               "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_left_a",
+                "goblin/walk_left_b",
+                "goblin/walk_left_c",
+                "goblin/walk_left_d"
+              ],
+              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
             "IdleLeft": {
@@ -708,38 +720,26 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkLeft": {
-              "state": "WalkLeft",
+            "WalkUp": {
+              "state": "WalkUp",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/walk_left_a",
-                "goblin/walk_left_b",
-                "goblin/walk_left_c",
-                "goblin/walk_left_d"
+                "goblin/walk_up_a",
+                "goblin/walk_up_b",
+                "goblin/walk_up_c",
+                "goblin/walk_up_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "Idle": {
-              "state": "Idle",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
               ],
               "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_right_a",
-                "goblin/walk_right_b",
-                "goblin/walk_right_c",
-                "goblin/walk_right_d"
-              ],
-              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             }
           },
@@ -833,6 +833,50 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_down_a",
+                "goblin/walk_down_b",
+                "goblin/walk_down_c",
+                "goblin/walk_down_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "IdleRight": {
+              "state": "IdleRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_right_a",
+                "goblin/idle_right_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_up_a",
+                "goblin/idle_up_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkUp": {
+              "state": "WalkUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_up_a",
+                "goblin/walk_up_b",
+                "goblin/walk_up_c",
+                "goblin/walk_up_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
             "WalkLeft": {
               "state": "WalkLeft",
               "atlas_name": "goblin.json",
@@ -869,32 +913,12 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "IdleRight": {
-              "state": "IdleRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_right_a",
-                "goblin/idle_right_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Idle": {
               "state": "Idle",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
                 "goblin/idle_a",
                 "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_up_a",
-                "goblin/idle_up_b"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -917,30 +941,6 @@
                 "goblin/idle_left_b"
               ],
               "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkDown": {
-              "state": "WalkDown",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_down_a",
-                "goblin/walk_down_b",
-                "goblin/walk_down_c",
-                "goblin/walk_down_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_up_a",
-                "goblin/walk_up_b",
-                "goblin/walk_up_c",
-                "goblin/walk_up_d"
-              ],
-              "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             }
           },
@@ -1034,28 +1034,6 @@
         "palette_override": "",
         "animation_controller": {
           "clips": {
-            "WalkDown": {
-              "state": "WalkDown",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_down_a",
-                "goblin/walk_down_b",
-                "goblin/walk_down_c",
-                "goblin/walk_down_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "IdleLeft": {
-              "state": "IdleLeft",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_left_a",
-                "goblin/idle_left_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "WalkLeft": {
               "state": "WalkLeft",
               "atlas_name": "goblin.json",
@@ -1068,28 +1046,6 @@
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
             },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/walk_right_a",
-                "goblin/walk_right_b",
-                "goblin/walk_right_c",
-                "goblin/walk_right_d"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "goblin.json",
-              "frame_tile_names": [
-                "goblin/idle_a",
-                "goblin/idle_b"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "IdleUp": {
               "state": "IdleUp",
               "atlas_name": "goblin.json",
@@ -1100,12 +1056,36 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "IdleLeft": {
+              "state": "IdleLeft",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/idle_down_a",
-                "goblin/idle_down_b"
+                "goblin/idle_left_a",
+                "goblin/idle_left_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkUp": {
+              "state": "WalkUp",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_up_a",
+                "goblin/walk_up_b",
+                "goblin/walk_up_c",
+                "goblin/walk_up_d"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_right_a",
+                "goblin/walk_right_b",
+                "goblin/walk_right_c",
+                "goblin/walk_right_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"
@@ -1132,14 +1112,34 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkUp": {
-              "state": "WalkUp",
+            "Idle": {
+              "state": "Idle",
               "atlas_name": "goblin.json",
               "frame_tile_names": [
-                "goblin/walk_up_a",
-                "goblin/walk_up_b",
-                "goblin/walk_up_c",
-                "goblin/walk_up_d"
+                "goblin/idle_a",
+                "goblin/idle_b"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/idle_down_a",
+                "goblin/idle_down_b"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "goblin.json",
+              "frame_tile_names": [
+                "goblin/walk_down_a",
+                "goblin/walk_down_b",
+                "goblin/walk_down_c",
+                "goblin/walk_down_d"
               ],
               "frame_duration_ms": 150.0,
               "loop_mode": "Loop"

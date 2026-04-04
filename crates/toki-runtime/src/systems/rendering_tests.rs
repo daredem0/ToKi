@@ -81,6 +81,8 @@ impl RenderFrameControl for FakeBackend {
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         self.tilemap_vertex_counts.borrow_mut().push(vertices.len());
     }
+
+    fn update_overlay_tilemap_vertices(&mut self, _vertices: &[QuadVertex]) {}
 }
 
 impl TextureBackend for FakeBackend {

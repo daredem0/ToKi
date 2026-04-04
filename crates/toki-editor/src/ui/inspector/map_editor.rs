@@ -1,5 +1,24 @@
 use super::*;
 
+enum LayerPanelAction {
+    ToggleVisibility(usize),
+    ToggleAboveEntities(usize),
+    Select(usize),
+    MoveUp(usize),
+    MoveDown(usize),
+    Remove(usize),
+    Add(String),
+}
+
+struct LayerRowData<'a> {
+    index: usize,
+    name: &'a str,
+    visible: bool,
+    above_entities: bool,
+    is_active: bool,
+    layer_count: usize,
+}
+
 impl InspectorSystem {
     pub(crate) fn render_map_editor_toolbox(
         ui_state: &mut EditorUI,
@@ -32,6 +51,8 @@ impl InspectorSystem {
                 "Pick Tile",
             );
         });
+        ui.separator();
+        Self::render_layer_panel(ui_state, ui);
         ui.separator();
 
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
@@ -186,6 +207,123 @@ impl InspectorSystem {
         if crate::ui::editor_ui::has_unsaved_map_editor_changes(ui_state) {
             ui.separator();
             ui.label("Map editor has unsaved changes.");
+        }
+    }
+
+    fn render_layer_panel(ui_state: &mut EditorUI, ui: &mut egui::Ui) {
+        let Some(draft) = &crate::ui::editor_context::map_state(ui_state).draft else {
+            return;
+        };
+        let layer_count = draft.tilemap.layers.len();
+        if layer_count == 0 {
+            return;
+        }
+        let active_layer = crate::ui::editor_context::map_state(ui_state).active_layer;
+
+        ui.label("Layers");
+        let mut action: Option<LayerPanelAction> = None;
+
+        // Render layers in reverse order (topmost first, like Photoshop)
+        for display_i in 0..layer_count {
+            let layer_index = layer_count - 1 - display_i;
+            let layer = &draft.tilemap.layers[layer_index];
+            let row = LayerRowData {
+                index: layer_index,
+                name: &layer.name,
+                visible: layer.visible,
+                above_entities: layer.above_entities,
+                is_active: layer_index == active_layer,
+                layer_count,
+            };
+            Self::render_layer_row(ui, &row, &mut action);
+            if row.is_active {
+                Self::render_active_layer_properties(ui, &row, &mut action);
+            }
+        }
+
+        ui.horizontal(|ui| {
+            if ui.small_button("+ Add Layer").clicked() {
+                let name = format!("Layer {}", layer_count);
+                action = Some(LayerPanelAction::Add(name));
+            }
+        });
+
+        Self::apply_layer_action(ui_state, action);
+    }
+
+    fn render_layer_row(
+        ui: &mut egui::Ui,
+        row: &LayerRowData<'_>,
+        action: &mut Option<LayerPanelAction>,
+    ) {
+        ui.horizontal(|ui| {
+            let eye_label = if row.visible { "\u{1F441}" } else { "--" };
+            if ui.small_button(eye_label).clicked() {
+                *action = Some(LayerPanelAction::ToggleVisibility(row.index));
+            }
+
+            let label = if row.is_active {
+                egui::RichText::new(row.name).strong()
+            } else if !row.visible {
+                egui::RichText::new(row.name).weak()
+            } else {
+                egui::RichText::new(row.name)
+            };
+            if ui.selectable_label(row.is_active, label).clicked() {
+                *action = Some(LayerPanelAction::Select(row.index));
+            }
+
+            if row.index + 1 < row.layer_count && ui.small_button("Up").clicked() {
+                *action = Some(LayerPanelAction::MoveUp(row.index));
+            }
+            if row.index > 0 && ui.small_button("Down").clicked() {
+                *action = Some(LayerPanelAction::MoveDown(row.index));
+            }
+            if row.layer_count > 1 && ui.small_button("🗑").clicked() {
+                *action = Some(LayerPanelAction::Remove(row.index));
+            }
+        });
+    }
+
+    fn render_active_layer_properties(
+        ui: &mut egui::Ui,
+        row: &LayerRowData<'_>,
+        action: &mut Option<LayerPanelAction>,
+    ) {
+        ui.indent(format!("layer_props_{}", row.index), |ui| {
+            let mut above = row.above_entities;
+            if ui.checkbox(&mut above, "Above entities").changed() {
+                *action = Some(LayerPanelAction::ToggleAboveEntities(row.index));
+            }
+        });
+    }
+
+    fn apply_layer_action(ui_state: &mut EditorUI, action: Option<LayerPanelAction>) {
+        let Some(action) = action else {
+            return;
+        };
+        match action {
+            LayerPanelAction::ToggleVisibility(i) => {
+                crate::ui::editor_ui::toggle_layer_visibility(ui_state, i);
+            }
+            LayerPanelAction::ToggleAboveEntities(i) => {
+                crate::ui::editor_ui::toggle_layer_above_entities(ui_state, i);
+            }
+            LayerPanelAction::Select(i) => {
+                crate::ui::editor_ui::set_active_layer(ui_state, i);
+            }
+            LayerPanelAction::MoveUp(i) => {
+                crate::ui::editor_ui::move_layer(ui_state, i, i + 1);
+            }
+            LayerPanelAction::MoveDown(i) => {
+                crate::ui::editor_ui::move_layer(ui_state, i, i - 1);
+            }
+            LayerPanelAction::Remove(i) => {
+                crate::ui::editor_ui::remove_layer_from_map(ui_state, i);
+            }
+            LayerPanelAction::Add(name) => {
+                crate::ui::editor_ui::add_layer_to_map(ui_state, &name);
+            }
         }
     }
 

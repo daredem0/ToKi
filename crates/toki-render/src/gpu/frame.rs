@@ -22,6 +22,8 @@ impl GpuState {
     fn update_render_resources(&mut self) {
         self.tilemap_pipeline
             .update_with_queue(&self.device, &self.queue);
+        self.overlay_tilemap_pipeline
+            .update_with_queue(&self.device, &self.queue);
         self.sprite_pipeline
             .update_with_queue(&self.device, &self.queue);
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
@@ -202,6 +204,9 @@ impl GpuState {
             }
         }
 
+        if self.tilemap_render_enabled {
+            self.overlay_tilemap_pipeline.render(&mut render_pass);
+        }
         self.debug_pipeline.render(&mut render_pass);
         self.ui_shape_pipeline.render(&mut render_pass);
         self.ui_debug_pipeline.render(&mut render_pass);

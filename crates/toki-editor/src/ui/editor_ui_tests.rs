@@ -1252,3 +1252,131 @@ fn toolbox_tab_labels_are_nonempty() {
         assert!(!tab.label().is_empty());
     }
 }
+
+// --- Layer operation tests ---
+
+fn layer_test_draft() -> MapEditorDraft {
+    MapEditorDraft {
+        name: "test_map".to_string(),
+        tilemap: toki_core::assets::tilemap::TileMap {
+            size: glam::UVec2::new(2, 2),
+            tile_size: glam::UVec2::new(8, 8),
+            atlas: std::path::PathBuf::from("terrain.json"),
+            layers: vec![toki_core::assets::tilemap::TileLayer::new(
+                "ground",
+                vec!["grass".to_string(); 4],
+            )],
+        },
+    }
+}
+
+fn setup_layer_test() -> EditorUI {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, layer_test_draft());
+    ui
+}
+
+#[test]
+fn add_layer_increases_count_and_sets_active() {
+    let mut ui = setup_layer_test();
+    crate::ui::editor_ui::add_layer_to_map(&mut ui, "detail");
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    let draft = state.draft.as_ref().expect("draft");
+    assert_eq!(draft.tilemap.layers.len(), 2);
+    assert_eq!(draft.tilemap.layers[1].name, "detail");
+    assert_eq!(draft.tilemap.layers[1].tiles.len(), 4);
+    assert!(draft.tilemap.layers[1].tiles.iter().all(|t| t.is_empty()));
+    assert_eq!(state.active_layer, 1);
+    assert!(state.pending_tilemap_sync.is_some());
+}
+
+#[test]
+fn remove_layer_decreases_count_and_clamps_active() {
+    let mut ui = setup_layer_test();
+    crate::ui::editor_ui::add_layer_to_map(&mut ui, "detail");
+    crate::ui::editor_ui::set_active_layer(&mut ui, 1);
+    crate::ui::editor_ui::remove_layer_from_map(&mut ui, 1);
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    let draft = state.draft.as_ref().expect("draft");
+    assert_eq!(draft.tilemap.layers.len(), 1);
+    assert_eq!(state.active_layer, 0);
+}
+
+#[test]
+fn remove_last_layer_is_rejected() {
+    let mut ui = setup_layer_test();
+    let before_layers = crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .unwrap()
+        .tilemap
+        .layers
+        .len();
+    crate::ui::editor_ui::remove_layer_from_map(&mut ui, 0);
+
+    let after_layers = crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .unwrap()
+        .tilemap
+        .layers
+        .len();
+    assert_eq!(before_layers, after_layers);
+}
+
+#[test]
+fn move_layer_reorders_and_tracks_active() {
+    let mut ui = setup_layer_test();
+    crate::ui::editor_ui::add_layer_to_map(&mut ui, "detail");
+    crate::ui::editor_ui::set_active_layer(&mut ui, 0);
+    crate::ui::editor_ui::move_layer(&mut ui, 0, 1);
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    let draft = state.draft.as_ref().expect("draft");
+    assert_eq!(draft.tilemap.layers[0].name, "detail");
+    assert_eq!(draft.tilemap.layers[1].name, "ground");
+    assert_eq!(state.active_layer, 1);
+}
+
+#[test]
+fn toggle_visibility_flips_flag_and_syncs_without_undo() {
+    let mut ui = setup_layer_test();
+    assert!(
+        crate::ui::editor_context::map_state(&ui)
+            .draft
+            .as_ref()
+            .unwrap()
+            .tilemap
+            .layers[0]
+            .visible
+    );
+
+    crate::ui::editor_ui::toggle_layer_visibility(&mut ui, 0);
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    assert!(!state.draft.as_ref().unwrap().tilemap.layers[0].visible);
+    assert!(state.pending_tilemap_sync.is_some());
+    // Visibility toggle does NOT push undo
+    assert!(!state.history.can_undo());
+}
+
+#[test]
+fn toggle_above_entities_pushes_undo() {
+    let mut ui = setup_layer_test();
+    crate::ui::editor_ui::toggle_layer_above_entities(&mut ui, 0);
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    assert!(state.draft.as_ref().unwrap().tilemap.layers[0].above_entities);
+    assert!(state.history.can_undo());
+}
+
+#[test]
+fn set_active_layer_clamps_to_bounds() {
+    let mut ui = setup_layer_test();
+    crate::ui::editor_ui::set_active_layer(&mut ui, 99);
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    assert_eq!(state.active_layer, 0); // only 1 layer, max index is 0
+}

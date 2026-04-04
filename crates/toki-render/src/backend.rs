@@ -58,8 +58,11 @@ pub trait RenderFrameControl {
     /// Draw the current frame
     fn draw(&mut self) -> Result<(), RenderError>;
 
-    /// Update tilemap vertex data
+    /// Update tilemap vertex data (below-entity layers)
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
+
+    /// Update overlay tilemap vertex data (above-entity layers)
+    fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
 }
 
 /// Texture and font asset loading operations used by rendering backends.

@@ -11,6 +11,13 @@ use std::path::PathBuf;
 
 pub const CHUNK_SIZE: u32 = 16; //16x16 tiles per chunk
 
+/// Tilemap vertices split by render order relative to entities.
+#[derive(Debug, Default)]
+pub struct SplitTilemapVertices {
+    pub below: Vec<QuadVertex>,
+    pub above: Vec<QuadVertex>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TileLayer {
     pub name: String,
@@ -19,6 +26,8 @@ pub struct TileLayer {
     pub visible: bool,
     #[serde(default = "default_true")]
     pub collision_enabled: bool,
+    #[serde(default)]
+    pub above_entities: bool,
 }
 
 fn default_true() -> bool {
@@ -32,6 +41,17 @@ impl TileLayer {
             tiles,
             visible: true,
             collision_enabled: true,
+            above_entities: false,
+        }
+    }
+
+    pub fn new_empty(name: impl Into<String>, tile_count: usize) -> Self {
+        Self {
+            name: name.into(),
+            tiles: vec![String::new(); tile_count],
+            visible: true,
+            collision_enabled: false,
+            above_entities: false,
         }
     }
 }
@@ -257,6 +277,26 @@ impl TileMap {
         vertices
     }
 
+    pub fn generate_split_vertices(
+        &self,
+        atlas: &AtlasMeta,
+        texture_size: UVec2,
+    ) -> SplitTilemapVertices {
+        let mut result = SplitTilemapVertices::default();
+        for layer in &self.layers {
+            if !layer.visible {
+                continue;
+            }
+            let target = if layer.above_entities {
+                &mut result.above
+            } else {
+                &mut result.below
+            };
+            self.append_layer_vertices(&layer.tiles, atlas, texture_size, target);
+        }
+        result
+    }
+
     fn append_layer_vertices(
         &self,
         tiles: &[String],
@@ -394,6 +434,27 @@ impl TileMap {
             );
         }
         vertices
+    }
+
+    pub fn generate_split_vertices_for_chunks(
+        &self,
+        atlas: &AtlasMeta,
+        texture_size: UVec2,
+        visible_chunks: &[(u32, u32)],
+    ) -> SplitTilemapVertices {
+        let mut result = SplitTilemapVertices::default();
+        for layer in &self.layers {
+            if !layer.visible {
+                continue;
+            }
+            let target = if layer.above_entities {
+                &mut result.above
+            } else {
+                &mut result.below
+            };
+            self.append_chunk_vertices(&layer.tiles, atlas, texture_size, visible_chunks, target);
+        }
+        result
     }
 
     fn append_chunk_vertices(

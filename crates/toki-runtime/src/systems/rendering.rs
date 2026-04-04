@@ -386,6 +386,12 @@ impl RenderingSystem {
         }
     }
 
+    pub fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        if let Some(backend) = &mut self.backend {
+            backend.as_mut().update_overlay_tilemap_vertices(vertices);
+        }
+    }
+
     pub fn clear_sprites(&mut self) {
         if let Some(backend) = &mut self.backend {
             backend.as_mut().clear_sprites();

@@ -60,6 +60,11 @@
             "type": "boolean",
             "default": true,
             "description": "Whether this layer participates in collision checks"
+          },
+          "above_entities": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, this layer renders above entity sprites"
           }
         }
       }

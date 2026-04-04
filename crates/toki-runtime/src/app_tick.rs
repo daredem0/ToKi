@@ -186,12 +186,16 @@ impl App {
                     .update_chunk_cache(self.resources.get_tilemap())
                 {
                     if let Some(atlas_size) = self.resources.terrain_image_size() {
-                        let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
-                            self.resources.get_terrain_atlas(),
-                            atlas_size,
-                            self.camera_system.cached_visible_chunks(),
-                        );
-                        self.rendering.update_tilemap_vertices(&verts);
+                        let split = self
+                            .resources
+                            .get_tilemap()
+                            .generate_split_vertices_for_chunks(
+                                self.resources.get_terrain_atlas(),
+                                atlas_size,
+                                self.camera_system.cached_visible_chunks(),
+                            );
+                        self.rendering.update_tilemap_vertices(&split.below);
+                        self.rendering.update_overlay_tilemap_vertices(&split.above);
                     } else {
                         tracing::warn!(
                             "Terrain image size unavailable; skipping tilemap vertex refresh"
@@ -244,12 +248,16 @@ impl App {
         self.camera_system
             .update_chunk_cache(self.resources.get_tilemap());
         if let Some(atlas_size) = self.resources.terrain_image_size() {
-            let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
-                self.resources.get_terrain_atlas(),
-                atlas_size,
-                self.camera_system.cached_visible_chunks(),
-            );
-            self.rendering.update_tilemap_vertices(&verts);
+            let split = self
+                .resources
+                .get_tilemap()
+                .generate_split_vertices_for_chunks(
+                    self.resources.get_terrain_atlas(),
+                    atlas_size,
+                    self.camera_system.cached_visible_chunks(),
+                );
+            self.rendering.update_tilemap_vertices(&split.below);
+            self.rendering.update_overlay_tilemap_vertices(&split.above);
         } else {
             tracing::warn!("Terrain image size unavailable; skipping tilemap vertex refresh");
         }

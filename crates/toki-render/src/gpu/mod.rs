@@ -33,6 +33,7 @@ pub struct GpuState {
     device: Device,
     queue: Queue,
     tilemap_pipeline: TilemapPipeline,
+    overlay_tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: PerFrameLruCache<PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<GpuSpriteBatchKey>>,
@@ -83,6 +84,8 @@ impl GpuState {
             create_device_and_surface(Arc::clone(&window), vsync)?;
         let tilemap_pipeline =
             TilemapPipeline::new(&device, &queue, config.format, tilemap_texture)?;
+        let overlay_tilemap_pipeline =
+            TilemapPipeline::new(&device, &queue, config.format, TextureSource::placeholder())?;
         let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_texture)?;
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -98,6 +101,7 @@ impl GpuState {
             device,
             queue,
             tilemap_pipeline,
+            overlay_tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: PerFrameLruCache::new(
                 GPU_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY,
@@ -265,9 +269,16 @@ impl GpuState {
             .update_vertices(&self.device, &self.queue, vertices);
     }
 
+    pub fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        self.overlay_tilemap_pipeline
+            .update_vertices(&self.device, &self.queue, vertices);
+    }
+
     pub fn update_projection(&mut self, mvp: glam::Mat4) {
         self.current_mvp = mvp;
         self.tilemap_pipeline.update_projection(&self.queue, mvp);
+        self.overlay_tilemap_pipeline
+            .update_projection(&self.queue, mvp);
         self.sprite_pipeline.update_projection(&self.queue, mvp);
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.update_projection(&self.queue, mvp);
@@ -308,6 +319,10 @@ impl crate::RenderFrameControl for GpuState {
 
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         GpuState::update_tilemap_vertices(self, vertices);
+    }
+
+    fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        GpuState::update_overlay_tilemap_vertices(self, vertices);
     }
 }
 

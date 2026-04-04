@@ -89,12 +89,13 @@ pub struct SceneRenderer {
     queue: wgpu::Queue,
     format: wgpu::TextureFormat,
     tilemap_pipeline: TilemapPipeline,
+    overlay_tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: PerFrameLruCache<std::path::PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<SceneSpriteBatchKey>>,
     underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
-    current_sprite_texture_path: Option<std::path::PathBuf>, // Cache current sprite texture
+    current_sprite_texture_path: Option<std::path::PathBuf>,
     current_projection: glam::Mat4,
 }
 
@@ -128,12 +129,16 @@ impl SceneRenderer {
         tracing::debug!("Surface format: {:?}", surface_format);
         tracing::debug!("Tilemap texture: {:?}", tilemap_texture);
         tracing::debug!("Sprite texture: {:?}", sprite_texture);
-        let tilemap_source = tilemap_texture
-            .as_deref()
-            .map(TextureSource::path)
-            .unwrap_or_else(TextureSource::placeholder);
+        let make_tilemap_source = || {
+            tilemap_texture
+                .as_deref()
+                .map(TextureSource::path)
+                .unwrap_or_else(TextureSource::placeholder)
+        };
         let tilemap_pipeline =
-            TilemapPipeline::new(&device, &queue, surface_format, tilemap_source)?;
+            TilemapPipeline::new(&device, &queue, surface_format, make_tilemap_source())?;
+        let overlay_tilemap_pipeline =
+            TilemapPipeline::new(&device, &queue, surface_format, make_tilemap_source())?;
 
         // Clone sprite_texture for caching before moving it
         let sprite_texture_cache = sprite_texture.clone();
@@ -153,6 +158,7 @@ impl SceneRenderer {
             queue,
             format: surface_format,
             tilemap_pipeline,
+            overlay_tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: PerFrameLruCache::new(
                 SCENE_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY,
@@ -172,6 +178,12 @@ impl SceneRenderer {
     ) -> Result<(), RenderError> {
         tracing::info!("Loading tilemap texture: {:?}", texture_path);
         self.tilemap_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.format,
+            TextureSource::path(texture_path.as_path()),
+        )?;
+        self.overlay_tilemap_pipeline = TilemapPipeline::new(
             &self.device,
             &self.queue,
             self.format,
@@ -405,27 +417,33 @@ impl SceneRenderer {
 
     fn prepare_scene_pipelines(&mut self, scene_data: &SceneData) {
         if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
-            let vertices = if scene_data.visible_chunks.is_empty() {
+            let split = if scene_data.visible_chunks.is_empty() {
                 tracing::trace!(
-                    "Generating vertices for all tiles ({}x{})",
+                    "Generating split vertices for all tiles ({}x{})",
                     tilemap.size.x,
                     tilemap.size.y
                 );
-                tilemap.generate_vertices(atlas, scene_data.texture_size)
+                tilemap.generate_split_vertices(atlas, scene_data.texture_size)
             } else {
                 tracing::trace!(
-                    "Generating vertices for {} visible chunks",
+                    "Generating split vertices for {} visible chunks",
                     scene_data.visible_chunks.len()
                 );
-                tilemap.generate_vertices_for_chunks(
+                tilemap.generate_split_vertices_for_chunks(
                     atlas,
                     scene_data.texture_size,
                     &scene_data.visible_chunks,
                 )
             };
-            tracing::trace!("Updating tilemap pipeline with {} vertices", vertices.len());
+            tracing::trace!(
+                "Updating tilemap pipelines: {} below, {} above vertices",
+                split.below.len(),
+                split.above.len()
+            );
             self.tilemap_pipeline
-                .update_vertices(&self.device, &self.queue, &vertices);
+                .update_vertices(&self.device, &self.queue, &split.below);
+            self.overlay_tilemap_pipeline
+                .update_vertices(&self.device, &self.queue, &split.above);
         } else {
             tracing::trace!("No tilemap or atlas to render");
         }
@@ -485,12 +503,14 @@ impl SceneRenderer {
                 occlusion_query_set: None,
             });
 
-            tracing::trace!("Rendering tilemap pipeline");
+            tracing::trace!("Rendering tilemap pipeline (below entities)");
             self.tilemap_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering underlay pipeline");
             self.underlay_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
             self.render_sprite_batches(&mut render_pass);
+            tracing::trace!("Rendering overlay tilemap pipeline (above entities)");
+            self.overlay_tilemap_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
@@ -570,6 +590,8 @@ impl SceneRenderer {
     fn update_projection(&mut self, projection: glam::Mat4) {
         self.current_projection = projection;
         self.tilemap_pipeline
+            .update_projection(&self.queue, projection);
+        self.overlay_tilemap_pipeline
             .update_projection(&self.queue, projection);
         self.update_sprite_projection(projection);
         self.underlay_pipeline

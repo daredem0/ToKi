@@ -2,7 +2,7 @@ use super::{EditorUI, MapEditorState};
 #[cfg(test)]
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::undo_redo::History;
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -235,16 +235,12 @@ pub(crate) fn map_editor_selected_label(ui_state: &EditorUI) -> String {
 }
 
 pub(crate) fn has_unsaved_map_editor_draft(ui_state: &EditorUI) -> bool {
-    crate::ui::editor_context::map_state(ui_state)
-        .draft
-        .is_some()
+    let state = crate::ui::editor_context::map_state(ui_state);
+    state.draft.is_some() && state.dirty
 }
 
 pub(crate) fn has_unsaved_map_editor_changes(ui_state: &EditorUI) -> bool {
     crate::ui::editor_context::map_state(ui_state).dirty
-        || crate::ui::editor_context::map_state(ui_state)
-            .draft
-            .is_some()
 }
 
 pub(crate) fn sync_map_editor_brush_selection(ui_state: &mut EditorUI, tile_names: &[String]) {
@@ -358,6 +354,129 @@ pub(crate) fn take_pending_map_editor_tilemap_sync(ui_state: &mut EditorUI) -> O
     crate::ui::editor_context::map_state_mut(ui_state)
         .pending_tilemap_sync
         .take()
+}
+
+// --- Layer operations ---
+
+pub(crate) fn add_layer_to_map(ui_state: &mut EditorUI, layer_name: &str) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return;
+    };
+    let before = draft.tilemap.clone();
+    let tile_count = (draft.tilemap.size.x * draft.tilemap.size.y) as usize;
+    let new_layer = TileLayer::new_empty(layer_name, tile_count);
+    let insert_at = (map_state.active_layer + 1).min(draft.tilemap.layers.len());
+    draft.tilemap.layers.insert(insert_at, new_layer);
+    map_state.active_layer = insert_at;
+    record_layer_edit(ui_state, before);
+}
+
+pub(crate) fn remove_layer_from_map(ui_state: &mut EditorUI, layer_index: usize) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return;
+    };
+    if draft.tilemap.layers.len() <= 1 || layer_index >= draft.tilemap.layers.len() {
+        return;
+    }
+    let before = draft.tilemap.clone();
+    draft.tilemap.layers.remove(layer_index);
+    map_state.active_layer = map_state
+        .active_layer
+        .min(draft.tilemap.layers.len().saturating_sub(1));
+    record_layer_edit(ui_state, before);
+}
+
+pub(crate) fn move_layer(ui_state: &mut EditorUI, from: usize, to: usize) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return;
+    };
+    let len = draft.tilemap.layers.len();
+    if from >= len || to >= len || from == to {
+        return;
+    }
+    let before = draft.tilemap.clone();
+    let layer = draft.tilemap.layers.remove(from);
+    draft.tilemap.layers.insert(to, layer);
+    map_state.active_layer = to;
+    record_layer_edit(ui_state, before);
+}
+
+#[allow(dead_code)]
+pub(crate) fn rename_layer(ui_state: &mut EditorUI, layer_index: usize, new_name: &str) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return;
+    };
+    let Some(layer) = draft.tilemap.layers.get_mut(layer_index) else {
+        return;
+    };
+    if layer.name == new_name {
+        return;
+    }
+    let before = draft.tilemap.clone();
+    draft.tilemap.layers[layer_index].name = new_name.to_string();
+    record_layer_edit(ui_state, before);
+}
+
+pub(crate) fn toggle_layer_visibility(ui_state: &mut EditorUI, layer_index: usize) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return;
+    };
+    let Some(layer) = draft.tilemap.layers.get_mut(layer_index) else {
+        return;
+    };
+    layer.visible = !layer.visible;
+    map_state.pending_tilemap_sync = Some(draft.tilemap.clone());
+    map_state.dirty = true;
+}
+
+pub(crate) fn toggle_layer_above_entities(ui_state: &mut EditorUI, layer_index: usize) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return;
+    };
+    if layer_index >= draft.tilemap.layers.len() {
+        return;
+    }
+    let before = draft.tilemap.clone();
+    draft.tilemap.layers[layer_index].above_entities =
+        !draft.tilemap.layers[layer_index].above_entities;
+    record_layer_edit(ui_state, before);
+}
+
+pub(crate) fn set_active_layer(ui_state: &mut EditorUI, layer_index: usize) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let max = map_state
+        .draft
+        .as_ref()
+        .map(|d| d.tilemap.layers.len().saturating_sub(1))
+        .unwrap_or(0);
+    map_state.active_layer = layer_index.min(max);
+}
+
+fn record_layer_edit(ui_state: &mut EditorUI, before: TileMap) {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &map_state.draft else {
+        return;
+    };
+    let after = draft.tilemap.clone();
+    let map_name = map_state
+        .active_map
+        .clone()
+        .unwrap_or_else(|| "map".to_string());
+    let is_draft = true;
+    map_state.history.push(MapEditorEditCommand {
+        map_name,
+        is_draft,
+        before,
+        after: after.clone(),
+    });
+    map_state.pending_tilemap_sync = Some(after);
+    map_state.dirty = true;
 }
 
 impl EditorUI {
