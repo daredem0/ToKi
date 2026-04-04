@@ -85,6 +85,8 @@ impl SceneViewport {
                     texture_size.x,
                     texture_size.y
                 );
+                self.tile_animation_clock.sync_definitions(&atlas);
+                scene_data.tile_animation_clock = Some(self.tile_animation_clock.clone());
                 scene_data.atlas = Some(atlas);
                 scene_data.texture_size = texture_size;
             }

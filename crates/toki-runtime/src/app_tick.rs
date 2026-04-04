@@ -51,6 +51,7 @@ impl App {
                 decoded_project_cache: &mut self.decoded_project_cache,
                 asset_load_plan: &mut self.asset_load_plan,
                 scene_transition: &mut self.scene_transition,
+                tile_animation_clock: &mut self.tile_animation_clock,
             },
             SceneRuntimeSettings {
                 audio_mix: &self.launch_options.audio_mix,
@@ -173,7 +174,7 @@ impl App {
         self.camera_system.update(&runtime, world_bounds) || player_moved || viewport_changed
     }
 
-    fn render_frame_if_ready(&mut self, cam_changed: bool) {
+    fn render_frame_if_ready(&mut self, cam_changed: bool, delta_ms: f32) {
         if self.rendering.has_gpu() {
             self.rendering
                 .set_post_process_settings(self.resolved_post_process_settings());
@@ -193,6 +194,7 @@ impl App {
                                 self.resources.get_terrain_atlas(),
                                 atlas_size,
                                 self.camera_system.cached_visible_chunks(),
+                                Some(&self.tile_animation_clock),
                             );
                         self.rendering.update_tilemap_vertices(&split.below);
                         self.rendering.update_overlay_tilemap_vertices(&split.above);
@@ -203,6 +205,13 @@ impl App {
                     }
                 }
             }
+
+            let atlas = self.resources.get_terrain_atlas();
+            let anim_changed = self.tile_animation_clock.update(delta_ms, atlas);
+            if anim_changed {
+                self.refresh_tilemap_vertices_for_current_camera();
+            }
+
             let viewport_scale_factor =
                 self.rendering.viewport_presentation().layout.resolved_scale;
             self.performance
@@ -235,7 +244,8 @@ impl App {
         let world_bounds = self.advance_scene_runtime(transition_delta_ms);
         let cam_changed =
             self.update_camera_and_projection(world_bounds, result.player_moved, viewport_changed);
-        self.render_frame_if_ready(cam_changed);
+        let effective_delta = delta_ms.unwrap_or(DEFAULT_TIMESTEP_MS);
+        self.render_frame_if_ready(cam_changed, effective_delta);
 
         self.platform.request_redraw();
     }
@@ -255,6 +265,7 @@ impl App {
                     self.resources.get_terrain_atlas(),
                     atlas_size,
                     self.camera_system.cached_visible_chunks(),
+                    Some(&self.tile_animation_clock),
                 );
             self.rendering.update_tilemap_vertices(&split.below);
             self.rendering.update_overlay_tilemap_vertices(&split.above);

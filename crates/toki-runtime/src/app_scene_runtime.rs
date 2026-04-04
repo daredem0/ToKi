@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::events::SceneSwitchRequest;
 use toki_core::game::{RenderQueryService, SceneSystem};
 use toki_core::graphics::image::load_image_rgba8;
@@ -21,6 +22,7 @@ pub(super) struct SceneRuntimeCoordinator<'a> {
     decoded_project_cache: &'a mut DecodedProjectCache,
     asset_load_plan: &'a mut RuntimeAssetLoadPlan,
     scene_transition: &'a mut SceneTransitionController,
+    tile_animation_clock: &'a mut TileAnimationClock,
     audio_mix: &'a RuntimeAudioMixOptions,
     scene_persistence: bool,
     indexed_palette_override: Option<String>,
@@ -37,6 +39,7 @@ pub(super) struct SceneRuntimeRefs<'a> {
     pub decoded_project_cache: &'a mut DecodedProjectCache,
     pub asset_load_plan: &'a mut RuntimeAssetLoadPlan,
     pub scene_transition: &'a mut SceneTransitionController,
+    pub tile_animation_clock: &'a mut TileAnimationClock,
 }
 
 pub(super) struct SceneRuntimeSettings<'a> {
@@ -58,6 +61,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             decoded_project_cache: refs.decoded_project_cache,
             asset_load_plan: refs.asset_load_plan,
             scene_transition: refs.scene_transition,
+            tile_animation_clock: refs.tile_animation_clock,
             audio_mix: settings.audio_mix,
             scene_persistence: settings.scene_persistence,
             indexed_palette_override: settings.indexed_palette_override,
@@ -214,6 +218,9 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             .camera_mut()
             .clamp_to_world_bounds(world_bounds);
 
+        let atlas = self.resources.get_terrain_atlas();
+        self.tile_animation_clock.sync_definitions(atlas);
+
         if self.rendering.has_gpu() {
             let view = self.camera_system.view_matrix();
             self.rendering.update_projection(view);
@@ -227,6 +234,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
                         self.resources.get_terrain_atlas(),
                         atlas_size,
                         self.camera_system.cached_visible_chunks(),
+                        Some(self.tile_animation_clock),
                     );
                 self.rendering.update_tilemap_vertices(&split.below);
                 self.rendering.update_overlay_tilemap_vertices(&split.above);
@@ -303,6 +311,7 @@ impl App {
                 decoded_project_cache: &mut self.decoded_project_cache,
                 asset_load_plan: &mut self.asset_load_plan,
                 scene_transition: &mut self.scene_transition,
+                tile_animation_clock: &mut self.tile_animation_clock,
             },
             SceneRuntimeSettings {
                 audio_mix: &self.launch_options.audio_mix,

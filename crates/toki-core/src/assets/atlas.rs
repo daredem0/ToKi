@@ -1,3 +1,5 @@
+use crate::assets::animated_tile::AnimatedTileDef;
+use crate::assets::autotile::AutoTileGroup;
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
 };
@@ -59,6 +61,10 @@ pub struct AtlasMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub palette_size: Option<PaletteSize>,
     pub tiles: HashMap<String, TileInfo>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub auto_tile_groups: HashMap<String, AutoTileGroup>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub animated_tiles: HashMap<String, AnimatedTileDef>,
 }
 
 impl AtlasMeta {
@@ -134,6 +140,22 @@ impl AtlasMeta {
         self.tiles.get(name).map(|tile_info| &tile_info.properties)
     }
 
+    pub fn is_auto_tile_group(&self, name: &str) -> bool {
+        self.auto_tile_groups.contains_key(name)
+    }
+
+    pub fn get_auto_tile_group(&self, name: &str) -> Option<&AutoTileGroup> {
+        self.auto_tile_groups.get(name)
+    }
+
+    pub fn is_animated_tile(&self, name: &str) -> bool {
+        self.animated_tiles.contains_key(name)
+    }
+
+    pub fn get_animated_tile(&self, name: &str) -> Option<&AnimatedTileDef> {
+        self.animated_tiles.get(name)
+    }
+
     /// Create a new atlas with a single tile covering the entire image.
     pub fn new_single_tile(image_filename: impl Into<PathBuf>, tile_size: UVec2) -> Self {
         let mut tiles = HashMap::new();
@@ -151,6 +173,8 @@ impl AtlasMeta {
             palette: None,
             palette_size: None,
             tiles,
+            auto_tile_groups: HashMap::new(),
+            animated_tiles: HashMap::new(),
         }
     }
 
@@ -181,6 +205,8 @@ impl AtlasMeta {
             palette: None,
             palette_size: None,
             tiles,
+            auto_tile_groups: HashMap::new(),
+            animated_tiles: HashMap::new(),
         }
     }
 

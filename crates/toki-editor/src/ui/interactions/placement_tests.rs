@@ -139,6 +139,8 @@ fn placement_collision_assets() -> (TileMap, AtlasMeta) {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     let tilemap = TileMap {

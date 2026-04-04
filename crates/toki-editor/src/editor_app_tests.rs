@@ -566,6 +566,8 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     let tilemap = TileMap {

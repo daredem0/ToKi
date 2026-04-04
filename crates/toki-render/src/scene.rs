@@ -5,6 +5,7 @@ use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::RenderTarget;
 use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
 use toki_core::assets::atlas::AtlasMeta;
+use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::sprite::SpriteFrame;
@@ -19,6 +20,7 @@ pub struct SceneData {
     pub texture_size: glam::UVec2,
     pub visible_chunks: Vec<(u32, u32)>,
     pub sprites: Vec<SpriteInstance>,
+    pub tile_animation_clock: Option<TileAnimationClock>,
     pub underlay_shapes: Vec<OverlayShape>,
     pub debug_shapes: Vec<DebugShape>,
     pub overlay_shapes: Vec<OverlayShape>,
@@ -76,6 +78,7 @@ impl Default for SceneData {
             texture_size: glam::UVec2::new(256, 256),
             visible_chunks: Vec::new(),
             sprites: Vec::new(),
+            tile_animation_clock: None,
             underlay_shapes: Vec::new(),
             debug_shapes: Vec::new(),
             overlay_shapes: Vec::new(),
@@ -417,13 +420,14 @@ impl SceneRenderer {
 
     fn prepare_scene_pipelines(&mut self, scene_data: &SceneData) {
         if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
+            let anim_clock = scene_data.tile_animation_clock.as_ref();
             let split = if scene_data.visible_chunks.is_empty() {
                 tracing::trace!(
                     "Generating split vertices for all tiles ({}x{})",
                     tilemap.size.x,
                     tilemap.size.y
                 );
-                tilemap.generate_split_vertices(atlas, scene_data.texture_size)
+                tilemap.generate_split_vertices(atlas, scene_data.texture_size, anim_clock)
             } else {
                 tracing::trace!(
                     "Generating split vertices for {} visible chunks",
@@ -433,6 +437,7 @@ impl SceneRenderer {
                     atlas,
                     scene_data.texture_size,
                     &scene_data.visible_chunks,
+                    anim_clock,
                 )
             };
             tracing::trace!(

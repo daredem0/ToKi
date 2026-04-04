@@ -113,6 +113,8 @@ fn atlas_image_size_with_scattered_tiles() {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     let size = atlas.image_size().unwrap();
@@ -129,6 +131,8 @@ fn atlas_image_size_empty_atlas() {
         palette: None,
         palette_size: None,
         tiles: HashMap::new(),
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     // Empty atlas should return None
@@ -153,6 +157,8 @@ fn atlas_get_tile_rect_with_different_tile_sizes() {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     let rect = atlas.get_tile_rect("big_tile").unwrap();
@@ -209,6 +215,8 @@ fn atlas_with_special_characters_in_tile_names() {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     assert_eq!(
@@ -309,5 +317,7 @@ fn create_test_atlas() -> AtlasMeta {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     }
 }

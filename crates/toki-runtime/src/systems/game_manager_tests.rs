@@ -52,6 +52,8 @@ fn sample_atlas() -> AtlasMeta {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     }
 }
 

@@ -70,6 +70,8 @@ fn create_test_atlas() -> AtlasMeta {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     }
 }
 
@@ -204,7 +206,7 @@ fn tilemap_generate_vertices_creates_correct_quads() {
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32); // 2x2 tiles of 16x16 each
 
-    let vertices = tilemap.generate_vertices(&atlas, texture_size);
+    let vertices = tilemap.generate_vertices(&atlas, texture_size, None);
 
     // Should have 4 tiles * 6 vertices per quad = 24 vertices
     assert_eq!(vertices.len(), 24);
@@ -235,7 +237,7 @@ fn tilemap_generate_vertices_handles_missing_tiles() {
     atlas.tiles.remove("stone"); // Remove the stone tile from atlas
     let texture_size = UVec2::new(32, 32);
 
-    let vertices = tilemap.generate_vertices(&atlas, texture_size);
+    let vertices = tilemap.generate_vertices(&atlas, texture_size, None);
 
     // Should have 3 tiles * 6 vertices per quad = 18 vertices (stone tile skipped)
     assert_eq!(vertices.len(), 18);
@@ -252,7 +254,7 @@ fn tilemap_generate_vertices_empty_map() {
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32);
 
-    let vertices = tilemap.generate_vertices(&atlas, texture_size);
+    let vertices = tilemap.generate_vertices(&atlas, texture_size, None);
     assert_eq!(vertices.len(), 0);
 }
 
@@ -277,7 +279,7 @@ fn tilemap_generate_vertices_with_larger_map() {
     let atlas = create_test_atlas();
     let texture_size = UVec2::new(32, 32);
 
-    let vertices = tilemap.generate_vertices(&atlas, texture_size);
+    let vertices = tilemap.generate_vertices(&atlas, texture_size, None);
 
     // 6 tiles * 6 vertices per quad = 36 vertices
     assert_eq!(vertices.len(), 36);

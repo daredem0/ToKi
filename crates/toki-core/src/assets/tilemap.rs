@@ -1,4 +1,6 @@
 use crate::assets::atlas::AtlasMeta;
+use crate::assets::autotile;
+use crate::assets::tile_animation::TileAnimationClock;
 use crate::graphics::vertex::QuadVertex;
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
@@ -107,6 +109,74 @@ impl<'de> Deserialize<'de> for TileMap {
             layers,
         })
     }
+}
+
+fn is_same_group(tiles: &[String], size: UVec2, x: i32, y: i32, group_name: &str) -> bool {
+    if x < 0 || y < 0 || x >= size.x as i32 || y >= size.y as i32 {
+        return false;
+    }
+    let index = (y as u32 * size.x + x as u32) as usize;
+    tiles.get(index).is_some_and(|t| t == group_name)
+}
+
+fn resolve_auto_tile<'a>(
+    tile_name: &'a str,
+    x: u32,
+    y: u32,
+    tiles: &[String],
+    size: UVec2,
+    atlas: &'a AtlasMeta,
+) -> &'a str {
+    let Some(group) = atlas.get_auto_tile_group(tile_name) else {
+        return tile_name;
+    };
+    let ix = x as i32;
+    let iy = y as i32;
+    let n = is_same_group(tiles, size, ix, iy - 1, tile_name);
+    let e = is_same_group(tiles, size, ix + 1, iy, tile_name);
+    let s = is_same_group(tiles, size, ix, iy + 1, tile_name);
+    let w = is_same_group(tiles, size, ix - 1, iy, tile_name);
+    let mask = match group.mode {
+        autotile::AutoTileMode::FourBit => autotile::compute_4bit_mask(n, e, s, w),
+        autotile::AutoTileMode::EightBit => {
+            let ne = is_same_group(tiles, size, ix + 1, iy - 1, tile_name);
+            let se = is_same_group(tiles, size, ix + 1, iy + 1, tile_name);
+            let sw = is_same_group(tiles, size, ix - 1, iy + 1, tile_name);
+            let nw = is_same_group(tiles, size, ix - 1, iy - 1, tile_name);
+            autotile::compute_8bit_mask(&autotile::FullNeighbors {
+                n,
+                ne,
+                e,
+                se,
+                s,
+                sw,
+                w,
+                nw,
+            })
+        }
+    };
+    group
+        .resolve_variant(mask)
+        .or(group.preview_tile.as_deref())
+        .unwrap_or(tile_name)
+}
+
+fn resolve_tile_name<'a>(
+    tile_name: &'a str,
+    x: u32,
+    y: u32,
+    tiles: &[String],
+    size: UVec2,
+    atlas: &'a AtlasMeta,
+    tile_anim: Option<&TileAnimationClock>,
+) -> &'a str {
+    let resolved = resolve_auto_tile(tile_name, x, y, tiles, size, atlas);
+    if let Some(clock) = tile_anim {
+        if let Some(frame_tile) = clock.current_frame_tile(resolved, atlas) {
+            return frame_tile;
+        }
+    }
+    resolved
 }
 
 impl TileMap {
@@ -266,13 +336,18 @@ impl TileMap {
         Some(tile_pos * self.tile_size)
     }
 
-    pub fn generate_vertices(&self, atlas: &AtlasMeta, texture_size: UVec2) -> Vec<QuadVertex> {
+    pub fn generate_vertices(
+        &self,
+        atlas: &AtlasMeta,
+        texture_size: UVec2,
+        tile_anim: Option<&TileAnimationClock>,
+    ) -> Vec<QuadVertex> {
         let mut vertices = Vec::new();
         for layer in &self.layers {
             if !layer.visible {
                 continue;
             }
-            self.append_layer_vertices(&layer.tiles, atlas, texture_size, &mut vertices);
+            self.append_layer_vertices(&layer.tiles, atlas, texture_size, tile_anim, &mut vertices);
         }
         vertices
     }
@@ -281,6 +356,7 @@ impl TileMap {
         &self,
         atlas: &AtlasMeta,
         texture_size: UVec2,
+        tile_anim: Option<&TileAnimationClock>,
     ) -> SplitTilemapVertices {
         let mut result = SplitTilemapVertices::default();
         for layer in &self.layers {
@@ -292,7 +368,7 @@ impl TileMap {
             } else {
                 &mut result.below
             };
-            self.append_layer_vertices(&layer.tiles, atlas, texture_size, target);
+            self.append_layer_vertices(&layer.tiles, atlas, texture_size, tile_anim, target);
         }
         result
     }
@@ -302,6 +378,7 @@ impl TileMap {
         tiles: &[String],
         atlas: &AtlasMeta,
         texture_size: UVec2,
+        tile_anim: Option<&TileAnimationClock>,
         vertices: &mut Vec<QuadVertex>,
     ) {
         for y in 0..self.size.y {
@@ -310,7 +387,9 @@ impl TileMap {
                     Ok(name) => name,
                     Err(_) => continue,
                 };
-                self.push_tile_quad(tile_name, x, y, atlas, texture_size, vertices);
+                let resolved =
+                    resolve_tile_name(tile_name, x, y, tiles, self.size, atlas, tile_anim);
+                self.push_tile_quad(resolved, x, y, atlas, texture_size, vertices);
             }
         }
     }
@@ -419,6 +498,7 @@ impl TileMap {
         atlas: &AtlasMeta,
         texture_size: UVec2,
         visible_chunks: &[(u32, u32)],
+        tile_anim: Option<&TileAnimationClock>,
     ) -> Vec<QuadVertex> {
         let mut vertices = Vec::new();
         for layer in &self.layers {
@@ -430,6 +510,7 @@ impl TileMap {
                 atlas,
                 texture_size,
                 visible_chunks,
+                tile_anim,
                 &mut vertices,
             );
         }
@@ -441,6 +522,7 @@ impl TileMap {
         atlas: &AtlasMeta,
         texture_size: UVec2,
         visible_chunks: &[(u32, u32)],
+        tile_anim: Option<&TileAnimationClock>,
     ) -> SplitTilemapVertices {
         let mut result = SplitTilemapVertices::default();
         for layer in &self.layers {
@@ -452,7 +534,14 @@ impl TileMap {
             } else {
                 &mut result.below
             };
-            self.append_chunk_vertices(&layer.tiles, atlas, texture_size, visible_chunks, target);
+            self.append_chunk_vertices(
+                &layer.tiles,
+                atlas,
+                texture_size,
+                visible_chunks,
+                tile_anim,
+                target,
+            );
         }
         result
     }
@@ -463,6 +552,7 @@ impl TileMap {
         atlas: &AtlasMeta,
         texture_size: UVec2,
         visible_chunks: &[(u32, u32)],
+        tile_anim: Option<&TileAnimationClock>,
         vertices: &mut Vec<QuadVertex>,
     ) {
         for &(chunk_x, chunk_y) in visible_chunks {
@@ -477,7 +567,10 @@ impl TileMap {
                         Ok(name) => name,
                         Err(_) => continue,
                     };
-                    self.push_tile_quad(tile_name, tile_x, tile_y, atlas, texture_size, vertices);
+                    let resolved = resolve_tile_name(
+                        tile_name, tile_x, tile_y, tiles, self.size, atlas, tile_anim,
+                    );
+                    self.push_tile_quad(resolved, tile_x, tile_y, atlas, texture_size, vertices);
                 }
             }
         }

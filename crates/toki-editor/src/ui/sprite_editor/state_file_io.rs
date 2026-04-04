@@ -546,6 +546,8 @@ impl SpriteEditorState {
             },
             palette_size: None,
             tiles,
+            auto_tile_groups: std::collections::HashMap::new(),
+            animated_tiles: std::collections::HashMap::new(),
         }
     }
 

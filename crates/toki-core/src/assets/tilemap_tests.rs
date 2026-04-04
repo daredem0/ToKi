@@ -202,6 +202,8 @@ fn test_atlas() -> AtlasMeta {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     }
 }
 
@@ -211,8 +213,8 @@ fn test_split_vertices_no_above_layers() {
     let atlas = test_atlas();
     let tex = UVec2::new(16, 8);
 
-    let split = map.generate_split_vertices(&atlas, tex);
-    let flat = map.generate_vertices(&atlas, tex);
+    let split = map.generate_split_vertices(&atlas, tex, None);
+    let flat = map.generate_vertices(&atlas, tex, None);
 
     assert_eq!(split.below.len(), flat.len());
     assert!(split.above.is_empty());
@@ -229,7 +231,7 @@ fn test_split_vertices_partitions_by_above_entities() {
     let atlas = test_atlas();
     let tex = UVec2::new(16, 8);
 
-    let split = map.generate_split_vertices(&atlas, tex);
+    let split = map.generate_split_vertices(&atlas, tex, None);
 
     assert_eq!(split.below.len(), 6); // 1 tile = 2 triangles = 6 vertices
     assert_eq!(split.above.len(), 6);
@@ -247,7 +249,7 @@ fn test_split_vertices_invisible_above_layer_produces_nothing() {
     let atlas = test_atlas();
     let tex = UVec2::new(16, 8);
 
-    let split = map.generate_split_vertices(&atlas, tex);
+    let split = map.generate_split_vertices(&atlas, tex, None);
 
     assert_eq!(split.below.len(), 6);
     assert!(split.above.is_empty());
@@ -264,8 +266,123 @@ fn test_split_vertices_for_chunks_partitions_correctly() {
     let atlas = test_atlas();
     let tex = UVec2::new(16, 8);
 
-    let split = map.generate_split_vertices_for_chunks(&atlas, tex, &[(0, 0)]);
+    let split = map.generate_split_vertices_for_chunks(&atlas, tex, &[(0, 0)], None);
 
     assert_eq!(split.below.len(), 6);
     assert_eq!(split.above.len(), 6);
+}
+
+// --- Auto-tile resolution in vertex gen tests ---
+
+fn autotile_atlas() -> AtlasMeta {
+    use crate::assets::autotile::{AutoTileGroup, AutoTileMode};
+    let mut tiles = HashMap::new();
+    // Base tiles for each variant
+    for i in 0u8..16 {
+        tiles.insert(
+            format!("grass_{i}"),
+            TileInfo {
+                position: UVec2::new(u32::from(i % 4), u32::from(i / 4)),
+                properties: TileProperties::default(),
+            },
+        );
+    }
+    let mut variants = HashMap::new();
+    for i in 0u8..16 {
+        variants.insert(i, format!("grass_{i}"));
+    }
+    let mut auto_tile_groups = HashMap::new();
+    auto_tile_groups.insert(
+        "grass".to_string(),
+        AutoTileGroup {
+            mode: AutoTileMode::FourBit,
+            preview_tile: Some("grass_15".to_string()),
+            variants,
+        },
+    );
+    AtlasMeta {
+        image: PathBuf::from("test.png"),
+        tile_size: UVec2::new(8, 8),
+        color_mode: ColorMode::TrueColor,
+        palette: None,
+        palette_size: None,
+        tiles,
+        auto_tile_groups,
+        animated_tiles: HashMap::new(),
+    }
+}
+
+#[test]
+fn test_autotile_center_resolves_all_neighbors() {
+    // 3x3 grid all "grass" — center tile has N+E+S+W = mask 0b1111 = 15
+    let map = make_tilemap(
+        UVec2::new(3, 3),
+        vec![make_layer("ground", vec!["grass"; 9])],
+    );
+    let atlas = autotile_atlas();
+    let tex = UVec2::new(32, 32);
+    let verts = map.generate_vertices(&atlas, tex, None);
+    // 9 tiles * 6 vertices each = 54, all should render
+    assert_eq!(verts.len(), 54);
+    // Center tile (1,1) should resolve to grass_15 (all neighbors)
+    // Its vertices are at indices 30..36 (tile index 4 * 6 = 24... actually row-major: y*3+x)
+    // tile(1,1) is index 4, so vertices 24..30
+    let center_verts = &verts[24..30];
+    // grass_15 is at position (3, 3) in the atlas -> rect [24, 24, 8, 8]
+    // u0 = 24/32 = 0.75
+    let u0 = center_verts[0].tex_coords[0];
+    assert!((u0 - 0.75).abs() < 0.01, "expected u0=0.75, got {u0}");
+}
+
+#[test]
+fn test_autotile_corner_resolves_two_neighbors() {
+    // 3x3 grid all "grass" — top-left (0,0) has E+S = mask 0b0110 = 6
+    let map = make_tilemap(
+        UVec2::new(3, 3),
+        vec![make_layer("ground", vec!["grass"; 9])],
+    );
+    let atlas = autotile_atlas();
+    let tex = UVec2::new(32, 32);
+    let verts = map.generate_vertices(&atlas, tex, None);
+    // tile(0,0) is index 0, vertices 0..6
+    let corner_verts = &verts[0..6];
+    // grass_6 is at position (2, 1) -> rect [16, 8, 8, 8]
+    // u0 = 16/32 = 0.5
+    let u0 = corner_verts[0].tex_coords[0];
+    assert!((u0 - 0.5).abs() < 0.01, "expected u0=0.5, got {u0}");
+}
+
+#[test]
+fn test_non_autotile_passes_through() {
+    let map = make_tilemap(UVec2::new(1, 1), vec![make_layer("ground", vec!["a"])]);
+    let atlas = test_atlas();
+    let tex = UVec2::new(16, 8);
+    let verts = map.generate_vertices(&atlas, tex, None);
+    assert_eq!(verts.len(), 6);
+    // "a" is at position (0,0), u0 = 0.0
+    assert!((verts[0].tex_coords[0]).abs() < 0.01);
+}
+
+#[test]
+fn test_missing_variant_falls_back_to_preview_tile() {
+    use crate::assets::autotile::{AutoTileGroup, AutoTileMode};
+    // Create a group with NO variants at all
+    let mut atlas = autotile_atlas();
+    atlas.auto_tile_groups.insert(
+        "empty_group".to_string(),
+        AutoTileGroup {
+            mode: AutoTileMode::FourBit,
+            preview_tile: Some("grass_0".to_string()),
+            variants: HashMap::new(),
+        },
+    );
+    let map = make_tilemap(
+        UVec2::new(1, 1),
+        vec![make_layer("ground", vec!["empty_group"])],
+    );
+    let tex = UVec2::new(32, 32);
+    let verts = map.generate_vertices(&atlas, tex, None);
+    // Should fall back to preview_tile "grass_0" at position (0,0), u0=0.0
+    assert_eq!(verts.len(), 6);
+    assert!((verts[0].tex_coords[0]).abs() < 0.01);
 }

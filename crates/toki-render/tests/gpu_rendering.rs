@@ -102,6 +102,8 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
         palette: None,
         palette_size: None,
         tiles: atlas_tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     SceneData {
@@ -109,6 +111,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
         atlas: Some(atlas),
         texture_size: UVec2::new(16, 16),
         visible_chunks,
+        tile_animation_clock: None,
         sprites: vec![SpriteInstance {
             frame: SpriteFrame {
                 u0: 0.0,

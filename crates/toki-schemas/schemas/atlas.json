@@ -40,6 +40,24 @@
         }
       },
       "description": "Dictionary of tiles keyed by tile name"
+    },
+    "auto_tile_groups": {
+      "type": "object",
+      "description": "Named auto-tile groups mapping bitmask indices to tile variants",
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/definitions/autoTileGroup"
+        }
+      }
+    },
+    "animated_tiles": {
+      "type": "object",
+      "description": "Named animated tile definitions with frame sequences",
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/definitions/animatedTileDef"
+        }
+      }
     }
   },
   "definitions": {
@@ -73,6 +91,56 @@
         }
       },
       "additionalProperties": true
+    },
+    "autoTileGroup": {
+      "type": "object",
+      "required": ["mode", "variants"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["four_bit", "eight_bit"],
+          "description": "Bitmask mode: four_bit (16 variants, cardinal) or eight_bit (47 Wang tile variants)"
+        },
+        "preview_tile": {
+          "type": "string",
+          "description": "Tile name shown in brush selector and used as fallback for missing variants"
+        },
+        "variants": {
+          "type": "object",
+          "description": "Bitmask index (as string) to tile name mapping",
+          "patternProperties": {
+            "^\\d+$": { "type": "string" }
+          }
+        }
+      }
+    },
+    "animatedTileDef": {
+      "type": "object",
+      "required": ["frames", "frame_duration_ms"],
+      "properties": {
+        "frames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Ordered list of tile names forming the animation frames"
+        },
+        "frame_duration_ms": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default duration per frame in milliseconds"
+        },
+        "frame_durations_ms": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 1 },
+          "description": "Per-frame duration overrides in milliseconds"
+        },
+        "loop_mode": {
+          "type": "string",
+          "enum": ["loop", "ping_pong"],
+          "default": "loop",
+          "description": "Animation loop behavior"
+        }
+      }
     }
   }
 }

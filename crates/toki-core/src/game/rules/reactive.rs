@@ -139,6 +139,8 @@ mod tests {
                     palette: None,
                     palette_size: None,
                     tiles: std::collections::HashMap::new(),
+                    auto_tile_groups: std::collections::HashMap::new(),
+                    animated_tiles: std::collections::HashMap::new(),
                 },
             );
 

@@ -4,6 +4,7 @@ use crate::project::ProjectAssets;
 use anyhow::Result;
 use std::collections::BTreeMap;
 use std::path::Path;
+use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
 use toki_core::graphics::image::DecodedImage;
@@ -87,6 +88,7 @@ pub struct SceneViewport {
     viewport_size: (u32, u32),
     requested_viewport_size: Option<(u32, u32)>,
     atlas_cache: Option<AtlasMeta>,
+    tile_animation_clock: TileAnimationClock,
     needs_render: bool, // Track if scene needs re-rendering
     camera: Camera,     // Camera for zoom and pan
     editor_zoom_scale: f32,
@@ -188,6 +190,7 @@ impl SceneViewport {
             viewport_size: (resolution_width, resolution_height),
             requested_viewport_size: None,
             atlas_cache: None,
+            tile_animation_clock: TileAnimationClock::new(),
             needs_render: true,
             camera,
             editor_zoom_scale: 1.0,
@@ -315,9 +318,24 @@ impl SceneViewport {
             return Ok(());
         }
 
-        // Scene doesn't need per-frame updates like runtime does
-        // The scene is static until the user modifies it
+        self.tick_tile_animations();
         Ok(())
+    }
+
+    /// Advance tile animation playback and mark dirty when a frame changes.
+    fn tick_tile_animations(&mut self) {
+        let Some(atlas) = self.atlas_cache.as_ref() else {
+            return;
+        };
+        // Fixed timestep matching ~60 fps; editor has no high-resolution delta.
+        const EDITOR_FRAME_DELTA_MS: f32 = 16.67;
+        let atlas_clone = atlas.clone();
+        if self
+            .tile_animation_clock
+            .update(EDITOR_FRAME_DELTA_MS, &atlas_clone)
+        {
+            self.needs_render = true;
+        }
     }
 
     /// Render scene to offscreen texture (called before egui UI construction)
@@ -619,6 +637,14 @@ impl SceneViewport {
 
     pub fn needs_render(&self) -> bool {
         self.needs_render
+    }
+
+    /// Returns `true` when the viewport has active tile animations that require
+    /// continuous repainting.
+    pub fn has_active_tile_animations(&self) -> bool {
+        self.atlas_cache
+            .as_ref()
+            .is_some_and(|atlas| !atlas.animated_tiles.is_empty())
     }
 
     /// Temporarily suppress rendering for multiple entities.

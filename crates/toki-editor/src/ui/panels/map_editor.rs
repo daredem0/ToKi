@@ -197,6 +197,9 @@ impl PanelSystem {
         if let Err(error) = viewport.update() {
             tracing::error!("Map editor viewport update error: {error}");
         }
+        if viewport.has_active_tile_animations() {
+            ui.ctx().request_repaint();
+        }
 
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());

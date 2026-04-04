@@ -1454,6 +1454,8 @@ fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: std::collections::HashMap::new(),
+        animated_tiles: std::collections::HashMap::new(),
     };
 
     assert_eq!(

@@ -251,6 +251,8 @@ fn resolve_atlas_tile_frame_returns_frame_and_intrinsic_size() {
         palette: None,
         palette_size: None,
         tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
     };
 
     let (frame, intrinsic_size) =
@@ -272,6 +274,8 @@ fn resolve_atlas_tile_frame_returns_error_for_missing_tile() {
         palette: None,
         palette_size: None,
         tiles: std::collections::HashMap::new(),
+        auto_tile_groups: std::collections::HashMap::new(),
+        animated_tiles: std::collections::HashMap::new(),
     };
 
     let result = resolve_atlas_tile_frame(&atlas, "creatures", "missing_tile");

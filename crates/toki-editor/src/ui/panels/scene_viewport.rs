@@ -21,6 +21,9 @@ impl PanelSystem {
         if let Err(e) = viewport.update() {
             tracing::error!("Scene viewport update error: {e}");
         }
+        if viewport.has_active_tile_animations() {
+            ui.ctx().request_repaint();
+        }
 
         if let Some(cfg) = config.as_deref_mut() {
             let mut toolbar_changed = false;

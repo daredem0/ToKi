@@ -5,6 +5,7 @@ use winit::event_loop::EventLoop;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::camera::{Camera, CameraController, CameraMode};
 use toki_core::dialog_runtime::DialogController;
 use toki_core::game::SceneSystem;
@@ -234,6 +235,7 @@ struct App {
     asset_load_plan: RuntimeAssetLoadPlan,
     scene_transition: SceneTransitionController,
     decoded_project_cache: DecodedProjectCache,
+    tile_animation_clock: TileAnimationClock,
     pack_mount: Option<tempfile::TempDir>,
 }
 
@@ -345,6 +347,7 @@ impl AppBuilder {
             asset_load_plan: startup.asset_load_plan,
             scene_transition,
             decoded_project_cache: startup.decoded_project_cache,
+            tile_animation_clock: TileAnimationClock::new(),
             pack_mount: startup.pack_mount,
         }
     }

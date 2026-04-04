@@ -42,9 +42,20 @@ pub use ui_layout::{
 pub mod animation;
 pub mod value_path;
 pub mod assets {
+    pub mod animated_tile;
     pub mod atlas;
+    pub mod autotile;
     pub mod object_sheet;
+    pub mod tile_animation;
     pub mod tilemap;
+
+    #[cfg(test)]
+    #[path = "animated_tile_tests.rs"]
+    mod animated_tile_tests;
+
+    #[cfg(test)]
+    #[path = "autotile_tests.rs"]
+    mod autotile_tests;
 
     #[cfg(test)]
     #[path = "tilemap_tests.rs"]

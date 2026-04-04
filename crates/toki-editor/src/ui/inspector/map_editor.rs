@@ -1,5 +1,15 @@
 use super::*;
 
+fn tile_display_label(name: &str, atlas: &toki_core::assets::atlas::AtlasMeta) -> String {
+    if atlas.is_auto_tile_group(name) {
+        format!("[A] {name}")
+    } else if atlas.is_animated_tile(name) {
+        format!("[~] {name}")
+    } else {
+        name.to_string()
+    }
+}
+
 enum LayerPanelAction {
     ToggleVisibility(usize),
     ToggleAboveEntities(usize),
@@ -127,7 +137,8 @@ impl InspectorSystem {
                                             .selected_tile
                                             .as_deref()
                                             == Some(tile_name.as_str());
-                                    if ui.selectable_label(is_selected, tile_name).clicked() {
+                                    let display = tile_display_label(tile_name, &atlas);
+                                    if ui.selectable_label(is_selected, display).clicked() {
                                         crate::ui::editor_context::map_state_mut(ui_state)
                                             .selected_tile = Some(tile_name.clone());
                                     }
@@ -426,7 +437,17 @@ impl InspectorSystem {
         };
         let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
         let texture_path = atlas_path.parent()?.join(&atlas.image);
-        let mut tile_names = atlas.tiles.keys().cloned().collect::<Vec<_>>();
+        let mut tile_names: Vec<String> = atlas.tiles.keys().cloned().collect();
+        for group_name in atlas.auto_tile_groups.keys() {
+            if !tile_names.contains(group_name) {
+                tile_names.push(group_name.clone());
+            }
+        }
+        for anim_name in atlas.animated_tiles.keys() {
+            if !tile_names.contains(anim_name) {
+                tile_names.push(anim_name.clone());
+            }
+        }
         tile_names.sort();
         Some((tile_names, atlas, texture_path))
     }
