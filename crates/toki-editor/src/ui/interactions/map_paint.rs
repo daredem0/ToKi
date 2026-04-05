@@ -86,6 +86,23 @@ impl MapPaintInteraction {
         changed
     }
 
+    pub fn stamp_collision_override(
+        tilemap: &mut TileMap,
+        layer: usize,
+        tile_pos: UVec2,
+        solid: bool,
+    ) -> bool {
+        if tile_pos.x >= tilemap.size.x || tile_pos.y >= tilemap.size.y {
+            return false;
+        }
+        let Some(layer_data) = tilemap.layers.get_mut(layer) else {
+            return false;
+        };
+        let index = tile_pos.y * tilemap.size.x + tile_pos.x;
+        let prev = layer_data.collision_overrides.insert(index, solid);
+        prev != Some(solid)
+    }
+
     pub fn fill_all(tilemap: &mut TileMap, layer: usize, tile_name: &str) -> bool {
         let Some(tiles) = tilemap.layer_tiles_mut(layer) else {
             return false;

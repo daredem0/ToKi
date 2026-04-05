@@ -11,6 +11,13 @@ use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::Palette;
 use toki_core::palette::PaletteSize;
 
+/// Tracks that the current spritesheet is an auto-tile template.
+#[derive(Debug, Clone)]
+pub struct AutoTileSpriteInfo {
+    pub group_name: String,
+    pub mode: toki_core::assets::autotile::AutoTileMode,
+}
+
 /// Sprite editor state
 pub struct SpriteEditorState {
     /// Dual canvas states (left and right)
@@ -21,6 +28,8 @@ pub struct SpriteEditorState {
     pub layout: DualCanvasLayout,
     /// Split ratio for dual canvas layout (0.0 to 1.0, where 0.5 is equal split)
     pub split_ratio: f32,
+    /// Auto-tile metadata for the current spritesheet (None if regular sprite)
+    pub autotile_info: Option<AutoTileSpriteInfo>,
     /// Current editing tool (shared across canvases)
     pub tool: SpriteEditorTool,
     /// Clipboard for copy/paste operations (shared across canvases)
@@ -63,6 +72,12 @@ pub struct SpriteEditorState {
     pub new_canvas_source_image: Option<PathBuf>,
     /// Cached dimensions of the source image selected for new-canvas-from-image flow.
     pub new_canvas_source_image_size: Option<glam::UVec2>,
+    /// New canvas dialog: create as auto-tile spritesheet
+    pub new_canvas_is_autotile: bool,
+    /// New canvas dialog: auto-tile group name
+    pub new_autotile_group_name: String,
+    /// New canvas dialog: auto-tile mode (4-bit or 8-bit)
+    pub new_autotile_mode: toki_core::assets::autotile::AutoTileMode,
     /// Inline error shown in the new canvas dialog.
     pub new_canvas_error: Option<String>,
     /// Show save sprite dialog
@@ -106,6 +121,7 @@ impl Default for SpriteEditorState {
             active_canvas: CanvasSide::default(),
             layout: DualCanvasLayout::default(),
             split_ratio: 0.5,
+            autotile_info: None,
             tool: SpriteEditorTool::Drag,
             clipboard: None,
             foreground_color: PixelColor::black(),
@@ -127,6 +143,9 @@ impl Default for SpriteEditorState {
             new_canvas_is_sheet: false,
             new_canvas_source_image: None,
             new_canvas_source_image_size: None,
+            new_canvas_is_autotile: false,
+            new_autotile_group_name: "autotile".to_string(),
+            new_autotile_mode: toki_core::assets::autotile::AutoTileMode::FourBit,
             new_canvas_error: None,
             show_save_dialog: false,
             show_load_dialog: false,

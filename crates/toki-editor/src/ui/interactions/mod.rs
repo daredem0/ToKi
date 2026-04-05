@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+pub mod atlas_merge;
 pub mod camera;
 pub mod grid;
 pub mod map_objects;

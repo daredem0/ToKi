@@ -717,6 +717,27 @@ fn sprite_editor_state_recent_colors() {
     assert_eq!(state.recent_colors.len(), 3);
 }
 
+#[test]
+fn begin_new_sprite_canvas_dialog_uses_active_asset_name_for_autotile_group_default() {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_context::sprite_state_mut(&mut ui)
+        .active_mut()
+        .save_asset_name = "AutoTile_Grass".to_string();
+    crate::ui::editor_context::sprite_state_mut(&mut ui).new_autotile_group_name =
+        "terrain".to_string();
+
+    crate::ui::editor_ui::begin_new_sprite_canvas_dialog(&mut ui);
+
+    assert!(
+        crate::ui::editor_context::sprite_state(&ui).show_new_canvas_dialog,
+        "new canvas dialog should be shown"
+    );
+    assert_eq!(
+        crate::ui::editor_context::sprite_state(&ui).new_autotile_group_name,
+        "AutoTile_Grass"
+    );
+}
+
 // ============================================================================
 // Import/Export Tests
 // ============================================================================

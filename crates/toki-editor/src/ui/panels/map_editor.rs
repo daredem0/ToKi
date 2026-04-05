@@ -22,16 +22,14 @@ impl PanelSystem {
             .as_deref()
             .and_then(|cfg| cfg.current_project_path())
             .cloned();
-        let available_tiles = project_path
+        let available_brush_entries = project_path
             .as_deref()
-            .and_then(|path| {
-                map_editor_viewport
-                    .as_ref()
-                    .and_then(|viewport| viewport.tilemap())
-                    .and_then(|tilemap| Self::load_map_editor_tile_names(path, tilemap).ok())
+            .and_then(|_| {
+                crate::ui::editor_ui::load_map_editor_brush_source(ui_state, config.as_deref())
             })
+            .map(|(brush_entries, _, _)| brush_entries)
             .unwrap_or_default();
-        crate::ui::editor_ui::sync_map_editor_brush_selection(ui_state, &available_tiles);
+        crate::ui::editor_ui::sync_map_editor_brush_selection(ui_state, &available_brush_entries);
 
         ui.horizontal(|ui| {
             ui.heading("Map Editor");

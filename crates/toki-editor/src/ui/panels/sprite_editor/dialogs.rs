@@ -106,7 +106,57 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                 );
             }
 
-            if crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_sheet {
+            if source_image.is_none() {
+                ui.checkbox(
+                    &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .new_canvas_is_autotile,
+                    "Auto-Tile Spritesheet",
+                );
+            }
+
+            if crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_autotile {
+                crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_sheet = true;
+                ui.horizontal(|ui| {
+                    ui.label("Group Name:");
+                    ui.text_edit_singleline(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .new_autotile_group_name,
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Mode:");
+                    let mode = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                        .new_autotile_mode;
+                    ui.selectable_value(
+                        mode,
+                        toki_core::assets::autotile::AutoTileMode::FourBit,
+                        "4-bit (16 tiles)",
+                    );
+                    ui.selectable_value(
+                        mode,
+                        toki_core::assets::autotile::AutoTileMode::EightBit,
+                        "8-bit (47 tiles)",
+                    );
+                });
+                let (cols, rows) =
+                    match crate::ui::editor_context::sprite_state_mut(ui_state).new_autotile_mode {
+                        toki_core::assets::autotile::AutoTileMode::FourBit => (4u32, 4u32),
+                        toki_core::assets::autotile::AutoTileMode::EightBit => (8u32, 6u32),
+                    };
+                crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_cols = cols;
+                crate::ui::editor_context::sprite_state_mut(ui_state).new_sheet_rows = rows;
+                let tile_w = crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_width;
+                let tile_h =
+                    crate::ui::editor_context::sprite_state_mut(ui_state).new_sprite_height;
+                ui.label(format!(
+                    "Canvas: {}x{} ({} cells, {}x{} grid)",
+                    tile_w * cols,
+                    tile_h * rows,
+                    cols * rows,
+                    cols,
+                    rows
+                ));
+            } else if crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_sheet {
                 if source_image.is_some() {
                     match source_image_validation.as_ref() {
                         Some(Ok((cols, rows))) => {
@@ -232,6 +282,7 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
         return;
     }
 
+    let is_autotile = crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_autotile;
     if crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_sheet {
         let cols = crate::ui::editor_context::sprite_state_mut(ui_state)
             .new_sheet_cols
@@ -245,6 +296,15 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
             .sprite_editor_context_mut()
             .sprite
             .new_sheet(canvas_w, canvas_h, sprite_w, sprite_h);
+        if is_autotile {
+            let state = crate::ui::editor_context::sprite_state_mut(ui_state);
+            state.autotile_info = Some(crate::ui::sprite_editor::AutoTileSpriteInfo {
+                group_name: state.new_autotile_group_name.clone(),
+                mode: state.new_autotile_mode,
+            });
+        } else {
+            crate::ui::editor_context::sprite_state_mut(ui_state).autotile_info = None;
+        }
     } else {
         crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas(sprite_w, sprite_h);
         crate::ui::editor_context::sprite_state_mut(ui_state)

@@ -1456,6 +1456,7 @@ fn atlas_tile_properties_readable_for_solid_and_trigger() {
         tiles,
         auto_tile_groups: std::collections::HashMap::new(),
         animated_tiles: std::collections::HashMap::new(),
+        imported_auto_tiles: Vec::new(),
     };
 
     let props = atlas.get_tile_properties("grass").unwrap();

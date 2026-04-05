@@ -67,19 +67,57 @@ impl PanelSystem {
             return false;
         };
 
-        let active_layer = crate::ui::editor_context::map_state(ui_state).active_layer;
-        if MapPaintInteraction::paint_brush(
+        let map_state = crate::ui::editor_context::map_state(ui_state);
+        let active_layer = map_state.active_layer;
+        let solid_stamp = map_state.brush_stamp_solid;
+        let mut changed = MapPaintInteraction::paint_brush(
             tilemap,
             active_layer,
             tile_pos,
             selected_tile,
             brush_size_tiles,
-        ) {
+        );
+        if let Some(solid) = solid_stamp {
+            changed |= Self::stamp_solid_in_footprint(
+                tilemap,
+                active_layer,
+                tile_pos,
+                brush_size_tiles,
+                solid,
+            );
+        }
+        if changed {
             viewport.mark_dirty();
             return true;
         }
 
         false
+    }
+
+    fn stamp_solid_in_footprint(
+        tilemap: &mut TileMap,
+        layer: usize,
+        center: glam::UVec2,
+        brush_size: u32,
+        solid: bool,
+    ) -> bool {
+        let Some((start, end)) =
+            MapPaintInteraction::brush_footprint_bounds(tilemap, center, brush_size)
+        else {
+            return false;
+        };
+        let mut changed = false;
+        for y in start.y..end.y {
+            for x in start.x..end.x {
+                changed |= MapPaintInteraction::stamp_collision_override(
+                    tilemap,
+                    layer,
+                    glam::UVec2::new(x, y),
+                    solid,
+                );
+            }
+        }
+        changed
     }
 
     pub(super) fn handle_map_editor_fill_paint(

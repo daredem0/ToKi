@@ -38,6 +38,7 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
         tiles,
         auto_tile_groups: HashMap::new(),
         animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
     };
 
     // 3x3 map with center tile solid

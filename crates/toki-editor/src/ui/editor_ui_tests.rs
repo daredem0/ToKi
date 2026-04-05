@@ -1,4 +1,6 @@
-use glam::IVec2;
+use glam::{IVec2, UVec2};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use tempfile::tempdir;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
@@ -27,6 +29,82 @@ fn sample_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
         active: true,
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
+    }
+}
+
+fn sample_plain_brush_atlas() -> toki_core::assets::atlas::AtlasMeta {
+    let mut tiles = HashMap::new();
+    for (name, x) in [("water", 0), ("grass", 1), ("bush", 2)] {
+        tiles.insert(
+            name.to_string(),
+            toki_core::assets::atlas::TileInfo {
+                position: UVec2::new(x, 0),
+                properties: toki_core::assets::atlas::TileProperties::default(),
+            },
+        );
+    }
+    toki_core::assets::atlas::AtlasMeta {
+        image: PathBuf::from("terrain.png"),
+        tile_size: UVec2::new(8, 8),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
+        palette_size: None,
+        tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
+    }
+}
+
+fn sample_auto_tile_brush_atlas() -> toki_core::assets::atlas::AtlasMeta {
+    let mut tiles = HashMap::new();
+    for (name, x) in [
+        ("brick", 0),
+        ("grass_center", 1),
+        ("grass_corner", 2),
+        ("water_frame_b", 3),
+    ] {
+        tiles.insert(
+            name.to_string(),
+            toki_core::assets::atlas::TileInfo {
+                position: UVec2::new(x, 0),
+                properties: toki_core::assets::atlas::TileProperties::default(),
+            },
+        );
+    }
+
+    let auto_tile_groups = HashMap::from([(
+        "terrain".to_string(),
+        toki_core::assets::autotile::AutoTileGroup {
+            mode: toki_core::assets::autotile::AutoTileMode::FourBit,
+            preview_tile: Some("grass_center".to_string()),
+            variants: HashMap::from([
+                (0, "grass_corner".to_string()),
+                (1, "grass_center".to_string()),
+            ]),
+        },
+    )]);
+
+    let animated_tiles = HashMap::from([(
+        "water_anim".to_string(),
+        toki_core::assets::animated_tile::AnimatedTileDef {
+            frames: vec!["missing".to_string(), "water_frame_b".to_string()],
+            frame_duration_ms: 120.0,
+            frame_durations_ms: None,
+            loop_mode: toki_core::assets::animated_tile::TileLoopMode::Loop,
+        },
+    )]);
+
+    toki_core::assets::atlas::AtlasMeta {
+        image: PathBuf::from("terrain.png"),
+        tile_size: UVec2::new(8, 8),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
+        palette_size: None,
+        tiles,
+        auto_tile_groups,
+        animated_tiles,
+        imported_auto_tiles: Vec::new(),
     }
 }
 
@@ -673,11 +751,10 @@ fn sync_menu_editor_selection_replaces_missing_screen_selection() {
 #[test]
 fn sync_map_editor_brush_selection_picks_first_sorted_tile() {
     let mut ui = EditorUI::new();
+    let brush_entries =
+        crate::ui::editor_ui::build_map_editor_brush_entries(&sample_plain_brush_atlas());
 
-    crate::ui::editor_ui::sync_map_editor_brush_selection(
-        &mut ui,
-        &["water".to_string(), "grass".to_string(), "bush".to_string()],
-    );
+    crate::ui::editor_ui::sync_map_editor_brush_selection(&mut ui, &brush_entries);
 
     assert_eq!(
         crate::ui::editor_context::map_state_mut(&mut ui)
@@ -685,6 +762,90 @@ fn sync_map_editor_brush_selection_picks_first_sorted_tile() {
             .as_deref(),
         Some("bush")
     );
+}
+
+#[test]
+fn sync_map_editor_brush_selection_preserves_auto_tile_group_selection() {
+    let mut ui = EditorUI::new();
+    let brush_entries =
+        crate::ui::editor_ui::build_map_editor_brush_entries(&sample_auto_tile_brush_atlas());
+    crate::ui::editor_context::map_state_mut(&mut ui).selected_tile = Some("terrain".to_string());
+
+    crate::ui::editor_ui::sync_map_editor_brush_selection(&mut ui, &brush_entries);
+
+    assert_eq!(
+        crate::ui::editor_context::map_state(&ui)
+            .selected_tile
+            .as_deref(),
+        Some("terrain")
+    );
+}
+
+#[test]
+fn build_map_editor_brush_entries_include_auto_tile_and_animated_entries() {
+    let atlas = sample_auto_tile_brush_atlas();
+    let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
+
+    let terrain = brush_entries
+        .iter()
+        .find(|entry| entry.id == "terrain")
+        .expect("auto-tile group should be exposed as a brush entry");
+    assert_eq!(
+        terrain.kind,
+        crate::ui::editor_ui::MapEditorBrushKind::AutoTileGroup
+    );
+    assert_eq!(terrain.display_label, "[A] terrain");
+    assert_eq!(terrain.preview_tile_id.as_deref(), Some("grass_center"));
+
+    let water_anim = brush_entries
+        .iter()
+        .find(|entry| entry.id == "water_anim")
+        .expect("animated tile should be exposed as a brush entry");
+    assert_eq!(
+        water_anim.kind,
+        crate::ui::editor_ui::MapEditorBrushKind::AnimatedTile
+    );
+    assert_eq!(water_anim.display_label, "[~] water_anim");
+    assert_eq!(water_anim.preview_tile_id.as_deref(), Some("water_frame_b"));
+}
+
+#[test]
+fn build_map_editor_brush_entries_fall_back_to_variant_preview_when_group_preview_is_missing() {
+    let mut atlas = sample_auto_tile_brush_atlas();
+    atlas
+        .auto_tile_groups
+        .get_mut("terrain")
+        .expect("terrain group should exist")
+        .preview_tile = Some("missing_preview".to_string());
+
+    let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
+    let terrain = brush_entries
+        .iter()
+        .find(|entry| entry.id == "terrain")
+        .expect("auto-tile group should be exposed as a brush entry");
+
+    assert_eq!(terrain.preview_tile_id.as_deref(), Some("grass_corner"));
+}
+
+#[test]
+fn build_map_editor_brush_entries_use_import_source_name_for_auto_tile_labels() {
+    let mut atlas = sample_auto_tile_brush_atlas();
+    atlas
+        .imported_auto_tiles
+        .push(toki_core::assets::atlas::ImportedAutoTile {
+            source_path: PathBuf::from("assets/sprites/AutoTile_Grass.json"),
+            group_name: "terrain".to_string(),
+            tile_names: vec!["grass_center".to_string(), "grass_corner".to_string()],
+        });
+
+    let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
+    let terrain = brush_entries
+        .iter()
+        .find(|entry| entry.id == "terrain")
+        .expect("imported auto-tile group should be exposed as a brush entry");
+
+    assert_eq!(terrain.id, "terrain");
+    assert_eq!(terrain.display_label, "[A] AutoTile_Grass");
 }
 
 #[test]

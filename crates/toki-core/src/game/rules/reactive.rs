@@ -141,6 +141,7 @@ mod tests {
                     tiles: std::collections::HashMap::new(),
                     auto_tile_groups: std::collections::HashMap::new(),
                     animated_tiles: std::collections::HashMap::new(),
+                    imported_auto_tiles: Vec::new(),
                 },
             );
 

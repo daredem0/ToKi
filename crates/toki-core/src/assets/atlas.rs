@@ -65,6 +65,16 @@ pub struct AtlasMeta {
     pub auto_tile_groups: HashMap<String, AutoTileGroup>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub animated_tiles: HashMap<String, AnimatedTileDef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub imported_auto_tiles: Vec<ImportedAutoTile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedAutoTile {
+    #[serde(with = "pathbuf_as_string")]
+    pub source_path: PathBuf,
+    pub group_name: String,
+    pub tile_names: Vec<String>,
 }
 
 impl AtlasMeta {
@@ -175,6 +185,7 @@ impl AtlasMeta {
             tiles,
             auto_tile_groups: HashMap::new(),
             animated_tiles: HashMap::new(),
+            imported_auto_tiles: Vec::new(),
         }
     }
 
@@ -207,6 +218,7 @@ impl AtlasMeta {
             tiles,
             auto_tile_groups: HashMap::new(),
             animated_tiles: HashMap::new(),
+            imported_auto_tiles: Vec::new(),
         }
     }
 

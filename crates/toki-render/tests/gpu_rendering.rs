@@ -104,6 +104,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
         tiles: atlas_tiles,
         auto_tile_groups: HashMap::new(),
         animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
     };
 
     SceneData {

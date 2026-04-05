@@ -65,6 +65,13 @@
             "type": "boolean",
             "default": false,
             "description": "When true, this layer renders above entity sprites"
+          },
+          "collision_overrides": {
+            "type": "object",
+            "description": "Per-tile collision overrides. Keys are tile indices (y*width+x as string), values are booleans.",
+            "patternProperties": {
+              "^\\d+$": { "type": "boolean" }
+            }
           }
         }
       }

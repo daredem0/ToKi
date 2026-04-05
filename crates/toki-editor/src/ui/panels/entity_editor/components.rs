@@ -63,7 +63,10 @@ fn render_collision_section(
             .show(ui, |ui| {
                 if let Some(project_path) = project_path {
                     super::collision_preview::render_collision_preview(
-                        ui, ui_state, project_path, ctx,
+                        ui,
+                        ui_state,
+                        project_path,
+                        ctx,
                     );
                 }
                 let edit = crate::ui::editor_context::entity_editor_state_mut(ui_state)

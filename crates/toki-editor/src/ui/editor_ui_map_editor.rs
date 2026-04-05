@@ -1,7 +1,10 @@
 use super::{EditorUI, MapEditorState};
+use crate::config::EditorConfig;
 #[cfg(test)]
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::undo_redo::History;
+use std::path::{Path, PathBuf};
+use toki_core::assets::atlas::{AtlasMeta, ImportedAutoTile};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +132,182 @@ pub struct NewMapRequest {
     pub tile_height: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MapEditorBrushKind {
+    Tile,
+    AutoTileGroup,
+    AnimatedTile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MapEditorBrushEntry {
+    pub id: String,
+    pub kind: MapEditorBrushKind,
+    pub display_label: String,
+    pub preview_tile_id: Option<String>,
+}
+
+fn imported_auto_tile_for_group<'a>(
+    imported_auto_tiles: &'a [ImportedAutoTile],
+    group_name: &str,
+) -> Option<&'a ImportedAutoTile> {
+    imported_auto_tiles
+        .iter()
+        .find(|import| import.group_name == group_name)
+}
+
+fn imported_auto_tile_display_name(imported: &ImportedAutoTile) -> Option<String> {
+    imported
+        .source_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(str::trim)
+        .filter(|stem| !stem.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn auto_tile_preview_tile_id(atlas: &AtlasMeta, group_name: &str) -> Option<String> {
+    let group = atlas.get_auto_tile_group(group_name)?;
+    if let Some(preview_tile) = group
+        .preview_tile
+        .as_ref()
+        .filter(|tile| atlas.tiles.contains_key(*tile))
+    {
+        return Some(preview_tile.clone());
+    }
+
+    let mut variants = group.variants.iter().collect::<Vec<_>>();
+    variants.sort_by_key(|(mask, _)| **mask);
+    variants.into_iter().find_map(|(_, tile_name)| {
+        atlas
+            .tiles
+            .contains_key(tile_name)
+            .then(|| tile_name.clone())
+    })
+}
+
+fn animated_tile_preview_tile_id(atlas: &AtlasMeta, tile_name: &str) -> Option<String> {
+    atlas.get_animated_tile(tile_name).and_then(|animated| {
+        animated
+            .frames
+            .iter()
+            .find(|frame| atlas.tiles.contains_key(frame.as_str()))
+            .cloned()
+    })
+}
+
+fn brush_entry_for_tile(atlas: &AtlasMeta, tile_name: &str) -> MapEditorBrushEntry {
+    if atlas.is_auto_tile_group(tile_name) {
+        let display_name = imported_auto_tile_for_group(&atlas.imported_auto_tiles, tile_name)
+            .and_then(imported_auto_tile_display_name)
+            .unwrap_or_else(|| tile_name.to_string());
+        return MapEditorBrushEntry {
+            id: tile_name.to_string(),
+            kind: MapEditorBrushKind::AutoTileGroup,
+            display_label: format!("[A] {display_name}"),
+            preview_tile_id: auto_tile_preview_tile_id(atlas, tile_name),
+        };
+    }
+
+    if atlas.is_animated_tile(tile_name) {
+        return MapEditorBrushEntry {
+            id: tile_name.to_string(),
+            kind: MapEditorBrushKind::AnimatedTile,
+            display_label: format!("[~] {tile_name}"),
+            preview_tile_id: animated_tile_preview_tile_id(atlas, tile_name),
+        };
+    }
+
+    MapEditorBrushEntry {
+        id: tile_name.to_string(),
+        kind: MapEditorBrushKind::Tile,
+        display_label: tile_name.to_string(),
+        preview_tile_id: Some(tile_name.to_string()),
+    }
+}
+
+pub(crate) fn build_map_editor_brush_entries(atlas: &AtlasMeta) -> Vec<MapEditorBrushEntry> {
+    let mut brush_ids = atlas.tiles.keys().cloned().collect::<Vec<_>>();
+    for group_name in atlas.auto_tile_groups.keys() {
+        if !brush_ids.contains(group_name) {
+            brush_ids.push(group_name.clone());
+        }
+    }
+    for anim_name in atlas.animated_tiles.keys() {
+        if !brush_ids.contains(anim_name) {
+            brush_ids.push(anim_name.clone());
+        }
+    }
+    brush_ids.sort();
+    brush_ids
+        .into_iter()
+        .map(|tile_name| brush_entry_for_tile(atlas, &tile_name))
+        .collect()
+}
+
+pub(crate) fn selected_map_editor_brush_entry<'a>(
+    brush_entries: &'a [MapEditorBrushEntry],
+    selected_tile: Option<&str>,
+) -> Option<&'a MapEditorBrushEntry> {
+    let selected_tile = selected_tile?;
+    brush_entries.iter().find(|entry| entry.id == selected_tile)
+}
+
+pub(crate) fn resolve_map_editor_atlas_path(project_path: &Path, tilemap: &TileMap) -> PathBuf {
+    let tilemaps_path = project_path
+        .join("assets")
+        .join("tilemaps")
+        .join(&tilemap.atlas);
+    if tilemaps_path.exists() {
+        tilemaps_path
+    } else {
+        project_path
+            .join("assets")
+            .join("sprites")
+            .join(&tilemap.atlas)
+    }
+}
+
+pub(crate) fn load_map_editor_brush_source(
+    ui_state: &EditorUI,
+    config: Option<&EditorConfig>,
+) -> Option<(Vec<MapEditorBrushEntry>, AtlasMeta, PathBuf)> {
+    let project_path = config?.current_project_path()?;
+
+    let tilemap = if let Some(draft) = &crate::ui::editor_context::map_state(ui_state).draft {
+        draft.tilemap.clone()
+    } else {
+        let active_map = crate::ui::editor_context::map_state(ui_state)
+            .active_map
+            .as_ref()?;
+        toki_core::assets::tilemap::TileMap::load_from_file(
+            project_path
+                .join("assets")
+                .join("tilemaps")
+                .join(format!("{}.json", active_map)),
+        )
+        .ok()?
+    };
+
+    let atlas_path = resolve_map_editor_atlas_path(project_path, &tilemap);
+    let atlas = if crate::ui::editor_context::map_state(ui_state)
+        .atlas_path
+        .as_deref()
+        == Some(atlas_path.as_path())
+    {
+        if let Some(cached) = &crate::ui::editor_context::map_state(ui_state).modified_atlas {
+            cached.clone()
+        } else {
+            toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?
+        }
+    } else {
+        toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?
+    };
+    let texture_path = atlas_path.parent()?.join(&atlas.image);
+    let brush_entries = build_map_editor_brush_entries(&atlas);
+    Some((brush_entries, atlas, texture_path))
+}
+
 pub(crate) fn sync_map_editor_selection(ui_state: &mut EditorUI, available_map_names: &[String]) {
     if has_unsaved_map_editor_changes(ui_state) {
         crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = None;
@@ -243,8 +422,11 @@ pub(crate) fn has_unsaved_map_editor_changes(ui_state: &EditorUI) -> bool {
     crate::ui::editor_context::map_state(ui_state).dirty
 }
 
-pub(crate) fn sync_map_editor_brush_selection(ui_state: &mut EditorUI, tile_names: &[String]) {
-    if tile_names.is_empty() {
+pub(crate) fn sync_map_editor_brush_selection(
+    ui_state: &mut EditorUI,
+    brush_entries: &[MapEditorBrushEntry],
+) {
+    if brush_entries.is_empty() {
         crate::ui::editor_context::map_state_mut(ui_state).selected_tile = None;
         return;
     }
@@ -255,15 +437,13 @@ pub(crate) fn sync_map_editor_brush_selection(ui_state: &mut EditorUI, tile_name
         .map
         .selected_tile
         .as_ref()
-        .is_some_and(|selected| tile_names.iter().any(|name| name == selected))
+        .is_some_and(|selected| brush_entries.iter().any(|entry| entry.id == *selected))
     {
         return;
     }
 
-    let mut sorted_names = tile_names.to_vec();
-    sorted_names.sort();
     crate::ui::editor_context::map_state_mut(ui_state).selected_tile =
-        Some(sorted_names[0].clone());
+        Some(brush_entries[0].id.clone());
 }
 
 pub(crate) fn pick_map_editor_tile(ui_state: &mut EditorUI, tile_name: String) {

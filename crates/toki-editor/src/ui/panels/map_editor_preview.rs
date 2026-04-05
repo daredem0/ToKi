@@ -41,8 +41,8 @@ impl PanelSystem {
         ) else {
             return;
         };
-        let Some((atlas, texture_path)) =
-            Self::load_map_editor_preview_assets(project_path, tilemap).ok()
+        let Some((brush_entries, atlas, texture_path)) =
+            Self::load_map_editor_preview_assets(ui_state, project_path, tilemap).ok()
         else {
             return;
         };
@@ -51,10 +51,19 @@ impl PanelSystem {
         else {
             return;
         };
+        let Some(brush_entry) = crate::ui::editor_ui::selected_map_editor_brush_entry(
+            &brush_entries,
+            Some(selected_tile.as_str()),
+        ) else {
+            return;
+        };
         let Some(texture_size) = atlas.image_size() else {
             return;
         };
-        let Some(tile_rect_px) = atlas.get_tile_rect(&selected_tile) else {
+        let Some(preview_tile_id) = brush_entry.preview_tile_id.as_deref() else {
+            return;
+        };
+        let Some(tile_rect_px) = atlas.get_tile_rect(preview_tile_id) else {
             return;
         };
         let uv_rect = egui::Rect::from_min_max(
@@ -85,64 +94,48 @@ impl PanelSystem {
         }
     }
 
-    pub(super) fn load_map_editor_tile_names(
-        project_path: &std::path::Path,
-        tilemap: &TileMap,
-    ) -> anyhow::Result<Vec<String>> {
-        let atlas = Self::load_map_editor_atlas(project_path, tilemap)?;
-        let mut tile_names = atlas.tiles.keys().cloned().collect::<Vec<_>>();
-        tile_names.sort();
-        Ok(tile_names)
-    }
-
     pub(super) fn load_map_editor_atlas(
         project_path: &std::path::Path,
         tilemap: &TileMap,
     ) -> anyhow::Result<AtlasMeta> {
-        let atlas_path = {
-            let tilemaps_path = project_path
-                .join("assets")
-                .join("tilemaps")
-                .join(&tilemap.atlas);
-            if tilemaps_path.exists() {
-                tilemaps_path
-            } else {
-                project_path
-                    .join("assets")
-                    .join("sprites")
-                    .join(&tilemap.atlas)
-            }
-        };
+        let atlas_path = crate::ui::editor_ui::resolve_map_editor_atlas_path(project_path, tilemap);
         AtlasMeta::load_from_file(&atlas_path)
             .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e))
     }
 
     pub(super) fn load_map_editor_preview_assets(
+        ui_state: &EditorUI,
         project_path: &std::path::Path,
         tilemap: &TileMap,
-    ) -> anyhow::Result<(AtlasMeta, std::path::PathBuf)> {
-        let atlas_path = {
-            let tilemaps_path = project_path
-                .join("assets")
-                .join("tilemaps")
-                .join(&tilemap.atlas);
-            if tilemaps_path.exists() {
-                tilemaps_path
+    ) -> anyhow::Result<(
+        Vec<crate::ui::editor_ui::MapEditorBrushEntry>,
+        AtlasMeta,
+        std::path::PathBuf,
+    )> {
+        let atlas_path = crate::ui::editor_ui::resolve_map_editor_atlas_path(project_path, tilemap);
+        let atlas = if crate::ui::editor_context::map_state(ui_state)
+            .atlas_path
+            .as_deref()
+            == Some(atlas_path.as_path())
+        {
+            if let Some(cached) = &crate::ui::editor_context::map_state(ui_state).modified_atlas {
+                cached.clone()
             } else {
-                project_path
-                    .join("assets")
-                    .join("sprites")
-                    .join(&tilemap.atlas)
+                AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
+                    anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
+                })?
             }
+        } else {
+            AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
+                anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
+            })?
         };
-        let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-            anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
-        })?;
         let texture_path = atlas_path
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Atlas path '{}' has no parent", atlas_path.display()))?
             .join(&atlas.image);
-        Ok((atlas, texture_path))
+        let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
+        Ok((brush_entries, atlas, texture_path))
     }
 
     pub(super) fn ensure_map_editor_brush_preview_texture(

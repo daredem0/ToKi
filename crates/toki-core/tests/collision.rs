@@ -92,6 +92,7 @@ fn create_collision_test_atlas() -> AtlasMeta {
         tiles,
         auto_tile_groups: HashMap::new(),
         animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
     }
 }
 

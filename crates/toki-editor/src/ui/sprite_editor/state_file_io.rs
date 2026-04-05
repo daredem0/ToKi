@@ -535,6 +535,8 @@ impl SpriteEditorState {
             }
         }
 
+        let auto_tile_groups = self.build_auto_tile_groups(cols, &tiles);
+
         AtlasMeta {
             image: png_filename.into(),
             tile_size: cs.cell_size,
@@ -546,9 +548,48 @@ impl SpriteEditorState {
             },
             palette_size: None,
             tiles,
-            auto_tile_groups: std::collections::HashMap::new(),
+            auto_tile_groups,
             animated_tiles: std::collections::HashMap::new(),
+            imported_auto_tiles: Vec::new(),
         }
+    }
+
+    fn build_auto_tile_groups(
+        &self,
+        cols: u32,
+        tiles: &std::collections::HashMap<String, toki_core::assets::atlas::TileInfo>,
+    ) -> std::collections::HashMap<String, toki_core::assets::autotile::AutoTileGroup> {
+        let mut groups = std::collections::HashMap::new();
+        let Some(info) = &self.autotile_info else {
+            return groups;
+        };
+        let variant_count = match info.mode {
+            toki_core::assets::autotile::AutoTileMode::FourBit => 16u8,
+            toki_core::assets::autotile::AutoTileMode::EightBit => 47u8,
+        };
+        let mut variants = std::collections::HashMap::new();
+        for mask in 0..variant_count {
+            let row = u32::from(mask) / cols;
+            let col = u32::from(mask) % cols;
+            let pos = glam::UVec2::new(col, row);
+            if let Some(tile_name) = tiles
+                .iter()
+                .find(|(_, ti)| ti.position == pos)
+                .map(|(name, _)| name.clone())
+            {
+                variants.insert(mask, tile_name);
+            }
+        }
+        let preview_tile = variants.get(&(variant_count - 1)).cloned();
+        groups.insert(
+            info.group_name.clone(),
+            toki_core::assets::autotile::AutoTileGroup {
+                mode: info.mode,
+                preview_tile,
+                variants,
+            },
+        );
+        groups
     }
 
     fn create_object_sheet_with_names(

@@ -48,9 +48,7 @@ pub fn render_collision_preview(
         return;
     };
 
-    let cell_rect = preview
-        .cell_rect
-        .unwrap_or([0, 0, img_size.0, img_size.1]);
+    let cell_rect = preview.cell_rect.unwrap_or([0, 0, img_size.0, img_size.1]);
 
     let uv = calc_uv(cell_rect, img_size);
 
@@ -98,10 +96,7 @@ fn resolve_sprite_source(edit: &EntityEditState, project_path: &Path) -> Option<
         .or_else(|| resolve_from_atlas(edit, &sprites_dir))
 }
 
-fn resolve_from_static_object(
-    edit: &EntityEditState,
-    sprites_dir: &Path,
-) -> Option<SpriteSource> {
+fn resolve_from_static_object(edit: &EntityEditState, sprites_dir: &Path) -> Option<SpriteSource> {
     let static_obj = edit.definition.rendering.static_object.as_ref()?;
     let sheet_path = sprites_dir.join(format!("{}.json", &static_obj.sheet));
     let sheet =
@@ -183,11 +178,7 @@ fn ensure_preview_texture(ui_state: &mut EditorUI, ctx: &egui::Context, source: 
     );
 
     if ui_state.collision_preview.texture.is_some()
-        && ui_state
-            .collision_preview
-            .cache_key
-            .as_deref()
-            == Some(cache_key.as_str())
+        && ui_state.collision_preview.cache_key.as_deref() == Some(cache_key.as_str())
     {
         return;
     }
@@ -390,11 +381,10 @@ fn apply_drag_snapped(edit: &mut EntityEditState, edge: Edge, pixel_x: i32, pixe
 }
 
 fn sync_grounding_footprint(edit: &mut EntityEditState) {
-    edit.definition.rendering.grounding.footprint =
-        Some(toki_core::entity::EntityFootprint::new(
-            edit.definition.collision.offset,
-            edit.definition.collision.size,
-        ));
+    edit.definition.rendering.grounding.footprint = Some(toki_core::entity::EntityFootprint::new(
+        edit.definition.collision.offset,
+        edit.definition.collision.size,
+    ));
 }
 
 fn draw_edge_handles(painter: &egui::Painter, rect: egui::Rect) {

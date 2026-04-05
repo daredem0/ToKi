@@ -1,0 +1,195 @@
+{
+  "image": "AutoTile_Grass.png",
+  "tile_size": [
+    8,
+    8
+  ],
+  "color_mode": "palette_indexed",
+  "palette": "swamp_16",
+  "tiles": {
+    "tile_10": {
+      "position": [
+        2,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_14": {
+      "position": [
+        2,
+        3
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_13": {
+      "position": [
+        1,
+        3
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_6": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_8": {
+      "position": [
+        0,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_0": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_1": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_3": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_5": {
+      "position": [
+        1,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_4": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_15": {
+      "position": [
+        3,
+        3
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_11": {
+      "position": [
+        3,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_12": {
+      "position": [
+        0,
+        3
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_2": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_9": {
+      "position": [
+        1,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "tile_7": {
+      "position": [
+        3,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  },
+  "auto_tile_groups": {
+    "terrain": {
+      "mode": "four_bit",
+      "preview_tile": "tile_15",
+      "variants": {
+        "14": "tile_14",
+        "0": "tile_0",
+        "9": "tile_9",
+        "11": "tile_11",
+        "5": "tile_5",
+        "4": "tile_4",
+        "1": "tile_1",
+        "6": "tile_6",
+        "13": "tile_13",
+        "15": "tile_15",
+        "12": "tile_12",
+        "7": "tile_7",
+        "2": "tile_2",
+        "8": "tile_8",
+        "10": "tile_10",
+        "3": "tile_3"
+      }
+    }
+  }
+}

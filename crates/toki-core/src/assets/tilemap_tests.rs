@@ -11,6 +11,7 @@ fn make_layer(name: &str, tiles: Vec<&str>) -> TileLayer {
         visible: true,
         collision_enabled: name == "ground",
         above_entities: false,
+        collision_overrides: HashMap::new(),
     }
 }
 
@@ -204,6 +205,7 @@ fn test_atlas() -> AtlasMeta {
         tiles,
         auto_tile_groups: HashMap::new(),
         animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
     }
 }
 
@@ -309,6 +311,7 @@ fn autotile_atlas() -> AtlasMeta {
         tiles,
         auto_tile_groups,
         animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
     }
 }
 
@@ -385,4 +388,86 @@ fn test_missing_variant_falls_back_to_preview_tile() {
     // Should fall back to preview_tile "grass_0" at position (0,0), u0=0.0
     assert_eq!(verts.len(), 6);
     assert!((verts[0].tex_coords[0]).abs() < 0.01);
+}
+
+// --- Collision override tests ---
+
+fn collision_atlas() -> AtlasMeta {
+    let mut tiles = HashMap::new();
+    tiles.insert(
+        "floor".to_string(),
+        TileInfo {
+            position: UVec2::new(0, 0),
+            properties: TileProperties {
+                solid: false,
+                trigger: false,
+            },
+        },
+    );
+    tiles.insert(
+        "wall".to_string(),
+        TileInfo {
+            position: UVec2::new(1, 0),
+            properties: TileProperties {
+                solid: true,
+                trigger: false,
+            },
+        },
+    );
+    AtlasMeta {
+        image: PathBuf::from("test.png"),
+        tile_size: UVec2::new(8, 8),
+        color_mode: ColorMode::TrueColor,
+        palette: None,
+        palette_size: None,
+        tiles,
+        auto_tile_groups: HashMap::new(),
+        animated_tiles: HashMap::new(),
+        imported_auto_tiles: Vec::new(),
+    }
+}
+
+#[test]
+fn test_collision_override_makes_floor_solid() {
+    let mut layer = make_layer("ground", vec!["floor", "floor", "floor", "floor"]);
+    layer.collision_overrides.insert(1, true); // tile at index 1 is solid
+    let map = make_tilemap(UVec2::new(2, 2), vec![layer]);
+    let atlas = collision_atlas();
+
+    assert!(!map.is_tile_solid_at(&atlas, 0, 0).unwrap()); // no override, floor = not solid
+    assert!(map.is_tile_solid_at(&atlas, 1, 0).unwrap()); // override = solid
+    assert!(!map.is_tile_solid_at(&atlas, 0, 1).unwrap()); // no override
+}
+
+#[test]
+fn test_collision_override_makes_wall_passable() {
+    let mut layer = make_layer("ground", vec!["wall", "wall"]);
+    layer.collision_overrides.insert(0, false); // tile at index 0 is NOT solid despite wall
+    let map = make_tilemap(UVec2::new(2, 1), vec![layer]);
+    let atlas = collision_atlas();
+
+    assert!(!map.is_tile_solid_at(&atlas, 0, 0).unwrap()); // override = not solid
+    assert!(map.is_tile_solid_at(&atlas, 1, 0).unwrap()); // no override, wall = solid
+}
+
+#[test]
+fn test_collision_override_absent_uses_atlas_default() {
+    let layer = make_layer("ground", vec!["wall", "floor"]);
+    let map = make_tilemap(UVec2::new(2, 1), vec![layer]);
+    let atlas = collision_atlas();
+
+    assert!(map.is_tile_solid_at(&atlas, 0, 0).unwrap()); // wall = solid (atlas default)
+    assert!(!map.is_tile_solid_at(&atlas, 1, 0).unwrap()); // floor = not solid (atlas default)
+}
+
+#[test]
+fn test_collision_override_deserializes_empty_by_default() {
+    let json = r#"{
+        "size": [1, 1],
+        "tile_size": [8, 8],
+        "atlas": "test.json",
+        "layers": [{"name": "ground", "tiles": ["a"]}]
+    }"#;
+    let map: TileMap = serde_json::from_str(json).expect("should parse");
+    assert!(map.layers[0].collision_overrides.is_empty());
 }

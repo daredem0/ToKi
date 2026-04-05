@@ -1,89 +1,309 @@
 {
-    "image": "terrain.png",
-    "tile_size": [
-        8,
-        8
-    ],
-    "tiles": {
-        "grass": {
-            "position": [
-                0,
-                0
-            ],
-            "properties": {
-                "solid": false,
-                "trigger": false
-            }
-        },
-        "stone": {
-            "position": [
-                1,
-                0
-            ],
-            "properties": {
-                "solid": true,
-                "trigger": false
-            }
-        },
-        "brick": {
-            "position": [
-                2,
-                0
-            ],
-            "properties": {
-                "solid": true,
-                "trigger": false
-            }
-        },
-        "water": {
-            "position": [
-                3,
-                0
-            ],
-            "properties": {
-                "solid": true,
-                "trigger": true
-            }
-        },
-        "sand": {
-            "position": [
-                4,
-                0
-            ],
-            "properties": {
-                "solid": false,
-                "trigger": false
-            }
-        },
-        "dirt": {
-            "position": [
-                5,
-                0
-            ],
-            "properties": {
-                "solid": false,
-                "trigger": false
-            }
-        },
-        "wood": {
-            "position": [
-                6,
-                0
-            ],
-            "properties": {
-                "solid": true,
-                "trigger": false
-            }
-        },
-        "roof": {
-            "position": [
-                7,
-                0
-            ],
-            "properties": {
-                "solid": true,
-                "trigger": false
-            }
-        }
+  "image": "terrain.png",
+  "tile_size": [
+    8,
+    8
+  ],
+  "color_mode": "truecolor",
+  "palette": null,
+  "tiles": {
+    "terrain_9": {
+      "position": [
+        1,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_15": {
+      "position": [
+        7,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_6": {
+      "position": [
+        6,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_11": {
+      "position": [
+        3,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_1": {
+      "position": [
+        1,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_preview": {
+      "position": [
+        7,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_0": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "water": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": true
+      }
+    },
+    "terrain_10": {
+      "position": [
+        2,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_4": {
+      "position": [
+        4,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_8": {
+      "position": [
+        0,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_13": {
+      "position": [
+        5,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "grass": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "dirt": {
+      "position": [
+        5,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_2": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_7": {
+      "position": [
+        7,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_12": {
+      "position": [
+        4,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_14": {
+      "position": [
+        6,
+        2
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "brick": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "terrain_3": {
+      "position": [
+        3,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "terrain_5": {
+      "position": [
+        5,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "wood": {
+      "position": [
+        6,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "roof": {
+      "position": [
+        7,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "sand": {
+      "position": [
+        4,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "stone": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
     }
+  },
+  "auto_tile_groups": {
+    "terrain": {
+      "mode": "four_bit",
+      "preview_tile": "terrain_preview",
+      "variants": {
+        "13": "terrain_13",
+        "15": "terrain_15",
+        "6": "terrain_6",
+        "10": "terrain_10",
+        "5": "terrain_5",
+        "1": "terrain_1",
+        "11": "terrain_11",
+        "0": "terrain_0",
+        "3": "terrain_3",
+        "12": "terrain_12",
+        "8": "terrain_8",
+        "7": "terrain_7",
+        "14": "terrain_14",
+        "4": "terrain_4",
+        "9": "terrain_9",
+        "2": "terrain_2"
+      }
+    }
+  },
+  "imported_auto_tiles": [
+    {
+      "source_path": "assets/sprites/AutoTile_Grass.json",
+      "group_name": "terrain",
+      "tile_names": [
+        "terrain_13",
+        "terrain_2",
+        "terrain_11",
+        "terrain_8",
+        "terrain_7",
+        "terrain_4",
+        "terrain_12",
+        "terrain_14",
+        "terrain_10",
+        "terrain_0",
+        "terrain_3",
+        "terrain_5",
+        "terrain_9",
+        "terrain_15",
+        "terrain_6",
+        "terrain_1"
+      ]
+    }
+  ]
 }

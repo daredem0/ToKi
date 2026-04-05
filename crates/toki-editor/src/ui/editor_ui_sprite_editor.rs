@@ -18,9 +18,20 @@ pub(crate) use crate::ui::sprite_editor::{
 
 /// Begin showing the new canvas dialog
 pub(crate) fn begin_new_sprite_canvas_dialog(ui_state: &mut EditorUI) {
+    let default_group_name = {
+        let state = crate::ui::editor_context::sprite_state_mut(ui_state);
+        let candidate = state.active().save_asset_name.trim();
+        if candidate.is_empty() {
+            "autotile".to_string()
+        } else {
+            candidate.to_string()
+        }
+    };
     crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image = None;
     crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image_size = None;
     crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_autotile_group_name =
+        default_group_name;
     crate::ui::editor_context::sprite_state_mut(ui_state).show_new_canvas_dialog = true;
 }
 

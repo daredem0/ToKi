@@ -60,15 +60,17 @@ pub(crate) use editor_ui_graph::{
 };
 #[allow(unused_imports)]
 pub(crate) use editor_ui_map_editor::{
-    add_layer_to_map, begin_map_editor_edit, begin_new_map_dialog, cancel_map_editor_edit,
-    clear_map_editor_dirty, clear_map_editor_history, finalize_saved_existing_map,
-    finalize_saved_map_editor_draft, finish_map_editor_edit, has_unsaved_map_editor_changes,
-    has_unsaved_map_editor_draft, map_editor_selected_label, mark_map_editor_dirty, move_layer,
-    pick_map_editor_tile, remove_layer_from_map, rename_layer, set_active_layer,
-    set_map_editor_draft, submit_new_map_request, sync_map_editor_brush_selection,
-    sync_map_editor_selection, take_pending_map_editor_tilemap_sync, toggle_layer_above_entities,
-    toggle_layer_visibility, MapEditorDraft, MapEditorHistory, MapEditorTileInfo, MapEditorTool,
-    NewMapRequest,
+    add_layer_to_map, begin_map_editor_edit, begin_new_map_dialog, build_map_editor_brush_entries,
+    cancel_map_editor_edit, clear_map_editor_dirty, clear_map_editor_history,
+    finalize_saved_existing_map, finalize_saved_map_editor_draft, finish_map_editor_edit,
+    has_unsaved_map_editor_changes, has_unsaved_map_editor_draft, load_map_editor_brush_source,
+    map_editor_selected_label, mark_map_editor_dirty, move_layer, pick_map_editor_tile,
+    remove_layer_from_map, rename_layer, resolve_map_editor_atlas_path,
+    selected_map_editor_brush_entry, set_active_layer, set_map_editor_draft,
+    submit_new_map_request, sync_map_editor_brush_selection, sync_map_editor_selection,
+    take_pending_map_editor_tilemap_sync, toggle_layer_above_entities, toggle_layer_visibility,
+    MapEditorBrushEntry, MapEditorBrushKind, MapEditorDraft, MapEditorHistory, MapEditorTileInfo,
+    MapEditorTool, NewMapRequest,
 };
 pub(crate) use editor_ui_menu_editor::{
     select_menu_dialog, select_menu_entry, select_menu_screen, selected_menu_dialog_id,
@@ -609,6 +611,7 @@ pub struct MapEditorState {
     pub active_layer: usize,
     pub modified_atlas: Option<toki_core::assets::atlas::AtlasMeta>,
     pub atlas_path: Option<PathBuf>,
+    pub brush_stamp_solid: Option<bool>,
 }
 
 impl Default for MapEditorState {
@@ -639,6 +642,7 @@ impl Default for MapEditorState {
             active_layer: 0,
             modified_atlas: None,
             atlas_path: None,
+            brush_stamp_solid: None,
         }
     }
 }
@@ -673,7 +677,8 @@ pub struct EditorUI {
     pub menu_preview_font_families: Vec<String>,
 
     // Collision box visual editor state
-    pub collision_preview: crate::ui::panels::entity_editor::collision_preview::CollisionPreviewState,
+    pub collision_preview:
+        crate::ui::panels::entity_editor::collision_preview::CollisionPreviewState,
 }
 
 pub struct EditorRenderContext<'a> {

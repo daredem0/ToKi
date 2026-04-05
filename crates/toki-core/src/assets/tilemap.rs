@@ -8,6 +8,7 @@ use crate::io::text::{
 use crate::CoreError;
 use glam::UVec2;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -30,6 +31,10 @@ pub struct TileLayer {
     pub collision_enabled: bool,
     #[serde(default)]
     pub above_entities: bool,
+    /// Per-tile collision overrides. Key = tile index (y * width + x), value = solid.
+    /// When present, overrides the atlas-level `solid` property for that position.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub collision_overrides: HashMap<u32, bool>,
 }
 
 fn default_true() -> bool {
@@ -44,6 +49,7 @@ impl TileLayer {
             visible: true,
             collision_enabled: true,
             above_entities: false,
+            collision_overrides: HashMap::new(),
         }
     }
 
@@ -54,6 +60,7 @@ impl TileLayer {
             visible: true,
             collision_enabled: false,
             above_entities: false,
+            collision_overrides: HashMap::new(),
         }
     }
 }
@@ -305,8 +312,15 @@ impl TileMap {
             });
         }
         let index = (tile_y * self.size.x + tile_x) as usize;
+        let index_u32 = index as u32;
         for layer in &self.layers {
             if !layer.collision_enabled {
+                continue;
+            }
+            if let Some(&override_solid) = layer.collision_overrides.get(&index_u32) {
+                if override_solid {
+                    return Ok(true);
+                }
                 continue;
             }
             let Some(tile_name) = layer.tiles.get(index) else {

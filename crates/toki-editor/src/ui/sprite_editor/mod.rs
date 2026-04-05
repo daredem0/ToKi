@@ -25,7 +25,7 @@ pub use history::{SpriteEditCommand, SpriteEditorHistory};
 #[cfg(test)]
 pub use selection::{clear_masked_pixels, extract_masked_selection};
 pub use selection::{SelectionMask, SpriteSelection};
-pub use state::SpriteEditorState;
+pub use state::{AutoTileSpriteInfo, SpriteEditorState};
 #[cfg(test)]
 pub use types::canonical_indexed_color;
 pub use types::{
