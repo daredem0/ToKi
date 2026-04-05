@@ -196,6 +196,26 @@ impl SceneRenderer {
         Ok(())
     }
 
+    /// Load new tilemap texture from RGBA8 image data.
+    pub fn load_tilemap_texture_rgba8(
+        &mut self,
+        image: &toki_core::graphics::image::DecodedImage,
+    ) -> Result<(), RenderError> {
+        self.tilemap_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.format,
+            TextureSource::rgba8(image),
+        )?;
+        self.overlay_tilemap_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.format,
+            TextureSource::rgba8(image),
+        )?;
+        Ok(())
+    }
+
     /// Load new sprite texture (with caching to avoid redundant loads)
     pub fn load_sprite_texture(
         &mut self,

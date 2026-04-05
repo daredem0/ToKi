@@ -1,7 +1,59 @@
 use glam::UVec2;
-use std::collections::HashMap;
-use toki_core::assets::atlas::{AtlasMeta, ImportedAutoTile, TileInfo, TileProperties};
+use std::collections::{BTreeMap, HashMap};
+use toki_core::assets::atlas::{AtlasMeta, ColorMode, ImportedAutoTile, TileInfo, TileProperties};
 use toki_core::graphics::image::DecodedImage;
+use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette};
+
+fn indexed_palette_id(atlas: &AtlasMeta) -> &str {
+    atlas.palette.as_deref().unwrap_or("gb_default")
+}
+
+fn prepare_source_image_for_import(
+    base_atlas: &AtlasMeta,
+    source_atlas: &AtlasMeta,
+    source_image: &DecodedImage,
+    available_palettes: &BTreeMap<String, Palette>,
+) -> Result<DecodedImage, String> {
+    match (base_atlas.color_mode, source_atlas.color_mode) {
+        (ColorMode::TrueColor, ColorMode::TrueColor) => Ok(source_image.clone()),
+        (ColorMode::TrueColor, ColorMode::PaletteIndexed) => {
+            let palette_id = indexed_palette_id(source_atlas);
+            let palette = resolve_palette(palette_id, available_palettes).ok_or_else(|| {
+                format!(
+                    "Missing palette '{}' required by indexed auto-tile import",
+                    palette_id
+                )
+            })?;
+            recolor_indexed_image(source_image, &palette).map_err(|error| {
+                format!(
+                    "Failed to bake indexed auto-tile '{}' into truecolor atlas: {}",
+                    palette_id, error
+                )
+            })
+        }
+        (ColorMode::PaletteIndexed, ColorMode::PaletteIndexed) => {
+            let base_palette_id = indexed_palette_id(base_atlas);
+            let source_palette_id = indexed_palette_id(source_atlas);
+            if base_atlas.effective_palette_size() != source_atlas.effective_palette_size() {
+                return Err(format!(
+                    "Palette size mismatch: base={}, source={}",
+                    base_atlas.effective_palette_size(),
+                    source_atlas.effective_palette_size()
+                ));
+            }
+            if base_palette_id != source_palette_id {
+                return Err(format!(
+                    "Palette mismatch: base='{}', source='{}'. Import into indexed atlases requires the same palette.",
+                    base_palette_id, source_palette_id
+                ));
+            }
+            Ok(source_image.clone())
+        }
+        (ColorMode::PaletteIndexed, ColorMode::TrueColor) => {
+            Err("Cannot import a truecolor auto-tile into a palette-indexed atlas.".to_string())
+        }
+    }
+}
 
 /// Merge auto-tile tiles from a source atlas into a base atlas image and metadata.
 pub fn import_auto_tile_into_atlas(
@@ -10,6 +62,7 @@ pub fn import_auto_tile_into_atlas(
     source_atlas: &AtlasMeta,
     source_image: &DecodedImage,
     source_path: &std::path::Path,
+    available_palettes: &BTreeMap<String, Palette>,
 ) -> Result<(), String> {
     let group = source_atlas
         .auto_tile_groups
@@ -35,8 +88,15 @@ pub fn import_auto_tile_into_atlas(
         ));
     }
 
+    let prepared_source_image = prepare_source_image_for_import(
+        base_atlas,
+        source_atlas,
+        source_image,
+        available_palettes,
+    )?;
     let base_cols = base_image.width / base_atlas.tile_size.x;
-    let positions = append_tiles_to_image(base_image, source_image, source_atlas, base_cols);
+    let positions =
+        append_tiles_to_image(base_image, &prepared_source_image, source_atlas, base_cols);
 
     let mut tile_names = Vec::new();
     let mut remapped_variants = HashMap::new();
@@ -44,7 +104,7 @@ pub fn import_auto_tile_into_atlas(
         let Some(source_tile) = source_atlas.tiles.get(source_tile_name) else {
             continue;
         };
-        let src_idx = (source_tile.position.y * source_cols(source_image, source_atlas)
+        let src_idx = (source_tile.position.y * source_cols(&prepared_source_image, source_atlas)
             + source_tile.position.x) as usize;
         let Some(&new_pos) = positions.get(src_idx) else {
             continue;
@@ -65,7 +125,7 @@ pub fn import_auto_tile_into_atlas(
     merged_group.variants = remapped_variants;
     if let Some(ref preview) = merged_group.preview_tile {
         if let Some(src_tile) = source_atlas.tiles.get(preview) {
-            let src_idx = (src_tile.position.y * source_cols(source_image, source_atlas)
+            let src_idx = (src_tile.position.y * source_cols(&prepared_source_image, source_atlas)
                 + src_tile.position.x) as usize;
             if let Some(&new_pos) = positions.get(src_idx) {
                 let preview_name = format!("{}_preview", group_name);
@@ -188,6 +248,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use toki_core::assets::autotile::{AutoTileGroup, AutoTileMode};
+    use toki_core::palette::{builtin_palettes, resolve_palette};
 
     fn make_test_image(width: u32, height: u32) -> DecodedImage {
         DecodedImage {
@@ -248,6 +309,7 @@ mod tests {
             &source,
             &source_image,
             std::path::Path::new("grass_autotile.json"),
+            &builtin_palettes(),
         );
         assert!(result.is_ok(), "import failed: {:?}", result);
         assert!(base.auto_tile_groups.contains_key("grass"));
@@ -269,6 +331,7 @@ mod tests {
             &source,
             &source_image,
             std::path::Path::new("grass.json"),
+            &builtin_palettes(),
         )
         .unwrap();
         let result = import_auto_tile_into_atlas(
@@ -277,6 +340,7 @@ mod tests {
             &source,
             &source_image,
             std::path::Path::new("grass.json"),
+            &builtin_palettes(),
         );
         assert!(result.is_err());
     }
@@ -293,6 +357,7 @@ mod tests {
             &source,
             &source_image,
             std::path::Path::new("grass.json"),
+            &builtin_palettes(),
         )
         .unwrap();
 
@@ -301,5 +366,61 @@ mod tests {
         assert!(!base.auto_tile_groups.contains_key("grass"));
         assert!(base.imported_auto_tiles.is_empty());
         assert!(base.tiles.len() < tile_count_before);
+    }
+
+    #[test]
+    fn import_bakes_indexed_auto_tile_when_target_atlas_is_truecolor() {
+        let mut base = AtlasMeta::new_single_tile("base.png", UVec2::new(8, 8));
+        let mut base_image = make_test_image(8, 8);
+        let (mut source, mut source_image) = make_source_atlas("grass");
+        source.color_mode = ColorMode::PaletteIndexed;
+        source.palette = Some("poison".to_string());
+
+        source_image.data.fill(0);
+        for rgba in source_image.data.chunks_exact_mut(4) {
+            rgba[3] = 0xFF;
+        }
+
+        import_auto_tile_into_atlas(
+            &mut base,
+            &mut base_image,
+            &source,
+            &source_image,
+            std::path::Path::new("grass.json"),
+            &builtin_palettes(),
+        )
+        .expect("indexed source should bake into truecolor target");
+
+        let poison = resolve_palette("poison", &builtin_palettes()).expect("poison palette");
+        let appended_offset = (base.tile_size.y * base_image.width * 4) as usize;
+        assert_eq!(
+            &base_image.data[appended_offset..appended_offset + 4],
+            &poison.color(0)
+        );
+        assert_eq!(base.color_mode, ColorMode::TrueColor);
+    }
+
+    #[test]
+    fn import_rejects_palette_indexed_auto_tile_with_different_palette() {
+        let mut base = AtlasMeta::new_single_tile("base.png", UVec2::new(8, 8));
+        base.color_mode = ColorMode::PaletteIndexed;
+        base.palette = Some("gb_default".to_string());
+        let mut base_image = make_test_image(8, 8);
+
+        let (mut source, source_image) = make_source_atlas("grass");
+        source.color_mode = ColorMode::PaletteIndexed;
+        source.palette = Some("poison".to_string());
+
+        let error = import_auto_tile_into_atlas(
+            &mut base,
+            &mut base_image,
+            &source,
+            &source_image,
+            std::path::Path::new("grass.json"),
+            &builtin_palettes(),
+        )
+        .expect_err("mismatched indexed palettes should be rejected");
+
+        assert!(error.contains("Palette mismatch"));
     }
 }

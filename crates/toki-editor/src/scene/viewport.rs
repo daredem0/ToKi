@@ -88,6 +88,7 @@ pub struct SceneViewport {
     viewport_size: (u32, u32),
     requested_viewport_size: Option<(u32, u32)>,
     atlas_cache: Option<AtlasMeta>,
+    atlas_cache_path: Option<std::path::PathBuf>,
     tile_animation_clock: TileAnimationClock,
     needs_render: bool, // Track if scene needs re-rendering
     camera: Camera,     // Camera for zoom and pan
@@ -105,6 +106,7 @@ pub struct SceneViewport {
     recolored_sprite_images: std::collections::HashMap<String, DecodedImage>,
     available_palettes: BTreeMap<String, Palette>,
     indexed_palette_override: Option<String>,
+    tilemap_texture_cache_key: Option<String>,
 }
 
 impl SceneViewport {
@@ -190,6 +192,7 @@ impl SceneViewport {
             viewport_size: (resolution_width, resolution_height),
             requested_viewport_size: None,
             atlas_cache: None,
+            atlas_cache_path: None,
             tile_animation_clock: TileAnimationClock::new(),
             needs_render: true,
             camera,
@@ -203,6 +206,7 @@ impl SceneViewport {
             recolored_sprite_images: std::collections::HashMap::new(),
             available_palettes: builtin_palettes(),
             indexed_palette_override: None,
+            tilemap_texture_cache_key: None,
         })
     }
 
@@ -613,10 +617,12 @@ impl SceneViewport {
 
     pub fn clear_asset_caches(&mut self) {
         self.atlas_cache = None;
+        self.atlas_cache_path = None;
         self.loaded_sprite_atlases.clear();
         self.loaded_object_sheets.clear();
         self.decoded_sprite_images.clear();
         self.recolored_sprite_images.clear();
+        self.tilemap_texture_cache_key = None;
         if let Some(scene_renderer) = &mut self.scene_renderer {
             scene_renderer.clear_sprite_texture_cache();
         }
@@ -625,6 +631,8 @@ impl SceneViewport {
 
     pub fn set_available_palettes(&mut self, palettes: &BTreeMap<String, Palette>) {
         self.available_palettes = palettes.clone();
+        self.recolored_sprite_images.clear();
+        self.tilemap_texture_cache_key = None;
         self.mark_dirty();
     }
 

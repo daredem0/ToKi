@@ -1,5 +1,7 @@
 use super::*;
-use crate::editor_sprite_preview::resolve_indexed_preview_palette;
+use crate::editor_sprite_preview::{
+    load_texture_preview_image, resolve_indexed_preview_palette, texture_preview_cache_key,
+};
 use toki_core::cache_utils::clone_cached_or_load;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
 use toki_core::palette::{recolor_indexed_image, Palette};
@@ -26,6 +28,63 @@ fn load_cached_string_keyed<T: Clone>(
 }
 
 impl SceneViewport {
+    fn ensure_tilemap_texture_loaded(
+        &mut self,
+        atlas: &AtlasMeta,
+        atlas_path: &std::path::Path,
+    ) -> Result<()> {
+        let Some(scene_renderer) = &mut self.scene_renderer else {
+            return Ok(());
+        };
+
+        let texture_path = atlas_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join(&atlas.image);
+        if !texture_path.exists() {
+            tracing::warn!("Tilemap texture not found: {}", texture_path.display());
+            return Ok(());
+        }
+
+        let resolved_palette = resolve_indexed_preview_palette(
+            atlas.color_mode,
+            &self.available_palettes,
+            self.indexed_palette_override.as_deref(),
+            None,
+            atlas.palette.as_deref(),
+        )
+        .map_err(|error| anyhow::anyhow!(error))?
+        .map(|(palette_id, _)| palette_id);
+
+        let cache_key =
+            texture_preview_cache_key(&texture_path, atlas.color_mode, resolved_palette.as_deref());
+        if self.tilemap_texture_cache_key.as_deref() == Some(cache_key.as_str()) {
+            return Ok(());
+        }
+
+        if atlas.is_palette_indexed() {
+            let (image, _) = load_texture_preview_image(
+                &texture_path,
+                atlas.color_mode,
+                &self.available_palettes,
+                self.indexed_palette_override.as_deref(),
+                None,
+                atlas.palette.as_deref(),
+            )
+            .map_err(|error| anyhow::anyhow!(error))?;
+            scene_renderer
+                .load_tilemap_texture_rgba8(&image)
+                .map_err(|e| anyhow::anyhow!("Failed to load recolored tilemap texture: {}", e))?;
+        } else {
+            scene_renderer
+                .load_tilemap_texture(texture_path.clone())
+                .map_err(|e| anyhow::anyhow!("Failed to load tilemap texture: {}", e))?;
+        }
+        self.tilemap_texture_cache_key = Some(cache_key);
+        tracing::info!("Loaded tilemap texture: {}", texture_path.display());
+        Ok(())
+    }
+
     fn decoded_sprite_image(&mut self, texture_path: &std::path::Path) -> Result<DecodedImage> {
         Ok(clone_cached_or_load(
             self.decoded_sprite_images.get(texture_path).cloned(),
@@ -83,40 +142,31 @@ impl SceneViewport {
             }
         };
 
-        clone_cached_or_load(
-            self.atlas_cache.clone(),
-            || {
+        let atlas = if self.atlas_cache_path.as_deref() == Some(atlas_path.as_path()) {
+            if let Some(atlas) = self.atlas_cache.clone() {
+                atlas
+            } else {
                 let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
                     anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
                 })?;
+                self.atlas_cache = Some(atlas.clone());
+                self.atlas_cache_path = Some(atlas_path.clone());
+                atlas
+            }
+        } else {
+            let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
+                anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
+            })?;
+            self.atlas_cache = Some(atlas.clone());
+            self.atlas_cache_path = Some(atlas_path.clone());
+            self.tilemap_texture_cache_key = None;
+            atlas
+        };
 
-                tracing::trace!("Atlas image field contains: {:?}", atlas.image);
-                if let Some(scene_renderer) = &mut self.scene_renderer {
-                    tracing::trace!("Scene renderer available, proceeding with texture load");
-                    let texture_path = atlas_path
-                        .parent()
-                        .unwrap_or_else(|| std::path::Path::new("."))
-                        .join(&atlas.image);
-
-                    if texture_path.exists() {
-                        tracing::info!("Loading tilemap texture: {}", texture_path.display());
-                        scene_renderer
-                            .load_tilemap_texture(texture_path)
-                            .map_err(|e| {
-                                anyhow::anyhow!("Failed to load tilemap texture: {}", e)
-                            })?;
-                        tracing::info!("Successfully loaded tilemap texture");
-                    } else {
-                        tracing::warn!("Tilemap texture not found: {}", texture_path.display());
-                    }
-                }
-                tracing::info!("Loaded and cached atlas: {}", atlas_path.display());
-                Ok(atlas)
-            },
-            |atlas| {
-                self.atlas_cache = Some(atlas);
-            },
-        )
+        tracing::trace!("Atlas image field contains: {:?}", atlas.image);
+        self.ensure_tilemap_texture_loaded(&atlas, &atlas_path)?;
+        tracing::info!("Loaded and cached atlas: {}", atlas_path.display());
+        Ok(atlas)
     }
 
     pub(super) fn load_sprite_atlas_from_asset(

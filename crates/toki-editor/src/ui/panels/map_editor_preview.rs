@@ -1,4 +1,7 @@
 use super::*;
+use crate::editor_sprite_preview::{
+    load_texture_preview_image, resolve_indexed_preview_palette, texture_preview_cache_key,
+};
 use crate::editor_viewport::EditorViewportContext;
 use crate::ui::editor_ui::MapEditorTool;
 use crate::ui::EditorUI;
@@ -46,9 +49,12 @@ impl PanelSystem {
         else {
             return;
         };
-        let Some(texture) =
-            Self::ensure_map_editor_brush_preview_texture(ui_state, ui.ctx(), &texture_path)
-        else {
+        let Some(texture) = Self::ensure_map_editor_brush_preview_texture(
+            ui_state,
+            ui.ctx(),
+            &atlas,
+            &texture_path,
+        ) else {
             return;
         };
         let Some(brush_entry) = crate::ui::editor_ui::selected_map_editor_brush_entry(
@@ -141,28 +147,55 @@ impl PanelSystem {
     pub(super) fn ensure_map_editor_brush_preview_texture(
         ui_state: &mut EditorUI,
         ctx: &egui::Context,
+        atlas: &AtlasMeta,
         texture_path: &std::path::Path,
     ) -> Option<egui::TextureHandle> {
-        if crate::ui::editor_context::map_state_mut(ui_state)
-            .brush_preview_image_path
+        let resolved_palette_id = resolve_indexed_preview_palette(
+            atlas.color_mode,
+            &ui_state.project.available_palettes,
+            ui_state.project.indexed_palette_override.as_deref(),
+            None,
+            atlas.palette.as_deref(),
+        )
+        .ok()
+        .flatten()
+        .map(|(palette_id, _)| palette_id);
+        let cache_key = texture_preview_cache_key(
+            texture_path,
+            atlas.color_mode,
+            resolved_palette_id.as_deref(),
+        );
+
+        if crate::ui::editor_context::map_state(ui_state)
+            .brush_preview_cache_key
             .as_deref()
-            == Some(texture_path)
-            && crate::ui::editor_context::map_state_mut(ui_state)
+            == Some(cache_key.as_str())
+            && crate::ui::editor_context::map_state(ui_state)
                 .brush_preview_texture
                 .is_some()
         {
-            return crate::ui::editor_context::map_state_mut(ui_state)
+            return crate::ui::editor_context::map_state(ui_state)
                 .brush_preview_texture
                 .clone();
         }
 
-        let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
+        let (decoded, _) = load_texture_preview_image(
+            texture_path,
+            atlas.color_mode,
+            &ui_state.project.available_palettes,
+            ui_state.project.indexed_palette_override.as_deref(),
+            None,
+            atlas.palette.as_deref(),
+        )
+        .ok()?;
         let color_image = egui::ColorImage::from_rgba_unmultiplied(
             [decoded.width as usize, decoded.height as usize],
             &decoded.data,
         );
-        let key = format!("map_editor_brush_preview:{}", texture_path.display());
+        let key = format!("map_editor_brush_preview:{cache_key}");
         let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
+        crate::ui::editor_context::map_state_mut(ui_state).brush_preview_cache_key =
+            Some(cache_key);
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path =
             Some(texture_path.to_path_buf());
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture =
