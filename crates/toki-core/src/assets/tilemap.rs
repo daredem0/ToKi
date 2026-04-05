@@ -345,9 +345,11 @@ impl TileMap {
     ) -> Vec<QuadVertex> {
         let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
         let resolver = TileSetResolver::new(&tileset, &atlases);
-        self.generate_render_batches(&resolver, tile_anim, None)
-            .map(|batches| batches.into_iter().flat_map(|batch| batch.vertices).collect())
-            .unwrap_or_default()
+        resolver
+            .generate_render_batches_best_effort(self, None, tile_anim, None)
+            .into_iter()
+            .flat_map(|batch| batch.vertices)
+            .collect()
     }
 
     pub fn generate_split_vertices(
@@ -359,13 +361,11 @@ impl TileMap {
         let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
         let resolver = TileSetResolver::new(&tileset, &atlases);
         let mut split = SplitTilemapVertices::default();
-        if let Ok(batches) = self.generate_render_batches(&resolver, tile_anim, None) {
-            for batch in batches {
-                if batch.key.above_entities {
-                    split.above.extend(batch.vertices);
-                } else {
-                    split.below.extend(batch.vertices);
-                }
+        for batch in resolver.generate_render_batches_best_effort(self, None, tile_anim, None) {
+            if batch.key.above_entities {
+                split.above.extend(batch.vertices);
+            } else {
+                split.below.extend(batch.vertices);
             }
         }
         split
@@ -381,15 +381,13 @@ impl TileMap {
         let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
         let resolver = TileSetResolver::new(&tileset, &atlases);
         let mut split = SplitTilemapVertices::default();
-        if let Ok(batches) =
-            self.generate_render_batches_for_chunks(&resolver, visible_chunks, tile_anim, None)
+        for batch in
+            resolver.generate_render_batches_best_effort(self, Some(visible_chunks), tile_anim, None)
         {
-            for batch in batches {
-                if batch.key.above_entities {
-                    split.above.extend(batch.vertices);
-                } else {
-                    split.below.extend(batch.vertices);
-                }
+            if batch.key.above_entities {
+                split.above.extend(batch.vertices);
+            } else {
+                split.below.extend(batch.vertices);
             }
         }
         split

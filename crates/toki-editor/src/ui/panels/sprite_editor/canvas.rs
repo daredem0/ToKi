@@ -1314,7 +1314,7 @@ mod tests {
     }
 
     #[test]
-    fn canvas_display_pixels_leaves_noncanonical_indexed_pixels_unchanged() {
+    fn canvas_display_pixels_rejects_noncanonical_indexed_pixels() {
         let canvas = SpriteCanvas::filled(1, 1, PixelColor::rgb(12, 34, 56));
         let palette = Palette::new(
             toki_core::palette::PaletteSize::Pal4,
@@ -1330,7 +1330,7 @@ mod tests {
             data: canvas.pixels().to_vec(),
         };
 
-        let materialized = toki_core::indexed_presentation::materialize_indexed_image(
+        let error = toki_core::indexed_presentation::materialize_indexed_image(
             &preview_image,
             "sprite_editor_canvas_test",
             ColorMode::PaletteIndexed,
@@ -1342,9 +1342,9 @@ mod tests {
                 apply_post_process: false,
             },
         )
-        .expect("preview image should materialize");
+        .expect_err("non-canonical indexed colors should be rejected");
 
-        assert_eq!(materialized.image.data, canvas.pixels());
+        assert!(error.contains("invalid colors"));
     }
 
     #[test]

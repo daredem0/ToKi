@@ -416,9 +416,15 @@ fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
     assert_eq!(draft.name, "new_map");
     assert_eq!(draft.tilemap.size, UVec2::new(5, 4));
     assert_eq!(draft.tilemap.tile_size, UVec2::new(16, 16));
-    assert_eq!(draft.tilemap.tileset, PathBuf::from("terrain.json"));
+    assert_eq!(draft.tilemap.tileset, PathBuf::from("new_map.json"));
     assert_eq!(draft.tilemap.tiles().len(), 20);
-    assert!(draft.tilemap.tiles().iter().all(|tile| tile == "grass"));
+    assert!(
+        draft
+            .tilemap
+            .tiles()
+            .iter()
+            .all(|tile| tile == "terrain/tile/grass")
+    );
 }
 
 #[test]

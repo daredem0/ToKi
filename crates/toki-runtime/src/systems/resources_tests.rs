@@ -1,7 +1,6 @@
 use super::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
-    resolve_project_resource_paths, resolve_tilemap_tileset_path as resolve_tilemap_atlas_path,
-    ResourceManager,
+    resolve_project_resource_paths, resolve_tilemap_tileset_path, ResourceManager,
     SpriteMetadataFileKind,
 };
 use std::fs;
@@ -57,13 +56,30 @@ fn write_palette_indexed_atlas(path: &std::path::Path, image_name: &str, palette
     fs::write(path, content).expect("palette atlas write");
 }
 
-fn write_minimal_map(path: &std::path::Path, atlas_ref: &str) {
+fn write_minimal_tileset(path: &std::path::Path, atlas_ref: &str) {
+    let atlas_name = atlas_ref.strip_suffix(".json").unwrap_or(atlas_ref);
+    let content = format!(
+        r#"{{
+  "tile_size": [16, 16],
+  "entries": {{
+    "{atlas_name}/tile/floor": {{
+      "atlas_name": "{atlas_ref}",
+      "kind": "tile",
+      "source_name": "floor"
+    }}
+  }}
+}}"#
+    );
+    fs::write(path, content).expect("tileset write");
+}
+
+fn write_minimal_map(path: &std::path::Path, tileset_ref: &str) {
     let content = format!(
         r#"{{
   "size": [1, 1],
   "tile_size": [16, 16],
-  "atlas": "{atlas_ref}",
-  "tiles": ["floor"]
+  "tileset": "{tileset_ref}",
+  "tiles": ["terrain/tile/floor"]
 }}"#
     );
     fs::write(path, content).expect("map write");
@@ -100,49 +116,49 @@ fn find_first_json_file_returns_sorted_first_json_entry() {
 }
 
 #[test]
-fn resolve_tilemap_atlas_path_prefers_map_directory_relative_atlas() {
+fn resolve_tilemap_tileset_path_prefers_map_directory_relative_tileset() {
     let project_dir = make_unique_temp_dir();
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
     let tilemap_path = tilemaps_dir.join("main_map.json");
-    let atlas_path = tilemaps_dir.join("terrain.json");
+    let tileset_path = tilemaps_dir.join("terrain.json");
     fs::write(&tilemap_path, "{}").expect("tilemap file");
-    fs::write(&atlas_path, "{}").expect("atlas file");
+    fs::write(&tileset_path, "{}").expect("tileset file");
 
     let tilemap = TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         tileset: PathBuf::from("terrain.json"),
-        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
+        layers: vec![TileLayer::new("ground", vec!["terrain/tile/floor".to_string()])],
     };
 
-    let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
-        .expect("atlas should resolve");
-    assert_eq!(resolved, atlas_path);
+    let resolved = resolve_tilemap_tileset_path(&project_dir, &tilemap_path, &tilemap)
+        .expect("tileset should resolve");
+    assert_eq!(resolved, tileset_path);
 }
 
 #[test]
-fn resolve_tilemap_atlas_path_falls_back_to_project_sprites_dir() {
+fn resolve_tilemap_tileset_path_falls_back_to_project_tilesets_dir() {
     let project_dir = make_unique_temp_dir();
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
-    let sprites_dir = project_dir.join("assets").join("sprites");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
-    fs::create_dir_all(&sprites_dir).expect("sprites dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
     let tilemap_path = tilemaps_dir.join("main_map.json");
-    let sprites_atlas = sprites_dir.join("terrain.json");
+    let project_tileset = tilesets_dir.join("terrain.json");
     fs::write(&tilemap_path, "{}").expect("tilemap file");
-    fs::write(&sprites_atlas, "{}").expect("sprites atlas");
+    fs::write(&project_tileset, "{}").expect("project tileset");
 
     let tilemap = TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         tileset: PathBuf::from("terrain.json"),
-        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
+        layers: vec![TileLayer::new("ground", vec!["terrain/tile/floor".to_string()])],
     };
 
-    let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
-        .expect("atlas should resolve from sprites dir");
-    assert_eq!(resolved, sprites_atlas);
+    let resolved = resolve_tilemap_tileset_path(&project_dir, &tilemap_path, &tilemap)
+        .expect("tileset should resolve from project tilesets dir");
+    assert_eq!(resolved, project_tileset);
 }
 
 #[test]
@@ -150,12 +166,15 @@ fn load_for_project_with_named_map_loads_resources() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
 
     let manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
         .expect("project resources should load");
@@ -170,17 +189,21 @@ fn load_for_project_without_map_name_discovers_first_tilemap() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("b_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("a_map.json"), "terrain.json");
+    write_minimal_tileset(&tilesets_dir.join("b_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("b_map.json"), "b_map.json");
     let a_map = r#"{
   "size": [2, 1],
   "tile_size": [16, 16],
-  "atlas": "terrain.json",
-  "tiles": ["floor", "floor"]
+  "tileset": "a_map.json",
+  "tiles": ["terrain/tile/floor", "terrain/tile/floor"]
 }"#;
     fs::write(tilemaps_dir.join("a_map.json"), a_map).expect("a_map write");
 
@@ -197,9 +220,12 @@ fn load_for_project_without_map_name_discovers_first_tilemap() {
 fn load_for_project_errors_when_no_sprite_atlas_exists() {
     let project_dir = make_unique_temp_dir();
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
 
     let error = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
         .expect_err("missing sprite atlas should fail");
@@ -216,12 +242,15 @@ fn load_for_project_registers_sprite_atlas_by_filename_and_stem() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("players.json"), "player.png");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
     fs::write(sprites_dir.join("player.png"), "png").expect("player image");
 
     let manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
@@ -240,16 +269,19 @@ fn resolve_atlas_tile_uses_palette_indexed_material_for_indexed_atlases() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_palette_indexed_atlas(
         &sprites_dir.join("creatures.json"),
         "creatures.png",
         "sepia",
     );
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
 
     let mut manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
         .expect("project resources should load");
@@ -269,16 +301,19 @@ fn resolve_indexed_palette_falls_back_when_entity_override_is_invalid() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_palette_indexed_atlas(
         &sprites_dir.join("creatures.json"),
         "creatures.png",
         "sepia",
     );
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
 
     let mut manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
         .expect("project resources should load");
@@ -298,16 +333,19 @@ fn resolve_indexed_palette_falls_back_to_builtin_default_when_all_ids_are_invali
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_palette_indexed_atlas(
         &sprites_dir.join("creatures.json"),
         "creatures.png",
         "missing_atlas_palette",
     );
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
 
     let mut manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
         .expect("project resources should load");
@@ -328,20 +366,23 @@ fn resolve_project_resource_paths_returns_expected_texture_paths() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
     fs::write(sprites_dir.join("creatures.png"), "png").expect("creatures image");
-    fs::write(tilemaps_dir.join("terrain.png"), "png").expect("terrain image");
+    fs::write(tilesets_dir.join("terrain.png"), "png").expect("terrain image");
 
     let resolved = resolve_project_resource_paths(&project_dir, Some("demo_map"))
         .expect("project resource paths should resolve");
     assert_eq!(
         resolved.tileset_atlas_paths,
-        vec![tilemaps_dir.join("terrain.json")]
+        vec![tilesets_dir.join("terrain.json")]
     );
     assert_eq!(
         resolved.sprite_texture_path,
@@ -389,8 +430,10 @@ fn resolve_project_resource_paths_ignores_object_sheets_in_sprite_registry() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
     fs::write(
@@ -408,10 +451,11 @@ fn resolve_project_resource_paths_ignores_object_sheets_in_sprite_registry() {
 }"#,
     )
     .expect("object sheet should be written");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
     fs::write(sprites_dir.join("creatures.png"), "png").expect("creatures image");
-    fs::write(tilemaps_dir.join("terrain.png"), "png").expect("terrain image");
+    fs::write(tilesets_dir.join("terrain.png"), "png").expect("terrain image");
 
     let resolved = resolve_project_resource_paths(&project_dir, Some("demo_map"))
         .expect("project resource paths should resolve");
@@ -430,8 +474,10 @@ fn load_for_project_registers_object_sheet_by_filename_and_stem() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("players.json"), "player.png");
     fs::write(
@@ -449,8 +495,9 @@ fn load_for_project_registers_object_sheet_by_filename_and_stem() {
 }"#,
     )
     .expect("object sheet should be written");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
     fs::write(sprites_dir.join("player.png"), "png").expect("player image");
     fs::write(sprites_dir.join("fauna.png"), "png").expect("fauna image");
 

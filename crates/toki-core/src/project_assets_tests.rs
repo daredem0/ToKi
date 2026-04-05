@@ -232,6 +232,7 @@ fn resolve_project_resource_paths_discovers_project_assets() {
     let project = tmp.path();
     fs::create_dir_all(project.join("assets/sprites")).expect("sprites");
     fs::create_dir_all(project.join("assets/tilemaps")).expect("tilemaps");
+    fs::create_dir_all(project.join("assets/tilesets")).expect("tilesets");
 
     fs::write(
         project.join("assets/sprites/players.json"),
@@ -265,12 +266,26 @@ fn resolve_project_resource_paths_discovers_project_assets() {
     .expect("terrain atlas");
     fs::write(project.join("assets/tilemaps/terrain.png"), "png").expect("terrain png");
     fs::write(
+        project.join("assets/tilesets/demo_map.json"),
+        r#"{
+            "tile_size": [16, 16],
+            "entries": {
+                "terrain/tile/grass": {
+                    "atlas_name": "terrain.json",
+                    "kind": "tile",
+                    "source_name": "grass"
+                }
+            }
+        }"#,
+    )
+    .expect("terrain tileset");
+    fs::write(
         project.join("assets/tilemaps/demo_map.json"),
         r#"{
             "size": [1, 1],
             "tile_size": [16, 16],
-            "atlas": "terrain.json",
-            "tiles": ["grass"]
+            "tileset": "demo_map.json",
+            "tiles": ["terrain/tile/grass"]
         }"#,
     )
     .expect("tilemap");
@@ -581,6 +596,7 @@ fn palette_demo_project_assets_parse_and_indexed_source_is_valid() {
     let project_root = temp_dir.path();
     fs::create_dir_all(project_root.join("assets").join("sprites")).expect("sprites dir");
     fs::create_dir_all(project_root.join("assets").join("tilemaps")).expect("tilemaps dir");
+    fs::create_dir_all(project_root.join("assets").join("tilesets")).expect("tilesets dir");
     fs::create_dir_all(project_root.join("assets").join("audio")).expect("audio dir");
     fs::create_dir_all(project_root.join("entities")).expect("entities dir");
     fs::create_dir_all(project_root.join("palettes")).expect("palettes dir");
@@ -698,22 +714,39 @@ indexed_palette_override = "gb_default"
     fs::write(
         project_root
             .join("assets")
+            .join("tilesets")
+            .join("palette_demo_map.json"),
+        r#"{
+  "tile_size": [16, 16],
+  "entries": {
+    "terrain/tile/grass": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "grass"
+    }
+  }
+}"#,
+    )
+    .expect("terrain tileset");
+    fs::write(
+        project_root
+            .join("assets")
             .join("tilemaps")
             .join("palette_demo_map.json"),
         r#"{
   "size": [10, 9],
   "tile_size": [16, 16],
-  "atlas": "terrain.json",
+  "tileset": "palette_demo_map.json",
   "tiles": [
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
-    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass"
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass",
+    "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass", "terrain/tile/grass"
   ]
 }"#,
     )

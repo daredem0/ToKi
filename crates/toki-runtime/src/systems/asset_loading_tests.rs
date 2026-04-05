@@ -29,13 +29,30 @@ fn write_minimal_atlas(path: &std::path::Path, image_name: &str) {
     fs::write(path, content).expect("atlas write");
 }
 
-fn write_minimal_map(path: &std::path::Path, atlas_ref: &str) {
+fn write_minimal_tileset(path: &std::path::Path, atlas_ref: &str) {
+    let atlas_name = atlas_ref.strip_suffix(".json").unwrap_or(atlas_ref);
+    let content = format!(
+        r#"{{
+  "tile_size": [16, 16],
+  "entries": {{
+    "{atlas_name}/tile/floor": {{
+      "atlas_name": "{atlas_ref}",
+      "kind": "tile",
+      "source_name": "floor"
+    }}
+  }}
+}}"#
+    );
+    fs::write(path, content).expect("tileset write");
+}
+
+fn write_minimal_map(path: &std::path::Path, tileset_ref: &str) {
     let content = format!(
         r#"{{
   "size": [1, 1],
   "tile_size": [16, 16],
-  "atlas": "{atlas_ref}",
-  "tiles": ["floor"]
+  "tileset": "{tileset_ref}",
+  "tiles": ["terrain/tile/floor"]
 }}"#
     );
     fs::write(path, content).expect("map write");
@@ -46,14 +63,17 @@ fn load_plan_prefers_hot_textures_and_preloads_common_sfx() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");
     let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    let tilesets_dir = project_dir.join("assets").join("tilesets");
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+    fs::create_dir_all(&tilesets_dir).expect("tilesets dir");
 
     write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
-    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
-    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_atlas(&tilesets_dir.join("terrain.json"), "terrain.png");
+    write_minimal_tileset(&tilesets_dir.join("demo_map.json"), "terrain.json");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "demo_map.json");
     fs::write(sprites_dir.join("creatures.png"), "png").expect("creatures image");
-    fs::write(tilemaps_dir.join("terrain.png"), "png").expect("terrain image");
+    fs::write(tilesets_dir.join("terrain.png"), "png").expect("terrain image");
 
     let plan =
         RuntimeAssetLoadPlan::for_project(&project_dir, Some("Main Scene"), Some("demo_map"))

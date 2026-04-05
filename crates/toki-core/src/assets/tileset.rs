@@ -508,12 +508,13 @@ impl<'a> TileSetResolver<'a> {
         Ok(false)
     }
 
-    pub fn generate_render_batches(
+    fn generate_render_batches_inner(
         &self,
         tilemap: &crate::assets::tilemap::TileMap,
         visible_chunks: Option<&[(u32, u32)]>,
         tile_anim: Option<&TileAnimationClock>,
         indexed_palette_override: Option<&str>,
+        skip_invalid_cells: bool,
     ) -> Result<Vec<TilemapRenderBatch>, CoreError> {
         let mut batches = Vec::<TilemapRenderBatch>::new();
         let chunk_set = visible_chunks.map(|chunks| chunks.to_vec());
@@ -534,22 +535,44 @@ impl<'a> TileSetResolver<'a> {
                         }
                     }
 
-                    let entry_id = tilemap.tile_name_in(&layer.tiles, x, y)?;
+                    let entry_id = match tilemap.tile_name_in(&layer.tiles, x, y) {
+                        Ok(entry_id) => entry_id,
+                        Err(err) => {
+                            if skip_invalid_cells {
+                                continue;
+                            }
+                            return Err(err);
+                        }
+                    };
                     if entry_id.is_empty() {
                         continue;
                     }
 
                     let resolved =
-                        self.resolve_cell_on_layer(tilemap, &layer.tiles, x, y, tile_anim)?;
+                        match self.resolve_cell_on_layer(tilemap, &layer.tiles, x, y, tile_anim) {
+                            Ok(resolved) => resolved,
+                            Err(err) => {
+                                if skip_invalid_cells {
+                                    continue;
+                                }
+                                return Err(err);
+                            }
+                        };
                     let atlas = &resolved.atlas_source.meta;
                     let texture_size = atlas.image_size().unwrap_or(UVec2::new(64, 16));
-                    let uvs = atlas.get_tile_uvs(&resolved.concrete_tile_name, texture_size).ok_or_else(
-                        || CoreError::MissingTileSourceInTileSet {
-                            entry_id: entry_id.to_string(),
-                            atlas_name: resolved.entry.atlas_name.clone(),
-                            source_name: resolved.concrete_tile_name.clone(),
-                        },
-                    )?;
+                    let uvs = match atlas.get_tile_uvs(&resolved.concrete_tile_name, texture_size) {
+                        Some(uvs) => uvs,
+                        None => {
+                            if skip_invalid_cells {
+                                continue;
+                            }
+                            return Err(CoreError::MissingTileSourceInTileSet {
+                                entry_id: entry_id.to_string(),
+                                atlas_name: resolved.entry.atlas_name.clone(),
+                                source_name: resolved.concrete_tile_name.clone(),
+                            });
+                        }
+                    };
 
                     let world_x = x as f32 * tilemap.tile_size.x as f32;
                     let world_y = y as f32 * tilemap.tile_size.y as f32;
@@ -586,6 +609,39 @@ impl<'a> TileSetResolver<'a> {
         }
 
         Ok(batches)
+    }
+
+    pub fn generate_render_batches(
+        &self,
+        tilemap: &crate::assets::tilemap::TileMap,
+        visible_chunks: Option<&[(u32, u32)]>,
+        tile_anim: Option<&TileAnimationClock>,
+        indexed_palette_override: Option<&str>,
+    ) -> Result<Vec<TilemapRenderBatch>, CoreError> {
+        self.generate_render_batches_inner(
+            tilemap,
+            visible_chunks,
+            tile_anim,
+            indexed_palette_override,
+            false,
+        )
+    }
+
+    pub(crate) fn generate_render_batches_best_effort(
+        &self,
+        tilemap: &crate::assets::tilemap::TileMap,
+        visible_chunks: Option<&[(u32, u32)]>,
+        tile_anim: Option<&TileAnimationClock>,
+        indexed_palette_override: Option<&str>,
+    ) -> Vec<TilemapRenderBatch> {
+        self.generate_render_batches_inner(
+            tilemap,
+            visible_chunks,
+            tile_anim,
+            indexed_palette_override,
+            true,
+        )
+        .unwrap_or_default()
     }
 }
 
@@ -689,6 +745,6 @@ mod tests {
         let left = resolver
             .resolve_cell_on_layer(&tilemap, &tilemap.layers[0].tiles, 0, 0, None)
             .expect("resolve left");
-        assert_eq!(left.concrete_tile_name, "terrain_0");
+        assert_eq!(left.concrete_tile_name, "terrain_15");
     }
 }

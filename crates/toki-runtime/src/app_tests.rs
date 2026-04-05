@@ -168,6 +168,72 @@ fn write_test_pak(pak_path: &std::path::Path, entries: &[(String, Vec<u8>)]) {
         .expect("write size");
 }
 
+fn minimal_runtime_tileset_json(atlas_ref: &str) -> String {
+    let atlas_name = atlas_ref.strip_suffix(".json").unwrap_or(atlas_ref);
+    format!(
+        r#"{{
+  "tile_size": [16, 16],
+  "entries": {{
+    "{atlas_name}/tile/floor": {{
+      "atlas_name": "{atlas_ref}",
+      "kind": "tile",
+      "source_name": "floor"
+    }}
+  }}
+}}"#
+    )
+}
+
+fn minimal_runtime_tilemap_json(tileset_ref: &str) -> String {
+    format!(
+        r#"{{
+  "size": [1, 1],
+  "tile_size": [16, 16],
+  "tileset": "{tileset_ref}",
+  "tiles": ["terrain/tile/floor"]
+}}"#
+    )
+}
+
+fn minimal_runtime_terrain_atlas_json() -> &'static str {
+    r#"{
+  "image": "terrain.png",
+  "tile_size": [16, 16],
+  "tiles": {
+    "floor": { "position": [0, 0], "properties": { "solid": false } }
+  }
+}"#
+}
+
+fn write_runtime_map_assets(project_path: &std::path::Path, map_name: &str) {
+    fs::create_dir_all(project_path.join("assets").join("tilemaps")).expect("tilemaps dir");
+    fs::create_dir_all(project_path.join("assets").join("tilesets")).expect("tilesets dir");
+    fs::write(
+        project_path
+            .join("assets")
+            .join("tilemaps")
+            .join(format!("{map_name}.json")),
+        minimal_runtime_tilemap_json(&format!("{map_name}.json")),
+    )
+    .expect("tilemap");
+    fs::write(
+        project_path
+            .join("assets")
+            .join("tilesets")
+            .join(format!("{map_name}.json")),
+        minimal_runtime_tileset_json("terrain.json"),
+    )
+    .expect("tileset");
+    fs::write(
+        project_path
+            .join("assets")
+            .join("tilesets")
+            .join("terrain.json"),
+        minimal_runtime_terrain_atlas_json(),
+    )
+    .expect("terrain atlas");
+}
+
 #[test]
 fn first_existing_path_returns_first_match() {
     let dir = make_unique_temp_dir();
@@ -453,26 +519,15 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
 }"#
     .to_vec();
 
-    let terrain_atlas_path = PathBuf::from("terrain.json");
-    let map_json = format!(
-        r#"{{
-  "size": [1, 1],
-  "tile_size": [16, 16],
-  "atlas": "{}",
-  "tiles": ["floor"]
-}}"#,
-        terrain_atlas_path.display()
+    let terrain_tileset_path = PathBuf::from("demo_map.json");
+    let map_json = minimal_runtime_tilemap_json(
+        terrain_tileset_path
+            .to_str()
+            .expect("tileset path should be valid utf-8"),
     )
     .into_bytes();
-
-    let terrain_atlas = br#"{
-  "image": "terrain.png",
-  "tile_size": [16, 16],
-  "tiles": {
-    "floor": { "position": [0, 0], "properties": { "solid": false } }
-  }
-}"#
-    .to_vec();
+    let terrain_tileset = minimal_runtime_tileset_json("terrain.json").into_bytes();
+    let terrain_atlas = minimal_runtime_terrain_atlas_json().as_bytes().to_vec();
 
     write_test_pak(
         &pack_path,
@@ -480,7 +535,8 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
             ("scenes/Main Scene.json".to_string(), scene_json),
             ("assets/sprites/creatures.json".to_string(), creatures_atlas),
             ("assets/tilemaps/demo_map.json".to_string(), map_json),
-            ("assets/tilemaps/terrain.json".to_string(), terrain_atlas),
+            ("assets/tilesets/demo_map.json".to_string(), terrain_tileset),
+            ("assets/tilesets/terrain.json".to_string(), terrain_atlas),
         ],
     );
 
@@ -513,7 +569,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         0
     );
     assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
-    assert_eq!(resources.get_tilemap().tileset, terrain_atlas_path);
+    assert_eq!(resources.get_tilemap().tileset, terrain_tileset_path);
     assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
 }
 
@@ -572,31 +628,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
 }"#,
     )
     .expect("creatures atlas");
-    fs::write(
-        project_dir
-            .join("assets")
-            .join("tilemaps")
-            .join("demo_map.json"),
-        r#"{
-  "size": [1, 1],
-  "tile_size": [16, 16],
-  "atlas": "terrain.json",
-  "tiles": ["floor"]
-}"#,
-    )
-    .expect("tilemap");
-    fs::write(
-        project_dir
-            .join("assets")
-            .join("tilemaps")
-            .join("terrain.json"),
-        r#"{
-  "image": "terrain.png",
-  "tile_size": [16, 16],
-  "tiles": { "floor": { "position": [0, 0], "properties": { "solid": false } } }
-}"#,
-    )
-    .expect("terrain atlas");
+    write_runtime_map_assets(&project_dir, "demo_map");
 
     let launch_options = RuntimeLaunchOptions {
         project_path: Some(project_dir.clone()),
@@ -681,31 +713,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
 }"#,
     )
     .expect("creatures atlas");
-    fs::write(
-        project_dir
-            .join("assets")
-            .join("tilemaps")
-            .join("demo_map.json"),
-        r#"{
-  "size": [1, 1],
-  "tile_size": [16, 16],
-  "atlas": "terrain.json",
-  "tiles": ["floor"]
-}"#,
-    )
-    .expect("tilemap");
-    fs::write(
-        project_dir
-            .join("assets")
-            .join("tilemaps")
-            .join("terrain.json"),
-        r#"{
-  "image": "terrain.png",
-  "tile_size": [16, 16],
-  "tiles": { "floor": { "position": [0, 0], "properties": { "solid": false } } }
-}"#,
-    )
-    .expect("terrain atlas");
+    write_runtime_map_assets(&project_dir, "demo_map");
 
     let launch_options = RuntimeLaunchOptions {
         project_path: Some(project_dir),
@@ -832,31 +840,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
 }"#,
     )
     .expect("creatures atlas");
-    fs::write(
-        project_dir
-            .join("assets")
-            .join("tilemaps")
-            .join("demo_map.json"),
-        r#"{
-  "size": [1, 1],
-  "tile_size": [16, 16],
-  "atlas": "terrain.json",
-  "tiles": ["floor"]
-}"#,
-    )
-    .expect("tilemap");
-    fs::write(
-        project_dir
-            .join("assets")
-            .join("tilemaps")
-            .join("terrain.json"),
-        r#"{
-  "image": "terrain.png",
-  "tile_size": [16, 16],
-  "tiles": { "floor": { "position": [0, 0], "properties": { "solid": false } } }
-}"#,
-    )
-    .expect("terrain atlas");
+    write_runtime_map_assets(&project_dir, "demo_map");
 
     let launch_options = RuntimeLaunchOptions {
         project_path: Some(project_dir),
