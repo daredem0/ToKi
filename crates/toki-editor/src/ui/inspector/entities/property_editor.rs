@@ -164,6 +164,7 @@ impl InspectorSystem {
         ui_state: &mut EditorUI,
         draft: &mut EntityPropertyDraft,
         config: Option<&EditorConfig>,
+        renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) -> bool {
         let Some(selected_sheet_name) = draft.static_object_sheet.clone() else {
             return false;
@@ -279,6 +280,8 @@ impl InspectorSystem {
             toolbox.selected_object_name = Some(selected_object.clone());
         }
 
+        let available_palettes = ui_state.project.available_palettes.clone();
+        let presentation_settings = ui_state.project.indexed_presentation_settings();
         let texture = {
             let toolbox =
                 &mut crate::ui::editor_context::scene_viewport_context_mut(ui_state).toolbox;
@@ -287,6 +290,11 @@ impl InspectorSystem {
                 &mut toolbox.preview_texture,
                 ui.ctx(),
                 &active_source.texture_path,
+                active_source.object_sheet.color_mode,
+                &available_palettes,
+                &presentation_settings,
+                active_source.object_sheet.palette.as_deref(),
+                renderer,
             )
         };
         if let Some(texture) = texture {
@@ -294,7 +302,7 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     render_object_gallery_item(
                         ui,
-                        texture.id(),
+                        texture,
                         texture_size,
                         &active_source.object_sheet,
                         &selected_object,

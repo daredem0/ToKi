@@ -227,7 +227,7 @@ fn render_sprite_frame_scaled(
     max_width: f32,
     max_height: f32,
 ) -> bool {
-    let Some(texture) = &crate::ui::editor_context::animation_state(ui_state).atlas_texture else {
+    let Some(texture_id) = crate::ui::editor_context::animation_state(ui_state).atlas_texture else {
         return false;
     };
     let Some((default_cell_w, default_cell_h)) =
@@ -285,7 +285,7 @@ fn render_sprite_frame_scaled(
 
         // Draw the sprite
         ui.painter()
-            .image(texture.id(), rect, uv_rect, egui::Color32::WHITE);
+            .image(texture_id, rect, uv_rect, egui::Color32::WHITE);
     });
 
     true

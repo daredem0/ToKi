@@ -5,8 +5,11 @@ use toki_core::assets::{
     tilemap::TileMap,
     tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver},
 };
-use toki_core::graphics::image::load_image_rgba8;
-use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette, PaletteMismatchStrategy};
+use toki_core::indexed_presentation::{
+    materialize_tilemap_batches, resolve_indexed_palette, IndexedPresentationSettings,
+    PresentedTextureSource,
+};
+use toki_core::palette::{Palette, PaletteMismatchStrategy};
 pub use toki_core::project_assets::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
     load_project_palettes, normalize_asset_name, resolve_atlas_texture_path,
@@ -306,42 +309,32 @@ impl ResourceManager {
         }
         .map_err(|error| RenderError::Other(error.to_string()))?;
 
-        let mut rendered = Vec::with_capacity(batches.len());
-        for batch in batches {
-            match &batch.key.material {
-                toki_core::assets::tileset::TileRenderMaterial::TrueColor => {
-                    rendered.push(SceneTilemapBatch {
-                        vertices: batch.vertices,
-                        texture_path: Some(batch.texture_path),
-                        texture_image: None,
-                        texture_cache_key: None,
-                        above_entities: batch.key.above_entities,
-                    });
-                }
-                toki_core::assets::tileset::TileRenderMaterial::PaletteIndexed { palette_id } => {
-                    let decoded = load_image_rgba8(&batch.texture_path)
-                        .map_err(|error| RenderError::Other(error.to_string()))?;
-                    let (_, palette) = self
-                        .resolve_indexed_palette_by_id(Some(palette_id.as_str()), None)
-                        .map_err(|error| RenderError::Other(format!("{error:?}")))?;
-                    let recolored = recolor_indexed_image(&decoded, &palette)
-                        .map_err(|error| RenderError::Other(error.to_string()))?;
-                    rendered.push(SceneTilemapBatch {
-                        vertices: batch.vertices,
-                        texture_path: None,
-                        texture_image: Some(recolored),
-                        texture_cache_key: Some(format!(
-                            "{}::{}",
-                            batch.texture_path.display(),
-                            palette_id
-                        )),
-                        above_entities: batch.key.above_entities,
-                    });
-                }
-            }
-        }
+        let presented = materialize_tilemap_batches(
+            batches,
+            &self.project_palettes,
+            &self.indexed_presentation_settings(),
+        )
+        .map_err(RenderError::Other)?;
 
-        Ok(rendered)
+        Ok(presented
+            .into_iter()
+            .map(|batch| match batch.texture {
+                PresentedTextureSource::File(texture_path) => SceneTilemapBatch {
+                    vertices: batch.vertices,
+                    texture_path: Some(texture_path),
+                    texture_image: None,
+                    texture_cache_key: None,
+                    above_entities: batch.above_entities,
+                },
+                PresentedTextureSource::Rgba8 { image, cache_key } => SceneTilemapBatch {
+                    vertices: batch.vertices,
+                    texture_path: None,
+                    texture_image: Some(image),
+                    texture_cache_key: Some(cache_key),
+                    above_entities: batch.above_entities,
+                },
+            })
+            .collect())
     }
 
     pub fn palette_mismatch_strategy(&self) -> PaletteMismatchStrategy {
@@ -361,21 +354,25 @@ impl ResourceManager {
         asset_palette: Option<&str>,
         palette_override: Option<&str>,
     ) -> Result<(String, Palette), SpriteResolveError> {
-        for palette_id in [
-            self.indexed_palette_override.as_deref(),
+        resolve_indexed_palette(
+            toki_core::assets::atlas::ColorMode::PaletteIndexed,
+            &self.project_palettes,
+            &self.indexed_presentation_settings(),
             palette_override,
             asset_palette,
-            Some("gb_default"),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if let Some(palette) = resolve_palette(palette_id, &self.project_palettes) {
-                return Ok((palette_id.to_string(), palette));
-            }
-        }
-
-        Err(SpriteResolveError::AssetLoadFailed {
+        )
+        .map_err(|message| SpriteResolveError::AssetLoadFailed {
+            asset_kind: "palette",
+            asset_name: self
+                .indexed_palette_override
+                .as_deref()
+                .or(palette_override)
+                .or(asset_palette)
+                .unwrap_or("gb_default")
+                .to_string(),
+            message,
+        })?
+        .ok_or_else(|| SpriteResolveError::AssetLoadFailed {
             asset_kind: "palette",
             asset_name: self
                 .indexed_palette_override
@@ -386,6 +383,15 @@ impl ResourceManager {
                 .to_string(),
             message: "palette id could not be resolved".to_string(),
         })
+    }
+}
+
+impl ResourceManager {
+    fn indexed_presentation_settings(&self) -> IndexedPresentationSettings {
+        IndexedPresentationSettings {
+            indexed_palette_override: self.indexed_palette_override.clone(),
+            post_process: toki_core::project_runtime::RuntimePostProcessSettings::default(),
+        }
     }
 }
 

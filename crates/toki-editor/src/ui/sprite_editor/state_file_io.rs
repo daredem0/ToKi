@@ -28,12 +28,13 @@ impl SpriteEditorState {
         cs.history.clear();
         cs.selection = None;
         cs.canvas_texture = None;
+        cs.canvas_texture_cache_key = None;
         cs.viewport = SpriteCanvasViewport::default();
         cs.selected_cell = None;
         cs.original_cell_aliases = None;
         cs.show_cell_grid = false;
         self.color_mode = toki_core::assets::atlas::ColorMode::TrueColor;
-        self.selected_palette_id = None;
+        self.authored_palette_id = None;
     }
 
     /// Open the save dialog
@@ -181,7 +182,7 @@ impl SpriteEditorState {
         let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
             .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
 
-        let (cell_size, is_sheet, original_aliases, color_mode, selected_palette_id) =
+        let (cell_size, is_sheet, original_aliases, color_mode, authored_palette_id) =
             match asset.kind {
                 SpriteAssetKind::TileAtlas => {
                     let meta = AtlasMeta::load_from_file(&asset.json_path)
@@ -221,7 +222,7 @@ impl SpriteEditorState {
 
         self.reset_canvas_state(canvas, false);
         self.color_mode = color_mode;
-        self.selected_palette_id = selected_palette_id;
+        self.authored_palette_id = authored_palette_id;
         if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
             // Default to the last canonical shade (white) for the palette size.
             // The palette size isn't available here, so we use Pal4 as a safe default.
@@ -464,7 +465,7 @@ impl SpriteEditorState {
                 meta.color_mode = self.color_mode;
                 meta.palette =
                     if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-                        self.selected_palette_id.clone()
+                        self.authored_palette_id.clone()
                     } else {
                         None
                     };
@@ -486,7 +487,7 @@ impl SpriteEditorState {
                 meta.color_mode = self.color_mode;
                 meta.palette =
                     if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-                        self.selected_palette_id.clone()
+                        self.authored_palette_id.clone()
                     } else {
                         None
                     };
@@ -542,7 +543,7 @@ impl SpriteEditorState {
             tile_size: cs.cell_size,
             color_mode: self.color_mode,
             palette: if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-                self.selected_palette_id.clone()
+                self.authored_palette_id.clone()
             } else {
                 None
             },
@@ -646,7 +647,7 @@ impl SpriteEditorState {
             tile_size: cs.cell_size,
             color_mode: self.color_mode,
             palette: if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-                self.selected_palette_id.clone()
+                self.authored_palette_id.clone()
             } else {
                 None
             },

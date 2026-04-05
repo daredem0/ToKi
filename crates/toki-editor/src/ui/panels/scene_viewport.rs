@@ -9,7 +9,7 @@ impl PanelSystem {
         ui_state: &mut EditorUI,
         scene_viewport: Option<&mut SceneViewport>,
         mut config: Option<&mut EditorConfig>,
-        renderer: Option<&mut egui_wgpu::Renderer>,
+        renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         let Some(viewport) = scene_viewport else {
             let available_size = ui.available_size();

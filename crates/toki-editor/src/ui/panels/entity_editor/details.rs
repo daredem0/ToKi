@@ -10,6 +10,7 @@ pub fn render_entity_details_with_project(
     ui_state: &mut EditorUI,
     project_path: Option<&std::path::Path>,
     ctx: &egui::Context,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     if crate::ui::editor_context::entity_editor_state_mut(ui_state)
         .edit_state
@@ -31,7 +32,7 @@ pub fn render_entity_details_with_project(
         .show(ui, |ui| {
             render_core_properties(ui, ui_state);
             ui.add_space(8.0);
-            render_component_toggles(ui, ui_state, project_path, ctx);
+            render_component_toggles(ui, ui_state, project_path, ctx, renderer);
             ui.add_space(8.0);
             render_save_section(ui, ui_state);
         });

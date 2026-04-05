@@ -9,6 +9,7 @@ use std::fs;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
+use toki_core::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
 use toki_core::game::{
     AudioChannel, AudioEvent, GameSimulation, InputSystem, RuleSystem, SceneSystem,
@@ -96,6 +97,8 @@ fn top_down_starter_player_is_loaded_as_runtime_player_and_can_move() {
         project_path.join("assets/sprites/terrain.json"),
     )
     .expect("starter atlas should load");
+    let (tileset, atlas_sources) = tileset_from_atlas("terrain", &atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlas_sources);
 
     let mut game_state = GameState::new_empty();
     let scene_name = scene.name.clone();
@@ -119,7 +122,7 @@ fn top_down_starter_player_is_loaded_as_runtime_player_and_can_move() {
         &mut game_state,
         glam::UVec2::new(160, 144),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Left);
 
@@ -208,10 +211,16 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         .expect("saved scene should load in runtime");
 
     let atlas = test_atlas();
+    let (tileset, atlas_sources) = tileset_from_atlas("atlas", &atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlas_sources);
     let tilemap = test_tilemap();
 
-    let first_update =
-        GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
+    let first_update = GameSimulation::tick_fixed(
+        &mut game_state,
+        glam::UVec2::new(16, 16),
+        &tilemap,
+        &resolver,
+    );
     assert!(first_update.events.iter().any(|event| {
         matches!(
             event,
@@ -229,8 +238,12 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         )
     }));
 
-    let second_update =
-        GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
+    let second_update = GameSimulation::tick_fixed(
+        &mut game_state,
+        glam::UVec2::new(16, 16),
+        &tilemap,
+        &resolver,
+    );
     assert!(!second_update.events.iter().any(|event| {
         matches!(event, AudioEvent::BackgroundMusic(track_id) if track_id == "lavandia")
     }));
@@ -331,11 +344,14 @@ fn on_player_move_fixture_executes_in_runtime_and_emits_expected_audio_event() {
     RuleSystem::set_rules(&mut game_state, scene.rules.clone());
     InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
+    let atlas = test_atlas();
+    let (tileset, atlas_sources) = tileset_from_atlas("atlas", &atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlas_sources);
     let update = GameSimulation::tick_fixed(
         &mut game_state,
         glam::UVec2::new(128, 128),
         &movement_test_tilemap(),
-        &test_atlas(),
+        &resolver,
     );
     assert!(
         update.player_moved,
@@ -418,8 +434,11 @@ fn movement_test_tilemap() -> TileMap {
     TileMap {
         size: glam::UVec2::new(8, 8),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("atlas.json"),
-        layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 64])],
+        tileset: PathBuf::from("atlas.json"),
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["atlas/tile/floor".to_string(); 64],
+        )],
     }
 }
 
@@ -427,8 +446,8 @@ fn test_tilemap() -> TileMap {
     TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("atlas.json"),
-        layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
+        tileset: PathBuf::from("atlas.json"),
+        layers: vec![TileLayer::new("ground", vec!["atlas/tile/floor".to_string()])],
     }
 }
 
@@ -445,8 +464,11 @@ fn save_tilemap_asset_writes_map_and_rescans_assets() {
     let tilemap = TileMap {
         size: glam::UVec2::new(4, 3),
         tile_size: glam::UVec2::new(8, 8),
-        atlas: PathBuf::from("terrain.json"),
-        layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 12])],
+        tileset: PathBuf::from("terrain.json"),
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["terrain/tile/grass".to_string(); 12],
+        )],
     };
 
     let saved_path = manager
@@ -485,23 +507,30 @@ fn save_tilemap_asset_persists_painted_brush_and_fill_changes() {
     let mut tilemap = TileMap {
         size: glam::UVec2::new(3, 3),
         tile_size: glam::UVec2::new(8, 8),
-        atlas: PathBuf::from("terrain.json"),
-        layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 9])],
+        tileset: PathBuf::from("terrain.json"),
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["terrain/tile/grass".to_string(); 9],
+        )],
     };
 
     assert!(MapPaintInteraction::paint_brush(
         &mut tilemap,
         0,
         glam::UVec2::new(1, 1),
-        "water",
+        "terrain/tile/water",
         1,
     ));
-    assert!(MapPaintInteraction::fill_all(&mut tilemap, 0, "stone"));
+    assert!(MapPaintInteraction::fill_all(
+        &mut tilemap,
+        0,
+        "terrain/tile/stone",
+    ));
     assert!(MapPaintInteraction::paint_brush(
         &mut tilemap,
         0,
         glam::UVec2::new(0, 0),
-        "water",
+        "terrain/tile/water",
         2,
     ));
 
@@ -511,11 +540,11 @@ fn save_tilemap_asset_persists_painted_brush_and_fill_changes() {
 
     let reloaded = TileMap::load_from_file(&saved_path).expect("saved tilemap should reload");
     assert_eq!(reloaded, tilemap);
-    assert_eq!(reloaded.tiles()[0], "water");
-    assert_eq!(reloaded.tiles()[1], "water");
-    assert_eq!(reloaded.tiles()[3], "water");
-    assert_eq!(reloaded.tiles()[4], "water");
-    assert_eq!(reloaded.tiles()[8], "stone");
+    assert_eq!(reloaded.tiles()[0], "terrain/tile/water");
+    assert_eq!(reloaded.tiles()[1], "terrain/tile/water");
+    assert_eq!(reloaded.tiles()[3], "terrain/tile/water");
+    assert_eq!(reloaded.tiles()[4], "terrain/tile/water");
+    assert_eq!(reloaded.tiles()[8], "terrain/tile/stone");
 }
 
 #[test]
@@ -546,13 +575,13 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
     let mut tilemap = TileMap {
         size: glam::UVec2::new(3, 1),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
-                "grass".to_string(),
-                "grass".to_string(),
-                "grass".to_string(),
+                "terrain/tile/grass".to_string(),
+                "terrain/tile/grass".to_string(),
+                "terrain/tile/grass".to_string(),
             ],
         )],
     };
@@ -561,13 +590,13 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
         &mut tilemap,
         0,
         glam::UVec2::new(1, 0),
-        "wall",
+        "terrain/tile/wall",
     ));
     assert!(MapPaintInteraction::paint_tile(
         &mut tilemap,
         0,
         glam::UVec2::new(2, 0),
-        "switch",
+        "terrain/tile/switch",
     ));
 
     let saved_path = manager
@@ -583,8 +612,8 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
     )
     .expect("terrain atlas should load");
 
-    assert_eq!(reloaded_map.tiles()[1], "wall");
-    assert_eq!(reloaded_map.tiles()[2], "switch");
+    assert_eq!(reloaded_map.tiles()[1], "terrain/tile/wall");
+    assert_eq!(reloaded_map.tiles()[2], "terrain/tile/switch");
     assert_eq!(
         reloaded_atlas.get_tile_properties("wall"),
         Some(&TileProperties {
@@ -601,17 +630,19 @@ fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
     );
 
     let collision_box = CollisionBox::solid_box(glam::UVec2::new(16, 16));
+    let (tileset, atlas_sources) = tileset_from_atlas("terrain", &reloaded_atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlas_sources);
     assert!(!can_place_collision_box_at_position(
         Some(&collision_box),
         glam::IVec2::new(16, 0),
         &reloaded_map,
-        &reloaded_atlas,
+        &resolver,
     ));
     assert!(can_place_collision_box_at_position(
         Some(&collision_box),
         glam::IVec2::new(32, 0),
         &reloaded_map,
-        &reloaded_atlas,
+        &resolver,
     ));
     assert!(
         reloaded_atlas
@@ -645,4 +676,20 @@ fn test_atlas() -> AtlasMeta {
         animated_tiles: HashMap::new(),
         imported_auto_tiles: Vec::new(),
     }
+}
+
+fn tileset_from_atlas(
+    name: &str,
+    atlas: &AtlasMeta,
+) -> (TileSetMeta, HashMap<String, TileSetAtlasSource>) {
+    let tileset = TileSetMeta::from_atlas(name, atlas);
+    let atlas_sources = HashMap::from([(
+        name.to_string(),
+        TileSetAtlasSource {
+            name: name.to_string(),
+            path: PathBuf::from(format!("{name}.json")),
+            meta: atlas.clone(),
+        },
+    )]);
+    (tileset, atlas_sources)
 }

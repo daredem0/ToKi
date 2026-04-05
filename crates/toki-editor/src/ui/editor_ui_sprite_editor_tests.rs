@@ -1036,14 +1036,14 @@ fn sprite_editor_state_load_palette_indexed_asset_reads_mode_and_palette() {
     state.load_sprite_asset(&assets[0]).unwrap();
 
     assert_eq!(state.color_mode, ColorMode::PaletteIndexed);
-    assert_eq!(state.selected_palette_id.as_deref(), Some("sepia"));
+    assert_eq!(state.authored_palette_id.as_deref(), Some("sepia"));
 }
 
 #[test]
 fn sprite_editor_state_sync_palette_selection_keeps_valid_loaded_palette() {
     let mut state = SpriteEditorState {
         color_mode: toki_core::assets::atlas::ColorMode::PaletteIndexed,
-        selected_palette_id: Some("sepia".to_string()),
+        authored_palette_id: Some("sepia".to_string()),
         ..Default::default()
     };
 
@@ -1055,14 +1055,14 @@ fn sprite_editor_state_sync_palette_selection_keeps_valid_loaded_palette() {
 
     state.sync_palette_selection(&palettes);
 
-    assert_eq!(state.selected_palette_id.as_deref(), Some("sepia"));
+    assert_eq!(state.authored_palette_id.as_deref(), Some("sepia"));
 }
 
 #[test]
 fn sprite_editor_state_sync_palette_selection_falls_back_to_first_available_palette() {
     let mut state = SpriteEditorState {
         color_mode: toki_core::assets::atlas::ColorMode::PaletteIndexed,
-        selected_palette_id: Some("missing".to_string()),
+        authored_palette_id: Some("missing".to_string()),
         ..Default::default()
     };
 
@@ -1074,7 +1074,7 @@ fn sprite_editor_state_sync_palette_selection_falls_back_to_first_available_pale
 
     state.sync_palette_selection(&palettes);
 
-    assert_eq!(state.selected_palette_id.as_deref(), Some("gb_default"));
+    assert_eq!(state.authored_palette_id.as_deref(), Some("gb_default"));
 }
 
 #[test]
@@ -1105,7 +1105,7 @@ fn sprite_editor_state_save_current_atlas_preserves_existing_tile_metadata() {
     state.load_sprite_asset(&assets[0]).unwrap();
     assert!(state.append_column());
     state.color_mode = toki_core::assets::atlas::ColorMode::PaletteIndexed;
-    state.selected_palette_id = Some("gb_default".to_string());
+    state.authored_palette_id = Some("gb_default".to_string());
 
     state.save_current_asset().unwrap();
 

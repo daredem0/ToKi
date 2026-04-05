@@ -122,24 +122,33 @@ pub(crate) fn sync_selected_object_name(
 
 pub(crate) fn ensure_object_sheet_preview_texture(
     preview_image_path: &mut Option<PathBuf>,
-    preview_texture: &mut Option<egui::TextureHandle>,
-    ctx: &egui::Context,
+    preview_texture: &mut Option<egui::TextureId>,
+    _ctx: &egui::Context,
     texture_path: &Path,
-) -> Option<egui::TextureHandle> {
+    color_mode: toki_core::assets::atlas::ColorMode,
+    available_palettes: &std::collections::BTreeMap<String, toki_core::palette::Palette>,
+    presentation_settings: &toki_core::indexed_presentation::IndexedPresentationSettings,
+    asset_palette: Option<&str>,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
+) -> Option<egui::TextureId> {
+    let renderer = renderer?;
     if preview_image_path.as_deref() == Some(texture_path) && preview_texture.is_some() {
-        return preview_texture.clone();
+        return *preview_texture;
     }
 
-    let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(
-        [decoded.width as usize, decoded.height as usize],
-        &decoded.data,
-    );
-    let key = format!("object_sheet_preview:{}", texture_path.display());
-    let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
+    let texture = renderer
+        .preview_texture_from_path(
+            texture_path,
+            color_mode,
+            available_palettes,
+            presentation_settings,
+            None,
+            asset_palette,
+        )
+        .ok()?;
     *preview_image_path = Some(texture_path.to_path_buf());
-    *preview_texture = Some(texture.clone());
-    Some(texture)
+    *preview_texture = Some(texture.texture_id);
+    Some(texture.texture_id)
 }
 
 pub(crate) fn render_object_gallery_item(

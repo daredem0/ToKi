@@ -1,6 +1,7 @@
 use super::*;
 use crate::editor_types::PlacementPreviewVisual;
 use toki_core::game::RenderQueryService;
+use toki_core::indexed_presentation::{materialize_tilemap_batches, PresentedTextureSource};
 use toki_core::sprite_render::{format_sprite_resolve_failure, SpriteRenderOrigin};
 
 impl SceneViewport {
@@ -89,83 +90,41 @@ impl SceneViewport {
                 );
                 scene_data.tile_animation_clock = Some(self.tile_animation_clock.clone());
                 if let Some(resolver) = self.tileset_resolver() {
+                    let presentation_settings = self.indexed_presentation_settings().clone();
                     match tilemap.generate_render_batches(
                         &resolver,
                         Some(&self.tile_animation_clock),
-                        self.indexed_palette_override.as_deref(),
+                        presentation_settings.indexed_palette_override.as_deref(),
                     ) {
-                        Ok(batches) => {
-                            for batch in batches {
-                                match batch.key.material {
-                                    toki_core::assets::tileset::TileRenderMaterial::TrueColor => {
-                                        scene_data.tilemap_batches.push(
-                                            toki_render::SceneTilemapBatch {
-                                                vertices: batch.vertices,
-                                                texture_path: Some(batch.texture_path),
-                                                texture_image: None,
-                                                texture_cache_key: None,
-                                                above_entities: batch.key.above_entities,
-                                            },
-                                        );
-                                    }
-                                    toki_core::assets::tileset::TileRenderMaterial::PaletteIndexed {
-                                        palette_id,
-                                    } => {
-                                        let Some(palette) =
-                                            self.available_palettes.get(&palette_id).cloned()
-                                        else {
-                                            tracing::warn!(
-                                                "Missing palette '{}' for tilemap batch '{}'",
-                                                palette_id,
-                                                batch.texture_path.display()
-                                            );
-                                            continue;
+                        Ok(batches) => match materialize_tilemap_batches(
+                            batches,
+                            &self.available_palettes,
+                            &presentation_settings,
+                        ) {
+                            Ok(batches) => {
+                                for batch in batches {
+                                    let (texture_path, texture_image, texture_cache_key) =
+                                        match batch.texture {
+                                            PresentedTextureSource::File(path) => {
+                                                (Some(path), None, None)
+                                            }
+                                            PresentedTextureSource::Rgba8 { image, cache_key } => {
+                                                (None, Some(image), Some(cache_key))
+                                            }
                                         };
-                                        let decoded =
-                                            match toki_core::graphics::image::load_image_rgba8(
-                                                &batch.texture_path,
-                                            ) {
-                                                Ok(decoded) => decoded,
-                                                Err(error) => {
-                                                    tracing::error!(
-                                                        "Failed to load indexed tilemap texture '{}': {}",
-                                                        batch.texture_path.display(),
-                                                        error
-                                                    );
-                                                    continue;
-                                                }
-                                            };
-                                        let recolored =
-                                            match toki_core::palette::recolor_indexed_image(
-                                                &decoded, &palette,
-                                            ) {
-                                                Ok(recolored) => recolored,
-                                                Err(error) => {
-                                                    tracing::error!(
-                                                        "Failed to recolor indexed tilemap texture '{}': {}",
-                                                        batch.texture_path.display(),
-                                                        error
-                                                    );
-                                                    continue;
-                                                }
-                                            };
-                                        scene_data.tilemap_batches.push(
-                                            toki_render::SceneTilemapBatch {
-                                                vertices: batch.vertices,
-                                                texture_path: None,
-                                                texture_image: Some(recolored),
-                                                texture_cache_key: Some(format!(
-                                                    "{}::{}",
-                                                    batch.texture_path.display(),
-                                                    palette_id
-                                                )),
-                                                above_entities: batch.key.above_entities,
-                                            },
-                                        );
-                                    }
+                                    scene_data.tilemap_batches.push(toki_render::SceneTilemapBatch {
+                                        vertices: batch.vertices,
+                                        texture_path,
+                                        texture_image,
+                                        texture_cache_key,
+                                        above_entities: batch.above_entities,
+                                    });
                                 }
                             }
-                        }
+                            Err(error) => {
+                                tracing::error!("Failed to materialize tilemap batches: {error}");
+                            }
+                        },
                         Err(error) => tracing::error!("Failed to build tilemap batches: {error}"),
                     }
                 }

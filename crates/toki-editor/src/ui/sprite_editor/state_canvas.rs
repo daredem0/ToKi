@@ -42,6 +42,7 @@ impl SpriteEditorState {
     pub fn invalidate_all_canvas_textures(&mut self) {
         for canvas in &mut self.canvases {
             canvas.canvas_texture_dirty = true;
+            canvas.canvas_texture_cache_key = None;
         }
     }
 
@@ -67,6 +68,7 @@ impl SpriteEditorState {
         cs.selection = None;
         cs.selection_drag_base = None;
         cs.canvas_texture = None;
+        cs.canvas_texture_cache_key = None;
         cs.viewport = SpriteCanvasViewport::default();
         cs.original_cell_aliases = None;
     }

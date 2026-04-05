@@ -1,93 +1,78 @@
+#![cfg_attr(not(test), allow(dead_code))]
+
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use toki_core::assets::atlas::ColorMode;
-use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
-use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette};
+use toki_core::indexed_presentation::{
+    resolve_indexed_palette as core_resolve_indexed_palette, IndexedPresentationSettings,
+};
+use toki_core::palette::Palette;
+
+#[cfg(test)]
+use std::path::Path;
+#[cfg(test)]
+use toki_core::indexed_presentation::{
+    load_materialized_indexed_image, ResolvedIndexedPresentation,
+};
 
 pub fn resolve_indexed_preview_palette(
     color_mode: ColorMode,
     available_palettes: &BTreeMap<String, Palette>,
-    global_override: Option<&str>,
+    settings: &IndexedPresentationSettings,
     local_override: Option<&str>,
-    atlas_palette: Option<&str>,
+    asset_palette: Option<&str>,
 ) -> Result<Option<(String, Palette)>, String> {
-    if color_mode != ColorMode::PaletteIndexed {
-        return Ok(None);
-    }
-
-    for palette_id in [
-        global_override,
-        local_override,
-        atlas_palette,
-        Some("gb_default"),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        if let Some(palette) = resolve_palette(palette_id, available_palettes) {
-            return Ok(Some((palette_id.to_string(), palette)));
-        }
-    }
-
-    Err("palette id could not be resolved".to_string())
-}
-
-pub fn texture_preview_cache_key(
-    texture_path: &Path,
-    color_mode: ColorMode,
-    palette_id: Option<&str>,
-) -> String {
-    format!(
-        "{}#{:?}#{}",
-        texture_path.display(),
+    core_resolve_indexed_palette(
         color_mode,
-        palette_id.unwrap_or("")
+        available_palettes,
+        settings,
+        local_override,
+        asset_palette,
     )
 }
 
+#[cfg(test)]
 pub fn load_texture_preview_image(
     texture_path: &Path,
     color_mode: ColorMode,
     available_palettes: &BTreeMap<String, Palette>,
-    global_override: Option<&str>,
+    settings: &IndexedPresentationSettings,
     local_override: Option<&str>,
-    atlas_palette: Option<&str>,
-) -> Result<(DecodedImage, Option<String>), String> {
-    let decoded = load_image_rgba8(texture_path).map_err(|error| error.to_string())?;
-    let Some((palette_id, palette)) = resolve_indexed_preview_palette(
+    asset_palette: Option<&str>,
+) -> Result<ResolvedIndexedPresentation, String> {
+    load_materialized_indexed_image(
+        texture_path,
         color_mode,
         available_palettes,
-        global_override,
+        settings,
         local_override,
-        atlas_palette,
-    )?
-    else {
-        return Ok((decoded, None));
-    };
-
-    let recolored = recolor_indexed_image(&decoded, &palette).map_err(|error| error.to_string())?;
-    Ok((recolored, Some(palette_id)))
+        asset_palette,
+        true,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use toki_core::graphics::image::save_image_rgba8;
-    use toki_core::palette::PaletteSize;
+    use toki_core::palette::{resolve_palette, PaletteSize};
 
     #[test]
-    fn resolve_indexed_preview_palette_prefers_global_override() {
+    fn resolve_indexed_preview_palette_prefers_project_override() {
         let mut palettes = toki_core::palette::builtin_palettes();
         palettes.insert(
             "custom".to_string(),
             Palette::new(PaletteSize::Pal4, vec![[1, 2, 3, 255]; 4]).unwrap(),
         );
 
+        let settings = IndexedPresentationSettings {
+            indexed_palette_override: Some("custom".to_string()),
+            ..Default::default()
+        };
         let resolved = resolve_indexed_preview_palette(
             ColorMode::PaletteIndexed,
             &palettes,
-            Some("custom"),
+            &settings,
             Some("poison"),
             Some("gb_default"),
         )
@@ -105,18 +90,18 @@ mod tests {
         save_image_rgba8(&png_path, 1, 1, &[0x00, 0x00, 0x00, 0xFF]).expect("png should save");
 
         let palettes = toki_core::palette::builtin_palettes();
-        let (image, palette_id) = load_texture_preview_image(
+        let presentation = load_texture_preview_image(
             &png_path,
             ColorMode::PaletteIndexed,
             &palettes,
-            None,
+            &IndexedPresentationSettings::default(),
             Some("poison"),
             None,
         )
         .expect("preview image should load");
 
-        assert_eq!(palette_id.as_deref(), Some("poison"));
+        assert_eq!(presentation.palette_id.as_deref(), Some("poison"));
         let poison = resolve_palette("poison", &palettes).expect("poison palette should exist");
-        assert_eq!(image.data[..4].to_vec(), poison.color(0).to_vec());
+        assert_eq!(presentation.image.data[..4].to_vec(), poison.color(0).to_vec());
     }
 }

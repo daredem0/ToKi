@@ -20,12 +20,12 @@ mod io;
 mod preview;
 mod toolbar;
 
-use crate::editor_sprite_preview::resolve_indexed_preview_palette;
 use crate::project::Project;
 use crate::ui::editor_ui::Selection;
 use crate::ui::widgets::separators::{render_horizontal_separator, render_vertical_separator};
 use crate::ui::EditorUI;
 use std::path::Path;
+use toki_core::indexed_presentation::resolve_indexed_palette;
 
 /// Renders the animation editor panel
 pub fn render_animation_editor(
@@ -33,6 +33,7 @@ pub fn render_animation_editor(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     project: Option<&mut Project>,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let project_path = project.as_ref().map(|p| p.path.clone());
 
@@ -51,7 +52,7 @@ pub fn render_animation_editor(
 
     // Main content
     if crate::ui::editor_context::animation_state_mut(ui_state).has_entity() {
-        render_editor_content(ui, ui_state, ctx);
+        render_editor_content(ui, ui_state, ctx, renderer);
     } else {
         render_no_entity_message(ui);
     }
@@ -94,10 +95,11 @@ fn sync_preview_palette(ui_state: &mut EditorUI) {
     let atlas_default_palette = crate::ui::editor_context::animation_state(ui_state)
         .atlas_default_palette
         .clone();
-    let resolved = resolve_indexed_preview_palette(
+    let presentation_settings = ui_state.project.indexed_presentation_settings();
+    let resolved = resolve_indexed_palette(
         atlas_color_mode,
         &ui_state.project.available_palettes,
-        ui_state.project.indexed_palette_override.as_deref(),
+        &presentation_settings,
         atlas_entity_palette_override.as_deref(),
         atlas_default_palette.as_deref(),
     )
@@ -122,7 +124,12 @@ fn render_no_entity_message(ui: &mut egui::Ui) {
     });
 }
 
-fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
+fn render_editor_content(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    mut renderer: Option<&mut crate::rendering::WindowRenderer>,
+) {
     // Left: Clip list. Center: Atlas grid + Preview. Right: Frame sequence
     let available_width = ui.available_width();
     let available_height = ui.available_height();
@@ -160,7 +167,7 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
             egui::vec2(center_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
-                render_center_panel(ui, ui_state, ctx);
+                render_center_panel(ui, ui_state, ctx, renderer.as_deref_mut());
             },
         );
 
@@ -185,7 +192,12 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     });
 }
 
-fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
+fn render_center_panel(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
+) {
     let available_width = ui.available_width();
     let available_height = ui.available_height();
 
@@ -215,5 +227,5 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
     ui.heading("Atlas");
 
     // Use all remaining space for atlas grid
-    atlas_grid::render_atlas_grid(ui, ui_state, ctx);
+    atlas_grid::render_atlas_grid(ui, ui_state, ctx, renderer);
 }

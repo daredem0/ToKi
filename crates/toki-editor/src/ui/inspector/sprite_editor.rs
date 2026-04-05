@@ -1,5 +1,7 @@
 use super::*;
-use crate::ui::sprite_editor::{canonical_indexed_color_for_size, indexed_slot_for_authored_color};
+use crate::ui::sprite_editor::{
+    canonical_indexed_color_for_size, indexed_slot_for_authored_color,
+};
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::{validate_indexed_rgba8, PaletteSize};
 
@@ -324,17 +326,16 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             .collect::<Vec<_>>();
 
         let previous_palette_id = crate::ui::editor_context::sprite_state_mut(ui_state)
-            .selected_palette_id
+            .authored_palette_id
             .clone();
-
         ui.horizontal(|ui| {
-            ui.label("Palette:");
+            ui.label("Authored Palette:");
             egui::ComboBox::from_id_salt("sprite_editor_palette_id")
                 .selected_text(
                     ui_state
                         .sprite_editor_context()
                         .sprite
-                        .selected_palette_id
+                        .authored_palette_id
                         .as_deref()
                         .unwrap_or("No palette"),
                 )
@@ -342,7 +343,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     for palette_id in &palette_ids {
                         ui.selectable_value(
                             &mut crate::ui::editor_context::sprite_state_mut(ui_state)
-                                .selected_palette_id,
+                                .authored_palette_id,
                             Some(palette_id.clone()),
                             palette_id,
                         );
@@ -352,7 +353,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
         ensure_valid_indexed_foreground_color(ui_state);
         if previous_palette_id
-            != crate::ui::editor_context::sprite_state_mut(ui_state).selected_palette_id
+            != crate::ui::editor_context::sprite_state_mut(ui_state).authored_palette_id
         {
             crate::ui::editor_context::sprite_state_mut(ui_state).invalidate_all_canvas_textures();
         }
@@ -361,7 +362,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             let can_convert = ui_state
                 .sprite_editor_context()
                 .sprite
-                .selected_palette_id
+                .authored_palette_id
                 .as_ref()
                 .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
                 .is_some();
@@ -374,7 +375,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 if let Some(palette) = ui_state
                     .sprite_editor_context()
                     .sprite
-                    .selected_palette_id
+                    .authored_palette_id
                     .as_ref()
                     .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
                     .cloned()
@@ -460,7 +461,7 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     {
         ensure_valid_indexed_foreground_color(ui_state);
         if let Some(palette_id) = crate::ui::editor_context::sprite_state_mut(ui_state)
-            .selected_palette_id
+            .authored_palette_id
             .clone()
         {
             if let Some(palette) = ui_state
@@ -542,7 +543,7 @@ fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let palette_size = ui_state
         .sprite_editor_context()
         .sprite
-        .selected_palette_id
+        .authored_palette_id
         .as_ref()
         .and_then(|id| ui_state.project.available_palettes.get(id))
         .map_or(PaletteSize::Pal4, |p| p.size());
@@ -582,7 +583,7 @@ fn ensure_valid_indexed_foreground_color(ui_state: &mut EditorUI) {
     let selected_palette = ui_state
         .sprite_editor_context()
         .sprite
-        .selected_palette_id
+        .authored_palette_id
         .as_ref()
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id));
 

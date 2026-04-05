@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
+use toki_core::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
     EntityDefinition, EntityStats, PickupDef, RenderingDef, StaticObjectRenderDef,
@@ -109,7 +110,7 @@ fn write_entity_definition_file(project_dir: &Path, entity_def: &EntityDefinitio
     fs::write(&file_path, json).expect("failed to write entity definition file");
 }
 
-fn placement_collision_assets() -> (TileMap, AtlasMeta) {
+fn placement_collision_assets() -> (TileMap, TileSetMeta, HashMap<String, TileSetAtlasSource>) {
     let mut tiles = HashMap::new();
     tiles.insert(
         "solid".to_string(),
@@ -147,20 +148,29 @@ fn placement_collision_assets() -> (TileMap, AtlasMeta) {
     let tilemap = TileMap {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         // top-left is solid, others are floor
         layers: vec![TileLayer::new(
             "ground",
             vec![
-                "solid".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
+                "test_atlas/tile/solid".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
             ],
         )],
     };
 
-    (tilemap, atlas)
+    let atlas_sources = HashMap::from([(
+        "test_atlas".to_string(),
+        TileSetAtlasSource {
+            name: "test_atlas".to_string(),
+            path: PathBuf::from("test_atlas.json"),
+            meta: atlas.clone(),
+        },
+    )]);
+
+    (tilemap, TileSetMeta::from_atlas("test_atlas", &atlas), atlas_sources)
 }
 
 #[test]
@@ -401,7 +411,8 @@ fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
         .scene_viewport_context_mut()
         .placement
         .enter_placement_mode("sample".to_string());
-    let (tilemap, atlas) = placement_collision_assets();
+    let (tilemap, tileset, atlas_sources) = placement_collision_assets();
+    let resolver = TileSetResolver::new(&tileset, &atlas_sources);
 
     let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
         &mut ui_state,
@@ -409,7 +420,7 @@ fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
         "sample",
         IVec2::new(0, 0), // top-left tile is solid in test map
         Some(&tilemap),
-        Some(&atlas),
+        Some(&resolver),
     );
 
     assert!(!placed);

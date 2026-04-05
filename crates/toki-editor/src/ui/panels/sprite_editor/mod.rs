@@ -17,6 +17,7 @@ pub fn render_sprite_editor(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     project: Option<&mut Project>,
+    mut renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     // Get sprites directory from project (needed for multiple operations)
     let sprites_dir = project
@@ -34,16 +35,28 @@ pub fn render_sprite_editor(
     match crate::ui::editor_context::sprite_state_mut(ui_state).layout {
         DualCanvasLayout::Single => {
             if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
-                canvas::render_canvas_viewport(ui, ui_state, ctx, None);
+                canvas::render_canvas_viewport(ui, ui_state, ctx, None, renderer.as_deref_mut());
             } else {
                 layout::render_no_canvas_message(ui, ui_state, sprites_dir.as_deref());
             }
         }
         DualCanvasLayout::Horizontal => {
-            layout::render_dual_viewports_horizontal(ui, ui_state, ctx, sprites_dir.as_deref());
+            layout::render_dual_viewports_horizontal(
+                ui,
+                ui_state,
+                ctx,
+                sprites_dir.as_deref(),
+                renderer.as_deref_mut(),
+            );
         }
         DualCanvasLayout::Vertical => {
-            layout::render_dual_viewports_vertical(ui, ui_state, ctx, sprites_dir.as_deref());
+            layout::render_dual_viewports_vertical(
+                ui,
+                ui_state,
+                ctx,
+                sprites_dir.as_deref(),
+                renderer.as_deref_mut(),
+            );
         }
     }
 

@@ -21,6 +21,7 @@ pub mod dialog;
 pub mod dialog_runtime;
 pub mod expression;
 pub mod flags;
+pub mod indexed_presentation;
 pub mod pack;
 pub mod palette;
 pub mod project_assets;

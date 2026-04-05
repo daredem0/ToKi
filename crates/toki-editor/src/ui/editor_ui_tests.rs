@@ -363,7 +363,7 @@ fn sync_map_editor_selection_preserves_unsaved_draft() {
             tilemap: toki_core::assets::tilemap::TileMap {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
-                atlas: std::path::PathBuf::from("terrain.json"),
+                tileset: std::path::PathBuf::from("terrain.json"),
                 layers: vec![toki_core::assets::tilemap::TileLayer::new(
                     "ground",
                     vec!["grass".to_string(); 4],
@@ -399,7 +399,7 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
             tilemap: toki_core::assets::tilemap::TileMap {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
-                atlas: std::path::PathBuf::from("terrain.json"),
+                tileset: std::path::PathBuf::from("terrain.json"),
                 layers: vec![toki_core::assets::tilemap::TileLayer::new(
                     "ground",
                     vec!["grass".to_string(); 4],
@@ -452,7 +452,7 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
             tilemap: toki_core::assets::tilemap::TileMap {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
-                atlas: std::path::PathBuf::from("terrain.json"),
+                tileset: std::path::PathBuf::from("terrain.json"),
                 layers: vec![toki_core::assets::tilemap::TileLayer::new(
                     "ground",
                     vec!["grass".to_string(); 4],
@@ -578,7 +578,7 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
             tilemap: toki_core::assets::tilemap::TileMap {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
-                atlas: std::path::PathBuf::from("terrain.json"),
+                tileset: std::path::PathBuf::from("terrain.json"),
                 layers: vec![toki_core::assets::tilemap::TileLayer::new(
                     "ground",
                     vec!["grass".to_string(); 4],
@@ -894,7 +894,7 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
             tilemap: toki_core::assets::tilemap::TileMap {
                 size: glam::UVec2::new(2, 2),
                 tile_size: glam::UVec2::new(8, 8),
-                atlas: std::path::PathBuf::from("terrain.json"),
+                tileset: std::path::PathBuf::from("terrain.json"),
                 layers: vec![toki_core::assets::tilemap::TileLayer::new(
                     "ground",
                     vec!["grass".to_string(); 4],
@@ -946,7 +946,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
             tilemap: toki_core::assets::tilemap::TileMap {
                 size: glam::UVec2::new(1, 1),
                 tile_size: glam::UVec2::new(8, 8),
-                atlas: std::path::PathBuf::from("terrain.json"),
+                tileset: std::path::PathBuf::from("terrain.json"),
                 layers: vec![toki_core::assets::tilemap::TileLayer::new(
                     "ground",
                     vec!["grass".to_string()],
@@ -1422,7 +1422,7 @@ fn layer_test_draft() -> MapEditorDraft {
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(2, 2),
             tile_size: glam::UVec2::new(8, 8),
-            atlas: std::path::PathBuf::from("terrain.json"),
+            tileset: std::path::PathBuf::from("terrain.json"),
             layers: vec![toki_core::assets::tilemap::TileLayer::new(
                 "ground",
                 vec!["grass".to_string(); 4],

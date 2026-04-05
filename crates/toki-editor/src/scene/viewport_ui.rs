@@ -49,7 +49,7 @@ impl SceneViewport {
             } else {
                 "Not Ready"
             },
-            if self.offscreen_target.is_some() {
+            if self.presentation_target.is_some() {
                 "Ready"
             } else {
                 "Not Ready"

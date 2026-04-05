@@ -51,6 +51,7 @@ pub fn render_dual_viewports_horizontal(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     sprites_dir: Option<&std::path::Path>,
+    mut renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let available = ui.available_size();
     let splitter_width = 8.0;
@@ -74,7 +75,13 @@ pub fn render_dual_viewports_horizontal(
                 .canvas
                 .is_some()
             {
-                render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
+                render_canvas_viewport(
+                    ui,
+                    ui_state,
+                    ctx,
+                    Some(CanvasSide::Left),
+                    renderer.as_deref_mut(),
+                );
             } else {
                 render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Left);
             }
@@ -101,7 +108,13 @@ pub fn render_dual_viewports_horizontal(
                 .canvas
                 .is_some()
             {
-                render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
+                render_canvas_viewport(
+                    ui,
+                    ui_state,
+                    ctx,
+                    Some(CanvasSide::Right),
+                    renderer.as_deref_mut(),
+                );
             } else {
                 render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
             }
@@ -115,6 +128,7 @@ pub fn render_dual_viewports_vertical(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     sprites_dir: Option<&std::path::Path>,
+    mut renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let available = ui.available_size();
     let splitter_height = 8.0;
@@ -137,7 +151,13 @@ pub fn render_dual_viewports_vertical(
             .canvas
             .is_some()
         {
-            render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
+            render_canvas_viewport(
+                ui,
+                ui_state,
+                ctx,
+                Some(CanvasSide::Left),
+                renderer.as_deref_mut(),
+            );
         } else {
             render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Left);
         }
@@ -164,7 +184,13 @@ pub fn render_dual_viewports_vertical(
             .canvas
             .is_some()
         {
-            render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
+            render_canvas_viewport(
+                ui,
+                ui_state,
+                ctx,
+                Some(CanvasSide::Right),
+                renderer.as_deref_mut(),
+            );
         } else {
             render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
         }

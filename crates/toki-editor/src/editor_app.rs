@@ -721,7 +721,26 @@ impl EditorApp {
 
         let available_map_names =
             Self::collect_available_map_names(self.core.project_manager.get_project_assets());
-        let full_output = self.run_egui_frame(&egui_ctx, raw_input, available_map_names);
+        let (current_project, project_assets) =
+            self.core.project_manager.current_project_and_assets_mut();
+        let mut current_project = current_project;
+        let mut project_assets = project_assets;
+        let full_output = egui_ctx.run(raw_input, |ctx| {
+            self.tabs.ui.render(
+                ctx,
+                crate::ui::editor_ui::EditorRenderContext {
+                    scene_viewport: self.viewport_manager.scene.as_mut(),
+                    map_editor_viewport: self.viewport_manager.map_editor.as_mut(),
+                    project: current_project.as_deref_mut(),
+                    project_assets: project_assets.as_deref_mut(),
+                    available_map_names: available_map_names.clone(),
+                    config: Some(&mut self.core.config),
+                    log_capture: self.log_capture.as_ref(),
+                    renderer: self.platform.renderer.as_mut(),
+                    busy_logo_texture: self.panel_coordinator.busy_logo_texture.as_ref(),
+                },
+            );
+        });
 
         if self.handle_render_ui_requests(event_loop) {
             return;
@@ -798,10 +817,9 @@ impl EditorApp {
                 project_path,
                 project_assets,
                 &self.tabs.ui.project.available_palettes,
-                Self::project_indexed_palette_override(
+                &Self::project_indexed_presentation_settings(
                     self.core.project_manager.current_project.as_ref(),
-                )
-                .as_deref(),
+                ),
             );
             crate::ui::editor_context::scene_viewport_context_mut(&mut self.tabs.ui)
                 .placement
@@ -812,6 +830,10 @@ impl EditorApp {
                 &draft.sheet,
                 &draft.object_name,
                 project_path,
+                &self.tabs.ui.project.available_palettes,
+                &Self::project_indexed_presentation_settings(
+                    self.core.project_manager.current_project.as_ref(),
+                ),
             );
             crate::ui::editor_context::scene_viewport_context_mut(&mut self.tabs.ui)
                 .placement
@@ -820,9 +842,11 @@ impl EditorApp {
     }
 
     fn sync_indexed_palette_override_from_project(&mut self) {
-        self.tabs.ui.project.indexed_palette_override = Self::project_indexed_palette_override(
+        let settings = Self::project_indexed_presentation_settings(
             self.core.project_manager.current_project.as_ref(),
         );
+        self.tabs.ui.project.indexed_palette_override = settings.indexed_palette_override;
+        self.tabs.ui.project.runtime_post_process = settings.post_process;
     }
 
     fn project_indexed_palette_override(
@@ -836,6 +860,17 @@ impl EditorApp {
                 .indexed_palette_override
                 .clone()
         })
+    }
+
+    fn project_indexed_presentation_settings(
+        project: Option<&crate::project::Project>,
+    ) -> toki_core::indexed_presentation::IndexedPresentationSettings {
+        toki_core::indexed_presentation::IndexedPresentationSettings {
+            indexed_palette_override: Self::project_indexed_palette_override(project),
+            post_process: project
+                .map(|project| project.metadata.runtime.display.post_process.clone())
+                .unwrap_or_default(),
+        }
     }
 
     fn pre_render_active_center_viewport(&mut self, project_path: Option<&std::path::Path>) {
@@ -865,10 +900,9 @@ impl EditorApp {
                         project_assets,
                         &mut self.panel_coordinator.preview_sprite_frames,
                         &self.tabs.ui.project.available_palettes,
-                        Self::project_indexed_palette_override(
+                        &Self::project_indexed_presentation_settings(
                             self.core.project_manager.current_project.as_ref(),
-                        )
-                        .as_deref(),
+                        ),
                     );
                 let overlay_data = self.viewport_manager.scene.as_ref().map(|scene_viewport| {
                     Self::build_scene_viewport_overlay_data(
@@ -886,7 +920,7 @@ impl EditorApp {
                         project_path,
                         project_assets,
                         renderer,
-                        Self::project_indexed_palette_override(
+                        Self::project_indexed_presentation_settings(
                             self.core.project_manager.current_project.as_ref(),
                         ),
                         overlay_data,
@@ -900,7 +934,7 @@ impl EditorApp {
                         project_path,
                         project_assets,
                         renderer,
-                        Self::project_indexed_palette_override(
+                        Self::project_indexed_presentation_settings(
                             self.core.project_manager.current_project.as_ref(),
                         ),
                     );
@@ -921,14 +955,14 @@ impl EditorApp {
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
         renderer: &mut crate::rendering::window::WindowRenderer,
-        indexed_palette_override: Option<String>,
+        presentation_settings: toki_core::indexed_presentation::IndexedPresentationSettings,
         overlay_data: ViewportOverlayData,
     ) {
-        scene_viewport.set_indexed_palette_override(indexed_palette_override);
+        scene_viewport.set_indexed_presentation_settings(presentation_settings);
         if let Err(e) = scene_viewport.render_to_texture(
             project_path,
             project_assets,
-            renderer.egui_renderer_mut(),
+            renderer,
             &overlay_data,
         ) {
             tracing::error!("Failed to render scene to texture: {}", e);
@@ -1039,13 +1073,13 @@ impl EditorApp {
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
         renderer: &mut crate::rendering::window::WindowRenderer,
-        indexed_palette_override: Option<String>,
+        presentation_settings: toki_core::indexed_presentation::IndexedPresentationSettings,
     ) {
-        map_editor_viewport.set_indexed_palette_override(indexed_palette_override);
+        map_editor_viewport.set_indexed_presentation_settings(presentation_settings);
         if let Err(e) = map_editor_viewport.render_to_texture(
             project_path,
             project_assets,
-            renderer.egui_renderer_mut(),
+            renderer,
             &ViewportOverlayData::default(),
         ) {
             tracing::error!("Failed to render map editor viewport to texture: {}", e);
@@ -1057,34 +1091,6 @@ impl EditorApp {
             let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
             names.sort();
             names
-        })
-    }
-
-    fn run_egui_frame(
-        &mut self,
-        egui_ctx: &egui::Context,
-        raw_input: egui::RawInput,
-        available_map_names: Option<Vec<String>>,
-    ) -> egui::FullOutput {
-        let (current_project, project_assets) =
-            self.core.project_manager.current_project_and_assets_mut();
-        let mut current_project = current_project;
-        let mut project_assets = project_assets;
-        egui_ctx.run(raw_input, |ctx| {
-            self.tabs.ui.render(
-                ctx,
-                crate::ui::editor_ui::EditorRenderContext {
-                    scene_viewport: self.viewport_manager.scene.as_mut(),
-                    map_editor_viewport: self.viewport_manager.map_editor.as_mut(),
-                    project: current_project.as_deref_mut(),
-                    project_assets: project_assets.as_deref_mut(),
-                    available_map_names: available_map_names.clone(),
-                    config: Some(&mut self.core.config),
-                    log_capture: self.log_capture.as_ref(),
-                    renderer: None,
-                    busy_logo_texture: self.panel_coordinator.busy_logo_texture.as_ref(),
-                },
-            );
         })
     }
 
@@ -1161,7 +1167,7 @@ impl EditorApp {
             project_path,
             project_assets,
             &toki_core::palette::builtin_palettes(),
-            None,
+            &toki_core::indexed_presentation::IndexedPresentationSettings::default(),
         )
     }
 
@@ -1173,7 +1179,7 @@ impl EditorApp {
         entity_def_name: &str,
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
-        indexed_palette_override: Option<&str>,
+        indexed_presentation_settings: &toki_core::indexed_presentation::IndexedPresentationSettings,
     ) -> Option<PlacementPreviewVisual> {
         scene_overlays::cached_preview_sprite_frame(
             preview_sprite_frames,
@@ -1181,7 +1187,7 @@ impl EditorApp {
             project_path,
             project_assets,
             &toki_core::palette::builtin_palettes(),
-            indexed_palette_override,
+            indexed_presentation_settings,
         )
     }
 
@@ -1201,7 +1207,7 @@ impl EditorApp {
             project_assets,
             preview_cache,
             &ui_state.project.available_palettes,
-            None,
+            &ui_state.project.indexed_presentation_settings(),
         )
     }
 

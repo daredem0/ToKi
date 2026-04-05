@@ -3,6 +3,8 @@ use std::sync::Arc;
 use toki_render::wgpu_utils;
 use winit::window::Window;
 
+use super::{EditorPreviewRenderer, EditorPreviewTexture};
+
 /// Handles WGPU window rendering and egui integration
 pub struct WindowRenderer {
     device: wgpu::Device,
@@ -10,6 +12,7 @@ pub struct WindowRenderer {
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
     egui_renderer: egui_wgpu::Renderer,
+    preview_renderer: EditorPreviewRenderer,
 }
 
 impl WindowRenderer {
@@ -22,6 +25,7 @@ impl WindowRenderer {
         // Initialize egui renderer
         let egui_renderer =
             egui_wgpu::Renderer::new(&device, surface_config.format, None, 1, false);
+        let preview_renderer = EditorPreviewRenderer::new(&device, &queue)?;
 
         Ok(Self {
             device,
@@ -29,6 +33,7 @@ impl WindowRenderer {
             surface,
             surface_config,
             egui_renderer,
+            preview_renderer,
         })
     }
 
@@ -54,6 +59,48 @@ impl WindowRenderer {
     /// Get mutable reference to egui renderer (for viewport texture registration)
     pub fn egui_renderer_mut(&mut self) -> &mut egui_wgpu::Renderer {
         &mut self.egui_renderer
+    }
+
+    pub fn preview_texture_from_path(
+        &mut self,
+        texture_path: &std::path::Path,
+        color_mode: toki_core::assets::atlas::ColorMode,
+        available_palettes: &std::collections::BTreeMap<String, toki_core::palette::Palette>,
+        settings: &toki_core::indexed_presentation::IndexedPresentationSettings,
+        local_override: Option<&str>,
+        asset_palette: Option<&str>,
+    ) -> Result<EditorPreviewTexture, String> {
+        self.preview_renderer.texture_preview_from_path(
+            &mut self.egui_renderer,
+            texture_path,
+            color_mode,
+            available_palettes,
+            settings,
+            local_override,
+            asset_palette,
+        )
+    }
+
+    pub fn preview_texture_from_image(
+        &mut self,
+        cache_source: &str,
+        decoded: &toki_core::graphics::image::DecodedImage,
+        color_mode: toki_core::assets::atlas::ColorMode,
+        available_palettes: &std::collections::BTreeMap<String, toki_core::palette::Palette>,
+        settings: &toki_core::indexed_presentation::IndexedPresentationSettings,
+        local_override: Option<&str>,
+        asset_palette: Option<&str>,
+    ) -> Result<EditorPreviewTexture, String> {
+        self.preview_renderer.texture_preview_from_image(
+            &mut self.egui_renderer,
+            cache_source,
+            decoded,
+            color_mode,
+            available_palettes,
+            settings,
+            local_override,
+            asset_palette,
+        )
     }
 
     /// Render a frame with the given egui output and context

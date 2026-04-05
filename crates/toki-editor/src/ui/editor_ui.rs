@@ -14,7 +14,9 @@ use crate::ui::editor_context::{
     CenterPanelHost, DialogEditorContext, EditorContext, EntityEditorContext, RuleGraphContext,
     SceneViewportContext, SpriteEditorContext, UiEditorContext,
 };
+use toki_core::indexed_presentation::IndexedPresentationSettings;
 use toki_core::palette::{builtin_palettes, Palette};
+use toki_core::project_runtime::RuntimePostProcessSettings;
 
 #[path = "editor_ui_animation_authoring.rs"]
 mod editor_ui_animation_authoring;
@@ -258,6 +260,7 @@ pub struct ProjectEditorState {
     pub available_palettes: BTreeMap<String, Palette>,
     pub available_dialog_outcomes: BTreeMap<String, Vec<String>>,
     pub indexed_palette_override: Option<String>,
+    pub runtime_post_process: RuntimePostProcessSettings,
 }
 
 impl Default for ProjectEditorState {
@@ -277,6 +280,7 @@ impl Default for ProjectEditorState {
             available_palettes: builtin_palettes(),
             available_dialog_outcomes: BTreeMap::new(),
             indexed_palette_override: None,
+            runtime_post_process: RuntimePostProcessSettings::default(),
         }
     }
 }
@@ -364,6 +368,13 @@ impl ProjectEditorState {
     pub fn set_window_title(&mut self, title: &str) {
         self.window_title = Some(title.to_string());
     }
+
+    pub fn indexed_presentation_settings(&self) -> IndexedPresentationSettings {
+        IndexedPresentationSettings {
+            indexed_palette_override: self.indexed_palette_override.clone(),
+            post_process: self.runtime_post_process.clone(),
+        }
+    }
 }
 
 /// Entity placement and drag interaction state
@@ -417,7 +428,7 @@ pub struct SceneToolboxState {
     pub selected_object_sheet: Option<String>,
     pub selected_object_name: Option<String>,
     pub preview_image_path: Option<PathBuf>,
-    pub preview_texture: Option<egui::TextureHandle>,
+    pub preview_texture: Option<egui::TextureId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -599,7 +610,7 @@ pub struct MapEditorState {
     pub brush_size_tiles: u32,
     pub brush_preview_cache_key: Option<String>,
     pub brush_preview_image_path: Option<PathBuf>,
-    pub brush_preview_texture: Option<egui::TextureHandle>,
+    pub brush_preview_texture: Option<egui::TextureId>,
     pub selected_tile_info: Option<MapEditorTileInfo>,
     pub show_new_map_dialog: bool,
     pub new_map_name: String,
@@ -696,7 +707,7 @@ pub struct EditorRenderContext<'a> {
     pub available_map_names: Option<Vec<String>>,
     pub config: Option<&'a mut crate::config::EditorConfig>,
     pub log_capture: Option<&'a crate::logging::LogCapture>,
-    pub renderer: Option<&'a mut egui_wgpu::Renderer>,
+    pub renderer: Option<&'a mut crate::rendering::WindowRenderer>,
     pub busy_logo_texture: Option<&'a egui::TextureHandle>,
 }
 
@@ -1150,6 +1161,7 @@ impl EditorUI {
                 context_host.project.as_deref_mut(),
                 context_host.project_assets.as_deref_mut(),
                 config_readonly,
+                context_host.renderer.as_deref_mut(),
             );
         }
 

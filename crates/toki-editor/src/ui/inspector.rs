@@ -460,6 +460,7 @@ impl InspectorSystem {
         project: Option<&mut Project>,
         project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
+        mut renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         egui::SidePanel::right("inspector_panel")
             .resizable(true)
@@ -495,6 +496,7 @@ impl InspectorSystem {
                                 project,
                                 project_assets,
                                 config,
+                                renderer.as_deref_mut(),
                             );
                         }
                         super::editor_ui::RightPanelTab::Project => {
@@ -515,6 +517,7 @@ impl InspectorSystem {
                                 project,
                                 project_assets,
                                 config,
+                                renderer.as_deref_mut(),
                             );
                         }
                     }
@@ -530,6 +533,7 @@ impl InspectorSystem {
         mut project: Option<&mut Project>,
         mut project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
+        renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         let mut host = super::editor_context::InspectorHost {
             project: match project.as_mut() {
@@ -541,6 +545,7 @@ impl InspectorSystem {
                 None => None,
             },
             config_readonly: config,
+            renderer,
         };
         let handled = ui_state.with_active_context(|context, shell| {
             context.render_inspector(shell, ui, ctx, game_state, &mut host)
@@ -548,6 +553,9 @@ impl InspectorSystem {
         if handled {
             return;
         }
+        let project = host.project.take();
+        let renderer = host.renderer.take();
+        drop(host);
 
         // Use trait-based dispatch for selection inspectors
         use super::inspector_trait::InspectorContext;
@@ -560,6 +568,7 @@ impl InspectorSystem {
             game_state,
             project,
             config,
+            renderer,
         };
 
         inspector.render(ui, &mut inspector_ctx);
@@ -573,6 +582,7 @@ impl InspectorSystem {
         mut project: Option<&mut Project>,
         mut project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
+        renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         let mut host = super::editor_context::ToolboxHost {
             scene_viewport: None,
@@ -586,6 +596,7 @@ impl InspectorSystem {
             },
             config: None,
             config_readonly: config,
+            renderer,
         };
         let handled = ui_state.with_active_context(|context, shell| {
             context.render_toolbox(shell, ui, ctx, game_state, &mut host)

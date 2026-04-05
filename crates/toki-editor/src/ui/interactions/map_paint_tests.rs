@@ -7,7 +7,7 @@ fn sample_tilemap() -> TileMap {
     TileMap {
         size: UVec2::new(3, 2),
         tile_size: UVec2::new(8, 8),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -26,7 +26,7 @@ fn multi_layer_tilemap() -> TileMap {
     TileMap {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(8, 8),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![
             TileLayer::new(
                 "ground",

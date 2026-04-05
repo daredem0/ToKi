@@ -38,8 +38,8 @@ pub struct SpriteEditorState {
     pub foreground_color: PixelColor,
     /// Current color interpretation mode for atlas authoring.
     pub color_mode: ColorMode,
-    /// Selected palette id when authoring indexed atlas art.
-    pub selected_palette_id: Option<String>,
+    /// Palette id authored into indexed atlas metadata.
+    pub authored_palette_id: Option<String>,
     /// Brush size in pixels (shared across canvases)
     pub brush_size: u32,
     /// Whether shape tools (rectangle, ellipse) draw filled or outline
@@ -126,7 +126,7 @@ impl Default for SpriteEditorState {
             clipboard: None,
             foreground_color: PixelColor::black(),
             color_mode: ColorMode::TrueColor,
-            selected_palette_id: None,
+            authored_palette_id: None,
             brush_size: 1,
             shape_filled: false,
             dither_pattern: DitherPattern::None,
@@ -170,20 +170,20 @@ impl Default for SpriteEditorState {
 impl SpriteEditorState {
     pub fn sync_palette_selection(&mut self, available_palettes: &BTreeMap<String, Palette>) {
         if self.color_mode != ColorMode::PaletteIndexed {
-            self.selected_palette_id = None;
+            self.authored_palette_id = None;
             return;
         }
 
         if self
-            .selected_palette_id
+            .authored_palette_id
             .as_ref()
             .is_none_or(|palette_id| !available_palettes.contains_key(palette_id))
         {
-            self.selected_palette_id = available_palettes.keys().next().cloned();
+            self.authored_palette_id = available_palettes.keys().next().cloned();
         }
 
         let selected_palette = self
-            .selected_palette_id
+            .authored_palette_id
             .as_ref()
             .and_then(|palette_id| available_palettes.get(palette_id))
             .cloned();

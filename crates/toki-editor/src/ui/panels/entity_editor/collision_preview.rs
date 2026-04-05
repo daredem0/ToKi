@@ -1,6 +1,5 @@
 //! Visual collision box editor rendered over a sprite preview.
 
-use crate::editor_sprite_preview::{load_texture_preview_image, texture_preview_cache_key};
 use crate::ui::editor_ui::EntityEditState;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
@@ -9,7 +8,7 @@ use toki_core::assets::atlas::ColorMode;
 /// Cached texture state for the entity editor sprite preview.
 #[derive(Clone, Default)]
 pub struct CollisionPreviewState {
-    pub texture: Option<egui::TextureHandle>,
+    pub texture: Option<egui::TextureId>,
     pub cache_key: Option<String>,
     pub image_size: Option<(u32, u32)>,
     pub cell_rect: Option<[u32; 4]>,
@@ -21,6 +20,7 @@ pub fn render_collision_preview(
     ui_state: &mut EditorUI,
     project_path: &Path,
     ctx: &egui::Context,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
         .edit_state
@@ -38,10 +38,10 @@ pub fn render_collision_preview(
         return;
     };
 
-    ensure_preview_texture(ui_state, ctx, &sprite_info);
+    ensure_preview_texture(ui_state, ctx, &sprite_info, renderer);
 
     let preview = &ui_state.collision_preview;
-    let Some(texture) = preview.texture.clone() else {
+    let Some(texture_id) = preview.texture else {
         return;
     };
     let Some(img_size) = preview.image_size else {
@@ -67,7 +67,7 @@ pub fn render_collision_preview(
 
     draw_checkered_background(ui.painter(), canvas_rect);
     ui.painter()
-        .image(texture.id(), canvas_rect, uv, egui::Color32::WHITE);
+        .image(texture_id, canvas_rect, uv, egui::Color32::WHITE);
 
     // Draw and handle the collision box
     let edit = crate::ui::editor_context::entity_editor_state_mut(ui_state)
@@ -170,11 +170,21 @@ fn resolve_from_atlas(edit: &EntityEditState, sprites_dir: &Path) -> Option<Spri
     })
 }
 
-fn ensure_preview_texture(ui_state: &mut EditorUI, ctx: &egui::Context, source: &SpriteSource) {
-    let cache_key = texture_preview_cache_key(
-        &source.png_path,
+fn ensure_preview_texture(
+    ui_state: &mut EditorUI,
+    _ctx: &egui::Context,
+    source: &SpriteSource,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
+) {
+    let Some(renderer) = renderer else {
+        return;
+    };
+    let presentation_settings = ui_state.project.indexed_presentation_settings();
+    let cache_key = toki_core::indexed_presentation::texture_preview_cache_key(
+        &source.png_path.display().to_string(),
         source.color_mode,
         source.palette_id.as_deref(),
+        &presentation_settings.resolve_post_process(&ui_state.project.available_palettes),
     );
 
     if ui_state.collision_preview.texture.is_some()
@@ -183,34 +193,22 @@ fn ensure_preview_texture(ui_state: &mut EditorUI, ctx: &egui::Context, source: 
         return;
     }
 
-    let available_palettes = ui_state.project.available_palettes.clone();
-    let indexed_override = ui_state.project.indexed_palette_override.clone();
-
-    let Ok((decoded, _palette_id)) = load_texture_preview_image(
+    let Ok(texture) = renderer.preview_texture_from_path(
         &source.png_path,
         source.color_mode,
-        &available_palettes,
-        indexed_override.as_deref(),
+        &ui_state.project.available_palettes,
+        &presentation_settings,
         source.entity_palette_override.as_deref(),
         source.default_palette.as_deref(),
     ) else {
         return;
     };
 
-    ui_state.collision_preview.image_size = Some((decoded.width, decoded.height));
+    ui_state.collision_preview.image_size =
+        Some((texture.size.x, texture.size.y));
     ui_state.collision_preview.cell_rect = source.cell_rect;
     ui_state.collision_preview.cache_key = Some(cache_key);
-
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(
-        [decoded.width as usize, decoded.height as usize],
-        &decoded.data,
-    );
-    let texture = ctx.load_texture(
-        "entity_collision_preview",
-        color_image,
-        egui::TextureOptions::NEAREST,
-    );
-    ui_state.collision_preview.texture = Some(texture);
+    ui_state.collision_preview.texture = Some(texture.texture_id);
 }
 
 fn calc_uv(cell_rect: [u32; 4], img_size: (u32, u32)) -> egui::Rect {

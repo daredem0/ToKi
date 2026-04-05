@@ -1,9 +1,7 @@
 use super::*;
-use crate::editor_sprite_preview::{
-    resolve_indexed_preview_palette,
-};
 use toki_core::cache_utils::clone_cached_or_load;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
+use toki_core::indexed_presentation::resolve_indexed_palette;
 use toki_core::palette::{recolor_indexed_image, Palette};
 use toki_core::project_assets::{
     normalize_asset_name, resolve_tilemap_tileset_path, resolve_tileset_atlas_paths,
@@ -311,10 +309,11 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
             })?;
         let (frame, intrinsic_size) = resolve_atlas_tile_frame(&atlas, atlas_name, tile_name)?;
         let material = if atlas.is_palette_indexed() {
-            let Some((palette_id, palette)) = resolve_indexed_preview_palette(
+            let presentation_settings = self.viewport.indexed_presentation_settings().clone();
+            let Some((palette_id, palette)) = resolve_indexed_palette(
                 atlas.color_mode,
                 &self.viewport.available_palettes,
-                self.viewport.indexed_palette_override.as_deref(),
+                &presentation_settings,
                 palette_override,
                 atlas.palette.as_deref(),
             )
@@ -322,6 +321,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 asset_kind: "palette",
                 asset_name: self
                     .viewport
+                    .indexed_presentation_settings()
                     .indexed_palette_override
                     .as_deref()
                     .or(palette_override)
@@ -377,10 +377,10 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
             resolve_object_sheet_frame(&object_sheet, sheet_name, object_name)?;
 
         let material = if object_sheet.is_palette_indexed() {
-            resolve_indexed_preview_palette(
+            resolve_indexed_palette(
                 toki_core::assets::atlas::ColorMode::PaletteIndexed,
                 &self.viewport.available_palettes,
-                self.viewport.indexed_palette_override.as_deref(),
+                self.viewport.indexed_presentation_settings(),
                 None,
                 object_sheet.palette.as_deref(),
             )

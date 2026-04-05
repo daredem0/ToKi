@@ -1,12 +1,12 @@
 use crate::config::EditorConfig;
 use crate::editor_grid::GridInteraction;
-use crate::editor_sprite_preview::{load_texture_preview_image, texture_preview_cache_key};
 use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectAssets;
 use crate::scene::viewport::{DragPreviewSprite, OverlayLineInstance, OverlaySpriteInstance};
 use std::collections::BTreeMap;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::entity::{ControlRole, Entity};
+use toki_core::indexed_presentation::{load_materialized_indexed_image, IndexedPresentationSettings};
 use toki_core::palette::Palette;
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::Scene;
@@ -29,12 +29,12 @@ pub fn cached_preview_sprite_frame(
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
     available_palettes: &BTreeMap<String, Palette>,
-    indexed_palette_override: Option<&str>,
+    indexed_presentation_settings: &IndexedPresentationSettings,
 ) -> Option<PlacementPreviewVisual> {
     let cache_key = (
         project_path.to_path_buf(),
         entity_def_name.to_string(),
-        indexed_palette_override.map(str::to_string),
+        indexed_presentation_settings.indexed_palette_override.clone(),
     );
     let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
         load_preview_sprite_frame(
@@ -42,7 +42,7 @@ pub fn cached_preview_sprite_frame(
             project_path,
             project_assets,
             available_palettes,
-            indexed_palette_override,
+            indexed_presentation_settings,
         )
     });
     cached.clone()
@@ -56,14 +56,22 @@ pub fn cached_decoration_preview_sprite_frame(
     sheet_name: &str,
     object_name: &str,
     project_path: &std::path::Path,
+    available_palettes: &BTreeMap<String, Palette>,
+    indexed_presentation_settings: &IndexedPresentationSettings,
 ) -> Option<PlacementPreviewVisual> {
     let cache_key = (
         project_path.to_path_buf(),
         format!("decoration::{sheet_name}::{object_name}"),
-        None,
+        indexed_presentation_settings.indexed_palette_override.clone(),
     );
     let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
-        load_decoration_preview_sprite_frame(project_path, sheet_name, object_name)
+        load_decoration_preview_sprite_frame(
+            project_path,
+            sheet_name,
+            object_name,
+            available_palettes,
+            indexed_presentation_settings,
+        )
     });
     cached.clone()
 }
@@ -73,7 +81,7 @@ pub fn load_preview_sprite_frame(
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
     available_palettes: &BTreeMap<String, Palette>,
-    indexed_palette_override: Option<&str>,
+    indexed_presentation_settings: &IndexedPresentationSettings,
 ) -> Option<PlacementPreviewVisual> {
     tracing::info!(
         "Loading preview sprite frame for entity '{}' (one-time cache)",
@@ -137,23 +145,20 @@ pub fn load_preview_sprite_frame(
                         .map(|parent| parent.join(&sprite_atlas.image));
                     let (texture_image, texture_cache_key) =
                         if let Some(texture_path) = texture_path.as_ref() {
-                            match load_texture_preview_image(
+                            match load_materialized_indexed_image(
                                 texture_path,
                                 sprite_atlas.color_mode,
                                 available_palettes,
-                                indexed_palette_override,
+                                indexed_presentation_settings,
                                 entity_def.rendering.palette_override.as_deref(),
                                 sprite_atlas.palette.as_deref(),
+                                false,
                             ) {
-                                Ok((image, palette_id)) if sprite_atlas.is_palette_indexed() => (
-                                    Some(image),
-                                    Some(texture_preview_cache_key(
-                                        texture_path,
-                                        sprite_atlas.color_mode,
-                                        palette_id.as_deref(),
-                                    )),
+                                Ok(presentation) if sprite_atlas.is_palette_indexed() => (
+                                    Some(presentation.image),
+                                    Some(presentation.cache_key),
                                 ),
-                                Ok((_image, _)) => (None, None),
+                                Ok(_) => (None, None),
                                 Err(error) => {
                                     tracing::warn!(
                                         "Failed to recolor indexed preview sprite for '{}': {}",
@@ -208,6 +213,33 @@ pub fn load_preview_sprite_frame(
                     );
                     return None;
                 };
+                let texture_path = object_sheet_asset
+                    .path
+                    .parent()
+                    .map(|parent| parent.join(&object_sheet.image));
+                let indexed_presentation = if object_sheet.is_palette_indexed() {
+                    texture_path.as_ref().and_then(|texture_path| {
+                        load_materialized_indexed_image(
+                            texture_path,
+                            toki_core::assets::atlas::ColorMode::PaletteIndexed,
+                            available_palettes,
+                            indexed_presentation_settings,
+                            entity_def.rendering.palette_override.as_deref(),
+                            object_sheet.palette.as_deref(),
+                            false,
+                        )
+                        .inspect_err(|error| {
+                            tracing::warn!(
+                                "Failed to recolor indexed object-sheet preview for '{}': {}",
+                                entity_def_name,
+                                error
+                            );
+                        })
+                        .ok()
+                    })
+                } else {
+                    None
+                };
 
                 return Some(PlacementPreviewVisual {
                     frame: toki_core::sprite::SpriteFrame {
@@ -216,12 +248,12 @@ pub fn load_preview_sprite_frame(
                         u1: uvs[2],
                         v1: uvs[3],
                     },
-                    texture_path: object_sheet_asset
-                        .path
-                        .parent()
-                        .map(|parent| parent.join(&object_sheet.image)),
-                    texture_image: None,
-                    texture_cache_key: None,
+                    texture_path,
+                    texture_image: indexed_presentation
+                        .as_ref()
+                        .map(|presentation| presentation.image.clone()),
+                    texture_cache_key: indexed_presentation
+                        .map(|presentation| presentation.cache_key),
                     size: glam::UVec2::new(
                         entity_def.rendering.size[0],
                         entity_def.rendering.size[1],
@@ -281,6 +313,8 @@ pub fn load_decoration_preview_sprite_frame(
     project_path: &std::path::Path,
     sheet_name: &str,
     object_name: &str,
+    available_palettes: &BTreeMap<String, Palette>,
+    indexed_presentation_settings: &IndexedPresentationSettings,
 ) -> Option<PlacementPreviewVisual> {
     let sheet_file = if sheet_name.ends_with(".json") {
         sheet_name.to_string()
@@ -297,6 +331,34 @@ pub fn load_decoration_preview_sprite_frame(
         .unwrap_or(glam::UVec2::new(16, 16));
     let uvs = object_sheet.get_object_uvs(object_name, texture_size)?;
 
+    let texture_path = object_sheet_path
+        .parent()
+        .map(|parent| parent.join(&object_sheet.image));
+    let indexed_presentation = if object_sheet.is_palette_indexed() {
+        texture_path.as_ref().and_then(|path| {
+            load_materialized_indexed_image(
+                path,
+                toki_core::assets::atlas::ColorMode::PaletteIndexed,
+                available_palettes,
+                indexed_presentation_settings,
+                None,
+                object_sheet.palette.as_deref(),
+                false,
+            )
+            .inspect_err(|error| {
+                tracing::warn!(
+                    "Failed to recolor indexed decoration preview for '{}::{}': {}",
+                    sheet_name,
+                    object_name,
+                    error
+                );
+            })
+            .ok()
+        })
+    } else {
+        None
+    };
+
     Some(PlacementPreviewVisual {
         frame: toki_core::sprite::SpriteFrame {
             u0: uvs[0],
@@ -304,11 +366,9 @@ pub fn load_decoration_preview_sprite_frame(
             u1: uvs[2],
             v1: uvs[3],
         },
-        texture_path: object_sheet_path
-            .parent()
-            .map(|parent| parent.join(&object_sheet.image)),
-        texture_image: None,
-        texture_cache_key: None,
+        texture_path,
+        texture_image: indexed_presentation.as_ref().map(|presentation| presentation.image.clone()),
+        texture_cache_key: indexed_presentation.map(|presentation| presentation.cache_key),
         size: glam::UVec2::new(
             object_info.size_tiles.x * object_sheet.tile_size.x,
             object_info.size_tiles.y * object_sheet.tile_size.y,
@@ -326,7 +386,7 @@ pub fn build_scene_player_overlay_sprites(
         Option<PlacementPreviewVisual>,
     >,
     available_palettes: &BTreeMap<String, Palette>,
-    indexed_palette_override: Option<&str>,
+    indexed_presentation_settings: &IndexedPresentationSettings,
 ) -> Vec<OverlaySpriteInstance> {
     let Some(active_scene_name) = active_scene_name else {
         return Vec::new();
@@ -355,7 +415,7 @@ pub fn build_scene_player_overlay_sprites(
         project_path,
         project_assets,
         available_palettes,
-        indexed_palette_override,
+        indexed_presentation_settings,
     ) else {
         return Vec::new();
     };

@@ -2,13 +2,18 @@ use crate::per_frame_lru::PerFrameLruCache;
 use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
 use crate::pipelines::TextureSource;
 use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
-use crate::targets::RenderTarget;
-use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
+use crate::targets::{OffscreenTarget, RenderTarget};
+use crate::{
+    DebugPipeline, PostProcessPipeline, RenderError, RenderPipeline, SpritePipeline,
+    TilemapPipeline,
+};
 use toki_core::assets::atlas::AtlasMeta;
 use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::palette::{Palette, PaletteSize};
+use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 use toki_core::sprite::SpriteFrame;
 
 const SCENE_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY: usize = 64;
@@ -112,6 +117,9 @@ pub struct SceneRenderer {
     sprite_draw_batches: Vec<OrderedDrawBatch<SceneSpriteBatchKey>>,
     underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
+    post_process_pipeline: PostProcessPipeline,
+    post_process_target: Option<OffscreenTarget>,
+    post_process_settings: ResolvedPostProcessSettings,
     current_sprite_texture_path: Option<std::path::PathBuf>,
     current_projection: glam::Mat4,
 }
@@ -135,6 +143,29 @@ enum SceneSpriteTextureSource<'a> {
 }
 
 impl SceneRenderer {
+    fn default_post_process_settings() -> ResolvedPostProcessSettings {
+        ResolvedPostProcessSettings {
+            mode: PostProcessMode::None,
+            quantize_strategy: QuantizeStrategy::Luminance,
+            tint_color: [0, 0, 0, 255],
+            tint_strength_percent: 0,
+            brightness_percent: 0,
+            saturation_percent: 100,
+            quantize_palette: Palette::new(
+                PaletteSize::Pal4,
+                vec![
+                    [0x11, 0x11, 0x11, 0xFF],
+                    [0x55, 0x55, 0x55, 0xFF],
+                    [0xAA, 0xAA, 0xAA, 0xFF],
+                    [0xF0, 0xF0, 0xF0, 0xFF],
+                ],
+            )
+            .expect("hard-coded default palette"),
+            gb_contrast_percent: 0,
+            vignette_strength_percent: 60,
+        }
+    }
+
     pub fn new(
         device: wgpu::Device,
         queue: wgpu::Queue,
@@ -190,6 +221,7 @@ impl SceneRenderer {
 
         let underlay_pipeline = DebugPipeline::new(&device, surface_format);
         let debug_pipeline = DebugPipeline::new(&device, surface_format);
+        let post_process_pipeline = PostProcessPipeline::new(&device, surface_format);
 
         tracing::info!("SceneRenderer created successfully");
 
@@ -207,6 +239,9 @@ impl SceneRenderer {
             sprite_draw_batches: Vec::new(),
             underlay_pipeline,
             debug_pipeline,
+            post_process_pipeline,
+            post_process_target: None,
+            post_process_settings: Self::default_post_process_settings(),
             current_sprite_texture_path: sprite_texture_cache,
             current_projection: glam::Mat4::IDENTITY,
         })
@@ -594,6 +629,55 @@ impl SceneRenderer {
         Ok(())
     }
 
+    fn ensure_post_process_target<T: RenderTarget>(
+        &mut self,
+        target: &T,
+    ) -> Result<(), RenderError> {
+        let size = target.size();
+        let post_process_target = self.post_process_target.get_or_insert(OffscreenTarget::new(
+            &self.device,
+            size,
+            self.format,
+        )?);
+        post_process_target.resize(&self.device, size)?;
+        self.post_process_pipeline
+            .update_source_texture(&self.device, post_process_target.get_render_view()?);
+        Ok(())
+    }
+
+    fn execute_post_process_pass<T: RenderTarget>(
+        &mut self,
+        target: &mut T,
+    ) -> Result<(), RenderError> {
+        self.post_process_pipeline
+            .update_settings(&self.queue, &self.post_process_settings);
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Scene Post Process Encoder"),
+            });
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Post Process Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.get_render_view()?,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            self.post_process_pipeline.render(&mut render_pass);
+        }
+        self.queue.submit(std::iter::once(encoder.finish()));
+        Ok(())
+    }
+
     fn render_scene_internal<T: RenderTarget>(
         &mut self,
         target: &mut T,
@@ -603,7 +687,19 @@ impl SceneRenderer {
         target.begin_frame()?;
         self.update_projection(projection);
         self.prepare_scene_pipelines(scene_data);
-        self.execute_scene_render_pass(target)?;
+        if self.post_process_settings.mode == PostProcessMode::None {
+            self.execute_scene_render_pass(target)?;
+        } else {
+            self.ensure_post_process_target(target)?;
+            let Some(mut post_process_target) = self.post_process_target.take() else {
+                return Err(RenderError::Other(
+                    "post-process target missing after initialization".to_string(),
+                ));
+            };
+            self.execute_scene_render_pass(&mut post_process_target)?;
+            self.post_process_target = Some(post_process_target);
+            self.execute_post_process_pass(target)?;
+        }
         target.end_frame()?;
         tracing::trace!("Scene render complete");
         Ok(())
@@ -670,6 +766,10 @@ impl SceneRenderer {
         self.underlay_pipeline
             .update_camera(&self.queue, projection);
         self.debug_pipeline.update_camera(&self.queue, projection);
+    }
+
+    pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
+        self.post_process_settings = settings;
     }
 }
 

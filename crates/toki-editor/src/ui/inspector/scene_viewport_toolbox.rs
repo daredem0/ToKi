@@ -19,6 +19,7 @@ impl InspectorSystem {
         project_assets: Option<&mut ProjectAssets>,
         config: Option<&EditorConfig>,
         mut viewport: Option<&mut SceneViewport>,
+        renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         ui.heading("Toolbox");
         render_mode_and_cancel(ui_state, ui, &mut viewport);
@@ -45,6 +46,7 @@ impl InspectorSystem {
                     &project_path,
                     definitions.get(&ToolboxTab::Decorations),
                     &mut viewport,
+                    renderer,
                 );
             }
             ToolboxTab::Creatures | ToolboxTab::Humans | ToolboxTab::Items => {
@@ -221,6 +223,7 @@ fn render_decoration_tab(
     project_path: &std::path::Path,
     decoration_definitions: Option<&Vec<crate::ui::hierarchy::ToolboxEntityDefinitionSummary>>,
     viewport: &mut Option<&mut SceneViewport>,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     ui.label("Decoration Definitions");
     match decoration_definitions {
@@ -286,7 +289,7 @@ fn render_decoration_tab(
         );
     }
 
-    let texture = load_preview_texture(ui_state, ctx, &active_source);
+    let texture = load_preview_texture(ui_state, ctx, &active_source, renderer);
     let mut gallery_object_selected = false;
     render_gallery(
         ui,
@@ -410,19 +413,27 @@ fn load_preview_texture(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     source: &crate::ui::object_sheet_browser::ObjectSheetBrowserSource,
-) -> Option<egui::TextureHandle> {
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
+) -> Option<egui::TextureId> {
+    let presentation_settings = ui_state.project.indexed_presentation_settings();
+    let available_palettes = ui_state.project.available_palettes.clone();
     let scene_context = ui_state.scene_viewport_context_mut();
     ensure_object_sheet_preview_texture(
         &mut scene_context.toolbox.preview_image_path,
         &mut scene_context.toolbox.preview_texture,
         ctx,
         &source.texture_path,
+        source.object_sheet.color_mode,
+        &available_palettes,
+        &presentation_settings,
+        source.object_sheet.palette.as_deref(),
+        renderer,
     )
 }
 
 fn render_gallery(
     ui: &mut egui::Ui,
-    texture: Option<egui::TextureHandle>,
+    texture: Option<egui::TextureId>,
     source: &crate::ui::object_sheet_browser::ObjectSheetBrowserSource,
     selected_object: &mut String,
     gallery_object_selected: &mut bool,
@@ -442,7 +453,7 @@ fn render_gallery(
         ui.horizontal(|ui| {
             render_object_gallery_item(
                 ui,
-                texture.id(),
+                texture,
                 texture_size,
                 &source.object_sheet,
                 object_name,
@@ -457,7 +468,7 @@ fn render_gallery(
     ui.label("Object Palette");
     render_object_gallery_grid(
         ui,
-        texture.id(),
+        texture,
         texture_size,
         &source.object_sheet,
         &source.object_names,

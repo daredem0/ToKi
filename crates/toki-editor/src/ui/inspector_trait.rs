@@ -10,6 +10,7 @@ pub struct InspectorContext<'a> {
     /// The project for inspectors that need to modify project settings.
     pub project: Option<&'a mut Project>,
     pub config: Option<&'a EditorConfig>,
+    pub renderer: Option<&'a mut crate::rendering::WindowRenderer>,
 }
 
 /// Trait for domain-specific inspector panels.

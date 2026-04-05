@@ -53,6 +53,7 @@ impl Inspector for EntityInspector {
                     ctx.ui_state,
                     &mut draft,
                     ctx.config,
+                    ctx.renderer.as_deref_mut(),
                 );
                 if draft_changed {
                     entity_changed = InspectorSystem::apply_entity_property_draft_with_undo(

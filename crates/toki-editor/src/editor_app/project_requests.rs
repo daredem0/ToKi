@@ -31,21 +31,20 @@ impl EditorApp {
             .set_available_dialogs(&available_dialogs);
 
         if let Some(current_project) = self.core.project_manager.current_project.as_ref() {
-            let indexed_palette_override = current_project
-                .metadata
-                .runtime
-                .display
-                .indexed_palette_override
-                .clone();
-            self.tabs.ui.project.indexed_palette_override = indexed_palette_override.clone();
+            let presentation_settings =
+                Self::project_indexed_presentation_settings(Some(current_project));
+            self.tabs.ui.project.indexed_palette_override =
+                presentation_settings.indexed_palette_override.clone();
+            self.tabs.ui.project.runtime_post_process =
+                presentation_settings.post_process.clone();
             if let Some(viewport) = self.viewport_manager.scene.as_mut() {
                 viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
-                viewport.set_indexed_palette_override(indexed_palette_override.clone());
+                viewport.set_indexed_presentation_settings(presentation_settings.clone());
                 viewport.clear_asset_caches();
             }
             if let Some(viewport) = self.viewport_manager.map_editor.as_mut() {
                 viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
-                viewport.set_indexed_palette_override(indexed_palette_override);
+                viewport.set_indexed_presentation_settings(presentation_settings);
                 viewport.clear_asset_caches();
             }
         }
@@ -136,27 +135,20 @@ impl EditorApp {
                         .project
                         .set_available_dialogs(&available_dialogs);
                 }
-                let indexed_palette_override = self
-                    .core
-                    .project_manager
-                    .current_project
-                    .as_ref()
-                    .and_then(|project| {
-                        project
-                            .metadata
-                            .runtime
-                            .display
-                            .indexed_palette_override
-                            .clone()
-                    });
-                self.tabs.ui.project.indexed_palette_override = indexed_palette_override.clone();
+                let presentation_settings = Self::project_indexed_presentation_settings(
+                    self.core.project_manager.current_project.as_ref(),
+                );
+                self.tabs.ui.project.indexed_palette_override =
+                    presentation_settings.indexed_palette_override.clone();
+                self.tabs.ui.project.runtime_post_process =
+                    presentation_settings.post_process.clone();
                 if let Some(viewport) = self.viewport_manager.scene.as_mut() {
                     viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
-                    viewport.set_indexed_palette_override(indexed_palette_override.clone());
+                    viewport.set_indexed_presentation_settings(presentation_settings.clone());
                 }
                 if let Some(viewport) = self.viewport_manager.map_editor.as_mut() {
                     viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
-                    viewport.set_indexed_palette_override(indexed_palette_override.clone());
+                    viewport.set_indexed_presentation_settings(presentation_settings.clone());
                 }
 
                 match self.core.project_manager.load_scenes() {

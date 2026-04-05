@@ -10,7 +10,7 @@ impl PanelSystem {
         map_editor_viewport: Option<&mut SceneViewport>,
         available_map_names: Option<Vec<String>>,
         mut config: Option<&mut EditorConfig>,
-        renderer: Option<&mut egui_wgpu::Renderer>,
+        mut renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         if let Some(names) = &available_map_names {
             crate::ui::editor_ui::sync_map_editor_selection(ui_state, names);
@@ -248,7 +248,7 @@ impl PanelSystem {
             }
         }
 
-        viewport.render(ui, rect, project_path.as_deref(), renderer);
+        viewport.render(ui, rect, project_path.as_deref(), renderer.as_deref_mut());
         if let Some(cfg) = config.as_deref() {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }
@@ -259,6 +259,7 @@ impl PanelSystem {
                 viewport,
                 &viewport_ctx,
                 project_path,
+                renderer.as_deref_mut(),
             );
         }
 

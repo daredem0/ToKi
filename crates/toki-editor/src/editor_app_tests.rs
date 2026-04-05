@@ -9,6 +9,7 @@ use std::fs;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
+use toki_core::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AudioDef, CollisionDef, CombatComponent, ComponentsDef,
@@ -415,7 +416,7 @@ fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
     assert_eq!(draft.name, "new_map");
     assert_eq!(draft.tilemap.size, UVec2::new(5, 4));
     assert_eq!(draft.tilemap.tile_size, UVec2::new(16, 16));
-    assert_eq!(draft.tilemap.atlas, PathBuf::from("terrain.json"));
+    assert_eq!(draft.tilemap.tileset, PathBuf::from("terrain.json"));
     assert_eq!(draft.tilemap.tiles().len(), 20);
     assert!(draft.tilemap.tiles().iter().all(|tile| tile == "grass"));
 }
@@ -427,14 +428,14 @@ fn tilemap_to_save_for_map_editor_draft_prefers_live_viewport_tilemap() {
         tilemap: TileMap {
             size: UVec2::new(2, 2),
             tile_size: UVec2::new(8, 8),
-            atlas: PathBuf::from("terrain.json"),
+            tileset: PathBuf::from("terrain.json"),
             layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 4])],
         },
     };
     let live_tilemap = TileMap {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(8, 8),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -459,7 +460,7 @@ fn tilemap_to_save_for_map_editor_draft_falls_back_to_original_draft_when_viewpo
         tilemap: TileMap {
             size: UVec2::new(2, 2),
             tile_size: UVec2::new(8, 8),
-            atlas: PathBuf::from("terrain.json"),
+            tileset: PathBuf::from("terrain.json"),
             layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 4])],
         },
     };
@@ -536,7 +537,8 @@ fn init_viewport_with_returns_viewport_when_creation_and_initialization_succeed(
     assert_eq!(viewport, Some(21));
 }
 
-fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
+fn collision_assets_with_center_solid_tile(
+) -> (TileMap, TileSetMeta, HashMap<String, TileSetAtlasSource>) {
     let mut tiles = HashMap::new();
     tiles.insert(
         "solid".to_string(),
@@ -574,24 +576,33 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
     let tilemap = TileMap {
         size: UVec2::new(3, 3),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
-                "floor".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
-                "solid".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
-                "floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/solid".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
+                "test_atlas/tile/floor".to_string(),
             ],
         )],
     };
 
-    (tilemap, atlas)
+    let atlas_sources = HashMap::from([(
+        "test_atlas".to_string(),
+        TileSetAtlasSource {
+            name: "test_atlas".to_string(),
+            path: PathBuf::from("test_atlas.json"),
+            meta: atlas.clone(),
+        },
+    )]);
+
+    (tilemap, TileSetMeta::from_atlas("test_atlas", &atlas), atlas_sources)
 }
 
 fn solid_entity(id: u32, position: IVec2) -> Entity {
@@ -616,7 +627,8 @@ fn solid_entity(id: u32, position: IVec2) -> Entity {
 
 #[test]
 fn build_drag_preview_sprites_computes_validity_per_entity() {
-    let (tilemap, atlas) = collision_assets_with_center_solid_tile();
+    let (tilemap, tileset, atlas_sources) = collision_assets_with_center_solid_tile();
+    let resolver = TileSetResolver::new(&tileset, &atlas_sources);
     let first = solid_entity(1, IVec2::new(0, 0));
     let second = solid_entity(2, IVec2::new(0, 16));
     let drag_state = EntityMoveDragState {
@@ -630,7 +642,7 @@ fn build_drag_preview_sprites_computes_validity_per_entity() {
         &drag_state,
         Vec2::new(16.0, 0.0),
         Some(&tilemap),
-        Some(&atlas),
+        Some(&resolver),
     );
 
     let first_preview = previews
@@ -1473,6 +1485,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
     project_assets
         .scan_assets()
         .expect("project assets should scan");
+    let presentation_settings = toki_core::indexed_presentation::IndexedPresentationSettings::default();
 
     let mut app = super::EditorApp::new(None);
     let first = super::EditorApp::cached_preview_sprite_frame(
@@ -1480,7 +1493,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
         "player",
         &project_path,
         &project_assets,
-        None,
+        &presentation_settings,
     )
     .expect("first cached load should succeed");
 
@@ -1492,7 +1505,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
         "player",
         &project_path,
         &project_assets,
-        None,
+        &presentation_settings,
     )
     .expect("cached preview should still be returned");
 
@@ -1537,7 +1550,7 @@ fn build_scene_anchor_overlay_lines_prefer_tilemap_tile_size() {
     let tilemap = toki_core::assets::tilemap::TileMap {
         size: UVec2::new(8, 8),
         tile_size: UVec2::new(40, 48),
-        atlas: std::path::PathBuf::from("dummy.json"),
+        tileset: std::path::PathBuf::from("dummy.json"),
         layers: vec![TileLayer::new("ground", vec![])],
     };
 

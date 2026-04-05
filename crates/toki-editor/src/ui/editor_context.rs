@@ -20,13 +20,14 @@ pub(crate) struct CenterPanelHost<'a> {
     pub available_map_names: Option<Vec<String>>,
     pub config: Option<&'a mut EditorConfig>,
     pub config_readonly: Option<&'a EditorConfig>,
-    pub renderer: Option<&'a mut egui_wgpu::Renderer>,
+    pub renderer: Option<&'a mut crate::rendering::WindowRenderer>,
 }
 
 pub(crate) struct InspectorHost<'a> {
     pub project: Option<&'a mut Project>,
     pub project_assets: Option<&'a mut ProjectAssets>,
     pub config_readonly: Option<&'a EditorConfig>,
+    pub renderer: Option<&'a mut crate::rendering::WindowRenderer>,
 }
 
 pub(crate) struct ToolboxHost<'a> {
@@ -35,6 +36,7 @@ pub(crate) struct ToolboxHost<'a> {
     pub project_assets: Option<&'a mut ProjectAssets>,
     pub config: Option<&'a mut EditorConfig>,
     pub config_readonly: Option<&'a EditorConfig>,
+    pub renderer: Option<&'a mut crate::rendering::WindowRenderer>,
 }
 
 pub(crate) trait EditorContext: Any {
@@ -367,6 +369,7 @@ impl EditorContext for SceneViewportContext {
             config,
             config_readonly,
             scene_viewport,
+            renderer,
             ..
         } = host;
         let config = config_readonly.as_ref().copied().or(config.as_deref());
@@ -378,6 +381,7 @@ impl EditorContext for SceneViewportContext {
             project_assets.as_deref_mut(),
             config,
             scene_viewport.as_deref_mut(),
+            renderer.as_deref_mut(),
         );
         true
     }
@@ -444,7 +448,13 @@ impl EditorContext for MapEditorContext {
         host: &mut InspectorHost<'_>,
     ) -> bool {
         let config = host.config_readonly;
-        InspectorSystem::render_map_editor_inspector(shell, ui, egui_ctx, config);
+        InspectorSystem::render_map_editor_inspector(
+            shell,
+            ui,
+            egui_ctx,
+            config,
+            host.renderer.as_deref_mut(),
+        );
         true
     }
 
@@ -461,7 +471,13 @@ impl EditorContext for MapEditorContext {
             .as_ref()
             .copied()
             .or(host.config.as_deref());
-        InspectorSystem::render_map_editor_toolbox(shell, ui, egui_ctx, config);
+        InspectorSystem::render_map_editor_toolbox(
+            shell,
+            ui,
+            egui_ctx,
+            config,
+            host.renderer.as_deref_mut(),
+        );
         true
     }
 
@@ -629,6 +645,7 @@ impl EditorContext for SpriteEditorContext {
             shell,
             egui_ctx,
             host.project.as_deref_mut(),
+            host.renderer.as_deref_mut(),
         );
     }
 
@@ -698,6 +715,7 @@ impl EditorContext for AnimationEditorContext {
             shell,
             egui_ctx,
             host.project.as_deref_mut(),
+            host.renderer.as_deref_mut(),
         );
     }
 
@@ -747,6 +765,7 @@ impl EditorContext for EntityEditorContext {
             shell,
             egui_ctx,
             host.project.as_deref_mut(),
+            host.renderer.as_deref_mut(),
         );
     }
 

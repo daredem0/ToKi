@@ -188,6 +188,7 @@ fn load_scene_music_choices_discovers_tracks_from_project_music_folder() {
         game_state: None,
         project: Some(&mut project.clone()),
         config: None,
+        renderer: None,
     };
 
     let choices = SceneInspector::load_scene_music_choices(&inspector_ctx, None);
@@ -205,6 +206,7 @@ fn load_scene_music_choices_keeps_current_track_even_if_not_discovered() {
         game_state: None,
         project: Some(&mut project),
         config: None,
+        renderer: None,
     };
 
     let choices = SceneInspector::load_scene_music_choices(&inspector_ctx, Some("legacy_track"));

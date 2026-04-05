@@ -156,7 +156,7 @@ pub struct AnimationEditorState {
     /// Preview playback state
     pub preview: AnimationPreviewState,
     /// Cached atlas texture handle (not Debug)
-    pub atlas_texture: Option<egui::TextureHandle>,
+    pub atlas_texture: Option<egui::TextureId>,
     /// Cached atlas texture path (to detect changes)
     pub atlas_texture_path: Option<PathBuf>,
     /// Cache key for the currently loaded atlas preview texture
@@ -210,7 +210,7 @@ impl std::fmt::Debug for AnimationEditorState {
             .field("preview", &self.preview)
             .field(
                 "atlas_texture",
-                &self.atlas_texture.as_ref().map(|_| "TextureHandle"),
+                &self.atlas_texture.as_ref().map(|_| "TextureId"),
             )
             .field("atlas_texture_path", &self.atlas_texture_path)
             .field("atlas_texture_cache_key", &self.atlas_texture_cache_key)

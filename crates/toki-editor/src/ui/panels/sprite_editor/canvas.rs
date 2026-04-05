@@ -3,9 +3,10 @@
 use crate::ui::editor_ui::{
     CanvasSide, PixelColor, SelectionMask, SpriteCanvas, SpriteCanvasViewport, SpriteEditorTool,
 };
-use crate::ui::sprite_editor::{preview_indexed_color, FloatingOrigin, FloatingSelection};
+use crate::ui::sprite_editor::{FloatingOrigin, FloatingSelection};
 use crate::ui::EditorUI;
 use toki_core::assets::atlas::ColorMode;
+use toki_core::graphics::image::DecodedImage;
 use toki_core::palette::Palette;
 
 use super::shortcuts::handle_undo_redo_shortcuts;
@@ -16,6 +17,7 @@ pub fn render_canvas_viewport(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     target_side: Option<CanvasSide>,
+    mut renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let available_size = ui.available_size();
 
@@ -134,7 +136,7 @@ pub fn render_canvas_viewport(
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.canvas.is_some() {
-        ensure_canvas_texture_for_side(ui_state, ctx, render_side);
+        ensure_canvas_texture_for_side(ui_state, ctx, render_side, renderer.as_deref_mut());
     }
 
     // Draw checkerboard and canvas
@@ -142,7 +144,7 @@ pub fn render_canvas_viewport(
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(canvas) = &canvas_state.canvas {
         let viewport = canvas_state.viewport.clone();
-        let texture = canvas_state.canvas_texture.as_ref();
+        let texture = canvas_state.canvas_texture;
         draw_canvas_with_checkerboard(&painter, rect, &viewport, canvas, texture);
     }
 
@@ -150,8 +152,7 @@ pub fn render_canvas_viewport(
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.tile_preview {
-        if let (Some(canvas), Some(texture)) =
-            (&canvas_state.canvas, canvas_state.canvas_texture.as_ref())
+        if let (Some(canvas), Some(texture)) = (&canvas_state.canvas, canvas_state.canvas_texture)
         {
             draw_tile_preview(&painter, rect, &canvas_state.viewport, canvas, texture);
         }
@@ -233,13 +234,13 @@ pub fn render_canvas_viewport(
     }
 
     // Keep floating-selection texture in sync before drawing
-    ensure_floating_texture(ui_state, ctx, render_side);
+    ensure_floating_texture(ui_state, ctx, render_side, renderer.as_deref_mut());
 
     // Draw floating selection overlay OR static selection overlay
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(floating) = &canvas_state.floating {
-        let texture = canvas_state.floating_texture.as_ref();
+        let texture = canvas_state.floating_texture;
         draw_floating_selection(&painter, rect, &canvas_state.viewport, floating, texture);
     } else if let Some(selection) = &canvas_state.selection {
         draw_selection_mask(&painter, rect, &canvas_state.viewport, selection);
@@ -283,17 +284,10 @@ pub fn render_empty_canvas_slot(
 
 pub fn ensure_canvas_texture_for_side(
     ui_state: &mut EditorUI,
-    ctx: &egui::Context,
+    _ctx: &egui::Context,
     side: CanvasSide,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
-    let cs = crate::ui::editor_context::sprite_state(ui_state).canvas_state(side);
-    if cs.canvas_texture.is_some() && !cs.canvas_texture_dirty {
-        return;
-    }
-    crate::ui::editor_context::sprite_state_mut(ui_state)
-        .canvas_state_mut(side)
-        .canvas_texture_dirty = false;
-
     let Some(canvas) = crate::ui::editor_context::sprite_state(ui_state)
         .canvas_state(side)
         .canvas
@@ -301,37 +295,68 @@ pub fn ensure_canvas_texture_for_side(
     else {
         return;
     };
-
-    let color_mode = crate::ui::editor_context::sprite_state(ui_state).color_mode;
-    let selected_palette = ui_state
-        .sprite_editor_context()
-        .sprite
-        .selected_palette_id
-        .as_ref()
-        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id));
-
-    let display_pixels = canvas_display_pixels(&canvas, color_mode, selected_palette);
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(
-        [canvas.width as usize, canvas.height as usize],
-        &display_pixels,
-    );
-
-    let texture_name = match side {
-        CanvasSide::Left => "sprite_editor_canvas_left",
-        CanvasSide::Right => "sprite_editor_canvas_right",
+    let Some(renderer) = renderer else {
+        return;
     };
 
-    let texture = ctx.load_texture(texture_name, color_image, egui::TextureOptions::NEAREST);
+    let (color_mode, authored_palette_id, presentation_settings) = {
+        let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+        (
+            sprite_state.color_mode,
+            sprite_state.authored_palette_id.clone(),
+            ui_state.project.indexed_presentation_settings(),
+        )
+    };
+    let preview_image = DecodedImage {
+        width: canvas.width,
+        height: canvas.height,
+        data: canvas.pixels().to_vec(),
+    };
+    let cache_key = inline_preview_cache_key(
+        "sprite_editor_canvas",
+        &preview_image,
+        color_mode,
+        authored_palette_id.as_deref(),
+        &ui_state.project.available_palettes,
+        &presentation_settings,
+    );
+
+    let cs = crate::ui::editor_context::sprite_state(ui_state).canvas_state(side);
+    if cs.canvas_texture.is_some()
+        && !cs.canvas_texture_dirty
+        && cs.canvas_texture_cache_key.as_deref() == Some(cache_key.as_str())
+    {
+        return;
+    }
     crate::ui::editor_context::sprite_state_mut(ui_state)
         .canvas_state_mut(side)
-        .canvas_texture = Some(texture);
+        .canvas_texture_dirty = false;
+    let Ok(texture) = renderer.preview_texture_from_image(
+        "sprite_editor_canvas",
+        &preview_image,
+        color_mode,
+        &ui_state.project.available_palettes,
+        &presentation_settings,
+        None,
+        authored_palette_id.as_deref(),
+    ) else {
+        return;
+    };
+    let cs = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state_mut(side);
+    cs.canvas_texture_cache_key = Some(cache_key);
+    cs.canvas_texture = Some(texture.texture_id);
 }
 
 /// Keeps the floating-selection GPU texture in sync with `CanvasState::floating`.
 /// - If `floating` is None, clears any stale texture.
 /// - If `floating` is Some but no texture exists yet, builds it from the pixel data.
 /// - Does nothing if texture is already current.
-pub fn ensure_floating_texture(ui_state: &mut EditorUI, ctx: &egui::Context, side: CanvasSide) {
+pub fn ensure_floating_texture(
+    ui_state: &mut EditorUI,
+    _ctx: &egui::Context,
+    side: CanvasSide,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
+) {
     let cs = crate::ui::editor_context::sprite_state(ui_state).canvas_state(side);
     let has_floating = cs.floating.is_some();
     let has_texture = cs.floating_texture.is_some();
@@ -347,25 +372,42 @@ pub fn ensure_floating_texture(ui_state: &mut EditorUI, ctx: &egui::Context, sid
     if has_texture {
         return;
     }
+    let Some(renderer) = renderer else {
+        return;
+    };
 
-    let Some((w, h, pixels)) = crate::ui::editor_context::sprite_state(ui_state)
+    let Some(decoded) = crate::ui::editor_context::sprite_state(ui_state)
         .canvas_state(side)
         .floating
         .as_ref()
-        .map(|f| (f.pixels.width, f.pixels.height, f.pixels.pixels().to_vec()))
+        .map(|f| DecodedImage {
+            width: f.pixels.width,
+            height: f.pixels.height,
+            data: f.pixels.pixels().to_vec(),
+        })
     else {
         return;
     };
 
-    let image = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &pixels);
-    let texture = ctx.load_texture(
+    let settings = ui_state.project.indexed_presentation_settings();
+    let color_mode = crate::ui::editor_context::sprite_state(ui_state).color_mode;
+    let authored_palette_id = crate::ui::editor_context::sprite_state(ui_state)
+        .authored_palette_id
+        .clone();
+    let Ok(texture) = renderer.preview_texture_from_image(
         "sprite_editor_floating",
-        image,
-        egui::TextureOptions::NEAREST,
-    );
+        &decoded,
+        color_mode,
+        &ui_state.project.available_palettes,
+        &settings,
+        None,
+        authored_palette_id.as_deref(),
+    ) else {
+        return;
+    };
     crate::ui::editor_context::sprite_state_mut(ui_state)
         .canvas_state_mut(side)
-        .floating_texture = Some(texture);
+        .floating_texture = Some(texture.texture_id);
 }
 
 pub fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
@@ -420,66 +462,12 @@ fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     }
 }
 
-fn canvas_display_pixels(
-    canvas: &SpriteCanvas,
-    color_mode: ColorMode,
-    palette: Option<&Palette>,
-) -> Vec<u8> {
-    let mut pixels = apply_palette_conversion(canvas, color_mode, palette);
-    composite_checkerboard_into(&mut pixels, canvas.width as usize);
-    pixels
-}
-
-fn apply_palette_conversion(
-    canvas: &SpriteCanvas,
-    color_mode: ColorMode,
-    palette: Option<&Palette>,
-) -> Vec<u8> {
-    if color_mode != ColorMode::PaletteIndexed {
-        return canvas.pixels().to_vec();
-    }
-    let Some(palette) = palette else {
-        return canvas.pixels().to_vec();
-    };
-    let mut pixels = canvas.pixels().to_vec();
-    for rgba in pixels.chunks_exact_mut(4) {
-        let display = preview_indexed_color(
-            crate::ui::editor_ui::PixelColor::from_rgba_array([rgba[0], rgba[1], rgba[2], rgba[3]]),
-            palette,
-        );
-        rgba.copy_from_slice(&display.to_rgba_array());
-    }
-    pixels
-}
-
-/// Composites transparent pixels against a 1×1 checkerboard pattern in-place.
-/// After this call every pixel has alpha=255, with the transparency indicator baked in.
-/// This avoids O(visible_pixels) per-pixel draw calls for the checkerboard background.
-fn composite_checkerboard_into(pixels: &mut [u8], width: usize) {
-    for (idx, rgba) in pixels.chunks_exact_mut(4).enumerate() {
-        let alpha = rgba[3];
-        if alpha == 255 {
-            continue;
-        }
-        let checker: u8 = if (idx % width + idx / width).is_multiple_of(2) {
-            180
-        } else {
-            220
-        };
-        let a = alpha as u32;
-        rgba[0] = ((a * rgba[0] as u32 + (255 - a) * checker as u32) / 255) as u8;
-        rgba[1] = ((a * rgba[1] as u32 + (255 - a) * checker as u32) / 255) as u8;
-        rgba[2] = ((a * rgba[2] as u32 + (255 - a) * checker as u32) / 255) as u8;
-        rgba[3] = 255;
-    }
-}
-
 fn draw_canvas_with_checkerboard(
     painter: &egui::Painter,
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
     canvas: &SpriteCanvas,
-    texture: Option<&egui::TextureHandle>,
+    texture: Option<egui::TextureId>,
 ) {
     let zoom = viewport.zoom;
     let pan = viewport.pan;
@@ -490,14 +478,19 @@ fn draw_canvas_with_checkerboard(
         canvas_screen_min.y + canvas.height as f32 * zoom,
     );
     let canvas_screen_rect = egui::Rect::from_min_max(canvas_screen_min, canvas_screen_max);
+    draw_canvas_checkerboard(
+        painter,
+        rect,
+        canvas_screen_rect,
+        viewport,
+        canvas,
+    );
 
     let visible_rect = canvas_screen_rect.intersect(rect);
     if visible_rect.is_positive() {
-        if let Some(tex) = texture {
-            // Checkerboard is baked into the texture by canvas_display_pixels —
-            // a single image draw replaces O(visible_pixels) rect_filled calls.
+        if let Some(texture_id) = texture {
             painter.image(
-                tex.id(),
+                texture_id,
                 canvas_screen_rect,
                 egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                 egui::Color32::WHITE,
@@ -518,7 +511,7 @@ fn draw_tile_preview(
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
     canvas: &SpriteCanvas,
-    texture: &egui::TextureHandle,
+    texture: egui::TextureId,
 ) {
     let zoom = viewport.zoom;
     let pan = viewport.pan;
@@ -549,8 +542,90 @@ fn draw_tile_preview(
         if !copy_rect.intersects(rect) {
             continue;
         }
-        painter.image(texture.id(), copy_rect, full_uv, tint);
+        painter.image(texture, copy_rect, full_uv, tint);
     }
+}
+
+fn draw_canvas_checkerboard(
+    painter: &egui::Painter,
+    clip_rect: egui::Rect,
+    canvas_rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+) {
+    let visible = canvas_rect.intersect(clip_rect);
+    if !visible.is_positive() {
+        return;
+    }
+
+    let zoom = viewport.zoom.max(0.01);
+    let checker = (zoom.max(4.0)).round();
+    let light = egui::Color32::from_gray(220);
+    let dark = egui::Color32::from_gray(180);
+
+    for y in 0..canvas.height {
+        let min_y = canvas_rect.top() + y as f32 * zoom;
+        let max_y = min_y + zoom;
+        if max_y < visible.top() || min_y > visible.bottom() {
+            continue;
+        }
+        for x in 0..canvas.width {
+            let min_x = canvas_rect.left() + x as f32 * zoom;
+            let max_x = min_x + zoom;
+            if max_x < visible.left() || min_x > visible.right() {
+                continue;
+            }
+            let alpha_index = ((x as f32 / checker).floor() as i32
+                + (y as f32 / checker).floor() as i32)
+                .rem_euclid(2);
+            let cell_rect = egui::Rect::from_min_max(
+                egui::pos2(min_x, min_y),
+                egui::pos2(max_x, max_y),
+            )
+            .intersect(visible);
+            painter.rect_filled(
+                cell_rect,
+                0.0,
+                if alpha_index == 0 { light } else { dark },
+            );
+        }
+    }
+}
+
+fn inline_preview_cache_key(
+    cache_source: &str,
+    decoded: &DecodedImage,
+    color_mode: ColorMode,
+    asset_palette: Option<&str>,
+    available_palettes: &std::collections::BTreeMap<String, Palette>,
+    presentation_settings: &toki_core::indexed_presentation::IndexedPresentationSettings,
+) -> String {
+    let palette_id = toki_core::indexed_presentation::resolve_indexed_palette(
+        color_mode,
+        available_palettes,
+        presentation_settings,
+        None,
+        asset_palette,
+    )
+    .ok()
+    .flatten()
+    .map(|(palette_id, _)| palette_id);
+    toki_core::indexed_presentation::texture_preview_cache_key(
+        &format!("{cache_source}:{}", image_content_hash(decoded)),
+        color_mode,
+        palette_id.as_deref(),
+        &presentation_settings.resolve_post_process(available_palettes),
+    )
+}
+
+fn image_content_hash(image: &DecodedImage) -> u64 {
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    image.width.hash(&mut hasher);
+    image.height.hash(&mut hasher);
+    image.data.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn draw_pixel_grid(
@@ -834,7 +909,7 @@ fn draw_floating_selection(
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
     floating: &FloatingSelection,
-    texture: Option<&egui::TextureHandle>,
+    texture: Option<egui::TextureId>,
 ) {
     let zoom = viewport.zoom;
     let pan = viewport.pan;
@@ -859,7 +934,7 @@ fn draw_floating_pixels(
     zoom: f32,
     floating: &FloatingSelection,
     display: glam::UVec2,
-    texture: Option<&egui::TextureHandle>,
+    texture: Option<egui::TextureId>,
 ) {
     let tl = egui::pos2(
         canvas_screen_min.x + floating.offset.x as f32 * zoom,
@@ -868,7 +943,7 @@ fn draw_floating_pixels(
     let size = egui::vec2(display.x as f32 * zoom, display.y as f32 * zoom);
     let dest = egui::Rect::from_min_size(tl, size);
 
-    if let Some(tex) = texture {
+    if let Some(texture_id) = texture {
         // Fast path: one GPU blit instead of O(W×H) rect_filled calls.
         let tint = if floating.origin.is_paste_preview() {
             egui::Color32::from_white_alpha(160)
@@ -876,7 +951,7 @@ fn draw_floating_pixels(
             egui::Color32::WHITE
         };
         let full_uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-        painter.image(tex.id(), dest, full_uv, tint);
+        painter.image(texture_id, dest, full_uv, tint);
         return;
     }
 
@@ -1198,14 +1273,31 @@ mod tests {
             ],
         )
         .unwrap();
+        let palettes =
+            std::collections::BTreeMap::from([("preview".to_string(), palette.clone())]);
+        let settings = toki_core::indexed_presentation::IndexedPresentationSettings::default();
+        let preview_image = DecodedImage {
+            width: canvas.width,
+            height: canvas.height,
+            data: canvas.pixels().to_vec(),
+        };
 
-        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(&palette));
+        let materialized = toki_core::indexed_presentation::materialize_indexed_image(
+            &preview_image,
+            "sprite_editor_canvas_test",
+            ColorMode::PaletteIndexed,
+            &palettes,
+            &settings,
+            None,
+            Some("preview"),
+            false,
+        )
+        .expect("preview image should materialize");
 
-        // Pixel 0: fully opaque (A=255) — checkerboard not applied, palette colour unchanged.
-        // Pixel 1: semi-transparent (A=128) — composited against checker square (180/220 grey),
-        //          position (1,0): (1%2 + 1/2)=1 → checker=220.
-        //          R=(128*70 + 127*220)/255=144, G=(128*80+127*220)/255=149, B=(128*90+127*220)/255=154
-        assert_eq!(pixels, vec![10, 20, 30, 255, 144, 149, 154, 255]);
+        assert_eq!(
+            materialized.image.data,
+            vec![10, 20, 30, 255, 70, 80, 90, 128]
+        );
     }
 
     #[test]
@@ -1216,10 +1308,74 @@ mod tests {
             vec![[1, 2, 3, 255]; 4],
         )
         .unwrap();
+        let palettes =
+            std::collections::BTreeMap::from([("preview".to_string(), palette.clone())]);
+        let settings = toki_core::indexed_presentation::IndexedPresentationSettings::default();
+        let preview_image = DecodedImage {
+            width: canvas.width,
+            height: canvas.height,
+            data: canvas.pixels().to_vec(),
+        };
 
-        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(&palette));
+        let materialized = toki_core::indexed_presentation::materialize_indexed_image(
+            &preview_image,
+            "sprite_editor_canvas_test",
+            ColorMode::PaletteIndexed,
+            &palettes,
+            &settings,
+            None,
+            Some("preview"),
+            false,
+        )
+        .expect("preview image should materialize");
 
-        assert_eq!(pixels, canvas.pixels());
+        assert_eq!(materialized.image.data, canvas.pixels());
+    }
+
+    #[test]
+    fn canvas_display_pixels_runtime_preview_prefers_project_palette_override() {
+        let canvas =
+            SpriteCanvas::from_rgba(1, 1, vec![0x00, 0x00, 0x00, 0xFF]).expect("canvas");
+        let mut palettes = std::collections::BTreeMap::new();
+        palettes.insert(
+            "authored".to_string(),
+            Palette::new(
+                toki_core::palette::PaletteSize::Pal4,
+                vec![[10, 20, 30, 255]; 4],
+            )
+            .unwrap(),
+        );
+        palettes.insert(
+            "override".to_string(),
+            Palette::new(
+                toki_core::palette::PaletteSize::Pal4,
+                vec![[40, 50, 60, 255]; 4],
+            )
+            .unwrap(),
+        );
+        let settings = toki_core::indexed_presentation::IndexedPresentationSettings {
+            indexed_palette_override: Some("override".to_string()),
+            ..Default::default()
+        };
+        let preview_image = DecodedImage {
+            width: canvas.width,
+            height: canvas.height,
+            data: canvas.pixels().to_vec(),
+        };
+
+        let materialized = toki_core::indexed_presentation::materialize_indexed_image(
+            &preview_image,
+            "sprite_editor_canvas_test",
+            ColorMode::PaletteIndexed,
+            &palettes,
+            &settings,
+            None,
+            Some("authored"),
+            true,
+        )
+        .expect("preview image should materialize");
+
+        assert_eq!(materialized.image.data[..4], [40, 50, 60, 255]);
     }
 
     #[test]

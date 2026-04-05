@@ -996,7 +996,7 @@ fn selected_palette(ui_state: &EditorUI) -> Option<&Palette> {
     ui_state
         .sprite_editor_context()
         .sprite
-        .selected_palette_id
+        .authored_palette_id
         .as_ref()
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
 }

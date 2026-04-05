@@ -70,15 +70,17 @@ pub struct CanvasState {
     pub show_grid: bool,
     /// Current cursor position in canvas coordinates (if hovering)
     pub cursor_canvas_pos: Option<glam::IVec2>,
-    /// Cached texture handle for canvas preview
-    pub canvas_texture: Option<egui::TextureHandle>,
+    /// Cached texture id for canvas preview
+    pub canvas_texture: Option<egui::TextureId>,
+    /// Cache key for the current canvas presentation settings.
+    pub canvas_texture_cache_key: Option<String>,
     /// When true, the canvas texture will be recreated next frame instead of
     /// being dropped immediately (which would crash if the current frame already
     /// submitted draw commands referencing the old texture).
     pub canvas_texture_dirty: bool,
-    /// Cached texture for the floating selection pixels.
+    /// Cached texture id for the floating selection pixels.
     /// Kept in sync with `floating` by `ensure_floating_texture()`.
-    pub floating_texture: Option<egui::TextureHandle>,
+    pub floating_texture: Option<egui::TextureId>,
     /// Asset kind being created/edited
     pub asset_kind: Option<SpriteAssetKind>,
     /// Grid cell size for sheet editing (width, height in pixels)
@@ -129,6 +131,7 @@ impl Default for CanvasState {
             show_grid: true,
             cursor_canvas_pos: None,
             canvas_texture: None,
+            canvas_texture_cache_key: None,
             canvas_texture_dirty: false,
             floating_texture: None,
             asset_kind: None,

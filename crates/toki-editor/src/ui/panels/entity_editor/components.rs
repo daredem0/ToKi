@@ -19,13 +19,14 @@ pub fn render_component_toggles(
     ui_state: &mut EditorUI,
     project_path: Option<&Path>,
     ctx: &egui::Context,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     ui.heading("Components");
     ui.separator();
 
     super::components_core::render_rendering_section(ui, ui_state, project_path);
     super::components_core::render_attributes_section(ui, ui_state);
-    render_collision_section(ui, ui_state, project_path, ctx);
+    render_collision_section(ui, ui_state, project_path, ctx, renderer);
     render_health_section(ui, ui_state);
     render_ai_section(ui, ui_state);
     render_inventory_section(ui, ui_state);
@@ -39,6 +40,7 @@ fn render_collision_section(
     ui_state: &mut EditorUI,
     project_path: Option<&Path>,
     ctx: &egui::Context,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
         .edit_state
@@ -67,6 +69,7 @@ fn render_collision_section(
                         ui_state,
                         project_path,
                         ctx,
+                        renderer,
                     );
                 }
                 let edit = crate::ui::editor_context::entity_editor_state_mut(ui_state)

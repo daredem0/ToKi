@@ -12,10 +12,11 @@ use toki_core::assets::{
     tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver},
 };
 use toki_core::graphics::image::DecodedImage;
+use toki_core::indexed_presentation::IndexedPresentationSettings;
 use toki_core::palette::{builtin_palettes, Palette};
 use toki_core::project_runtime::{default_resolution_height, default_resolution_width};
 use toki_core::{Camera, GameState, ResourceManager};
-use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
+use toki_render::{SceneData, SceneRenderer};
 
 #[path = "viewport_assets.rs"]
 mod viewport_assets;
@@ -85,7 +86,7 @@ pub struct SceneViewport {
     tilemap_path: Option<std::path::PathBuf>,
     // Rendering infrastructure
     scene_renderer: Option<SceneRenderer>,
-    offscreen_target: Option<OffscreenTarget>,
+    presentation_target: Option<crate::rendering::PresentedOffscreenTexture>,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
     is_initialized: bool,
@@ -111,7 +112,7 @@ pub struct SceneViewport {
     decoded_sprite_images: std::collections::HashMap<std::path::PathBuf, DecodedImage>,
     recolored_sprite_images: std::collections::HashMap<String, DecodedImage>,
     available_palettes: BTreeMap<String, Palette>,
-    indexed_palette_override: Option<String>,
+    indexed_presentation_settings: IndexedPresentationSettings,
     tilemap_texture_cache_key: Option<String>,
 }
 
@@ -191,7 +192,7 @@ impl SceneViewport {
             tilemap: None,
             tilemap_path: None,
             scene_renderer: None,
-            offscreen_target: None,
+            presentation_target: None,
             device: None,
             queue: None,
             is_initialized: false,
@@ -213,7 +214,7 @@ impl SceneViewport {
             decoded_sprite_images: std::collections::HashMap::new(),
             recolored_sprite_images: std::collections::HashMap::new(),
             available_palettes: builtin_palettes(),
-            indexed_palette_override: None,
+            indexed_presentation_settings: IndexedPresentationSettings::default(),
             tilemap_texture_cache_key: None,
         })
     }
@@ -238,22 +239,18 @@ impl SceneViewport {
         let scene_renderer = SceneRenderer::new(
             device.clone(),
             queue.clone(),
-            wgpu::TextureFormat::Bgra8UnormSrgb, // Match pipeline format
+            wgpu::TextureFormat::Rgba8UnormSrgb,
             None,                                // No default tilemap texture
             None,                                // No default sprite texture
         )
         .map_err(|e| anyhow::anyhow!("Failed to create scene renderer: {}", e))?;
 
-        // Create offscreen render target
-        let offscreen_target = OffscreenTarget::new(
-            &device,
-            self.viewport_size,
-            wgpu::TextureFormat::Bgra8UnormSrgb, // Match pipeline format
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to create offscreen target: {}", e))?;
+        let presentation_target =
+            crate::rendering::PresentedOffscreenTexture::new(&device, self.viewport_size)
+                .map_err(|e| anyhow::anyhow!("Failed to create viewport target: {}", e))?;
 
         self.scene_renderer = Some(scene_renderer);
-        self.offscreen_target = Some(offscreen_target);
+        self.presentation_target = Some(presentation_target);
         self.device = Some(device);
         self.queue = Some(queue);
         self.is_initialized = true;
@@ -292,13 +289,14 @@ impl SceneViewport {
         }
 
         self.set_viewport_size_immediate(new_size);
-        if let Some(target) = &mut self.offscreen_target {
+        if let Some(target) = &mut self.presentation_target {
             let device = self
                 .device
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("Missing device for viewport resize"))?;
-            toki_render::RenderTarget::resize(target, device, new_size)
-                .map_err(|e| anyhow::anyhow!("Failed to resize offscreen target: {}", e))?;
+            target
+                .resize(device, new_size)
+                .map_err(|e| anyhow::anyhow!("Failed to resize viewport target: {}", e))?;
         }
         self.needs_render = true;
         Ok(())
@@ -354,7 +352,7 @@ impl SceneViewport {
         &mut self,
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
-        renderer: &mut egui_wgpu::Renderer,
+        renderer: &mut crate::rendering::WindowRenderer,
         overlay_data: &ViewportOverlayData,
     ) -> Result<()> {
         if !self.is_initialized {
@@ -377,8 +375,12 @@ impl SceneViewport {
         let projection = self.calculate_editor_projection();
 
         if let (Some(scene_renderer), Some(target)) =
-            (&mut self.scene_renderer, &mut self.offscreen_target)
+            (&mut self.scene_renderer, &mut self.presentation_target)
         {
+            scene_renderer.set_post_process_settings(
+                self.indexed_presentation_settings
+                    .resolve_post_process(&self.available_palettes),
+            );
             tracing::trace!("About to render scene with data: tilemap={}, tilemap_batches={}, sprites={}, debug_shapes={}",
                            scene_data.tilemap.is_some(),
                            scene_data.tilemap_batches.len(),
@@ -386,14 +388,21 @@ impl SceneViewport {
                            scene_data.debug_shapes.len());
 
             // Render scene to texture with camera projection
-            scene_renderer.render_scene_with_projection(target, &scene_data, projection)?;
+            scene_renderer.render_scene_with_projection(
+                target.scene_target_mut(),
+                &scene_data,
+                projection,
+            )?;
 
-            // Register texture with egui for later use
             let device = self
                 .device
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("Missing device for egui registration"))?;
-            let texture_id = target.register_with_egui(device, renderer);
+            let queue = self
+                .queue
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Missing queue for egui registration"))?;
+            let texture_id = target.present_to_egui(device, queue, renderer.egui_renderer_mut())?;
             tracing::trace!("Registered texture with egui, texture_id: {:?}", texture_id);
 
             tracing::trace!("Scene rendered to texture successfully");
@@ -404,7 +413,7 @@ impl SceneViewport {
             tracing::warn!(
                 "Scene renderer or offscreen target not available: renderer={}, target={}",
                 self.scene_renderer.is_some(),
-                self.offscreen_target.is_some()
+                self.presentation_target.is_some()
             );
         }
 
@@ -417,7 +426,7 @@ impl SceneViewport {
         ui: &mut egui::Ui,
         rect: egui::Rect,
         _project_path: Option<&std::path::Path>,
-        _renderer: Option<&mut egui_wgpu::Renderer>,
+        _renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
         if !self.is_initialized {
             self.render_placeholder(ui, rect);
@@ -428,11 +437,8 @@ impl SceneViewport {
         // The texture will be stretched by egui to fit the UI rect
 
         // Display the pre-rendered texture or show fallback message
-        if let Some(_target) = &self.offscreen_target {
-            // Access the texture ID if available (compiled with editor feature)
-            #[cfg(feature = "editor")]
-            {
-                if let Some(texture_id) = _target.egui_texture_id {
+        if let Some(target) = &self.presentation_target {
+            if let Some(texture_id) = target.texture_id() {
                     // Calculate aspect ratio preserving viewport size
                     let display_rect = if self.sizing_mode == ViewportSizingMode::Responsive {
                         rect
@@ -483,13 +489,8 @@ impl SceneViewport {
                     // Show status instead of error - this is normal during initialization
                     self.render_debug_status(ui, rect, "Texture rendering in progress...");
                 }
-            }
-
-            // If editor feature not enabled, show error
-            #[cfg(not(feature = "editor"))]
-            self.render_error(ui, rect, "Editor features not enabled");
         } else {
-            self.render_error(ui, rect, "Offscreen target not initialized");
+            self.render_error(ui, rect, "Viewport target not initialized");
         }
     }
 
@@ -654,11 +655,21 @@ impl SceneViewport {
         self.mark_dirty();
     }
 
-    pub fn set_indexed_palette_override(&mut self, palette_id: Option<String>) {
-        if self.indexed_palette_override != palette_id {
-            self.indexed_palette_override = palette_id;
+    pub fn set_indexed_presentation_settings(&mut self, settings: IndexedPresentationSettings) {
+        if self.indexed_presentation_settings != settings {
+            self.indexed_presentation_settings = settings;
             self.mark_dirty();
         }
+    }
+
+    pub fn set_indexed_palette_override(&mut self, palette_id: Option<String>) {
+        let mut settings = self.indexed_presentation_settings.clone();
+        settings.indexed_palette_override = palette_id;
+        self.set_indexed_presentation_settings(settings);
+    }
+
+    pub fn indexed_presentation_settings(&self) -> &IndexedPresentationSettings {
+        &self.indexed_presentation_settings
     }
 
     pub fn needs_render(&self) -> bool {

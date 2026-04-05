@@ -20,6 +20,7 @@ pub fn render_entity_editor(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
     project: Option<&mut Project>,
+    renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let project_path = project.as_ref().map(|p| p.path.clone());
 
@@ -57,7 +58,7 @@ pub fn render_entity_editor(
     ui.separator();
 
     // Main content: Browser + Editor split
-    render_main_content(ui, ui_state, project_path.as_deref(), ctx);
+    render_main_content(ui, ui_state, project_path.as_deref(), ctx, renderer);
 }
 
 fn render_main_content(
@@ -65,6 +66,7 @@ fn render_main_content(
     ui_state: &mut EditorUI,
     project_path: Option<&std::path::Path>,
     ctx: &egui::Context,
+    mut renderer: Option<&mut crate::rendering::WindowRenderer>,
 ) {
     let available_width = ui.available_width();
     let available_height = ui.available_height();
@@ -97,7 +99,13 @@ fn render_main_content(
             egui::vec2(editor_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
-                details::render_entity_details_with_project(ui, ui_state, project_path, ctx);
+                details::render_entity_details_with_project(
+                    ui,
+                    ui_state,
+                    project_path,
+                    ctx,
+                    renderer.as_deref_mut(),
+                );
             },
         );
     });
