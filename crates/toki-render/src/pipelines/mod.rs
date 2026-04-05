@@ -2,6 +2,7 @@ mod common;
 pub mod debug;
 mod dynamic_buffer;
 pub mod post_process;
+pub mod presentation;
 pub mod sprite;
 pub mod tilemap;
 

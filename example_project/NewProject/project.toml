@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Scene 2" = "scenes/Scene 2.json"
 "Main Scene" = "scenes/Main Scene.json"
+"Scene 2" = "scenes/Scene 2.json"
 main = "scenes/main.json"
 
 [assets]
@@ -273,103 +273,6 @@ recent_files = []
 
 [editor.camera_settings]
 
-[editor.graph_layouts."Main Scene"]
-zoom = 0.6417899131774902
-pan = [
-    48.50739288330078,
-    16.0,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:17" = [
-    60.0,
-    723.0,
-]
-"node:11" = [
-    60.0,
-    471.0,
-]
-"node:4" = [
-    60.0,
-    219.0,
-]
-"node:14" = [
-    60.0,
-    597.0,
-]
-"node:6" = [
-    673.96875,
-    219.0,
-]
-"node:8" = [
-    60.0,
-    345.0,
-]
-"node:1" = [
-    60.0,
-    93.0,
-]
-"node:20" = [
-    60.0,
-    849.0,
-]
-"node:5" = [
-    987.9375,
-    93.0,
-]
-"node:2" = [
-    660.0,
-    93.0,
-]
-"node:15" = [
-    695.96875,
-    597.0,
-]
-"node:22" = [
-    360.0,
-    849.0,
-]
-"node:9" = [
-    684.296875,
-    345.0,
-]
-"node:21" = [
-    660.0,
-    849.0,
-]
-"node:3" = [
-    360.0,
-    93.0,
-]
-"node:13" = [
-    360.0,
-    471.0,
-]
-"node:10" = [
-    360.0,
-    345.0,
-]
-"node:19" = [
-    360.0,
-    723.0,
-]
-"node:18" = [
-    660.0,
-    723.0,
-]
-"node:16" = [
-    360.0,
-    597.0,
-]
-"node:12" = [
-    663.96875,
-    471.0,
-]
-"node:7" = [
-    360.0,
-    219.0,
-]
-
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8239601850509644
 pan = [
@@ -378,12 +281,12 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:3" = [
-    800.0,
-    50.0,
-]
 "node:2" = [
     1170.0,
+    50.0,
+]
+"node:3" = [
+    800.0,
     50.0,
 ]
 "node:1" = [
@@ -393,6 +296,103 @@ pan = [
 "node:4" = [
     430.0,
     50.0,
+]
+
+[editor.graph_layouts."Main Scene"]
+zoom = 0.6417899131774902
+pan = [
+    48.50739288330078,
+    16.0,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:19" = [
+    360.0,
+    723.0,
+]
+"node:8" = [
+    60.0,
+    345.0,
+]
+"node:15" = [
+    695.96875,
+    597.0,
+]
+"node:1" = [
+    60.0,
+    93.0,
+]
+"node:13" = [
+    360.0,
+    471.0,
+]
+"node:9" = [
+    684.296875,
+    345.0,
+]
+"node:7" = [
+    360.0,
+    219.0,
+]
+"node:14" = [
+    60.0,
+    597.0,
+]
+"node:17" = [
+    60.0,
+    723.0,
+]
+"node:16" = [
+    360.0,
+    597.0,
+]
+"node:10" = [
+    360.0,
+    345.0,
+]
+"node:5" = [
+    987.9375,
+    93.0,
+]
+"node:21" = [
+    660.0,
+    849.0,
+]
+"node:20" = [
+    60.0,
+    849.0,
+]
+"node:12" = [
+    663.96875,
+    471.0,
+]
+"node:6" = [
+    673.96875,
+    219.0,
+]
+"node:4" = [
+    60.0,
+    219.0,
+]
+"node:18" = [
+    660.0,
+    723.0,
+]
+"node:2" = [
+    660.0,
+    93.0,
+]
+"node:11" = [
+    60.0,
+    471.0,
+]
+"node:22" = [
+    360.0,
+    849.0,
+]
+"node:3" = [
+    360.0,
+    93.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -750,6 +750,10 @@ pan = [
 ]
 
 [editor.dialog_graph_layouts.dialog_1.node_positions]
+end = [
+    720.0,
+    80.0,
+]
 start = [
     80.0,
     80.0,
@@ -758,23 +762,19 @@ line = [
     400.0,
     80.0,
 ]
-end = [
-    720.0,
-    80.0,
-]
-
-[editor.ui_layout_views.ui_2]
-zoom = 1.0
-pan = [
-    12.0,
-    12.0,
-]
-selected_widget_id = "label_1"
 
 [editor.ui_layout_views.ui_1]
 zoom = 3.0
 pan = [
     16.0,
     16.0,
+]
+selected_widget_id = "label_1"
+
+[editor.ui_layout_views.ui_2]
+zoom = 1.0
+pan = [
+    12.0,
+    12.0,
 ]
 selected_widget_id = "label_1"

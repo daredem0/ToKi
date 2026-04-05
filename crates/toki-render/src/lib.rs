@@ -19,7 +19,8 @@ pub use backend::{
 pub use errors::RenderError;
 pub use gpu::GpuState;
 pub use pipelines::{
-    debug::DebugPipeline, post_process::PostProcessPipeline, sprite::SpritePipeline,
+    debug::DebugPipeline, post_process::PostProcessPipeline,
+    presentation::PresentationBlitPipeline, sprite::SpritePipeline,
     tilemap::TilemapPipeline, RenderPipeline,
 };
 pub use scene::{

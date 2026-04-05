@@ -8,13 +8,14 @@ use toki_core::indexed_presentation::{
     load_materialized_indexed_image, materialize_indexed_image, resolve_indexed_palette,
     texture_preview_cache_key, IndexedPresentationSettings,
 };
-use toki_core::palette::{Palette, PaletteSize};
+use toki_core::palette::Palette;
 use toki_core::project_runtime::{
-    PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings,
+    ResolvedPostProcessSettings,
 };
 use toki_core::sprite::SpriteFrame;
 use toki_render::{
-    OffscreenTarget, PostProcessPipeline, RenderTarget, SceneData, SceneRenderer, SpriteInstance,
+    OffscreenTarget, PresentationBlitPipeline, RenderTarget, SceneData, SceneRenderer,
+    SpriteInstance,
 };
 
 const PREVIEW_SCENE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -29,7 +30,7 @@ pub struct EditorPreviewTexture {
 pub struct PresentedOffscreenTexture {
     scene_target: OffscreenTarget,
     presentation_target: OffscreenTarget,
-    presentation_pipeline: PostProcessPipeline,
+    presentation_pipeline: PresentationBlitPipeline,
     texture_id: Option<egui::TextureId>,
 }
 
@@ -45,7 +46,7 @@ impl PresentedOffscreenTexture {
                 size,
                 PREVIEW_PRESENTATION_FORMAT,
             )?,
-            presentation_pipeline: PostProcessPipeline::new(device, PREVIEW_PRESENTATION_FORMAT),
+            presentation_pipeline: PresentationBlitPipeline::new(device, PREVIEW_PRESENTATION_FORMAT),
             texture_id: None,
         })
     }
@@ -82,8 +83,6 @@ impl PresentedOffscreenTexture {
             }
         };
 
-        self.presentation_pipeline
-            .update_settings(queue, &identity_post_process_settings());
         {
             let source_view = self.scene_target.get_render_view()?;
             self.presentation_pipeline
@@ -297,29 +296,6 @@ impl EditorPreviewRenderer {
             .target
             .present_to_egui(&self.device, &self.queue, egui_renderer)?;
         Ok(EditorPreviewTexture { texture_id, size })
-    }
-}
-
-fn identity_post_process_settings() -> ResolvedPostProcessSettings {
-    ResolvedPostProcessSettings {
-        mode: PostProcessMode::None,
-        quantize_strategy: QuantizeStrategy::Luminance,
-        tint_color: [0, 0, 0, 255],
-        tint_strength_percent: 0,
-        brightness_percent: 0,
-        saturation_percent: 100,
-        quantize_palette: toki_core::palette::Palette::new(
-            PaletteSize::Pal4,
-            vec![
-                [0, 0, 0, 255],
-                [85, 85, 85, 255],
-                [170, 170, 170, 255],
-                [255, 255, 255, 255],
-            ],
-        )
-        .expect("identity post-process palette"),
-        gb_contrast_percent: 0,
-        vignette_strength_percent: 0,
     }
 }
 
