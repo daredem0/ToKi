@@ -1,5 +1,5 @@
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::entity::{Entity, EntityId};
 use glam::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
@@ -66,12 +66,12 @@ pub fn can_entity_move_to_position(
     entity: &Entity,
     new_position: IVec2,
     tilemap: &TileMap,
-    atlas: &AtlasMeta,
+    resolver: &TileSetResolver<'_>,
 ) -> bool {
     let Some(collision_box) = &entity.collision_box else {
         return true;
     };
-    !is_collision_box_blocked(collision_box, new_position, tilemap, atlas)
+    !is_collision_box_blocked(collision_box, new_position, tilemap, resolver)
 }
 
 /// Check if a collision box at a specific position would collide with solid tiles.
@@ -90,19 +90,19 @@ pub fn can_place_collision_box_at_position(
     collision_box: Option<&CollisionBox>,
     position: IVec2,
     tilemap: &TileMap,
-    atlas: &AtlasMeta,
+    resolver: &TileSetResolver<'_>,
 ) -> bool {
     let Some(collision_box) = collision_box else {
         return true;
     };
-    !is_collision_box_blocked(collision_box, position, tilemap, atlas)
+    !is_collision_box_blocked(collision_box, position, tilemap, resolver)
 }
 
 fn is_collision_box_blocked(
     collision_box: &CollisionBox,
     position: IVec2,
     tilemap: &TileMap,
-    atlas: &AtlasMeta,
+    resolver: &TileSetResolver<'_>,
 ) -> bool {
     if collision_box.trigger {
         return false;
@@ -121,7 +121,7 @@ fn is_collision_box_blocked(
 
     for tile_y in min_tile_y..=max_tile_y {
         for tile_x in min_tile_x..=max_tile_x {
-            if tile_blocks_collision(tilemap, atlas, tile_x, tile_y) {
+            if tile_blocks_collision(tilemap, resolver, tile_x, tile_y) {
                 return true;
             }
         }
@@ -130,9 +130,14 @@ fn is_collision_box_blocked(
     false
 }
 
-fn tile_blocks_collision(tilemap: &TileMap, atlas: &AtlasMeta, tile_x: u32, tile_y: u32) -> bool {
+fn tile_blocks_collision(
+    tilemap: &TileMap,
+    resolver: &TileSetResolver<'_>,
+    tile_x: u32,
+    tile_y: u32,
+) -> bool {
     tilemap
-        .is_tile_solid_at(atlas, tile_x, tile_y)
+        .is_tile_solid_at(resolver, tile_x, tile_y)
         .unwrap_or(true)
 }
 

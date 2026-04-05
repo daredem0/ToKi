@@ -153,7 +153,7 @@ impl PanelSystem {
         viewport: &mut SceneViewport,
         response: &egui::Response,
         rect: egui::Rect,
-        project_path: &std::path::Path,
+        _project_path: &std::path::Path,
     ) -> Option<Option<MapEditorTileInfo>> {
         let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
         if !clicked {
@@ -180,10 +180,7 @@ impl PanelSystem {
         else {
             return Some(None);
         };
-        let Some(atlas) = Self::load_map_editor_atlas(project_path, tilemap).ok() else {
-            return Some(None);
-        };
-        let Some(properties) = atlas.get_tile_properties(&tile_name) else {
+        let Some(tileset) = viewport.tileset_resolver() else {
             return Some(None);
         };
 
@@ -191,8 +188,10 @@ impl PanelSystem {
             tile_x: tile_pos.x,
             tile_y: tile_pos.y,
             tile_name,
-            solid: properties.solid,
-            trigger: properties.trigger,
+            solid: tilemap.is_tile_solid_at(&tileset, tile_pos.x, tile_pos.y).unwrap_or(false),
+            trigger: tileset
+                .is_tile_trigger_at(tilemap, tile_pos.x, tile_pos.y)
+                .unwrap_or(false),
         }))
     }
 

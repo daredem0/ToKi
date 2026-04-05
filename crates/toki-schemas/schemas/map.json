@@ -4,7 +4,7 @@
   "title": "ToKi Tilemap",
   "description": "A tilemap definition containing tile layout and metadata for the ToKi game engine",
   "type": "object",
-  "required": ["size", "tile_size", "atlas"],
+  "required": ["size", "tile_size", "tileset"],
   "oneOf": [
     {"required": ["tiles"]},
     {"required": ["layers"]}
@@ -24,9 +24,9 @@
       "maxItems": 2,
       "description": "Size of each tile [width, height] in pixels"
     },
-    "atlas": {
+    "tileset": {
       "type": "string",
-      "description": "Name of the atlas file containing the tiles"
+      "description": "Name of the tileset file containing the paintable map entries"
     },
     "tiles": {
       "type": "array",

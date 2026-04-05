@@ -1,11 +1,13 @@
 use super::*;
 use crate::editor_sprite_preview::{
-    load_texture_preview_image, resolve_indexed_preview_palette, texture_preview_cache_key,
+    resolve_indexed_preview_palette,
 };
 use toki_core::cache_utils::clone_cached_or_load;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
 use toki_core::palette::{recolor_indexed_image, Palette};
-use toki_core::project_assets::normalize_asset_name;
+use toki_core::project_assets::{
+    normalize_asset_name, resolve_tilemap_tileset_path, resolve_tileset_atlas_paths,
+};
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
     sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial,
@@ -28,63 +30,6 @@ fn load_cached_string_keyed<T: Clone>(
 }
 
 impl SceneViewport {
-    fn ensure_tilemap_texture_loaded(
-        &mut self,
-        atlas: &AtlasMeta,
-        atlas_path: &std::path::Path,
-    ) -> Result<()> {
-        let Some(scene_renderer) = &mut self.scene_renderer else {
-            return Ok(());
-        };
-
-        let texture_path = atlas_path
-            .parent()
-            .unwrap_or_else(|| std::path::Path::new("."))
-            .join(&atlas.image);
-        if !texture_path.exists() {
-            tracing::warn!("Tilemap texture not found: {}", texture_path.display());
-            return Ok(());
-        }
-
-        let resolved_palette = resolve_indexed_preview_palette(
-            atlas.color_mode,
-            &self.available_palettes,
-            self.indexed_palette_override.as_deref(),
-            None,
-            atlas.palette.as_deref(),
-        )
-        .map_err(|error| anyhow::anyhow!(error))?
-        .map(|(palette_id, _)| palette_id);
-
-        let cache_key =
-            texture_preview_cache_key(&texture_path, atlas.color_mode, resolved_palette.as_deref());
-        if self.tilemap_texture_cache_key.as_deref() == Some(cache_key.as_str()) {
-            return Ok(());
-        }
-
-        if atlas.is_palette_indexed() {
-            let (image, _) = load_texture_preview_image(
-                &texture_path,
-                atlas.color_mode,
-                &self.available_palettes,
-                self.indexed_palette_override.as_deref(),
-                None,
-                atlas.palette.as_deref(),
-            )
-            .map_err(|error| anyhow::anyhow!(error))?;
-            scene_renderer
-                .load_tilemap_texture_rgba8(&image)
-                .map_err(|e| anyhow::anyhow!("Failed to load recolored tilemap texture: {}", e))?;
-        } else {
-            scene_renderer
-                .load_tilemap_texture(texture_path.clone())
-                .map_err(|e| anyhow::anyhow!("Failed to load tilemap texture: {}", e))?;
-        }
-        self.tilemap_texture_cache_key = Some(cache_key);
-        tracing::info!("Loaded tilemap texture: {}", texture_path.display());
-        Ok(())
-    }
-
     fn decoded_sprite_image(&mut self, texture_path: &std::path::Path) -> Result<DecodedImage> {
         Ok(clone_cached_or_load(
             self.decoded_sprite_images.get(texture_path).cloned(),
@@ -125,48 +70,66 @@ impl SceneViewport {
         Ok(recolored)
     }
 
-    pub(super) fn load_atlas_for_tilemap(
+    pub(super) fn load_tileset_for_tilemap(
         &mut self,
-        atlas_name: &str,
+        tilemap: &toki_core::assets::tilemap::TileMap,
+        tilemap_path: &std::path::Path,
         project_path: &std::path::Path,
-    ) -> Result<AtlasMeta> {
-        let atlas_path = {
-            let tilemaps_path = project_path
-                .join("assets")
-                .join("tilemaps")
-                .join(atlas_name);
-            if tilemaps_path.exists() {
-                tilemaps_path
-            } else {
-                project_path.join("assets").join("sprites").join(atlas_name)
-            }
-        };
+    ) -> Result<TileSetMeta> {
+        let tileset_path = resolve_tilemap_tileset_path(project_path, tilemap_path, tilemap)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to resolve tileset '{}' for tilemap '{}'",
+                    tilemap.tileset.display(),
+                    tilemap_path.display()
+                )
+            })?;
 
-        let atlas = if self.atlas_cache_path.as_deref() == Some(atlas_path.as_path()) {
-            if let Some(atlas) = self.atlas_cache.clone() {
-                atlas
+        let tileset = if self.tileset_cache_path.as_deref() == Some(tileset_path.as_path()) {
+            if let Some(tileset) = self.tileset_cache.clone() {
+                tileset
             } else {
-                let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-                    anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
+                let loaded = TileSetMeta::load_from_file(&tileset_path).map_err(|e| {
+                    anyhow::anyhow!("Failed to load tileset '{}': {}", tileset_path.display(), e)
                 })?;
-                self.atlas_cache = Some(atlas.clone());
-                self.atlas_cache_path = Some(atlas_path.clone());
-                atlas
+                self.tileset_cache = Some(loaded.clone());
+                self.tileset_cache_path = Some(tileset_path.clone());
+                loaded
             }
         } else {
-            let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-                anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
+            let loaded = TileSetMeta::load_from_file(&tileset_path).map_err(|e| {
+                anyhow::anyhow!("Failed to load tileset '{}': {}", tileset_path.display(), e)
             })?;
-            self.atlas_cache = Some(atlas.clone());
-            self.atlas_cache_path = Some(atlas_path.clone());
+            self.tileset_cache = Some(loaded.clone());
+            self.tileset_cache_path = Some(tileset_path.clone());
             self.tilemap_texture_cache_key = None;
-            atlas
+            loaded
         };
 
-        tracing::trace!("Atlas image field contains: {:?}", atlas.image);
-        self.ensure_tilemap_texture_loaded(&atlas, &atlas_path)?;
-        tracing::info!("Loaded and cached atlas: {}", atlas_path.display());
-        Ok(atlas)
+        let atlas_paths = resolve_tileset_atlas_paths(project_path, &tileset_path, &tileset);
+        let mut atlas_cache = std::collections::HashMap::new();
+        for atlas_path in atlas_paths {
+            let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
+                anyhow::anyhow!("Failed to load linked atlas '{}': {}", atlas_path.display(), e)
+            })?;
+            let atlas_name = atlas_path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(normalize_asset_name)
+                .unwrap_or_default()
+                .to_string();
+            atlas_cache.insert(
+                atlas_name.clone(),
+                toki_core::assets::tileset::TileSetAtlasSource {
+                    name: atlas_name,
+                    path: atlas_path,
+                    meta: atlas,
+                },
+            );
+        }
+        self.tileset_atlas_cache = atlas_cache;
+        tracing::info!("Loaded tileset '{}' with {} linked atlases", tileset_path.display(), self.tileset_atlas_cache.len());
+        Ok(tileset)
     }
 
     pub(super) fn load_sprite_atlas_from_asset(

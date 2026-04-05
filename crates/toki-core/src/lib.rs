@@ -48,6 +48,7 @@ pub mod assets {
     pub mod object_sheet;
     pub mod tile_animation;
     pub mod tilemap;
+    pub mod tileset;
 
     #[cfg(test)]
     #[path = "animated_tile_tests.rs"]

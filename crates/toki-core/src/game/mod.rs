@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::ai::AiSystem;
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::entity::{EntityDefinition, EntityId, EntityManager};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::flags::{FlagValue, GameFlags};
@@ -244,7 +244,7 @@ pub struct UpdateContext<'a> {
     pub time_scale: f32,
     pub world_bounds: glam::UVec2,
     pub tilemap: &'a TileMap,
-    pub atlas: &'a AtlasMeta,
+    pub tileset: &'a TileSetResolver<'a>,
 }
 
 pub struct GameSimulation;
@@ -356,7 +356,7 @@ impl GameState {
             self.world.player_id(),
             world.bounds,
             world.tilemap,
-            world.atlas,
+            world.tileset,
         );
         for ai_result in &ai_updates {
             let Some(direction) = ai_result.movement_intent else {
@@ -377,7 +377,7 @@ impl GameState {
                 movement::MovementStepContext {
                     world_bounds: world.bounds,
                     tilemap: world.tilemap,
-                    atlas: world.atlas,
+                    tileset: world.tileset,
                     result,
                     time_scale: 1.0,
                 },

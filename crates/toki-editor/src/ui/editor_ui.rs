@@ -64,13 +64,16 @@ pub(crate) use editor_ui_map_editor::{
     cancel_map_editor_edit, clear_map_editor_dirty, clear_map_editor_history,
     finalize_saved_existing_map, finalize_saved_map_editor_draft, finish_map_editor_edit,
     has_unsaved_map_editor_changes, has_unsaved_map_editor_draft, load_map_editor_brush_source,
+    load_map_editor_brush_source_for_tilemap,
+    load_map_editor_tileset_meta,
+    map_editor_brush_entry_atlas_name,
     map_editor_selected_label, mark_map_editor_dirty, move_layer, pick_map_editor_tile,
-    remove_layer_from_map, rename_layer, resolve_map_editor_atlas_path,
+    remove_layer_from_map, rename_layer, resolve_map_editor_tileset_path,
     selected_map_editor_brush_entry, set_active_layer, set_map_editor_draft,
     submit_new_map_request, sync_map_editor_brush_selection, sync_map_editor_selection,
     take_pending_map_editor_tilemap_sync, toggle_layer_above_entities, toggle_layer_visibility,
-    MapEditorBrushEntry, MapEditorBrushKind, MapEditorDraft, MapEditorHistory, MapEditorTileInfo,
-    MapEditorTool, NewMapRequest,
+    LoadedMapEditorBrushSource, MapEditorBrushEntry, MapEditorBrushKind, MapEditorDraft,
+    MapEditorHistory, MapEditorTileInfo, MapEditorTool, NewMapRequest,
 };
 pub(crate) use editor_ui_menu_editor::{
     select_menu_dialog, select_menu_entry, select_menu_screen, selected_menu_dialog_id,
@@ -612,6 +615,7 @@ pub struct MapEditorState {
     pub active_layer: usize,
     pub modified_atlas: Option<toki_core::assets::atlas::AtlasMeta>,
     pub atlas_path: Option<PathBuf>,
+    pub modified_tileset: Option<toki_core::assets::tileset::TileSetMeta>,
     pub brush_stamp_solid: Option<bool>,
 }
 
@@ -644,6 +648,7 @@ impl Default for MapEditorState {
             active_layer: 0,
             modified_atlas: None,
             atlas_path: None,
+            modified_tileset: None,
             brush_stamp_solid: None,
         }
     }

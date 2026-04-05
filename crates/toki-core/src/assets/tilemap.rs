@@ -1,6 +1,8 @@
-use crate::assets::atlas::AtlasMeta;
-use crate::assets::autotile;
-use crate::assets::tile_animation::TileAnimationClock;
+use crate::assets::{
+    atlas::AtlasMeta,
+    tile_animation::TileAnimationClock,
+    tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver, TilemapRenderBatch},
+};
 use crate::graphics::vertex::QuadVertex;
 use crate::io::text::{
     read_text_file_with_limit, too_large_io_error, DEFAULT_TEXT_FILE_SIZE_LIMIT,
@@ -9,12 +11,10 @@ use crate::CoreError;
 use glam::UVec2;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-pub const CHUNK_SIZE: u32 = 16; //16x16 tiles per chunk
+pub const CHUNK_SIZE: u32 = 16;
 
-/// Tilemap vertices split by render order relative to entities.
 #[derive(Debug, Default)]
 pub struct SplitTilemapVertices {
     pub below: Vec<QuadVertex>,
@@ -31,8 +31,6 @@ pub struct TileLayer {
     pub collision_enabled: bool,
     #[serde(default)]
     pub above_entities: bool,
-    /// Per-tile collision overrides. Key = tile index (y * width + x), value = solid.
-    /// When present, overrides the atlas-level `solid` property for that position.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub collision_overrides: HashMap<u32, bool>,
 }
@@ -65,12 +63,14 @@ impl TileLayer {
     }
 }
 
-/// Wire format that accepts both old (flat `tiles`) and new (`layers`) JSON.
 #[derive(Deserialize)]
 struct TileMapWire {
     size: UVec2,
     tile_size: UVec2,
-    atlas: PathBuf,
+    #[serde(default)]
+    tileset: Option<PathBuf>,
+    #[serde(default)]
+    atlas: Option<PathBuf>,
     #[serde(default)]
     tiles: Option<Vec<String>>,
     #[serde(default)]
@@ -81,7 +81,7 @@ struct TileMapWire {
 pub struct TileMap {
     pub size: UVec2,
     pub tile_size: UVec2,
-    pub atlas: PathBuf,
+    pub tileset: PathBuf,
     pub layers: Vec<TileLayer>,
 }
 
@@ -91,7 +91,7 @@ impl Serialize for TileMap {
         let mut state = serializer.serialize_struct("TileMap", 4)?;
         state.serialize_field("size", &self.size)?;
         state.serialize_field("tile_size", &self.tile_size)?;
-        state.serialize_field("atlas", &self.atlas)?;
+        state.serialize_field("tileset", &self.tileset)?;
         state.serialize_field("layers", &self.layers)?;
         state.end()
     }
@@ -109,81 +109,16 @@ impl<'de> Deserialize<'de> for TileMap {
                 ));
             }
         };
+        let tileset = wire.tileset.or(wire.atlas).ok_or_else(|| {
+            serde::de::Error::custom("tilemap must contain 'tileset'")
+        })?;
         Ok(TileMap {
             size: wire.size,
             tile_size: wire.tile_size,
-            atlas: wire.atlas,
+            tileset,
             layers,
         })
     }
-}
-
-fn is_same_group(tiles: &[String], size: UVec2, x: i32, y: i32, group_name: &str) -> bool {
-    if x < 0 || y < 0 || x >= size.x as i32 || y >= size.y as i32 {
-        return false;
-    }
-    let index = (y as u32 * size.x + x as u32) as usize;
-    tiles.get(index).is_some_and(|t| t == group_name)
-}
-
-fn resolve_auto_tile<'a>(
-    tile_name: &'a str,
-    x: u32,
-    y: u32,
-    tiles: &[String],
-    size: UVec2,
-    atlas: &'a AtlasMeta,
-) -> &'a str {
-    let Some(group) = atlas.get_auto_tile_group(tile_name) else {
-        return tile_name;
-    };
-    let ix = x as i32;
-    let iy = y as i32;
-    let n = is_same_group(tiles, size, ix, iy - 1, tile_name);
-    let e = is_same_group(tiles, size, ix + 1, iy, tile_name);
-    let s = is_same_group(tiles, size, ix, iy + 1, tile_name);
-    let w = is_same_group(tiles, size, ix - 1, iy, tile_name);
-    let mask = match group.mode {
-        autotile::AutoTileMode::FourBit => autotile::compute_4bit_mask(n, e, s, w),
-        autotile::AutoTileMode::EightBit => {
-            let ne = is_same_group(tiles, size, ix + 1, iy - 1, tile_name);
-            let se = is_same_group(tiles, size, ix + 1, iy + 1, tile_name);
-            let sw = is_same_group(tiles, size, ix - 1, iy + 1, tile_name);
-            let nw = is_same_group(tiles, size, ix - 1, iy - 1, tile_name);
-            autotile::compute_8bit_mask(&autotile::FullNeighbors {
-                n,
-                ne,
-                e,
-                se,
-                s,
-                sw,
-                w,
-                nw,
-            })
-        }
-    };
-    group
-        .resolve_variant(mask)
-        .or(group.preview_tile.as_deref())
-        .unwrap_or(tile_name)
-}
-
-fn resolve_tile_name<'a>(
-    tile_name: &'a str,
-    x: u32,
-    y: u32,
-    tiles: &[String],
-    size: UVec2,
-    atlas: &'a AtlasMeta,
-    tile_anim: Option<&TileAnimationClock>,
-) -> &'a str {
-    let resolved = resolve_auto_tile(tile_name, x, y, tiles, size, atlas);
-    if let Some(clock) = tile_anim {
-        if let Some(frame_tile) = clock.current_frame_tile(resolved, atlas) {
-            return frame_tile;
-        }
-    }
-    resolved
 }
 
 impl TileMap {
@@ -218,8 +153,6 @@ impl TileMap {
         Ok(())
     }
 
-    /// Returns the tile name at (x, y) on the first layer. Convenience for
-    /// backward-compatible call sites (collision, transitions).
     pub fn get_tile_name(&self, x: u32, y: u32) -> Result<&str, CoreError> {
         self.get_tile_name_on_layer(0, x, y)
     }
@@ -244,7 +177,6 @@ impl TileMap {
             })
     }
 
-    /// Returns the tile name at (x, y) within the given tile slice.
     pub fn tile_name_in<'a>(
         &self,
         tiles: &'a [String],
@@ -272,75 +204,45 @@ impl TileMap {
     fn layer_tiles(&self, layer: usize) -> Result<&[String], CoreError> {
         self.layers
             .get(layer)
-            .map(|l| l.tiles.as_slice())
+            .map(|layer| layer.tiles.as_slice())
             .ok_or(CoreError::InvalidMapSize {
                 expected: self.layers.len(),
                 actual: layer,
             })
     }
 
-    /// Convenience: returns first layer tiles for call sites that need direct access.
     pub fn tiles(&self) -> &[String] {
         self.layers
             .first()
-            .map(|l| l.tiles.as_slice())
+            .map(|layer| layer.tiles.as_slice())
             .unwrap_or(&[])
     }
 
-    /// Mutable access to first layer tiles.
     pub fn tiles_mut(&mut self) -> &mut Vec<String> {
         &mut self.layers[0].tiles
     }
 
-    /// Mutable access to tiles on a specific layer.
     pub fn layer_tiles_mut(&mut self, layer: usize) -> Option<&mut Vec<String>> {
-        self.layers.get_mut(layer).map(|l| &mut l.tiles)
+        self.layers.get_mut(layer).map(|layer| &mut layer.tiles)
     }
 
     pub fn is_tile_solid_at(
         &self,
-        atlas: &AtlasMeta,
+        resolver: &TileSetResolver<'_>,
         tile_x: u32,
         tile_y: u32,
     ) -> Result<bool, CoreError> {
-        if tile_x >= self.size.x || tile_y >= self.size.y {
-            return Err(CoreError::TileOutOfBounds {
-                x: tile_x,
-                y: tile_y,
-                map_width: self.size.x,
-                map_height: self.size.y,
-            });
-        }
-        let index = (tile_y * self.size.x + tile_x) as usize;
-        let index_u32 = index as u32;
-        for layer in &self.layers {
-            if !layer.collision_enabled {
-                continue;
-            }
-            if let Some(&override_solid) = layer.collision_overrides.get(&index_u32) {
-                if override_solid {
-                    return Ok(true);
-                }
-                continue;
-            }
-            let Some(tile_name) = layer.tiles.get(index) else {
-                continue;
-            };
-            if atlas.is_tile_solid(tile_name) {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        resolver.is_tile_solid_at(self, tile_x, tile_y)
     }
 
     pub fn is_world_position_solid(
         &self,
-        atlas: &AtlasMeta,
+        resolver: &TileSetResolver<'_>,
         world_pos: glam::UVec2,
     ) -> Result<bool, CoreError> {
         let tile_x = world_pos.x / self.tile_size.x;
         let tile_y = world_pos.y / self.tile_size.y;
-        self.is_tile_solid_at(atlas, tile_x, tile_y)
+        resolver.is_tile_solid_at(self, tile_x, tile_y)
     }
 
     pub fn tile_to_world(&self, tile_pos: UVec2) -> Option<UVec2> {
@@ -348,121 +250,6 @@ impl TileMap {
             return None;
         }
         Some(tile_pos * self.tile_size)
-    }
-
-    pub fn generate_vertices(
-        &self,
-        atlas: &AtlasMeta,
-        texture_size: UVec2,
-        tile_anim: Option<&TileAnimationClock>,
-    ) -> Vec<QuadVertex> {
-        let mut vertices = Vec::new();
-        for layer in &self.layers {
-            if !layer.visible {
-                continue;
-            }
-            self.append_layer_vertices(&layer.tiles, atlas, texture_size, tile_anim, &mut vertices);
-        }
-        vertices
-    }
-
-    pub fn generate_split_vertices(
-        &self,
-        atlas: &AtlasMeta,
-        texture_size: UVec2,
-        tile_anim: Option<&TileAnimationClock>,
-    ) -> SplitTilemapVertices {
-        let mut result = SplitTilemapVertices::default();
-        for layer in &self.layers {
-            if !layer.visible {
-                continue;
-            }
-            let target = if layer.above_entities {
-                &mut result.above
-            } else {
-                &mut result.below
-            };
-            self.append_layer_vertices(&layer.tiles, atlas, texture_size, tile_anim, target);
-        }
-        result
-    }
-
-    fn append_layer_vertices(
-        &self,
-        tiles: &[String],
-        atlas: &AtlasMeta,
-        texture_size: UVec2,
-        tile_anim: Option<&TileAnimationClock>,
-        vertices: &mut Vec<QuadVertex>,
-    ) {
-        for y in 0..self.size.y {
-            for x in 0..self.size.x {
-                let tile_name = match self.tile_name_in(tiles, x, y) {
-                    Ok(name) => name,
-                    Err(_) => continue,
-                };
-                let resolved =
-                    resolve_tile_name(tile_name, x, y, tiles, self.size, atlas, tile_anim);
-                self.push_tile_quad(resolved, x, y, atlas, texture_size, vertices);
-            }
-        }
-    }
-
-    fn push_tile_quad(
-        &self,
-        tile_name: &str,
-        tile_x: u32,
-        tile_y: u32,
-        atlas: &AtlasMeta,
-        texture_size: UVec2,
-        vertices: &mut Vec<QuadVertex>,
-    ) {
-        let Some(rect) = atlas.get_tile_rect(tile_name) else {
-            return;
-        };
-        let Some(pos) = self.tile_to_world(UVec2::new(tile_x, tile_y)) else {
-            return;
-        };
-
-        let tile_w = rect[2] as f32;
-        let tile_h = rect[3] as f32;
-        let u0 = rect[0] as f32 / texture_size.x as f32;
-        let v0 = rect[1] as f32 / texture_size.y as f32;
-        let u1 = (rect[0] + rect[2]) as f32 / texture_size.x as f32;
-        let v1 = (rect[1] + rect[3]) as f32 / texture_size.y as f32;
-        let x = pos.x as f32;
-        let y = pos.y as f32;
-
-        vertices.push(QuadVertex {
-            position: [x, y],
-            tex_coords: [u0, v0],
-            tint_alpha: 0.0,
-        });
-        vertices.push(QuadVertex {
-            position: [x + tile_w, y],
-            tex_coords: [u1, v0],
-            tint_alpha: 0.0,
-        });
-        vertices.push(QuadVertex {
-            position: [x, y + tile_h],
-            tex_coords: [u0, v1],
-            tint_alpha: 0.0,
-        });
-        vertices.push(QuadVertex {
-            position: [x + tile_w, y],
-            tex_coords: [u1, v0],
-            tint_alpha: 0.0,
-        });
-        vertices.push(QuadVertex {
-            position: [x + tile_w, y + tile_h],
-            tex_coords: [u1, v1],
-            tint_alpha: 0.0,
-        });
-        vertices.push(QuadVertex {
-            position: [x, y + tile_h],
-            tex_coords: [u0, v1],
-            tint_alpha: 0.0,
-        });
     }
 
     pub fn chunk_count(&self) -> UVec2 {
@@ -507,86 +294,104 @@ impl TileMap {
         visible
     }
 
-    pub fn generate_vertices_for_chunks(
+    pub fn generate_render_batches(
         &self,
-        atlas: &AtlasMeta,
-        texture_size: UVec2,
+        resolver: &TileSetResolver<'_>,
+        tile_anim: Option<&TileAnimationClock>,
+        indexed_palette_override: Option<&str>,
+    ) -> Result<Vec<TilemapRenderBatch>, CoreError> {
+        resolver.generate_render_batches(self, None, tile_anim, indexed_palette_override)
+    }
+
+    pub fn generate_render_batches_for_chunks(
+        &self,
+        resolver: &TileSetResolver<'_>,
         visible_chunks: &[(u32, u32)],
         tile_anim: Option<&TileAnimationClock>,
+        indexed_palette_override: Option<&str>,
+    ) -> Result<Vec<TilemapRenderBatch>, CoreError> {
+        resolver.generate_render_batches(
+            self,
+            Some(visible_chunks),
+            tile_anim,
+            indexed_palette_override,
+        )
+    }
+
+    fn legacy_resolver_storage(
+        atlas: &AtlasMeta,
+    ) -> (
+        TileSetMeta,
+        std::collections::HashMap<String, TileSetAtlasSource>,
+    ) {
+        let atlas_name = "legacy_atlas.json".to_string();
+        let tileset = TileSetMeta::from_legacy_atlas(&atlas_name, atlas);
+        let atlases = std::collections::HashMap::from([(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: "legacy_atlas".to_string(),
+                path: PathBuf::from(&atlas_name),
+                meta: atlas.clone(),
+            },
+        )]);
+        (tileset, atlases)
+    }
+
+    pub fn generate_vertices(
+        &self,
+        atlas: &AtlasMeta,
+        _texture_size: UVec2,
+        tile_anim: Option<&TileAnimationClock>,
     ) -> Vec<QuadVertex> {
-        let mut vertices = Vec::new();
-        for layer in &self.layers {
-            if !layer.visible {
-                continue;
+        let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
+        let resolver = TileSetResolver::new(&tileset, &atlases);
+        self.generate_render_batches(&resolver, tile_anim, None)
+            .map(|batches| batches.into_iter().flat_map(|batch| batch.vertices).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn generate_split_vertices(
+        &self,
+        atlas: &AtlasMeta,
+        _texture_size: UVec2,
+        tile_anim: Option<&TileAnimationClock>,
+    ) -> SplitTilemapVertices {
+        let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
+        let resolver = TileSetResolver::new(&tileset, &atlases);
+        let mut split = SplitTilemapVertices::default();
+        if let Ok(batches) = self.generate_render_batches(&resolver, tile_anim, None) {
+            for batch in batches {
+                if batch.key.above_entities {
+                    split.above.extend(batch.vertices);
+                } else {
+                    split.below.extend(batch.vertices);
+                }
             }
-            self.append_chunk_vertices(
-                &layer.tiles,
-                atlas,
-                texture_size,
-                visible_chunks,
-                tile_anim,
-                &mut vertices,
-            );
         }
-        vertices
+        split
     }
 
     pub fn generate_split_vertices_for_chunks(
         &self,
         atlas: &AtlasMeta,
-        texture_size: UVec2,
+        _texture_size: UVec2,
         visible_chunks: &[(u32, u32)],
         tile_anim: Option<&TileAnimationClock>,
     ) -> SplitTilemapVertices {
-        let mut result = SplitTilemapVertices::default();
-        for layer in &self.layers {
-            if !layer.visible {
-                continue;
-            }
-            let target = if layer.above_entities {
-                &mut result.above
-            } else {
-                &mut result.below
-            };
-            self.append_chunk_vertices(
-                &layer.tiles,
-                atlas,
-                texture_size,
-                visible_chunks,
-                tile_anim,
-                target,
-            );
-        }
-        result
-    }
-
-    fn append_chunk_vertices(
-        &self,
-        tiles: &[String],
-        atlas: &AtlasMeta,
-        texture_size: UVec2,
-        visible_chunks: &[(u32, u32)],
-        tile_anim: Option<&TileAnimationClock>,
-        vertices: &mut Vec<QuadVertex>,
-    ) {
-        for &(chunk_x, chunk_y) in visible_chunks {
-            let start_x = chunk_x * CHUNK_SIZE;
-            let start_y = chunk_y * CHUNK_SIZE;
-            let end_x = ((chunk_x + 1) * CHUNK_SIZE).min(self.size.x);
-            let end_y = ((chunk_y + 1) * CHUNK_SIZE).min(self.size.y);
-
-            for tile_y in start_y..end_y {
-                for tile_x in start_x..end_x {
-                    let tile_name = match self.tile_name_in(tiles, tile_x, tile_y) {
-                        Ok(name) => name,
-                        Err(_) => continue,
-                    };
-                    let resolved = resolve_tile_name(
-                        tile_name, tile_x, tile_y, tiles, self.size, atlas, tile_anim,
-                    );
-                    self.push_tile_quad(resolved, tile_x, tile_y, atlas, texture_size, vertices);
+        let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
+        let resolver = TileSetResolver::new(&tileset, &atlases);
+        let mut split = SplitTilemapVertices::default();
+        if let Ok(batches) =
+            self.generate_render_batches_for_chunks(&resolver, visible_chunks, tile_anim, None)
+        {
+            for batch in batches {
+                if batch.key.above_entities {
+                    split.above.extend(batch.vertices);
+                } else {
+                    split.below.extend(batch.vertices);
                 }
             }
         }
+        split
     }
 }

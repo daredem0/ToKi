@@ -24,6 +24,7 @@ pub use pipelines::{
 };
 pub use scene::{
     DebugShape, DebugShapeType, OverlayShape, OverlayShapeType, SceneData, SceneRenderer,
+    SceneTilemapBatch,
     SpriteInstance,
 };
 pub use targets::{OffscreenTarget, RenderTarget, SurfaceProvider};

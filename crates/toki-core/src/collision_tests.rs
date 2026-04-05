@@ -1,6 +1,7 @@
 use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::{TileLayer, TileMap};
+use crate::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
 use crate::entity::{Entity, EntityKind, EntityRendering};
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
@@ -45,7 +46,7 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
     let tilemap = TileMap {
         size: UVec2::new(3, 3),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -63,6 +64,21 @@ fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
     };
 
     (tilemap, atlas)
+}
+
+fn legacy_resolver(atlas: &AtlasMeta) -> (TileSetMeta, HashMap<String, TileSetAtlasSource>) {
+    let atlas_name = "test_atlas.json".to_string();
+    (
+        TileSetMeta::from_legacy_atlas(&atlas_name, atlas),
+        HashMap::from([(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: "test_atlas".to_string(),
+                path: PathBuf::from(&atlas_name),
+                meta: atlas.clone(),
+            },
+        )]),
+    )
 }
 
 fn solid_entity() -> Entity {
@@ -88,6 +104,8 @@ fn solid_entity() -> Entity {
 #[test]
 fn can_place_collision_box_right_or_bottom_edge_touch_is_not_collision() {
     let (tilemap, atlas) = collision_assets_with_center_solid_tile();
+    let (tileset, atlases) = legacy_resolver(&atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
     let collision_box = CollisionBox::solid_box(UVec2::new(16, 16));
 
     // Right edge touching solid tile's left edge at x=16
@@ -95,7 +113,7 @@ fn can_place_collision_box_right_or_bottom_edge_touch_is_not_collision() {
         Some(&collision_box),
         IVec2::new(0, 16),
         &tilemap,
-        &atlas,
+        &resolver,
     ));
 
     // Bottom edge touching solid tile's top edge at y=16
@@ -103,13 +121,15 @@ fn can_place_collision_box_right_or_bottom_edge_touch_is_not_collision() {
         Some(&collision_box),
         IVec2::new(16, 0),
         &tilemap,
-        &atlas,
+        &resolver,
     ));
 }
 
 #[test]
 fn can_place_collision_box_detects_one_pixel_overlap_on_right_or_bottom() {
     let (tilemap, atlas) = collision_assets_with_center_solid_tile();
+    let (tileset, atlases) = legacy_resolver(&atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
     let collision_box = CollisionBox::solid_box(UVec2::new(16, 16));
 
     // One pixel into solid tile from the left
@@ -117,7 +137,7 @@ fn can_place_collision_box_detects_one_pixel_overlap_on_right_or_bottom() {
         Some(&collision_box),
         IVec2::new(1, 16),
         &tilemap,
-        &atlas,
+        &resolver,
     ));
 
     // One pixel into solid tile from above
@@ -125,25 +145,27 @@ fn can_place_collision_box_detects_one_pixel_overlap_on_right_or_bottom() {
         Some(&collision_box),
         IVec2::new(16, 1),
         &tilemap,
-        &atlas,
+        &resolver,
     ));
 }
 
 #[test]
 fn can_entity_move_to_position_right_or_bottom_edge_touch_is_not_collision() {
     let (tilemap, atlas) = collision_assets_with_center_solid_tile();
+    let (tileset, atlases) = legacy_resolver(&atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
     let entity = solid_entity();
 
     assert!(can_entity_move_to_position(
         &entity,
         IVec2::new(0, 16),
         &tilemap,
-        &atlas,
+        &resolver,
     ));
     assert!(can_entity_move_to_position(
         &entity,
         IVec2::new(16, 0),
         &tilemap,
-        &atlas,
+        &resolver,
     ));
 }

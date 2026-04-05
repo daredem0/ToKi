@@ -160,13 +160,14 @@ impl<'a> WorldFramePresenter<'a> {
     fn render_debug_collision_overlay(&mut self) {
         let queries = self.render_queries();
         let entity_boxes = queries.entity_collision_boxes();
+        let tileset = self.resources.tileset_resolver();
         let solid_tiles = queries.solid_tile_positions(
             self.resources.get_tilemap(),
-            self.resources.get_terrain_atlas(),
+            &tileset,
         );
         let trigger_tiles = queries.trigger_tile_positions(
             self.resources.get_tilemap(),
-            self.resources.get_terrain_atlas(),
+            &tileset,
         );
 
         let entity_color = [1.0, 0.0, 0.0, 0.8];

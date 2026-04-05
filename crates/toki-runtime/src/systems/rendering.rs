@@ -12,8 +12,8 @@ use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMateria
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
 use toki_render::{
-    GpuState, Rect, RenderFrameControl, SceneClipRect, ShapeBackend, SpriteBackend, TextBackend,
-    TextureBackend,
+    GpuState, Rect, RenderFrameControl, SceneClipRect, SceneTilemapBatch, ShapeBackend,
+    SpriteBackend, TextBackend, TextureBackend,
 };
 use winit::window::Window;
 
@@ -389,6 +389,12 @@ impl RenderingSystem {
     pub fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         if let Some(backend) = &mut self.backend {
             backend.as_mut().update_overlay_tilemap_vertices(vertices);
+        }
+    }
+
+    pub fn set_tilemap_batches(&mut self, batches: &[SceneTilemapBatch]) {
+        if let Some(backend) = &mut self.backend {
+            backend.as_mut().set_tilemap_batches(batches);
         }
     }
 

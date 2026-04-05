@@ -27,7 +27,7 @@ impl PanelSystem {
             .and_then(|_| {
                 crate::ui::editor_ui::load_map_editor_brush_source(ui_state, config.as_deref())
             })
-            .map(|(brush_entries, _, _)| brush_entries)
+            .map(|source| source.brush_entries)
             .unwrap_or_default();
         crate::ui::editor_ui::sync_map_editor_brush_selection(ui_state, &available_brush_entries);
 

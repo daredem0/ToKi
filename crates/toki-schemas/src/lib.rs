@@ -4,15 +4,17 @@ pub const SCENE_SCHEMA: &str = include_str!("../schemas/scene.json");
 pub const ENTITY_SCHEMA: &str = include_str!("../schemas/entity.json");
 pub const ATLAS_SCHEMA: &str = include_str!("../schemas/atlas.json");
 pub const MAP_SCHEMA: &str = include_str!("../schemas/map.json");
+pub const TILESET_SCHEMA: &str = include_str!("../schemas/tileset.json");
 pub const OBJECT_SHEET_SCHEMA: &str = include_str!("../schemas/object_sheet.json");
 pub const PALETTE_SCHEMA: &str = include_str!("../schemas/palette.json");
 pub const UI_LAYOUT_SCHEMA: &str = include_str!("../schemas/ui_layout.json");
 
-pub const SCHEMA_FILES: [(&str, &str); 7] = [
+pub const SCHEMA_FILES: [(&str, &str); 8] = [
     ("scene", SCENE_SCHEMA),
     ("entity", ENTITY_SCHEMA),
     ("atlas", ATLAS_SCHEMA),
     ("map", MAP_SCHEMA),
+    ("tileset", TILESET_SCHEMA),
     ("object_sheet", OBJECT_SHEET_SCHEMA),
     ("palette", PALETTE_SCHEMA),
     ("ui_layout", UI_LAYOUT_SCHEMA),

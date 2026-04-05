@@ -1,7 +1,7 @@
 //! AI context for bundling commonly-used references.
 
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::collision::can_entity_move_to_position;
 use crate::entity::{Entity, EntityId, EntityManager};
 use glam::{IVec2, UVec2};
@@ -9,13 +9,13 @@ use glam::{IVec2, UVec2};
 /// Context for AI movement operations, grouping related parameters.
 ///
 /// This reduces parameter counts for AI methods by bundling commonly-used
-/// references together: entity manager, world bounds, tilemap, and atlas.
+/// references together: entity manager, world bounds, tilemap, and tileset resolver.
 #[derive(Clone, Copy)]
 pub struct AiContext<'a> {
     pub entity_manager: &'a EntityManager,
     pub world_bounds: UVec2,
     pub tilemap: &'a TileMap,
-    pub atlas: &'a AtlasMeta,
+    pub tileset: &'a TileSetResolver<'a>,
 }
 
 impl<'a> AiContext<'a> {
@@ -24,13 +24,13 @@ impl<'a> AiContext<'a> {
         entity_manager: &'a EntityManager,
         world_bounds: UVec2,
         tilemap: &'a TileMap,
-        atlas: &'a AtlasMeta,
+        tileset: &'a TileSetResolver<'a>,
     ) -> Self {
         Self {
             entity_manager,
             world_bounds,
             tilemap,
-            atlas,
+            tileset,
         }
     }
 
@@ -49,7 +49,7 @@ impl<'a> AiContext<'a> {
         entity_id: EntityId,
         new_position: IVec2,
     ) -> bool {
-        can_entity_move_to_position(entity, new_position, self.tilemap, self.atlas)
+        can_entity_move_to_position(entity, new_position, self.tilemap, self.tileset)
             && !self
                 .entity_manager
                 .would_collide_with_solid_entity(entity_id, new_position)

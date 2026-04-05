@@ -2,8 +2,8 @@ use super::rules::CollisionEvent;
 use super::{
     AudioChannel, AudioEvent, GameState, InputKey, RuntimeState, WorldContext, WorldState,
 };
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::collision;
 use crate::entity::{EntityId, MovementSoundTrigger};
 use crate::events::GameUpdateResult;
@@ -27,7 +27,7 @@ struct MovementCollisionResult {
 pub(super) struct MovementStepContext<'a> {
     pub world_bounds: glam::UVec2,
     pub tilemap: &'a TileMap,
-    pub atlas: &'a AtlasMeta,
+    pub tileset: &'a TileSetResolver<'a>,
     pub result: &'a mut GameUpdateResult<AudioEvent>,
     pub time_scale: f32,
 }
@@ -41,12 +41,12 @@ impl MovementSystem {
         if time_scale == 1.0 {
             state
                 .movement_service()
-                .process_input(world.bounds, world.tilemap, world.atlas)
+                .process_input(world.bounds, world.tilemap, world.tileset)
         } else {
             state.movement_service().process_input_scaled(
                 world.bounds,
                 world.tilemap,
-                world.atlas,
+                world.tileset,
                 time_scale,
             )
         }
@@ -60,7 +60,7 @@ impl MovementSystem {
         state.movement_service().apply_rule_velocities(
             world.bounds,
             world.tilemap,
-            world.atlas,
+            world.tileset,
             result,
         )
     }
@@ -233,7 +233,7 @@ impl<'a> MovementService<'a> {
 
         // Check for collisions and identify the colliding entity if any
         let collision_result =
-            self.check_movement_collision(entity_id, new_position, ctx.tilemap, ctx.atlas);
+            self.check_movement_collision(entity_id, new_position, ctx.tilemap, ctx.tileset);
 
         if collision_result.blocked {
             self.handle_entity_collision_blocked(
@@ -261,7 +261,7 @@ impl<'a> MovementService<'a> {
         entity_id: EntityId,
         new_position: glam::IVec2,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> MovementCollisionResult {
         let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
             return MovementCollisionResult {
@@ -271,7 +271,7 @@ impl<'a> MovementService<'a> {
         };
 
         // Check tile collision first
-        if !collision::can_entity_move_to_position(entity, new_position, tilemap, atlas) {
+        if !collision::can_entity_move_to_position(entity, new_position, tilemap, tileset) {
             return MovementCollisionResult {
                 blocked: true,
                 collided_with: None, // Tile collision, no entity involved
@@ -480,9 +480,9 @@ impl<'a> MovementService<'a> {
         &mut self,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> GameUpdateResult<AudioEvent> {
-        self.process_input_scaled(world_bounds, tilemap, atlas, 1.0)
+        self.process_input_scaled(world_bounds, tilemap, tileset, 1.0)
     }
 
     /// Process input with time scaling for delta timestep mode.
@@ -490,7 +490,7 @@ impl<'a> MovementService<'a> {
         &mut self,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
         time_scale: f32,
     ) -> GameUpdateResult<AudioEvent> {
         let controlled_entity_ids = self.controlled_input_entity_ids();
@@ -525,7 +525,7 @@ impl<'a> MovementService<'a> {
                 MovementStepContext {
                     world_bounds,
                     tilemap,
-                    atlas,
+                    tileset,
                     result: &mut result,
                     time_scale,
                 },
@@ -629,7 +629,7 @@ impl<'a> MovementService<'a> {
         &mut self,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
         result: &mut GameUpdateResult<AudioEvent>,
     ) -> bool {
         let mut velocities = self
@@ -667,7 +667,7 @@ impl<'a> MovementService<'a> {
             }
 
             let collision_result =
-                self.check_movement_collision(entity_id, candidate_position, tilemap, atlas);
+                self.check_movement_collision(entity_id, candidate_position, tilemap, tileset);
 
             if collision_result.blocked {
                 self.handle_entity_collision_blocked(

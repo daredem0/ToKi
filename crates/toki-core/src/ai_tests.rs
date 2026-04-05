@@ -2,6 +2,7 @@ use super::*;
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::{TileLayer, TileMap};
+use crate::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
 use crate::collision::CollisionBox;
 use crate::entity::{
     AiBehavior, AiComponent, AiConfig, CombatComponent, ControlRole, Entity, EntityId, EntityKind,
@@ -11,6 +12,32 @@ use crate::entity::{
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+struct TestTilesetContext {
+    tileset: TileSetMeta,
+    atlases: HashMap<String, TileSetAtlasSource>,
+}
+
+impl TestTilesetContext {
+    fn resolver(&self) -> TileSetResolver<'_> {
+        TileSetResolver::new(&self.tileset, &self.atlases)
+    }
+}
+
+fn test_tileset_context(atlas: &AtlasMeta) -> TestTilesetContext {
+    let atlas_name = "test_atlas.json".to_string();
+    TestTilesetContext {
+        tileset: TileSetMeta::from_legacy_atlas(&atlas_name, atlas),
+        atlases: HashMap::from([(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: "test_atlas".to_string(),
+                path: PathBuf::from(&atlas_name),
+                meta: atlas.clone(),
+            },
+        )]),
+    }
+}
 
 fn intended_position(result: &AiUpdateResult, current_position: IVec2) -> Option<IVec2> {
     result
@@ -27,6 +54,8 @@ fn chase_handler_returns_result_when_player_in_range() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -37,7 +66,7 @@ fn chase_handler_returns_result_when_player_in_range() {
         create_test_entity_with_detection_radius(2, IVec2::new(70, 100), AiBehavior::Chase, 64);
     entity_manager.add_existing_stored_entity(chaser);
 
-    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
+    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &resolver);
     let entity = entity_manager.get_entity(2).unwrap();
     let handler = ChaseHandler;
 
@@ -58,6 +87,8 @@ fn run_handler_moves_away_from_player() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -68,7 +99,7 @@ fn run_handler_moves_away_from_player() {
         create_test_entity_with_detection_radius(2, IVec2::new(120, 100), AiBehavior::Run, 64);
     entity_manager.add_existing_stored_entity(runner);
 
-    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
+    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &resolver);
     let entity = entity_manager.get_entity(2).unwrap();
     let handler = RunHandler;
 
@@ -88,11 +119,13 @@ fn wander_handler_respects_frame_throttling() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Wander);
     entity_manager.add_existing_stored_entity(entity);
 
-    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
+    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &resolver);
     let entity = entity_manager.get_entity(1).unwrap();
     let handler = WanderHandler::new(1); // frame_counter = 1 (not divisible by 60)
 
@@ -143,9 +176,11 @@ fn ai_context_creates_from_components() {
     let entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
     let world_bounds = UVec2::new(256, 256);
 
-    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &resolver);
 
     assert_eq!(context.world_bounds, UVec2::new(256, 256));
 }
@@ -155,9 +190,11 @@ fn ai_context_computes_max_position() {
     let entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
     let world_bounds = UVec2::new(256, 256);
 
-    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &resolver);
     let entity_size = UVec2::new(16, 16);
 
     let (max_x, max_y) = context.max_position(entity_size);
@@ -170,9 +207,11 @@ fn ai_context_max_position_clamps_to_zero() {
     let entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
     let world_bounds = UVec2::new(10, 10); // Smaller than entity
 
-    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &resolver);
     let entity_size = UVec2::new(16, 16);
 
     let (max_x, max_y) = context.max_position(entity_size);
@@ -185,12 +224,14 @@ fn ai_context_validates_movement() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
     let world_bounds = UVec2::new(256, 256);
 
     let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Chase);
     entity_manager.add_existing_stored_entity(entity);
 
-    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &resolver);
     let entity = entity_manager.get_entity(1).unwrap();
 
     // Movement to open position should be valid
@@ -202,6 +243,8 @@ fn ai_context_rejects_movement_into_solid_entity() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
     let world_bounds = UVec2::new(256, 256);
 
     let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Chase);
@@ -212,7 +255,7 @@ fn ai_context_rejects_movement_into_solid_entity() {
     blocker.entity.solid = true;
     entity_manager.add_existing_stored_entity(blocker);
 
-    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &resolver);
     let entity = entity_manager.get_entity(1).unwrap();
 
     // Movement should be blocked by solid entity
@@ -224,7 +267,7 @@ fn create_test_tilemap() -> TileMap {
     TileMap {
         size: UVec2::new(16, 16),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new("ground", vec!["grass".to_string(); 256])],
     }
 }
@@ -276,7 +319,7 @@ fn create_tilemap_with_vertical_wall() -> TileMap {
     TileMap {
         size: UVec2::new(16, 16),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new("ground", tiles)],
     }
 }
@@ -292,7 +335,7 @@ fn create_tilemap_with_horizontal_wall() -> TileMap {
     TileMap {
         size: UVec2::new(16, 16),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new("ground", tiles)],
     }
 }
@@ -387,6 +430,8 @@ fn ai_system_updates_every_tick() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -403,7 +448,7 @@ fn ai_system_updates_every_tick() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     assert_eq!(results.len(), 1, "Should update on first tick");
 
@@ -413,7 +458,7 @@ fn ai_system_updates_every_tick() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     assert_eq!(results.len(), 1, "Should update on every tick");
 }
@@ -424,6 +469,8 @@ fn ai_system_skips_player_entity() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     let mut player = create_test_entity(1, IVec2::new(32, 32), AiBehavior::Wander);
     player.entity.control_role = ControlRole::PlayerCharacter;
@@ -437,7 +484,7 @@ fn ai_system_skips_player_entity() {
             entity_manager.get_player_id(),
             UVec2::new(256, 256),
             &tilemap,
-            &atlas,
+            &resolver,
         );
     }
 
@@ -447,7 +494,7 @@ fn ai_system_skips_player_entity() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     // No wander entities since player is skipped
     assert!(results.is_empty());
@@ -459,6 +506,8 @@ fn ai_system_only_updates_wander_entities() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     let wander_npc = create_test_entity(1, IVec2::new(32, 32), AiBehavior::Wander);
     let idle_npc = create_test_entity(2, IVec2::new(64, 64), AiBehavior::None);
@@ -473,7 +522,7 @@ fn ai_system_only_updates_wander_entities() {
         None,
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     // Only wander entity should be in results
@@ -489,6 +538,8 @@ fn ai_system_wander_entity_moves_or_stays() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     let npc = create_test_entity(1, IVec2::new(64, 64), AiBehavior::Wander);
     entity_manager.add_existing_stored_entity(npc);
@@ -500,7 +551,7 @@ fn ai_system_wander_entity_moves_or_stays() {
         None,
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -546,6 +597,8 @@ fn ai_system_chase_moves_toward_player_when_in_radius() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -563,7 +616,7 @@ fn ai_system_chase_moves_toward_player_when_in_radius() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -584,6 +637,8 @@ fn ai_system_chase_wanders_with_walk_wait_cycle() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (200, 100)
     let player = create_player_entity(1, IVec2::new(200, 100));
@@ -600,7 +655,7 @@ fn ai_system_chase_wanders_with_walk_wait_cycle() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -619,7 +674,7 @@ fn ai_system_chase_wanders_with_walk_wait_cycle() {
             entity_manager.get_player_id(),
             UVec2::new(256, 256),
             &tilemap,
-            &atlas,
+            &resolver,
         );
         if results.len() == 1 {
             if results[0].new_animation == Some(AnimationState::Walk) {
@@ -643,6 +698,8 @@ fn ai_system_chase_closes_distance_to_player() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -662,7 +719,7 @@ fn ai_system_chase_closes_distance_to_player() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -689,6 +746,8 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -706,7 +765,7 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -730,6 +789,8 @@ fn ai_system_run_wanders_with_walk_wait_cycle() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (200, 100)
     let player = create_player_entity(1, IVec2::new(200, 100));
@@ -746,7 +807,7 @@ fn ai_system_run_wanders_with_walk_wait_cycle() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -764,7 +825,7 @@ fn ai_system_run_wanders_with_walk_wait_cycle() {
             entity_manager.get_player_id(),
             UVec2::new(256, 256),
             &tilemap,
-            &atlas,
+            &resolver,
         );
         if results.len() == 1 && results[0].new_animation == Some(AnimationState::Walk) {
             found_walk = true;
@@ -780,6 +841,8 @@ fn ai_system_run_increases_distance_from_player() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -799,7 +862,7 @@ fn ai_system_run_increases_distance_from_player() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -826,6 +889,8 @@ fn ai_system_chase_respects_world_bounds() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (0, 100) - at the left edge
     let player = create_player_entity(1, IVec2::new(0, 100));
@@ -843,7 +908,7 @@ fn ai_system_chase_respects_world_bounds() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -868,6 +933,8 @@ fn ai_system_run_respects_world_bounds() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 100)
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -886,7 +953,7 @@ fn ai_system_run_respects_world_bounds() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -915,6 +982,8 @@ fn ai_system_chase_navigates_around_vertical_wall() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_tilemap_with_vertical_wall(); // Wall at x=64-80
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (100, 50) - on the right side of the wall
     let player = create_player_entity(1, IVec2::new(100, 50));
@@ -931,7 +1000,7 @@ fn ai_system_chase_navigates_around_vertical_wall() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -954,6 +1023,8 @@ fn ai_system_run_navigates_around_horizontal_wall() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_tilemap_with_horizontal_wall(); // Wall at y=64-80
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (50, 100) - below the wall
     let player = create_player_entity(1, IVec2::new(50, 100));
@@ -973,7 +1044,7 @@ fn ai_system_run_navigates_around_horizontal_wall() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -994,6 +1065,8 @@ fn ai_system_chase_tries_perpendicular_when_blocked() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_tilemap_with_vertical_wall(); // Wall at x=64-80
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player directly to the right of chaser, wall in between
     let player = create_player_entity(1, IVec2::new(100, 32));
@@ -1015,7 +1088,7 @@ fn ai_system_chase_tries_perpendicular_when_blocked() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -1045,6 +1118,8 @@ fn ai_system_chase_wanders_when_player_outside_radius() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (200, 100) - far away
     let player = create_player_entity(1, IVec2::new(200, 100));
@@ -1062,7 +1137,7 @@ fn ai_system_chase_wanders_when_player_outside_radius() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -1083,6 +1158,8 @@ fn ai_system_run_wanders_when_player_outside_radius() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player at (200, 100) - far away
     let player = create_player_entity(1, IVec2::new(200, 100));
@@ -1100,7 +1177,7 @@ fn ai_system_run_wanders_when_player_outside_radius() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -1119,6 +1196,8 @@ fn ai_system_chase_idle_wander_is_throttled() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 100));
@@ -1135,7 +1214,7 @@ fn ai_system_chase_idle_wander_is_throttled() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     assert_eq!(results.len(), 1);
     // Should return idle with no position change (throttled)
@@ -1152,6 +1231,8 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away initially
     let player = create_player_entity(1, IVec2::new(200, 100));
@@ -1169,7 +1250,7 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     assert_eq!(results.len(), 1);
 
@@ -1182,7 +1263,7 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
     assert_eq!(results.len(), 1);
     let result = &results[0];
@@ -1206,6 +1287,8 @@ fn ai_system_run_and_multiply_wanders_when_no_threats_or_mates() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
@@ -1225,7 +1308,7 @@ fn ai_system_run_and_multiply_wanders_when_no_threats_or_mates() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -1240,6 +1323,8 @@ fn ai_system_run_and_multiply_flees_from_player() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player nearby
     let player = create_player_entity(1, IVec2::new(100, 100));
@@ -1261,7 +1346,7 @@ fn ai_system_run_and_multiply_flees_from_player() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(results.len(), 1);
@@ -1282,6 +1367,8 @@ fn ai_system_run_and_multiply_seeks_compatible_entity() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
@@ -1310,7 +1397,7 @@ fn ai_system_run_and_multiply_seeks_compatible_entity() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     // Both entities should be updated
@@ -1333,6 +1420,8 @@ fn ai_system_run_and_multiply_spawns_on_collision() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
@@ -1360,7 +1449,7 @@ fn ai_system_run_and_multiply_spawns_on_collision() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     // One of the entities should have a spawn request
@@ -1394,6 +1483,8 @@ fn ai_system_run_and_multiply_enters_separation_after_spawn() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
@@ -1422,7 +1513,7 @@ fn ai_system_run_and_multiply_enters_separation_after_spawn() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     // Check that entities are in separation state
@@ -1439,6 +1530,8 @@ fn ai_system_run_and_multiply_exits_separation_when_distance_met() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
@@ -1475,7 +1568,7 @@ fn ai_system_run_and_multiply_exits_separation_when_distance_met() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     // Should have exited separation
@@ -1492,6 +1585,8 @@ fn ai_system_run_and_multiply_ignores_different_definition() {
     let mut entity_manager = EntityManager::new();
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
+    let tileset_context = test_tileset_context(&atlas);
+    let resolver = tileset_context.resolver();
 
     // Player far away
     let player = create_player_entity(1, IVec2::new(200, 200));
@@ -1521,7 +1616,7 @@ fn ai_system_run_and_multiply_ignores_different_definition() {
         entity_manager.get_player_id(),
         UVec2::new(256, 256),
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     // Neither should have a spawn request since they're incompatible

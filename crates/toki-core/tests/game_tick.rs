@@ -1,6 +1,6 @@
 use glam::{IVec2, UVec2};
 mod support;
-use support::{test_atlas, test_tilemap};
+use support::{test_atlas, test_tilemap, test_tileset_context, test_tileset_resolver};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
     game::{GameSimulation, InputSystem, RenderQueryService},
@@ -47,17 +47,19 @@ fn default_delta_tick_matches_fixed_tick_movement() {
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = test_tilemap();
     let atlas = test_atlas();
+    let (tileset, atlases) = test_tileset_context(&atlas);
+    let resolver = test_tileset_resolver(&tileset, &atlases);
 
     InputSystem::handle_key_press(fixed_state.runtime_mut(), InputKey::Right);
     InputSystem::handle_key_press(delta_state.runtime_mut(), InputKey::Right);
 
-    GameSimulation::tick_fixed(&mut fixed_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut fixed_state, world_bounds, &tilemap, &resolver);
     GameSimulation::tick_with_delta(
         &mut delta_state,
         DEFAULT_TIMESTEP_MS,
         world_bounds,
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     assert_eq!(player_position(&fixed_state), player_position(&delta_state));
@@ -69,6 +71,8 @@ fn sub_frame_time_scale_still_accumulates_play_time() {
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = test_tilemap();
     let atlas = test_atlas();
+    let (tileset, atlases) = test_tileset_context(&atlas);
+    let resolver = test_tileset_resolver(&tileset, &atlases);
 
     for _ in 0..10 {
         GameSimulation::tick_with_delta(
@@ -76,7 +80,7 @@ fn sub_frame_time_scale_still_accumulates_play_time() {
             DEFAULT_TIMESTEP_MS * 0.25,
             world_bounds,
             &tilemap,
-            &atlas,
+            &resolver,
         );
     }
 

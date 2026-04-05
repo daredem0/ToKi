@@ -25,6 +25,8 @@ pub struct ProjectAssets {
     pub scenes: HashMap<String, SceneAsset>,
     /// Discovered tilemaps
     pub tilemaps: HashMap<String, TilemapAsset>,
+    /// Discovered tilesets
+    pub tilesets: HashMap<String, TilesetAsset>,
     /// Discovered sprite atlases
     pub sprite_atlases: HashMap<String, SpriteAtlasAsset>,
     /// Discovered object sheets
@@ -58,6 +60,13 @@ pub struct SceneAsset {
 #[derive(Debug, Clone)]
 pub struct TilemapAsset {
     /// Full path to tilemap file
+    pub path: PathBuf,
+}
+
+/// Tileset asset information.
+#[derive(Debug, Clone)]
+pub struct TilesetAsset {
+    /// Full path to tileset file
     pub path: PathBuf,
 }
 
@@ -109,6 +118,7 @@ impl ProjectAssets {
             project_path,
             scenes: HashMap::new(),
             tilemaps: HashMap::new(),
+            tilesets: HashMap::new(),
             sprite_atlases: HashMap::new(),
             object_sheets: HashMap::new(),
             entities: HashMap::new(),
@@ -122,6 +132,7 @@ impl ProjectAssets {
     pub fn scan_assets(&mut self) -> Result<()> {
         self.scan_scenes()?;
         self.scan_tilemaps()?;
+        self.scan_tilesets()?;
         self.scan_sprite_atlases()?;
         self.scan_entities()?;
         self.scan_dialogs()?;
@@ -129,9 +140,10 @@ impl ProjectAssets {
         self.scan_palettes()?;
 
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities, {} dialogs, {} ui layouts, {} palettes",
+            "Scanned project assets: {} scenes, {} tilemaps, {} tilesets, {} atlases, {} object sheets, {} entities, {} dialogs, {} ui layouts, {} palettes",
             self.scenes.len(),
             self.tilemaps.len(),
+            self.tilesets.len(),
             self.sprite_atlases.len(),
             self.object_sheets.len(),
             self.entities.len(),
@@ -221,6 +233,7 @@ impl ProjectAssets {
     /// Scan for tilemap files
     fn scan_tilemaps(&mut self) -> Result<()> {
         let tilemaps_dir = self.project_path.join("assets/tilemaps");
+        self.tilemaps.clear();
         if !tilemaps_dir.exists() {
             tracing::debug!("Tilemaps directory does not exist: {:?}", tilemaps_dir);
             return Ok(());
@@ -238,6 +251,32 @@ impl ProjectAssets {
 
                     self.tilemaps.insert(stem.to_string(), tilemap_asset);
                     tracing::debug!("🗺️ Found tilemap file: '{}' at {:?}", stem, path);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn scan_tilesets(&mut self) -> Result<()> {
+        let tilesets_dir = self.project_path.join("assets/tilesets");
+        self.tilesets.clear();
+        if !tilesets_dir.exists() {
+            tracing::debug!("Tilesets directory does not exist: {:?}", tilesets_dir);
+            return Ok(());
+        }
+
+        tracing::debug!("🔍 Scanning for tilesets in {:?}", tilesets_dir);
+
+        for entry in fs::read_dir(&tilesets_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    self.tilesets
+                        .insert(stem.to_string(), TilesetAsset { path: path.clone() });
+                    tracing::debug!("🧩 Found tileset file: '{}' at {:?}", stem, path);
                 }
             }
         }

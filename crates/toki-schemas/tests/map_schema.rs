@@ -13,7 +13,7 @@ fn map_schema_accepts_map_objects_with_visibility_and_solidity() {
     let doc = json!({
         "size": [2, 2],
         "tile_size": [16, 16],
-        "atlas": "terrain.json",
+        "tileset": "terrain_tileset.json",
         "tiles": ["grass", "grass", "grass", "grass"],
         "objects": [
             {
@@ -36,7 +36,7 @@ fn map_schema_rejects_invalid_map_object_size() {
     let doc = json!({
         "size": [1, 1],
         "tile_size": [16, 16],
-        "atlas": "terrain.json",
+        "tileset": "terrain_tileset.json",
         "tiles": ["grass"],
         "objects": [
             {

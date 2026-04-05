@@ -304,7 +304,7 @@ impl ApplicationHandler for App {
             if let Err(error) = self.rendering.initialize_gpu_with_textures(
                 window.clone(),
                 self.launch_options.display.vsync,
-                self.asset_load_plan.tilemap_texture_path.clone(),
+                None,
                 self.asset_load_plan.sprite_texture_path.clone(),
             ) {
                 if let Some(content_root) = content_root.as_deref() {

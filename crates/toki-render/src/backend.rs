@@ -5,7 +5,7 @@ use toki_core::project_runtime::ResolvedPostProcessSettings;
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
 
-use crate::RenderError;
+use crate::{RenderError, SceneTilemapBatch};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SceneClipRect {
@@ -63,6 +63,9 @@ pub trait RenderFrameControl {
 
     /// Update overlay tilemap vertex data (above-entity layers)
     fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
+
+    /// Replace tilemap submission with explicit per-texture batches.
+    fn set_tilemap_batches(&mut self, batches: &[SceneTilemapBatch]);
 }
 
 /// Texture and font asset loading operations used by rendering backends.

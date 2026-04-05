@@ -1,4 +1,5 @@
 use super::*;
+use toki_core::assets::tileset::TileSetMeta;
 
 impl EditorApp {
     pub(super) fn build_map_editor_draft(
@@ -38,22 +39,20 @@ impl EditorApp {
             .ok_or_else(|| anyhow::anyhow!("Missing atlas asset '{}'", chosen_atlas_name))?;
         let atlas_meta = AtlasMeta::load_from_file(&atlas_asset.path)
             .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", chosen_atlas_name, e))?;
-
-        let mut tile_names = atlas_meta.tiles.keys().cloned().collect::<Vec<_>>();
-        tile_names.sort();
-        let fill_tile = tile_names.into_iter().next().ok_or_else(|| {
-            anyhow::anyhow!("Atlas '{}' does not define any tiles", chosen_atlas_name)
+        let atlas_file_name = atlas_asset
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| anyhow::anyhow!("Atlas path has no valid file name"))?;
+        let tileset = TileSetMeta::from_atlas(atlas_file_name, &atlas_meta);
+        let fill_tile = tileset.first_tile_entry_id().ok_or_else(|| {
+            anyhow::anyhow!("Atlas '{}' does not define any paintable tiles", chosen_atlas_name)
         })?;
 
         let tilemap = TileMap {
             size: glam::UVec2::new(width.max(1), height.max(1)),
             tile_size: glam::UVec2::new(tile_width.max(1), tile_height.max(1)),
-            atlas: PathBuf::from(
-                atlas_asset
-                    .path
-                    .file_name()
-                    .ok_or_else(|| anyhow::anyhow!("Atlas path has no file name"))?,
-            ),
+            tileset: PathBuf::from(format!("{}.json", name.trim())),
             layers: vec![TileLayer::new(
                 "ground",
                 vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
@@ -66,6 +65,46 @@ impl EditorApp {
         })
     }
 
+    pub(super) fn build_map_editor_tileset_draft(
+        project_assets: &ProjectAssets,
+        map_name: &str,
+    ) -> Result<TileSetMeta> {
+        let mut atlas_names = project_assets
+            .sprite_atlases
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        atlas_names.sort();
+
+        let chosen_atlas_name = if project_assets.sprite_atlases.contains_key("terrain") {
+            "terrain".to_string()
+        } else {
+            atlas_names
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No sprite atlases available for new map"))?
+        };
+
+        let atlas_asset = project_assets
+            .sprite_atlases
+            .get(&chosen_atlas_name)
+            .ok_or_else(|| anyhow::anyhow!("Missing atlas asset '{}'", chosen_atlas_name))?;
+        let atlas_meta = AtlasMeta::load_from_file(&atlas_asset.path)
+            .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", chosen_atlas_name, e))?;
+        let atlas_file_name = atlas_asset
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| anyhow::anyhow!("Atlas path has no valid file name"))?;
+        let mut tileset = TileSetMeta::from_atlas(atlas_file_name, &atlas_meta);
+        for entry in tileset.entries.values_mut() {
+            if entry.display_name.is_none() {
+                entry.display_name = Some(format!("{map_name}: {}", entry.source_name));
+            }
+        }
+        Ok(tileset)
+    }
+
     pub(super) fn tilemap_to_save_for_map_editor_draft(
         draft: &MapEditorDraft,
         viewport_tilemap: Option<&TileMap>,
@@ -73,6 +112,16 @@ impl EditorApp {
         viewport_tilemap
             .cloned()
             .unwrap_or_else(|| draft.tilemap.clone())
+    }
+
+    fn tileset_to_save(ui: &crate::ui::EditorUI, tilemap: &TileMap) -> TileSetMeta {
+        crate::ui::editor_context::map_state(ui)
+            .modified_tileset
+            .clone()
+            .unwrap_or(TileSetMeta {
+                tile_size: tilemap.tile_size,
+                entries: std::collections::HashMap::new(),
+            })
     }
 
     pub(super) fn handle_map_requests(&mut self) {
@@ -154,6 +203,18 @@ impl EditorApp {
             request.tile_height,
         ) {
             Ok(draft) => {
+                let tileset = match Self::build_map_editor_tileset_draft(project_assets, &request.name)
+                {
+                    Ok(tileset) => tileset,
+                    Err(error) => {
+                        tracing::error!(
+                            "Failed to create tileset draft for new map '{}': {}",
+                            request.name,
+                            error
+                        );
+                        return;
+                    }
+                };
                 let Some(viewport) = &mut self.viewport_manager.map_editor else {
                     tracing::warn!(
                         "No map editor viewport available for new map '{}'",
@@ -172,6 +233,8 @@ impl EditorApp {
                 }
 
                 crate::ui::editor_ui::set_map_editor_draft(&mut self.tabs.ui, draft);
+                crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).modified_tileset =
+                    Some(tileset);
                 viewport.mark_dirty();
             }
             Err(error) => {
@@ -199,6 +262,20 @@ impl EditorApp {
                 .as_ref()
                 .and_then(|viewport| viewport.tilemap());
             let tilemap_to_save = Self::tilemap_to_save_for_map_editor_draft(&draft, live_tilemap);
+            let tileset_to_save = Self::tileset_to_save(&self.tabs.ui, &tilemap_to_save);
+            if let Err(error) = self
+                .core
+                .project_manager
+                .save_tileset_asset(&draft.name, &tileset_to_save)
+            {
+                tracing::error!(
+                    "Failed to save map editor tileset '{}': {}",
+                    draft.name,
+                    error
+                );
+                crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested = false;
+                return;
+            }
             match self
                 .core
                 .project_manager
@@ -240,6 +317,20 @@ impl EditorApp {
             crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested = false;
             return;
         };
+        let tileset_to_save = Self::tileset_to_save(&self.tabs.ui, &tilemap);
+        if let Err(error) = self
+            .core
+            .project_manager
+            .save_tileset_asset(&active_map_name, &tileset_to_save)
+        {
+            tracing::error!(
+                "Failed to save map editor tileset '{}': {}",
+                active_map_name,
+                error
+            );
+            crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).save_requested = false;
+            return;
+        }
 
         match self
             .core
@@ -302,14 +393,16 @@ impl EditorApp {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
                 if let Ok(tilemap) = toki_core::assets::tilemap::TileMap::load_from_file(&map_file)
                 {
-                    let atlas_path = Self::resolve_atlas_path(&project_path, &tilemap);
+                    let modified_tileset = Self::resolve_tileset_path(&project_path, &tilemap)
+                        .and_then(|tileset_path| TileSetMeta::load_from_file(&tileset_path).ok());
                     let draft = crate::ui::editor_ui::MapEditorDraft {
                         name: map_name.clone(),
                         tilemap,
                     };
                     let state = crate::ui::editor_context::map_state_mut(&mut self.tabs.ui);
                     state.draft = Some(draft);
-                    state.atlas_path = atlas_path;
+                    state.modified_tileset = modified_tileset;
+                    state.atlas_path = None;
                     state.modified_atlas = None;
                 }
                 crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).active_map =
@@ -352,25 +445,15 @@ impl EditorApp {
         }
     }
 
-    fn resolve_atlas_path(
+    fn resolve_tileset_path(
         project_path: &std::path::Path,
         tilemap: &toki_core::assets::tilemap::TileMap,
     ) -> Option<std::path::PathBuf> {
-        let tilemaps_path = project_path
-            .join("assets")
-            .join("tilemaps")
-            .join(&tilemap.atlas);
-        if tilemaps_path.exists() {
-            return Some(tilemaps_path);
-        }
-        let sprites_path = project_path
-            .join("assets")
-            .join("sprites")
-            .join(&tilemap.atlas);
-        if sprites_path.exists() {
-            return Some(sprites_path);
-        }
-        None
+        toki_core::project_assets::resolve_tilemap_tileset_path(
+            project_path,
+            &project_path.join("assets").join("tilemaps").join("__editor__.json"),
+            tilemap,
+        )
     }
 
     pub(super) fn handle_pending_map_editor_tilemap_sync(&mut self) {

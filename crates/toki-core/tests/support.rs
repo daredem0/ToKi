@@ -7,6 +7,7 @@ use toki_core::animation::{AnimationClip, AnimationController, AnimationState, L
 use toki_core::assets::{
     atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties},
     tilemap::{TileLayer, TileMap},
+    tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver},
 };
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
@@ -22,7 +23,7 @@ pub fn test_tilemap() -> TileMap {
     TileMap {
         size: UVec2::new(10, 10),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 100])],
     }
 }
@@ -51,6 +52,30 @@ pub fn test_atlas() -> AtlasMeta {
         animated_tiles: HashMap::new(),
         imported_auto_tiles: Vec::new(),
     }
+}
+
+pub fn test_tileset_context(
+    atlas: &AtlasMeta,
+) -> (TileSetMeta, HashMap<String, TileSetAtlasSource>) {
+    let atlas_name = "test_atlas.json".to_string();
+    (
+        TileSetMeta::from_legacy_atlas(&atlas_name, atlas),
+        HashMap::from([(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: "test_atlas".to_string(),
+                path: PathBuf::from(&atlas_name),
+                meta: atlas.clone(),
+            },
+        )]),
+    )
+}
+
+pub fn test_tileset_resolver<'a>(
+    tileset: &'a TileSetMeta,
+    atlases: &'a HashMap<String, TileSetAtlasSource>,
+) -> TileSetResolver<'a> {
+    TileSetResolver::new(tileset, atlases)
 }
 
 pub fn test_entity_definition(name: &str, category: &str) -> EntityDefinition {

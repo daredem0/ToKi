@@ -1,10 +1,17 @@
 use std::collections::{BTreeMap, HashMap};
-use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
-use toki_core::palette::{resolve_palette, Palette, PaletteMismatchStrategy};
+use toki_core::assets::{
+    atlas::AtlasMeta,
+    object_sheet::ObjectSheetMeta,
+    tilemap::TileMap,
+    tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver},
+};
+use toki_core::graphics::image::load_image_rgba8;
+use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette, PaletteMismatchStrategy};
 pub use toki_core::project_assets::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
     load_project_palettes, normalize_asset_name, resolve_atlas_texture_path,
-    resolve_object_sheet_texture_path, resolve_project_resource_paths, resolve_tilemap_atlas_path,
+    resolve_object_sheet_texture_path, resolve_project_resource_paths, resolve_tilemap_tileset_path,
+    resolve_tileset_atlas_paths,
     ResolvedProjectResourcePaths, SpriteMetadataFileKind,
 };
 use toki_core::project_runtime::ProjectRuntimeMetadata;
@@ -13,6 +20,7 @@ use toki_core::sprite_render::{
     SpriteAssetResolver, SpriteRenderMaterial, SpriteResolveError,
 };
 use toki_render::RenderError;
+use toki_render::SceneTilemapBatch;
 
 use crate::systems::DecodedProjectCache;
 
@@ -20,6 +28,7 @@ type SpriteAtlasRegistry = HashMap<String, AtlasMeta>;
 type SpriteTextureRegistry = HashMap<String, Option<std::path::PathBuf>>;
 type ObjectSheetRegistry = HashMap<String, ObjectSheetMeta>;
 type ObjectTextureRegistry = HashMap<String, Option<std::path::PathBuf>>;
+type TileSetAtlasRegistry = HashMap<String, TileSetAtlasSource>;
 
 fn to_render_error(error: toki_core::project_assets::ProjectAssetError) -> RenderError {
     RenderError::Other(error.to_string())
@@ -31,7 +40,8 @@ fn to_render_error(error: toki_core::project_assets::ProjectAssetError) -> Rende
 /// Future-ready for additional asset types like fonts, sounds, and shaders.
 #[derive(Debug)]
 pub struct ResourceManager {
-    terrain_atlas: AtlasMeta,
+    tileset: TileSetMeta,
+    tileset_atlases: TileSetAtlasRegistry,
     sprite_atlases: SpriteAtlasRegistry,
     sprite_texture_paths: SpriteTextureRegistry,
     object_sheets: ObjectSheetRegistry,
@@ -43,7 +53,8 @@ pub struct ResourceManager {
 }
 
 pub struct PreloadedResources {
-    pub terrain_atlas: AtlasMeta,
+    pub tileset: TileSetMeta,
+    pub tileset_atlases: TileSetAtlasRegistry,
     pub sprite_atlases: SpriteAtlasRegistry,
     pub sprite_texture_paths: SpriteTextureRegistry,
     pub object_sheets: ObjectSheetRegistry,
@@ -57,7 +68,15 @@ pub struct PreloadedResources {
 impl ResourceManager {
     /// Load all game resources from their respective files
     pub fn load_all() -> Result<Self, RenderError> {
-        let terrain_atlas = AtlasMeta::load_from_file("assets/terrain.json")?;
+        let tileset = TileSetMeta::load_from_file("assets/tilesets/new_town_map_64x64_crossings.json")?;
+        let mut tileset_atlases = HashMap::new();
+        let terrain_path = std::path::PathBuf::from("assets/sprites/terrain.json");
+        let terrain_atlas = AtlasMeta::load_from_file(&terrain_path)?;
+        register_tileset_atlas(
+            &mut tileset_atlases,
+            &terrain_path,
+            terrain_atlas,
+        );
         let mut sprite_atlases = HashMap::new();
         let mut sprite_texture_paths = HashMap::new();
         let object_sheets = HashMap::new();
@@ -75,7 +94,8 @@ impl ResourceManager {
         tilemap.validate()?;
 
         Ok(Self {
-            terrain_atlas,
+            tileset,
+            tileset_atlases,
             sprite_atlases,
             sprite_texture_paths,
             object_sheets,
@@ -108,8 +128,11 @@ impl ResourceManager {
             resolve_project_resource_paths(project_path, map_name).map_err(to_render_error)?;
         let tilemap = decoded_project_cache.load_tilemap_from_path(&resolved_paths.tilemap_path)?;
         tilemap.validate()?;
-        let terrain_atlas =
-            decoded_project_cache.load_atlas_from_path(&resolved_paths.terrain_atlas_path)?;
+        let tileset = decoded_project_cache.load_tileset_from_path(&resolved_paths.tileset_path)?;
+        let tileset_atlases = load_tileset_atlas_registry_with_cache(
+            &resolved_paths.tileset_atlas_paths,
+            decoded_project_cache,
+        )?;
         let (sprite_atlases, sprite_texture_paths) = load_sprite_atlas_registry_with_cache(
             &resolved_paths.sprite_atlas_paths,
             decoded_project_cache,
@@ -133,7 +156,8 @@ impl ResourceManager {
 
         Ok((
             Self {
-                terrain_atlas,
+                tileset,
+                tileset_atlases,
                 sprite_atlases,
                 sprite_texture_paths,
                 object_sheets,
@@ -149,7 +173,8 @@ impl ResourceManager {
 
     pub fn from_preloaded(preloaded: PreloadedResources) -> Self {
         Self {
-            terrain_atlas: preloaded.terrain_atlas,
+            tileset: preloaded.tileset,
+            tileset_atlases: preloaded.tileset_atlases,
             sprite_atlases: preloaded.sprite_atlases,
             sprite_texture_paths: preloaded.sprite_texture_paths,
             object_sheets: preloaded.object_sheets,
@@ -161,8 +186,23 @@ impl ResourceManager {
         }
     }
 
-    pub fn get_terrain_atlas(&self) -> &AtlasMeta {
-        &self.terrain_atlas
+    pub fn get_tileset(&self) -> &TileSetMeta {
+        &self.tileset
+    }
+
+    pub fn tileset_resolver(&self) -> TileSetResolver<'_> {
+        TileSetResolver::new(&self.tileset, &self.tileset_atlases)
+    }
+
+    pub fn get_tileset_atlas(&self, atlas_name: &str) -> Option<&TileSetAtlasSource> {
+        let normalized = normalize_asset_name(atlas_name);
+        self.tileset_atlases
+            .get(atlas_name)
+            .or_else(|| self.tileset_atlases.get(normalized))
+    }
+
+    pub fn tileset_atlas_metas(&self) -> impl Iterator<Item = &AtlasMeta> {
+        self.tileset_atlases.values().map(|source| &source.meta)
     }
 
     pub fn get_sprite_atlas(&self, atlas_name: &str) -> Option<&AtlasMeta> {
@@ -206,7 +246,7 @@ impl ResourceManager {
     }
 
     pub fn terrain_tile_size(&self) -> glam::UVec2 {
-        self.terrain_atlas.tile_size
+        self.tileset.tile_size
     }
 
     pub fn creature_tile_size(&self) -> glam::UVec2 {
@@ -214,7 +254,10 @@ impl ResourceManager {
     }
 
     pub fn terrain_image_size(&self) -> Option<glam::UVec2> {
-        self.terrain_atlas.image_size()
+        self.tileset_atlases
+            .values()
+            .next()
+            .and_then(|atlas| atlas.meta.image_size())
     }
 
     pub fn creature_image_size(&self) -> Option<glam::UVec2> {
@@ -239,6 +282,66 @@ impl ResourceManager {
 
     pub fn set_indexed_palette_override(&mut self, palette_id: Option<String>) {
         self.indexed_palette_override = palette_id;
+    }
+
+    pub fn build_runtime_tilemap_batches(
+        &self,
+        visible_chunks: &[(u32, u32)],
+        tile_animation_clock: Option<&toki_core::assets::tile_animation::TileAnimationClock>,
+    ) -> Result<Vec<SceneTilemapBatch>, RenderError> {
+        let resolver = self.tileset_resolver();
+        let batches = if visible_chunks.is_empty() {
+            self.tilemap.generate_render_batches(
+                &resolver,
+                tile_animation_clock,
+                self.indexed_palette_override(),
+            )
+        } else {
+            self.tilemap.generate_render_batches_for_chunks(
+                &resolver,
+                visible_chunks,
+                tile_animation_clock,
+                self.indexed_palette_override(),
+            )
+        }
+        .map_err(|error| RenderError::Other(error.to_string()))?;
+
+        let mut rendered = Vec::with_capacity(batches.len());
+        for batch in batches {
+            match &batch.key.material {
+                toki_core::assets::tileset::TileRenderMaterial::TrueColor => {
+                    rendered.push(SceneTilemapBatch {
+                        vertices: batch.vertices,
+                        texture_path: Some(batch.texture_path),
+                        texture_image: None,
+                        texture_cache_key: None,
+                        above_entities: batch.key.above_entities,
+                    });
+                }
+                toki_core::assets::tileset::TileRenderMaterial::PaletteIndexed { palette_id } => {
+                    let decoded = load_image_rgba8(&batch.texture_path)
+                        .map_err(|error| RenderError::Other(error.to_string()))?;
+                    let (_, palette) = self
+                        .resolve_indexed_palette_by_id(Some(palette_id.as_str()), None)
+                        .map_err(|error| RenderError::Other(format!("{error:?}")))?;
+                    let recolored = recolor_indexed_image(&decoded, &palette)
+                        .map_err(|error| RenderError::Other(error.to_string()))?;
+                    rendered.push(SceneTilemapBatch {
+                        vertices: batch.vertices,
+                        texture_path: None,
+                        texture_image: Some(recolored),
+                        texture_cache_key: Some(format!(
+                            "{}::{}",
+                            batch.texture_path.display(),
+                            palette_id
+                        )),
+                        above_entities: batch.key.above_entities,
+                    });
+                }
+            }
+        }
+
+        Ok(rendered)
     }
 
     pub fn palette_mismatch_strategy(&self) -> PaletteMismatchStrategy {
@@ -401,6 +504,40 @@ fn register_sprite_atlas(
         atlas_map.insert(stem.to_string(), atlas);
         texture_map.insert(stem.to_string(), texture_path);
     }
+}
+
+fn register_tileset_atlas(
+    atlas_map: &mut TileSetAtlasRegistry,
+    atlas_path: &std::path::Path,
+    atlas: AtlasMeta,
+) {
+    let source = TileSetAtlasSource {
+        name: atlas_path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        path: atlas_path.to_path_buf(),
+        meta: atlas,
+    };
+    if let Some(file_name) = atlas_path.file_name().and_then(|name| name.to_str()) {
+        atlas_map.insert(file_name.to_string(), source.clone());
+    }
+    if let Some(stem) = atlas_path.file_stem().and_then(|name| name.to_str()) {
+        atlas_map.insert(stem.to_string(), source);
+    }
+}
+
+fn load_tileset_atlas_registry_with_cache(
+    atlas_paths: &[std::path::PathBuf],
+    decoded_project_cache: &mut DecodedProjectCache,
+) -> Result<TileSetAtlasRegistry, RenderError> {
+    let mut atlas_map = HashMap::new();
+    for atlas_path in atlas_paths {
+        let atlas = decoded_project_cache.load_atlas_from_path(atlas_path)?;
+        register_tileset_atlas(&mut atlas_map, atlas_path, atlas);
+    }
+    Ok(atlas_map)
 }
 
 fn load_sprite_atlas_registry_with_cache(

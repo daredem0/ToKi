@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use toki_core::assets::{
+    atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap, tileset::TileSetMeta,
+};
 use toki_core::dialog::DialogTree;
 use toki_core::entity::EntityDefinition;
 use toki_core::project_assets::{
@@ -33,7 +35,6 @@ const COMMON_SFX_NAMES: &[&str] = &[
 pub struct RuntimeAssetLoadPlan {
     pub scene_name: Option<String>,
     pub map_name: Option<String>,
-    pub tilemap_texture_path: Option<PathBuf>,
     pub sprite_texture_path: Option<PathBuf>,
     pub preloaded_sfx_names: Vec<String>,
     pub stream_music: bool,
@@ -62,7 +63,6 @@ impl RuntimeAssetLoadPlan {
         Self {
             scene_name,
             map_name,
-            tilemap_texture_path: resolved.tilemap_texture_path.clone(),
             sprite_texture_path: resolved.sprite_texture_path.clone(),
             preloaded_sfx_names: common_preloaded_sfx_names(),
             stream_music: true,
@@ -89,6 +89,7 @@ pub fn common_preloaded_sfx_names() -> Vec<String> {
 pub struct DecodedProjectCache {
     scenes: AssetCache<PathBuf, Scene>,
     tilemaps: AssetCache<PathBuf, TileMap>,
+    tilesets: AssetCache<PathBuf, TileSetMeta>,
     atlases: AssetCache<PathBuf, AtlasMeta>,
     object_sheets: AssetCache<PathBuf, ObjectSheetMeta>,
     entity_definitions: AssetCache<PathBuf, EntityDefinition>,
@@ -129,6 +130,15 @@ impl DecodedProjectCache {
     ) -> Result<AtlasMeta, toki_core::CoreError> {
         self.atlases.get_or_load(atlas_path.to_path_buf(), |path| {
             AtlasMeta::load_from_file(path)
+        })
+    }
+
+    pub fn load_tileset_from_path(
+        &mut self,
+        tileset_path: &Path,
+    ) -> Result<TileSetMeta, toki_core::CoreError> {
+        self.tilesets.get_or_load(tileset_path.to_path_buf(), |path| {
+            TileSetMeta::load_from_file(path)
         })
     }
 

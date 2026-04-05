@@ -87,14 +87,14 @@ impl App {
                 delta,
                 world_bounds,
                 self.resources.get_tilemap(),
-                self.resources.get_terrain_atlas(),
+                &self.resources.tileset_resolver(),
             )
         } else {
             GameSimulation::tick_fixed(
                 &mut self.game_system.game_state,
                 world_bounds,
                 self.resources.get_tilemap(),
-                self.resources.get_terrain_atlas(),
+                &self.resources.tileset_resolver(),
             )
         };
         GameUpdatePhase {
@@ -186,28 +186,21 @@ impl App {
                     .camera_system
                     .update_chunk_cache(self.resources.get_tilemap())
                 {
-                    if let Some(atlas_size) = self.resources.terrain_image_size() {
-                        let split = self
-                            .resources
-                            .get_tilemap()
-                            .generate_split_vertices_for_chunks(
-                                self.resources.get_terrain_atlas(),
-                                atlas_size,
-                                self.camera_system.cached_visible_chunks(),
-                                Some(&self.tile_animation_clock),
-                            );
-                        self.rendering.update_tilemap_vertices(&split.below);
-                        self.rendering.update_overlay_tilemap_vertices(&split.above);
-                    } else {
-                        tracing::warn!(
-                            "Terrain image size unavailable; skipping tilemap vertex refresh"
-                        );
+                    match self.resources.build_runtime_tilemap_batches(
+                        self.camera_system.cached_visible_chunks(),
+                        Some(&self.tile_animation_clock),
+                    ) {
+                        Ok(batches) => self.rendering.set_tilemap_batches(&batches),
+                        Err(error) => {
+                            tracing::warn!("Failed to refresh tilemap batches: {}", error);
+                        }
                     }
                 }
             }
 
-            let atlas = self.resources.get_terrain_atlas();
-            let anim_changed = self.tile_animation_clock.update(delta_ms, atlas);
+            let anim_changed = self
+                .tile_animation_clock
+                .update_from_iter(delta_ms, self.resources.tileset_atlas_metas());
             if anim_changed {
                 self.refresh_tilemap_vertices_for_current_camera();
             }
@@ -257,20 +250,14 @@ impl App {
 
         self.camera_system
             .update_chunk_cache(self.resources.get_tilemap());
-        if let Some(atlas_size) = self.resources.terrain_image_size() {
-            let split = self
-                .resources
-                .get_tilemap()
-                .generate_split_vertices_for_chunks(
-                    self.resources.get_terrain_atlas(),
-                    atlas_size,
-                    self.camera_system.cached_visible_chunks(),
-                    Some(&self.tile_animation_clock),
-                );
-            self.rendering.update_tilemap_vertices(&split.below);
-            self.rendering.update_overlay_tilemap_vertices(&split.above);
-        } else {
-            tracing::warn!("Terrain image size unavailable; skipping tilemap vertex refresh");
+        match self.resources.build_runtime_tilemap_batches(
+            self.camera_system.cached_visible_chunks(),
+            Some(&self.tile_animation_clock),
+        ) {
+            Ok(batches) => self.rendering.set_tilemap_batches(&batches),
+            Err(error) => {
+                tracing::warn!("Failed to refresh tilemap batches: {}", error);
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 use super::tilemap::{TileLayer, TileMap};
 use crate::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
+use crate::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
 use glam::UVec2;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -19,9 +20,24 @@ fn make_tilemap(size: UVec2, layers: Vec<TileLayer>) -> TileMap {
     TileMap {
         size,
         tile_size: UVec2::new(8, 8),
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers,
     }
+}
+
+fn legacy_resolver(atlas: &AtlasMeta) -> (TileSetMeta, HashMap<String, TileSetAtlasSource>) {
+    let atlas_name = "test.json".to_string();
+    (
+        TileSetMeta::from_legacy_atlas(&atlas_name, atlas),
+        HashMap::from([(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: "test".to_string(),
+                path: PathBuf::from(&atlas_name),
+                meta: atlas.clone(),
+            },
+        )]),
+    )
 }
 
 // --- Validation tests ---
@@ -433,10 +449,12 @@ fn test_collision_override_makes_floor_solid() {
     layer.collision_overrides.insert(1, true); // tile at index 1 is solid
     let map = make_tilemap(UVec2::new(2, 2), vec![layer]);
     let atlas = collision_atlas();
+    let (tileset, atlases) = legacy_resolver(&atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
 
-    assert!(!map.is_tile_solid_at(&atlas, 0, 0).unwrap()); // no override, floor = not solid
-    assert!(map.is_tile_solid_at(&atlas, 1, 0).unwrap()); // override = solid
-    assert!(!map.is_tile_solid_at(&atlas, 0, 1).unwrap()); // no override
+    assert!(!map.is_tile_solid_at(&resolver, 0, 0).unwrap()); // no override, floor = not solid
+    assert!(map.is_tile_solid_at(&resolver, 1, 0).unwrap()); // override = solid
+    assert!(!map.is_tile_solid_at(&resolver, 0, 1).unwrap()); // no override
 }
 
 #[test]
@@ -445,9 +463,11 @@ fn test_collision_override_makes_wall_passable() {
     layer.collision_overrides.insert(0, false); // tile at index 0 is NOT solid despite wall
     let map = make_tilemap(UVec2::new(2, 1), vec![layer]);
     let atlas = collision_atlas();
+    let (tileset, atlases) = legacy_resolver(&atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
 
-    assert!(!map.is_tile_solid_at(&atlas, 0, 0).unwrap()); // override = not solid
-    assert!(map.is_tile_solid_at(&atlas, 1, 0).unwrap()); // no override, wall = solid
+    assert!(!map.is_tile_solid_at(&resolver, 0, 0).unwrap()); // override = not solid
+    assert!(map.is_tile_solid_at(&resolver, 1, 0).unwrap()); // no override, wall = solid
 }
 
 #[test]
@@ -455,9 +475,11 @@ fn test_collision_override_absent_uses_atlas_default() {
     let layer = make_layer("ground", vec!["wall", "floor"]);
     let map = make_tilemap(UVec2::new(2, 1), vec![layer]);
     let atlas = collision_atlas();
+    let (tileset, atlases) = legacy_resolver(&atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
 
-    assert!(map.is_tile_solid_at(&atlas, 0, 0).unwrap()); // wall = solid (atlas default)
-    assert!(!map.is_tile_solid_at(&atlas, 1, 0).unwrap()); // floor = not solid (atlas default)
+    assert!(map.is_tile_solid_at(&resolver, 0, 0).unwrap()); // wall = solid (atlas default)
+    assert!(!map.is_tile_solid_at(&resolver, 1, 0).unwrap()); // floor = not solid (atlas default)
 }
 
 #[test]

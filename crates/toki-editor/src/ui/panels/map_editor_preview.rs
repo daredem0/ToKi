@@ -44,32 +44,50 @@ impl PanelSystem {
         ) else {
             return;
         };
-        let Some((brush_entries, atlas, texture_path)) =
-            Self::load_map_editor_preview_assets(ui_state, project_path, tilemap).ok()
+        let Some(brush_source) =
+            crate::ui::editor_ui::load_map_editor_brush_source_for_tilemap(
+                ui_state,
+                project_path,
+                tilemap,
+            )
+        else {
+            return;
+        };
+        let Some(brush_entry) = crate::ui::editor_ui::selected_map_editor_brush_entry(
+            &brush_source.brush_entries,
+            Some(selected_tile.as_str()),
+        ) else {
+            return;
+        };
+        let Some(atlas_name) = crate::ui::editor_ui::map_editor_brush_entry_atlas_name(&brush_entry.id)
+        else {
+            return;
+        };
+        let Some(atlas_source) = brush_source.atlases.get(atlas_name) else {
+            return;
+        };
+        let Some(texture_path) = atlas_source
+            .path
+            .parent()
+            .map(|parent| parent.join(&atlas_source.meta.image))
         else {
             return;
         };
         let Some(texture) = Self::ensure_map_editor_brush_preview_texture(
             ui_state,
             ui.ctx(),
-            &atlas,
+            &atlas_source.meta,
             &texture_path,
         ) else {
             return;
         };
-        let Some(brush_entry) = crate::ui::editor_ui::selected_map_editor_brush_entry(
-            &brush_entries,
-            Some(selected_tile.as_str()),
-        ) else {
-            return;
-        };
-        let Some(texture_size) = atlas.image_size() else {
+        let Some(texture_size) = atlas_source.meta.image_size() else {
             return;
         };
         let Some(preview_tile_id) = brush_entry.preview_tile_id.as_deref() else {
             return;
         };
-        let Some(tile_rect_px) = atlas.get_tile_rect(preview_tile_id) else {
+        let Some(tile_rect_px) = atlas_source.meta.get_tile_rect(preview_tile_id) else {
             return;
         };
         let uv_rect = egui::Rect::from_min_max(
@@ -98,50 +116,6 @@ impl PanelSystem {
                 painter.rect_stroke(tile_screen_rect, 0.0, stroke, egui::StrokeKind::Inside);
             }
         }
-    }
-
-    pub(super) fn load_map_editor_atlas(
-        project_path: &std::path::Path,
-        tilemap: &TileMap,
-    ) -> anyhow::Result<AtlasMeta> {
-        let atlas_path = crate::ui::editor_ui::resolve_map_editor_atlas_path(project_path, tilemap);
-        AtlasMeta::load_from_file(&atlas_path)
-            .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e))
-    }
-
-    pub(super) fn load_map_editor_preview_assets(
-        ui_state: &EditorUI,
-        project_path: &std::path::Path,
-        tilemap: &TileMap,
-    ) -> anyhow::Result<(
-        Vec<crate::ui::editor_ui::MapEditorBrushEntry>,
-        AtlasMeta,
-        std::path::PathBuf,
-    )> {
-        let atlas_path = crate::ui::editor_ui::resolve_map_editor_atlas_path(project_path, tilemap);
-        let atlas = if crate::ui::editor_context::map_state(ui_state)
-            .atlas_path
-            .as_deref()
-            == Some(atlas_path.as_path())
-        {
-            if let Some(cached) = &crate::ui::editor_context::map_state(ui_state).modified_atlas {
-                cached.clone()
-            } else {
-                AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-                    anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
-                })?
-            }
-        } else {
-            AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-                anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
-            })?
-        };
-        let texture_path = atlas_path
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("Atlas path '{}' has no parent", atlas_path.display()))?
-            .join(&atlas.image);
-        let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
-        Ok((brush_entries, atlas, texture_path))
     }
 
     pub(super) fn ensure_map_editor_brush_preview_texture(

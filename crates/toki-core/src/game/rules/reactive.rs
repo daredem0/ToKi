@@ -1,5 +1,5 @@
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::rules::RuleTrigger;
 
 use super::{RuleCommand, RuleEvaluationService};
@@ -10,7 +10,7 @@ impl RuleEvaluationService<'_> {
         &mut self,
         player_moved: bool,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> Vec<RuleCommand> {
         let mut reactive_rule_commands = Vec::new();
 
@@ -49,7 +49,7 @@ impl RuleEvaluationService<'_> {
 
         self.collect_rule_commands_for_tile_transitions(tilemap, &mut reactive_rule_commands);
 
-        if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
+        if self.any_entity_overlaps_trigger_tile(tilemap, tileset) {
             self.collect_rule_commands_for_trigger(
                 RuleTrigger::OnTrigger,
                 &mut reactive_rule_commands,
@@ -129,20 +129,43 @@ mod tests {
                 &TileMap {
                     size: glam::UVec2::new(1, 1),
                     tile_size: glam::UVec2::new(16, 16),
-                    atlas: std::path::PathBuf::new(),
+                    tileset: std::path::PathBuf::new(),
                     layers: vec![TileLayer::new("ground", vec!["default".to_string()])],
                 },
-                &AtlasMeta {
-                    image: std::path::PathBuf::new(),
-                    tile_size: glam::UVec2::new(16, 16),
-                    color_mode: crate::assets::atlas::ColorMode::TrueColor,
-                    palette: None,
-                    palette_size: None,
-                    tiles: std::collections::HashMap::new(),
-                    auto_tile_groups: std::collections::HashMap::new(),
-                    animated_tiles: std::collections::HashMap::new(),
-                    imported_auto_tiles: Vec::new(),
-                },
+                &crate::assets::tileset::TileSetResolver::new(
+                    &crate::assets::tileset::TileSetMeta::from_legacy_atlas(
+                        "test_atlas.json",
+                        &AtlasMeta {
+                            image: std::path::PathBuf::new(),
+                            tile_size: glam::UVec2::new(16, 16),
+                            color_mode: crate::assets::atlas::ColorMode::TrueColor,
+                            palette: None,
+                            palette_size: None,
+                            tiles: std::collections::HashMap::new(),
+                            auto_tile_groups: std::collections::HashMap::new(),
+                            animated_tiles: std::collections::HashMap::new(),
+                            imported_auto_tiles: Vec::new(),
+                        },
+                    ),
+                    &std::collections::HashMap::from([(
+                        "test_atlas.json".to_string(),
+                        crate::assets::tileset::TileSetAtlasSource {
+                            name: "test_atlas".to_string(),
+                            path: std::path::PathBuf::from("test_atlas.json"),
+                            meta: AtlasMeta {
+                                image: std::path::PathBuf::new(),
+                                tile_size: glam::UVec2::new(16, 16),
+                                color_mode: crate::assets::atlas::ColorMode::TrueColor,
+                                palette: None,
+                                palette_size: None,
+                                tiles: std::collections::HashMap::new(),
+                                auto_tile_groups: std::collections::HashMap::new(),
+                                animated_tiles: std::collections::HashMap::new(),
+                                imported_auto_tiles: Vec::new(),
+                            },
+                        },
+                    )]),
+                ),
             );
 
         assert!(commands.iter().any(|command| matches!(

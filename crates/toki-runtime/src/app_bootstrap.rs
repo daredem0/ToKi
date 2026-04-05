@@ -164,7 +164,6 @@ impl<'a> StartupCoordinator<'a> {
                 asset_load_plan: RuntimeAssetLoadPlan {
                     scene_name: self.launch_options.scene_name.clone(),
                     map_name: self.launch_options.map_name.clone(),
-                    tilemap_texture_path: None,
                     sprite_texture_path: None,
                     preloaded_sfx_names: crate::systems::asset_loading::common_preloaded_sfx_names(
                     ),

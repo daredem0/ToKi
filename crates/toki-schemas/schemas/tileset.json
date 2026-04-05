@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tokkiclient/toki/schemas/tileset.json",
+  "title": "ToKi TileSet",
+  "description": "A source-linked tileset definition containing paintable map entries",
+  "type": "object",
+  "required": ["tile_size", "entries"],
+  "properties": {
+    "tile_size": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Size of each tile [width, height] in pixels"
+    },
+    "entries": {
+      "type": "object",
+      "description": "Map entry definitions keyed by stable tileset id",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["atlas_name", "kind", "source_name"],
+        "properties": {
+          "atlas_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["tile", "autotile", "animated"]
+          },
+          "source_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -38,9 +38,9 @@ impl SceneViewport {
         self.prepare_debug_shapes(&mut scene_data);
 
         tracing::trace!(
-            "Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}, overlay_shapes={}",
+            "Scene data prepared: tilemap={}, tilemap_batches={}, sprites={}, debug_shapes={}, overlay_shapes={}",
             scene_data.tilemap.is_some(),
-            scene_data.atlas.is_some(),
+            scene_data.tilemap_batches.len(),
             scene_data.sprites.len(),
             scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
@@ -60,38 +60,118 @@ impl SceneViewport {
         };
 
         tracing::debug!(
-            "Found tilemap: size={}x{}, atlas={}",
+            "Found tilemap: size={}x{}, tileset={}",
             tilemap.size.x,
             tilemap.size.y,
-            tilemap.atlas.display()
+            tilemap.tileset.display()
         );
         scene_data.tilemap = Some(tilemap.clone());
 
         let Some(project_path) = project_path else {
-            tracing::warn!("No project path provided for atlas loading");
+            tracing::warn!("No project path provided for tileset loading");
             return;
         };
 
+        let tilemap_path = self.tilemap_path.clone().unwrap_or_else(|| {
+            project_path
+                .join("assets")
+                .join("tilemaps")
+                .join("__draft__.json")
+        });
         tracing::debug!(
-            "Loading atlas for tilemap from project path: {}",
+            "Loading tileset for tilemap from project path: {}",
             project_path.display()
         );
-        match self.load_atlas_for_tilemap(&tilemap.atlas.to_string_lossy(), project_path) {
-            Ok(atlas) => {
-                tracing::trace!("Successfully loaded atlas with {} tiles", atlas.tiles.len());
-                let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 8));
-                tracing::trace!(
-                    "Calculated atlas texture size: {}x{}",
-                    texture_size.x,
-                    texture_size.y
+        match self.load_tileset_for_tilemap(&tilemap, &tilemap_path, project_path) {
+            Ok(_tileset) => {
+                self.tile_animation_clock.sync_definitions_from_iter(
+                    self.tileset_atlas_cache.values().map(|source| &source.meta),
                 );
-                self.tile_animation_clock.sync_definitions(&atlas);
                 scene_data.tile_animation_clock = Some(self.tile_animation_clock.clone());
-                scene_data.atlas = Some(atlas);
-                scene_data.texture_size = texture_size;
+                if let Some(resolver) = self.tileset_resolver() {
+                    match tilemap.generate_render_batches(
+                        &resolver,
+                        Some(&self.tile_animation_clock),
+                        self.indexed_palette_override.as_deref(),
+                    ) {
+                        Ok(batches) => {
+                            for batch in batches {
+                                match batch.key.material {
+                                    toki_core::assets::tileset::TileRenderMaterial::TrueColor => {
+                                        scene_data.tilemap_batches.push(
+                                            toki_render::SceneTilemapBatch {
+                                                vertices: batch.vertices,
+                                                texture_path: Some(batch.texture_path),
+                                                texture_image: None,
+                                                texture_cache_key: None,
+                                                above_entities: batch.key.above_entities,
+                                            },
+                                        );
+                                    }
+                                    toki_core::assets::tileset::TileRenderMaterial::PaletteIndexed {
+                                        palette_id,
+                                    } => {
+                                        let Some(palette) =
+                                            self.available_palettes.get(&palette_id).cloned()
+                                        else {
+                                            tracing::warn!(
+                                                "Missing palette '{}' for tilemap batch '{}'",
+                                                palette_id,
+                                                batch.texture_path.display()
+                                            );
+                                            continue;
+                                        };
+                                        let decoded =
+                                            match toki_core::graphics::image::load_image_rgba8(
+                                                &batch.texture_path,
+                                            ) {
+                                                Ok(decoded) => decoded,
+                                                Err(error) => {
+                                                    tracing::error!(
+                                                        "Failed to load indexed tilemap texture '{}': {}",
+                                                        batch.texture_path.display(),
+                                                        error
+                                                    );
+                                                    continue;
+                                                }
+                                            };
+                                        let recolored =
+                                            match toki_core::palette::recolor_indexed_image(
+                                                &decoded, &palette,
+                                            ) {
+                                                Ok(recolored) => recolored,
+                                                Err(error) => {
+                                                    tracing::error!(
+                                                        "Failed to recolor indexed tilemap texture '{}': {}",
+                                                        batch.texture_path.display(),
+                                                        error
+                                                    );
+                                                    continue;
+                                                }
+                                            };
+                                        scene_data.tilemap_batches.push(
+                                            toki_render::SceneTilemapBatch {
+                                                vertices: batch.vertices,
+                                                texture_path: None,
+                                                texture_image: Some(recolored),
+                                                texture_cache_key: Some(format!(
+                                                    "{}::{}",
+                                                    batch.texture_path.display(),
+                                                    palette_id
+                                                )),
+                                                above_entities: batch.key.above_entities,
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        Err(error) => tracing::error!("Failed to build tilemap batches: {error}"),
+                    }
+                }
             }
             Err(error) => {
-                tracing::error!("Failed to load atlas: {}", error);
+                tracing::error!("Failed to load tileset: {}", error);
             }
         }
     }
@@ -417,8 +497,10 @@ impl SceneViewport {
     }
 
     pub(super) fn add_tile_debug_shapes(&mut self, scene_data: &mut SceneData) {
-        let Some((tilemap, atlas)) = scene_data.tilemap.as_ref().zip(scene_data.atlas.as_ref())
-        else {
+        let Some(tilemap) = scene_data.tilemap.as_ref() else {
+            return;
+        };
+        let Some(tileset) = self.tileset_resolver() else {
             return;
         };
 
@@ -430,7 +512,7 @@ impl SceneViewport {
             self.game_state.world().player_id(),
             self.game_state.runtime().debug_collision_rendering(),
         );
-        let solid_tiles = queries.solid_tile_positions(tilemap, atlas);
+        let solid_tiles = queries.solid_tile_positions(tilemap, &tileset);
         for (tile_x, tile_y) in solid_tiles {
             let world_pos = glam::Vec2::new(
                 (tile_x * tilemap.tile_size.x) as f32,
@@ -446,7 +528,7 @@ impl SceneViewport {
             scene_data.debug_shapes.push(debug_shape);
         }
 
-        let trigger_tiles = queries.trigger_tile_positions(tilemap, atlas);
+        let trigger_tiles = queries.trigger_tile_positions(tilemap, &tileset);
         for (tile_x, tile_y) in trigger_tiles {
             let world_pos = glam::Vec2::new(
                 (tile_x * tilemap.tile_size.x) as f32,

@@ -3,8 +3,6 @@ use std::path::PathBuf;
 use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::events::SceneSwitchRequest;
 use toki_core::game::{RenderQueryService, SceneSystem};
-use toki_core::graphics::image::load_image_rgba8;
-use toki_core::palette::recolor_indexed_image;
 
 use crate::systems::{
     AudioManager, CameraManager, DecodedProjectCache, GameManager, RenderingSystem,
@@ -218,63 +216,35 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             .camera_mut()
             .clamp_to_world_bounds(world_bounds);
 
-        let atlas = self.resources.get_terrain_atlas();
-        self.tile_animation_clock.sync_definitions(atlas);
+        self.tile_animation_clock
+            .sync_definitions_from_iter(self.resources.tileset_atlas_metas());
 
         if self.rendering.has_gpu() {
             let view = self.camera_system.view_matrix();
             self.rendering.update_projection(view);
             self.camera_system
                 .update_chunk_cache(self.resources.get_tilemap());
-            if let Some(atlas_size) = self.resources.terrain_image_size() {
-                let split = self
-                    .resources
-                    .get_tilemap()
-                    .generate_split_vertices_for_chunks(
-                        self.resources.get_terrain_atlas(),
-                        atlas_size,
-                        self.camera_system.cached_visible_chunks(),
-                        Some(self.tile_animation_clock),
-                    );
-                self.rendering.update_tilemap_vertices(&split.below);
-                self.rendering.update_overlay_tilemap_vertices(&split.above);
-            } else {
-                tracing::warn!("Terrain image size unavailable; skipping tilemap vertex refresh");
+            match self.resources.build_runtime_tilemap_batches(
+                self.camera_system.cached_visible_chunks(),
+                Some(self.tile_animation_clock),
+            ) {
+                Ok(batches) => self.rendering.set_tilemap_batches(&batches),
+                Err(error) => {
+                    tracing::warn!("Failed to rebuild tilemap batches: {}", error);
+                }
             }
         }
     }
 
     fn reload_runtime_render_textures(&mut self, scene_name: &str) {
-        if let Some(tilemap_texture_path) = self.asset_load_plan.tilemap_texture_path.clone() {
-            let terrain_atlas = self.resources.get_terrain_atlas();
-            let tilemap_result = if terrain_atlas.is_palette_indexed() {
-                match self.resources.resolve_indexed_palette(terrain_atlas, None) {
-                    Ok((palette_id, palette)) => match load_image_rgba8(&tilemap_texture_path) {
-                        Ok(image) => match recolor_indexed_image(&image, &palette) {
-                            Ok(recolored) => self.rendering.load_tilemap_texture_rgba8(&recolored),
-                            Err(error) => Err(toki_render::RenderError::Other(format!(
-                                "Indexed tilemap texture '{}' failed validation for palette '{}': {}",
-                                tilemap_texture_path.display(),
-                                palette_id,
-                                error
-                            ))),
-                        },
-                        Err(error) => Err(toki_render::RenderError::Other(format!(
-                            "Failed to decode indexed tilemap texture '{}': {}",
-                            tilemap_texture_path.display(),
-                            error
-                        ))),
-                    },
-                    Err(error) => Err(toki_render::RenderError::Other(format!("{error:?}"))),
-                }
-            } else {
-                self.rendering
-                    .load_tilemap_texture(tilemap_texture_path.clone())
-            };
-
-            if let Err(error) = tilemap_result {
+        match self.resources.build_runtime_tilemap_batches(
+            self.camera_system.cached_visible_chunks(),
+            Some(self.tile_animation_clock),
+        ) {
+            Ok(batches) => self.rendering.set_tilemap_batches(&batches),
+            Err(error) => {
                 tracing::warn!(
-                    "Failed to reload tilemap texture for scene '{}': {}",
+                    "Failed to reload tilemap batches for scene '{}': {}",
                     scene_name,
                     error
                 );

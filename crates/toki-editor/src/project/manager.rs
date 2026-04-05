@@ -3,7 +3,7 @@ use crate::project::{Project, ProjectAssets, ProjectTemplateKind};
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
-use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::{tilemap::TileMap, tileset::TileSetMeta};
 use toki_core::{GameState, Scene};
 
 /// Manages project operations (create, load, save)
@@ -275,6 +275,34 @@ impl ProjectManager {
         Ok(map_path)
     }
 
+    pub fn save_tileset_asset(&mut self, tileset_name: &str, tileset: &TileSetMeta) -> Result<PathBuf> {
+        if tileset_name.trim().is_empty() {
+            return Err(anyhow::anyhow!("Tileset name cannot be empty"));
+        }
+        if tileset_name.contains('/') || tileset_name.contains('\\') {
+            return Err(anyhow::anyhow!("Tileset name cannot contain path separators"));
+        }
+
+        let project_path = self
+            .current_project
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No project currently loaded"))?
+            .path
+            .clone();
+        let tilesets_dir = project_path.join("assets").join("tilesets");
+        fs::create_dir_all(&tilesets_dir)?;
+
+        let tileset_path = tilesets_dir.join(format!("{}.json", tileset_name));
+        fs::write(&tileset_path, serde_json::to_string_pretty(tileset)?)?;
+
+        if let Some(project_assets) = &mut self.project_assets {
+            project_assets.scan_assets()?;
+        }
+
+        tracing::info!("Saved tileset asset '{}' to {:?}", tileset_name, tileset_path);
+        Ok(tileset_path)
+    }
+
     /// Create the project folder structure
     fn create_project_structure(&self, project_path: &PathBuf) -> Result<()> {
         // Create main project directory
@@ -284,6 +312,7 @@ impl ProjectManager {
         fs::create_dir_all(project_path.join("scenes"))?;
         fs::create_dir_all(project_path.join("assets").join("sprites"))?;
         fs::create_dir_all(project_path.join("assets").join("tilemaps"))?;
+        fs::create_dir_all(project_path.join("assets").join("tilesets"))?;
         fs::create_dir_all(project_path.join("assets").join("audio"))?;
         fs::create_dir_all(project_path.join("entities"))?;
         fs::create_dir_all(project_path.join("dialogs"))?;

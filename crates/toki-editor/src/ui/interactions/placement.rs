@@ -7,7 +7,7 @@ use crate::ui::interactions::MapObjectInteraction;
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::assets::{tilemap::TileMap, tileset::TileSetResolver};
 use toki_core::entity::{
     build_decoration_entity, decoration_collision_box, DecorationSpec, Entity, EntityDefinition,
     StoredEntity,
@@ -357,8 +357,8 @@ impl PlacementInteraction {
         );
 
         let tilemap = viewport.tilemap();
-        let terrain_atlas = tilemap.map(|_| viewport.resources().get_terrain_atlas());
-        let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, terrain_atlas);
+        let tileset = viewport.tileset_resolver();
+        let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, tileset.as_ref());
         if !can_place {
             tracing::warn!(
                 "Cannot place decoration '{}:{}' at position ({}, {}) - collision detected with solid terrain",
@@ -389,14 +389,14 @@ impl PlacementInteraction {
         viewport: &SceneViewport,
     ) -> bool {
         let tilemap = viewport.tilemap();
-        let terrain_atlas = tilemap.map(|_| viewport.resources().get_terrain_atlas());
+        let tileset = viewport.tileset_resolver();
         Self::create_entity_in_scene_with_collision_context(
             ui_state,
             entity_def,
             entity_def_name,
             world_pos_i32,
             tilemap,
-            terrain_atlas,
+            tileset.as_ref(),
         )
     }
 
@@ -406,7 +406,7 @@ impl PlacementInteraction {
         entity_def_name: &str,
         world_pos_i32: glam::IVec2,
         tilemap: Option<&TileMap>,
-        terrain_atlas: Option<&AtlasMeta>,
+        tileset: Option<&TileSetResolver<'_>>,
     ) -> bool {
         let Some(active_scene_name) = ui_state.active_scene.clone() else {
             tracing::error!("No active scene for entity placement");
@@ -443,7 +443,7 @@ impl PlacementInteraction {
         let entity = spawn_bundle.entity.clone();
         let stored = StoredEntity::new(spawn_bundle.entity, spawn_bundle.optional_components);
 
-        let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, terrain_atlas);
+        let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, tileset);
 
         if can_place {
             let add_command = EditorCommand::add_stored_entity(active_scene_name.clone(), stored);
@@ -498,13 +498,15 @@ impl PlacementInteraction {
                 decoration_draft.solid,
             );
             return if let Some(tilemap) = viewport.tilemap() {
-                let terrain_atlas = viewport.resources().get_terrain_atlas();
-                toki_core::collision::can_place_collision_box_at_position(
-                    collision_box.as_ref(),
-                    world_pos_i32,
-                    tilemap,
-                    terrain_atlas,
-                )
+                let tileset = viewport.tileset_resolver();
+                tileset.as_ref().is_none_or(|tileset| {
+                    toki_core::collision::can_place_collision_box_at_position(
+                        collision_box.as_ref(),
+                        world_pos_i32,
+                        tilemap,
+                        tileset,
+                    )
+                })
             } else {
                 true
             };
@@ -530,13 +532,15 @@ impl PlacementInteraction {
 
         let collision_box = entity_def.get_collision_box();
         if let Some(tilemap) = viewport.tilemap() {
-            let terrain_atlas = viewport.resources().get_terrain_atlas();
-            toki_core::collision::can_place_collision_box_at_position(
-                collision_box.as_ref(),
-                world_pos_i32,
-                tilemap,
-                terrain_atlas,
-            )
+            let tileset = viewport.tileset_resolver();
+            tileset.as_ref().is_none_or(|tileset| {
+                toki_core::collision::can_place_collision_box_at_position(
+                    collision_box.as_ref(),
+                    world_pos_i32,
+                    tilemap,
+                    tileset,
+                )
+            })
         } else {
             true
         }
@@ -568,15 +572,15 @@ impl PlacementInteraction {
         entity: &Entity,
         world_pos_i32: glam::IVec2,
         tilemap: Option<&TileMap>,
-        terrain_atlas: Option<&AtlasMeta>,
+        tileset: Option<&TileSetResolver<'_>>,
     ) -> bool {
-        match (tilemap, terrain_atlas) {
-            (Some(tilemap), Some(terrain_atlas)) => {
+        match (tilemap, tileset) {
+            (Some(tilemap), Some(tileset)) => {
                 toki_core::collision::can_entity_move_to_position(
                     entity,
                     world_pos_i32,
                     tilemap,
-                    terrain_atlas,
+                    tileset,
                 )
             }
             _ => true,

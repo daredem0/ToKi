@@ -1,0 +1,54 @@
+{
+  "tile_size": [
+    8,
+    8
+  ],
+  "entries": {
+    "terrain/tile/brick": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "brick"
+    },
+    "terrain/tile/dirt": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "dirt"
+    },
+    "terrain/tile/grass": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "grass"
+    },
+    "terrain/tile/roof": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "roof"
+    },
+    "terrain/tile/sand": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "sand"
+    },
+    "terrain/tile/stone": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "stone"
+    },
+    "terrain/tile/water": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "water"
+    },
+    "terrain/tile/wood": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "wood"
+    },
+    "AutoTile_Grass/autotile/terrain": {
+      "atlas_name": "AutoTile_Grass.json",
+      "kind": "autotile",
+      "source_name": "terrain",
+      "display_name": "AutoTile_Grass"
+    }
+  }
+}

@@ -6,7 +6,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::assets::tilemap::TileMap;
-use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
+use toki_core::assets::{
+    atlas::AtlasMeta,
+    object_sheet::ObjectSheetMeta,
+    tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver},
+};
 use toki_core::graphics::image::DecodedImage;
 use toki_core::palette::{builtin_palettes, Palette};
 use toki_core::project_runtime::{default_resolution_height, default_resolution_width};
@@ -78,6 +82,7 @@ pub struct SceneViewport {
     game_state: GameState,
     resources: ResourceManager,
     tilemap: Option<TileMap>,
+    tilemap_path: Option<std::path::PathBuf>,
     // Rendering infrastructure
     scene_renderer: Option<SceneRenderer>,
     offscreen_target: Option<OffscreenTarget>,
@@ -87,8 +92,9 @@ pub struct SceneViewport {
     sizing_mode: ViewportSizingMode,
     viewport_size: (u32, u32),
     requested_viewport_size: Option<(u32, u32)>,
-    atlas_cache: Option<AtlasMeta>,
-    atlas_cache_path: Option<std::path::PathBuf>,
+    tileset_cache: Option<TileSetMeta>,
+    tileset_cache_path: Option<std::path::PathBuf>,
+    tileset_atlas_cache: std::collections::HashMap<String, TileSetAtlasSource>,
     tile_animation_clock: TileAnimationClock,
     needs_render: bool, // Track if scene needs re-rendering
     camera: Camera,     // Camera for zoom and pan
@@ -183,6 +189,7 @@ impl SceneViewport {
             game_state,
             resources,
             tilemap: None,
+            tilemap_path: None,
             scene_renderer: None,
             offscreen_target: None,
             device: None,
@@ -191,8 +198,9 @@ impl SceneViewport {
             sizing_mode,
             viewport_size: (resolution_width, resolution_height),
             requested_viewport_size: None,
-            atlas_cache: None,
-            atlas_cache_path: None,
+            tileset_cache: None,
+            tileset_cache_path: None,
+            tileset_atlas_cache: std::collections::HashMap::new(),
             tile_animation_clock: TileAnimationClock::new(),
             needs_render: true,
             camera,
@@ -328,16 +336,15 @@ impl SceneViewport {
 
     /// Advance tile animation playback and mark dirty when a frame changes.
     fn tick_tile_animations(&mut self) {
-        let Some(atlas) = self.atlas_cache.as_ref() else {
+        if self.tileset_atlas_cache.is_empty() {
             return;
-        };
+        }
         // Fixed timestep matching ~60 fps; editor has no high-resolution delta.
         const EDITOR_FRAME_DELTA_MS: f32 = 16.67;
-        let atlas_clone = atlas.clone();
-        if self
-            .tile_animation_clock
-            .update(EDITOR_FRAME_DELTA_MS, &atlas_clone)
-        {
+        if self.tile_animation_clock.update_from_iter(
+            EDITOR_FRAME_DELTA_MS,
+            self.tileset_atlas_cache.values().map(|source| &source.meta),
+        ) {
             self.needs_render = true;
         }
     }
@@ -372,9 +379,9 @@ impl SceneViewport {
         if let (Some(scene_renderer), Some(target)) =
             (&mut self.scene_renderer, &mut self.offscreen_target)
         {
-            tracing::trace!("About to render scene with data: tilemap={}, atlas={}, sprites={}, debug_shapes={}",
+            tracing::trace!("About to render scene with data: tilemap={}, tilemap_batches={}, sprites={}, debug_shapes={}",
                            scene_data.tilemap.is_some(),
-                           scene_data.atlas.is_some(),
+                           scene_data.tilemap_batches.len(),
                            scene_data.sprites.len(),
                            scene_data.debug_shapes.len());
 
@@ -506,6 +513,13 @@ impl SceneViewport {
         self.tilemap.as_ref()
     }
 
+    pub fn tileset_resolver(&self) -> Option<TileSetResolver<'_>> {
+        Some(TileSetResolver::new(
+            self.tileset_cache.as_ref()?,
+            &self.tileset_atlas_cache,
+        ))
+    }
+
     /// Get mutable reference to current tilemap
     pub fn tilemap_mut(&mut self) -> Option<&mut TileMap> {
         self.tilemap.as_mut()
@@ -521,6 +535,7 @@ impl SceneViewport {
             .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
 
         self.tilemap = Some(tilemap);
+        self.tilemap_path = Some(map_path.as_ref().to_path_buf());
         self.mark_dirty();
         tracing::info!("Loaded tilemap from: {}", map_path.as_ref().display());
         Ok(())
@@ -532,6 +547,7 @@ impl SceneViewport {
             .validate()
             .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
         self.tilemap = Some(tilemap);
+        self.tilemap_path = None;
         self.mark_dirty();
         tracing::info!("Set in-memory tilemap on scene viewport");
         Ok(())
@@ -540,6 +556,7 @@ impl SceneViewport {
     /// Clear the current tilemap
     pub fn clear_tilemap(&mut self) {
         self.tilemap = None;
+        self.tilemap_path = None;
         self.mark_dirty();
         tracing::info!("Cleared tilemap from scene viewport");
     }
@@ -616,8 +633,9 @@ impl SceneViewport {
     }
 
     pub fn clear_asset_caches(&mut self) {
-        self.atlas_cache = None;
-        self.atlas_cache_path = None;
+        self.tileset_cache = None;
+        self.tileset_cache_path = None;
+        self.tileset_atlas_cache.clear();
         self.loaded_sprite_atlases.clear();
         self.loaded_object_sheets.clear();
         self.decoded_sprite_images.clear();
@@ -650,9 +668,9 @@ impl SceneViewport {
     /// Returns `true` when the viewport has active tile animations that require
     /// continuous repainting.
     pub fn has_active_tile_animations(&self) -> bool {
-        self.atlas_cache
-            .as_ref()
-            .is_some_and(|atlas| !atlas.animated_tiles.is_empty())
+        self.tileset_atlas_cache
+            .values()
+            .any(|atlas| !atlas.meta.animated_tiles.is_empty())
     }
 
     /// Temporarily suppress rendering for multiple entities.

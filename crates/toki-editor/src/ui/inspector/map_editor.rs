@@ -74,23 +74,14 @@ impl InspectorSystem {
                         ui.label("Position:");
                         ui.label(format!("{}, {}", tile_info.tile_x, tile_info.tile_y));
                     });
-                    let mut solid = tile_info.solid;
-                    let mut trigger = tile_info.trigger;
-                    let tile_name_for_edit = tile_info.tile_name.clone();
-                    let mut changed = false;
                     ui.horizontal(|ui| {
-                        changed |= ui.checkbox(&mut solid, "Solid").changed();
-                        changed |= ui.checkbox(&mut trigger, "Trigger").changed();
+                        ui.label("Solid:");
+                        ui.label(if tile_info.solid { "Yes" } else { "No" });
                     });
-                    if changed {
-                        Self::update_tile_property(
-                            ui_state,
-                            config,
-                            &tile_name_for_edit,
-                            solid,
-                            trigger,
-                        );
-                    }
+                    ui.horizontal(|ui| {
+                        ui.label("Trigger:");
+                        ui.label(if tile_info.trigger { "Yes" } else { "No" });
+                    });
                 } else {
                     ui.label("Click a tile or object to inspect it.");
                 }
@@ -103,30 +94,54 @@ impl InspectorSystem {
                         MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
                     },
                 );
-                if let Some((brush_entries, atlas, texture_path)) =
-                    Self::load_map_editor_brush_source(ui_state, config)
+                if let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config)
                 {
+                    let selected_entry = crate::ui::editor_ui::selected_map_editor_brush_entry(
+                        &brush_source.brush_entries,
+                        crate::ui::editor_context::map_state(ui_state)
+                            .selected_tile
+                            .as_deref(),
+                    )
+                    .cloned();
+                    let selected_atlas = selected_entry
+                        .as_ref()
+                        .and_then(|entry| {
+                            crate::ui::editor_ui::map_editor_brush_entry_atlas_name(&entry.id)
+                        })
+                        .and_then(|atlas_name| brush_source.atlases.get(atlas_name));
+
                     ui.horizontal(|ui| {
-                        ui.label("Atlas Mode:");
-                        ui.label(match atlas.color_mode {
-                            toki_core::assets::atlas::ColorMode::TrueColor => "TrueColor",
-                            toki_core::assets::atlas::ColorMode::PaletteIndexed => "PaletteIndexed",
-                        });
+                        ui.label("Tileset Entries:");
+                        ui.label(brush_source.tileset.entries.len().to_string());
                     });
-                    if atlas.is_palette_indexed() {
+                    if let Some(atlas) = selected_atlas.map(|source| &source.meta) {
                         ui.horizontal(|ui| {
-                            ui.label("Default Palette:");
-                            ui.label(atlas.palette.as_deref().unwrap_or("gb_default"));
+                            ui.label("Selected Source Mode:");
+                            ui.label(match atlas.color_mode {
+                                toki_core::assets::atlas::ColorMode::TrueColor => "TrueColor",
+                                toki_core::assets::atlas::ColorMode::PaletteIndexed => {
+                                    "PaletteIndexed"
+                                }
+                            });
                         });
-                        ui.label(
-                            "Indexed atlas palette selection is controlled by atlas metadata or the project-wide indexed override.",
-                        );
+                        if atlas.is_palette_indexed() {
+                            ui.horizontal(|ui| {
+                                ui.label("Default Palette:");
+                                ui.label(atlas.palette.as_deref().unwrap_or("gb_default"));
+                            });
+                            ui.label(
+                                "Indexed atlas palette selection is controlled by atlas metadata or the project-wide indexed override.",
+                            );
+                        }
                     }
-                    crate::ui::editor_ui::sync_map_editor_brush_selection(ui_state, &brush_entries);
+                    crate::ui::editor_ui::sync_map_editor_brush_selection(
+                        ui_state,
+                        &brush_source.brush_entries,
+                    );
                     ui.horizontal(|ui| {
                         ui.label("Tile:");
                         let selected_label = crate::ui::editor_ui::selected_map_editor_brush_entry(
-                            &brush_entries,
+                            &brush_source.brush_entries,
                             crate::ui::editor_context::map_state(ui_state)
                                 .selected_tile
                                 .as_deref(),
@@ -136,7 +151,7 @@ impl InspectorSystem {
                         egui::ComboBox::from_id_salt("inspector_map_editor_brush_tile_selector")
                             .selected_text(selected_label)
                             .show_ui(ui, |ui| {
-                                for entry in &brush_entries {
+                                for entry in &brush_source.brush_entries {
                                     let is_selected =
                                         crate::ui::editor_context::map_state_mut(ui_state)
                                             .selected_tile
@@ -170,51 +185,30 @@ impl InspectorSystem {
                     });
                     Self::render_collision_stamp_toggle(ui_state, ui);
 
-                    if let Some(selected_entry) =
-                        crate::ui::editor_ui::selected_map_editor_brush_entry(
-                            &brush_entries,
-                            crate::ui::editor_context::map_state(ui_state)
-                                .selected_tile
-                                .as_deref(),
-                        )
-                        .cloned()
+                    if let (Some(selected_entry), Some(atlas_source)) = (selected_entry, selected_atlas)
                     {
+                        let texture_path = atlas_source
+                            .path
+                            .parent()
+                            .map(|parent| parent.join(&atlas_source.meta.image));
                         ui.horizontal(|ui| {
                             ui.label(format!("Selected Tile: {}", selected_entry.display_label));
-                            Self::render_map_editor_selected_tile_preview(
-                                ui_state,
-                                ui,
-                                ctx,
-                                &atlas,
-                                &texture_path,
-                                &selected_entry,
-                            );
-                        });
-                        if let Some(props) = atlas.get_tile_properties(&selected_entry.id).cloned()
-                        {
-                            let mut solid = props.solid;
-                            let mut trigger = props.trigger;
-                            let mut changed = false;
-                            ui.horizontal(|ui| {
-                                changed |= ui.checkbox(&mut solid, "Solid").changed();
-                                changed |= ui.checkbox(&mut trigger, "Trigger").changed();
-                            });
-                            if changed {
-                                let mut atlas_mut = atlas.clone();
-                                if let Some(tile_info) = atlas_mut.tiles.get_mut(&selected_entry.id)
-                                {
-                                    tile_info.properties.solid = solid;
-                                    tile_info.properties.trigger = trigger;
-                                }
-                                crate::ui::editor_context::map_state_mut(ui_state).modified_atlas =
-                                    Some(atlas_mut);
+                            if let Some(texture_path) = texture_path.as_ref() {
+                                Self::render_map_editor_selected_tile_preview(
+                                    ui_state,
+                                    ui,
+                                    ctx,
+                                    &atlas_source.meta,
+                                    texture_path,
+                                    &selected_entry,
+                                );
                             }
-                        }
+                        });
                     } else {
                         ui.label("Selected Tile: none");
                     }
                 } else {
-                    ui.label("No atlas tiles available for the current map.");
+                    ui.label("No tileset entries available for the current map.");
                 }
                 ui.label(
                     match crate::ui::editor_context::map_state_mut(ui_state).tool {
@@ -251,84 +245,39 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         config: Option<&EditorConfig>,
     ) {
-        let Some((_, atlas, _)) = Self::load_map_editor_brush_source(ui_state, config) else {
+        let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config) else {
             return;
         };
-        if atlas.auto_tile_groups.is_empty() && atlas.imported_auto_tiles.is_empty() {
+        let mut auto_tile_entries = brush_source
+            .brush_entries
+            .iter()
+            .filter(|entry| entry.kind == crate::ui::editor_ui::MapEditorBrushKind::AutoTileGroup)
+            .collect::<Vec<_>>();
+        auto_tile_entries.sort_by(|left, right| left.display_label.cmp(&right.display_label));
+        if auto_tile_entries.is_empty() {
             ui.label("Auto-Tile Groups: none");
-            Self::render_import_auto_tile_button(ui_state, ui, config);
             return;
         }
         ui.label("Auto-Tile Groups");
-        let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
-        let mut remove_group: Option<String> = None;
-        for (name, group) in &atlas.auto_tile_groups {
+        for entry in auto_tile_entries {
             ui.horizontal(|ui| {
-                let mode_label = match group.mode {
-                    toki_core::assets::autotile::AutoTileMode::FourBit => "4-bit",
-                    toki_core::assets::autotile::AutoTileMode::EightBit => "8-bit",
-                };
-                let filled = group.variants.len();
-                let expected = group.expected_variant_count();
-                let display_name = brush_entries
-                    .iter()
-                    .find(|entry| entry.id == *name)
-                    .map(|entry| entry.display_label.trim_start_matches("[A] ").to_string())
-                    .unwrap_or_else(|| name.clone());
-                ui.label(format!(
-                    "{display_name} ({mode_label}, {filled}/{expected})"
-                ));
-                let is_imported = atlas
-                    .imported_auto_tiles
-                    .iter()
-                    .any(|i| i.group_name == *name);
-                if is_imported && ui.small_button("🗑").clicked() {
-                    remove_group = Some(name.clone());
+                ui.label(&entry.display_label);
+                if let Some(atlas_name) =
+                    crate::ui::editor_ui::map_editor_brush_entry_atlas_name(&entry.id)
+                {
+                    ui.small(format!("source: {atlas_name}"));
                 }
             });
         }
-        if let Some(group_name) = remove_group {
-            let mut atlas_mut = atlas.clone();
-            crate::ui::interactions::atlas_merge::remove_auto_tile_from_atlas(
-                &mut atlas_mut,
-                &group_name,
-            );
-            if let Some(atlas_path) = &crate::ui::editor_context::map_state(ui_state).atlas_path {
-                if let Ok(json) = serde_json::to_string_pretty(&atlas_mut) {
-                    let _ = std::fs::write(atlas_path, json);
-                }
-            }
-            crate::ui::editor_context::map_state_mut(ui_state).modified_atlas = Some(atlas_mut);
-        }
-        Self::render_import_auto_tile_button(ui_state, ui, config);
+        ui.small("Auto-tiles are linked through the map tileset; atlas merge import is not used here.");
     }
 
     fn render_import_auto_tile_button(
-        ui_state: &mut EditorUI,
+        _ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
-        config: Option<&EditorConfig>,
+        _config: Option<&EditorConfig>,
     ) {
-        let Some(project_path) = config.and_then(|c| c.current_project_path()).cloned() else {
-            return;
-        };
-        let available = Self::discover_auto_tile_atlases(&project_path);
-        if available.is_empty() {
-            ui.label("No auto-tile spritesheets found in project.");
-            return;
-        }
-        let mut selected: Option<std::path::PathBuf> = None;
-        egui::ComboBox::from_id_salt("import_autotile_selector")
-            .selected_text("Import Auto-Tile...")
-            .show_ui(ui, |ui| {
-                for (name, path) in &available {
-                    if ui.selectable_label(false, name).clicked() {
-                        selected = Some(path.clone());
-                    }
-                }
-            });
-        if let Some(source_path) = selected {
-            Self::execute_auto_tile_import(ui_state, config, &project_path, &source_path);
-        }
+        ui.small("Use tileset composition to link auto-tiles from source atlases.");
     }
 
     fn discover_auto_tile_atlases(
@@ -358,89 +307,12 @@ impl InspectorSystem {
     }
 
     fn execute_auto_tile_import(
-        ui_state: &mut EditorUI,
-        config: Option<&EditorConfig>,
-        project_path: &std::path::Path,
-        source_path: &std::path::Path,
+        _ui_state: &mut EditorUI,
+        _config: Option<&EditorConfig>,
+        _project_path: &std::path::Path,
+        _source_path: &std::path::Path,
     ) {
-        let Some((_, atlas, _)) = Self::load_map_editor_brush_source(ui_state, config) else {
-            return;
-        };
-        let source_atlas = match toki_core::assets::atlas::AtlasMeta::load_from_file(source_path) {
-            Ok(a) => a,
-            Err(e) => {
-                tracing::error!("Failed to load auto-tile atlas: {e}");
-                return;
-            }
-        };
-        let source_image_path = source_path.parent().unwrap().join(&source_atlas.image);
-        let source_image = match toki_core::graphics::image::load_image_rgba8(&source_image_path) {
-            Ok(img) => img,
-            Err(e) => {
-                tracing::error!("Failed to load auto-tile image: {e}");
-                return;
-            }
-        };
-        let atlas_path = crate::ui::editor_context::map_state(ui_state)
-            .atlas_path
-            .clone();
-        let base_image_path = atlas_path
-            .as_ref()
-            .and_then(|p| p.parent())
-            .map(|dir| dir.join(&atlas.image));
-        let mut base_image = base_image_path
-            .as_ref()
-            .and_then(|p| toki_core::graphics::image::load_image_rgba8(p).ok())
-            .unwrap_or(toki_core::graphics::image::DecodedImage {
-                width: atlas.tile_size.x,
-                height: atlas.tile_size.y,
-                data: vec![0u8; (atlas.tile_size.x * atlas.tile_size.y * 4) as usize],
-            });
-        let mut atlas_mut = atlas;
-        let relative_source = source_path
-            .strip_prefix(project_path)
-            .unwrap_or(source_path)
-            .to_path_buf();
-        match crate::ui::interactions::atlas_merge::import_auto_tile_into_atlas(
-            &mut atlas_mut,
-            &mut base_image,
-            &source_atlas,
-            &source_image,
-            &relative_source,
-            &ui_state.project.available_palettes,
-        ) {
-            Ok(()) => {
-                if let Some(img_path) = &base_image_path {
-                    if let Err(e) = toki_core::graphics::image::save_image_rgba8(
-                        img_path,
-                        base_image.width,
-                        base_image.height,
-                        &base_image.data,
-                    ) {
-                        tracing::error!("Failed to save merged atlas image: {e}");
-                    }
-                }
-                // Save atlas JSON immediately so it persists
-                if let Some(atlas_path) = &crate::ui::editor_context::map_state(ui_state).atlas_path
-                {
-                    if let Ok(json) = serde_json::to_string_pretty(&atlas_mut) {
-                        if let Err(e) = std::fs::write(atlas_path, json) {
-                            tracing::error!("Failed to save atlas JSON: {e}");
-                        }
-                    }
-                }
-                let state = crate::ui::editor_context::map_state_mut(ui_state);
-                state.modified_atlas = Some(atlas_mut);
-                // Trigger viewport re-render to reload the resized texture
-                if let Some(draft) = &state.draft {
-                    state.pending_tilemap_sync = Some(draft.tilemap.clone());
-                }
-                tracing::info!("Imported auto-tile from {}", source_path.display());
-            }
-            Err(e) => {
-                tracing::error!("Auto-tile import failed: {e}");
-            }
-        }
+        tracing::warn!("Auto-tile atlas import via atlas merge is not used in tileset-based maps");
     }
 
     fn render_layer_panel(ui_state: &mut EditorUI, ui: &mut egui::Ui) {
@@ -591,25 +463,39 @@ impl InspectorSystem {
                 ui.label(if tile_info.trigger { "Yes" } else { "No" });
             });
 
-            if let Some((_, atlas, texture_path)) =
-                Self::load_map_editor_brush_source(ui_state, config)
+            if let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config)
             {
-                let brush_entries = crate::ui::editor_ui::build_map_editor_brush_entries(&atlas);
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label("Preview:");
-                    if let Some(brush_entry) = crate::ui::editor_ui::selected_map_editor_brush_entry(
-                        &brush_entries,
-                        Some(tile_info.tile_name.as_str()),
-                    ) {
-                        Self::render_map_editor_selected_tile_preview(
-                            ui_state,
-                            ui,
-                            ctx,
-                            &atlas,
-                            &texture_path,
-                            brush_entry,
-                        );
+                    if let Some(brush_entry) =
+                        crate::ui::editor_ui::selected_map_editor_brush_entry(
+                            &brush_source.brush_entries,
+                            Some(tile_info.tile_name.as_str()),
+                        )
+                    {
+                        if let Some(atlas_name) =
+                            crate::ui::editor_ui::map_editor_brush_entry_atlas_name(
+                                &brush_entry.id,
+                            )
+                        {
+                            if let Some(atlas_source) = brush_source.atlases.get(atlas_name) {
+                                if let Some(texture_path) = atlas_source
+                                    .path
+                                    .parent()
+                                    .map(|parent| parent.join(&atlas_source.meta.image))
+                                {
+                                    Self::render_map_editor_selected_tile_preview(
+                                        ui_state,
+                                        ui,
+                                        ctx,
+                                        &atlas_source.meta,
+                                        &texture_path,
+                                        brush_entry,
+                                    );
+                                }
+                            }
+                        }
                     }
                 });
             }
@@ -645,39 +531,19 @@ impl InspectorSystem {
     }
 
     fn update_tile_property(
-        ui_state: &mut EditorUI,
-        config: Option<&EditorConfig>,
-        tile_name: &str,
-        solid: bool,
-        trigger: bool,
+        _ui_state: &mut EditorUI,
+        _config: Option<&EditorConfig>,
+        _tile_name: &str,
+        _solid: bool,
+        _trigger: bool,
     ) {
-        let Some((_, atlas, _)) = Self::load_map_editor_brush_source(ui_state, config) else {
-            return;
-        };
-        let mut atlas_mut = atlas;
-        if let Some(tile_info) = atlas_mut.tiles.get_mut(tile_name) {
-            tile_info.properties.solid = solid;
-            tile_info.properties.trigger = trigger;
-        }
-        let map_state = crate::ui::editor_context::map_state_mut(ui_state);
-        map_state.modified_atlas = Some(atlas_mut);
-        // Update cached tile info to reflect the change immediately
-        if let Some(info) = &mut map_state.selected_tile_info {
-            if info.tile_name == tile_name {
-                info.solid = solid;
-                info.trigger = trigger;
-            }
-        }
+        tracing::warn!("Editing tile collision properties from the map inspector is disabled in tileset-based mode");
     }
 
     pub(super) fn load_map_editor_brush_source(
         ui_state: &EditorUI,
         config: Option<&EditorConfig>,
-    ) -> Option<(
-        Vec<crate::ui::editor_ui::MapEditorBrushEntry>,
-        toki_core::assets::atlas::AtlasMeta,
-        std::path::PathBuf,
-    )> {
+    ) -> Option<crate::ui::editor_ui::LoadedMapEditorBrushSource> {
         crate::ui::editor_ui::load_map_editor_brush_source(ui_state, config)
     }
 

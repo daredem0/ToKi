@@ -20,7 +20,8 @@ use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
     per_frame_lru::PerFrameLruCache, DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, Rect,
-    RenderError, SceneClipRect, SpritePipeline, TextBackgroundRect, TilemapPipeline,
+    RenderError, SceneClipRect, SceneTilemapBatch, SpritePipeline, TextBackgroundRect,
+    TilemapPipeline,
 };
 
 const GPU_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY: usize = 64;
@@ -34,6 +35,9 @@ pub struct GpuState {
     queue: Queue,
     tilemap_pipeline: TilemapPipeline,
     overlay_tilemap_pipeline: TilemapPipeline,
+    tilemap_pipelines_by_texture: PerFrameLruCache<PathBuf, TilemapPipeline>,
+    tilemap_batches_below: Vec<PathBuf>,
+    tilemap_batches_above: Vec<PathBuf>,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: PerFrameLruCache<PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<GpuSpriteBatchKey>>,
@@ -102,6 +106,9 @@ impl GpuState {
             queue,
             tilemap_pipeline,
             overlay_tilemap_pipeline,
+            tilemap_pipelines_by_texture: PerFrameLruCache::new(64),
+            tilemap_batches_below: Vec::new(),
+            tilemap_batches_above: Vec::new(),
             sprite_pipeline,
             sprite_pipelines_by_texture: PerFrameLruCache::new(
                 GPU_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY,
@@ -283,12 +290,55 @@ impl GpuState {
         self.tilemap_pipeline.update_projection(&self.queue, mvp);
         self.overlay_tilemap_pipeline
             .update_projection(&self.queue, mvp);
+        for pipeline in self.tilemap_pipelines_by_texture.values_mut() {
+            pipeline.update_projection(&self.queue, mvp);
+        }
         self.sprite_pipeline.update_projection(&self.queue, mvp);
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.update_projection(&self.queue, mvp);
         }
         self.world_underlay_pipeline.update_camera(&self.queue, mvp);
         self.debug_pipeline.update_camera(&self.queue, mvp);
+    }
+
+    pub fn set_tilemap_batches(&mut self, batches: &[SceneTilemapBatch]) {
+        self.tilemap_pipelines_by_texture.begin_frame();
+        self.tilemap_batches_below.clear();
+        self.tilemap_batches_above.clear();
+
+        for batch in batches {
+            let texture_key = batch
+                .texture_cache_key
+                .clone()
+                .map(PathBuf::from)
+                .or_else(|| batch.texture_path.clone())
+                .unwrap_or_default();
+            let insert = self.tilemap_pipelines_by_texture.get_or_try_insert_with(
+                texture_key.clone(),
+                || {
+                    let source = if let Some(image) = batch.texture_image.as_ref() {
+                        TextureSource::rgba8(image)
+                    } else if let Some(texture_path) = batch.texture_path.as_deref() {
+                        TextureSource::path(texture_path)
+                    } else {
+                        TextureSource::placeholder()
+                    };
+                    TilemapPipeline::new(&self.device, &self.queue, self.config.format, source)
+                },
+            );
+            let Ok(Some(pipeline)) = insert else {
+                continue;
+            };
+            pipeline.update_projection(&self.queue, self.current_mvp);
+            pipeline.update_vertices(&self.device, &self.queue, &batch.vertices);
+            if batch.above_entities {
+                self.tilemap_batches_above.push(texture_key);
+            } else {
+                self.tilemap_batches_below.push(texture_key);
+            }
+        }
+
+        self.tilemap_pipelines_by_texture.evict_unused_lru();
     }
 }
 
@@ -327,6 +377,10 @@ impl crate::RenderFrameControl for GpuState {
 
     fn update_overlay_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         GpuState::update_overlay_tilemap_vertices(self, vertices);
+    }
+
+    fn set_tilemap_batches(&mut self, batches: &[SceneTilemapBatch]) {
+        GpuState::set_tilemap_batches(self, batches);
     }
 }
 

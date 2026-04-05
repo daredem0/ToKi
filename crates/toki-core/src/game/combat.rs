@@ -9,6 +9,7 @@ use crate::entity::{
 use super::animation::FacingDirection;
 use super::stat_effects::{StatChangeRequest, StatEffectService};
 use super::{GameState, InputAction, RuntimeState, WorldContext, WorldState};
+use crate::assets::tileset::TileSetResolver;
 
 pub struct CombatSystem;
 
@@ -52,7 +53,7 @@ impl CombatSystem {
     ) {
         state
             .combat_service()
-            .update_projectiles(world.tilemap, world.atlas, time_scale);
+            .update_projectiles(world.tilemap, world.tileset, time_scale);
     }
 }
 
@@ -75,13 +76,13 @@ impl<'a> CombatService<'a> {
         entity_id: EntityId,
         new_position: glam::IVec2,
         tilemap: &crate::assets::tilemap::TileMap,
-        atlas: &crate::assets::atlas::AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> bool {
         let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
             return false;
         };
 
-        collision::can_entity_move_to_position(entity, new_position, tilemap, atlas)
+        collision::can_entity_move_to_position(entity, new_position, tilemap, tileset)
             && !self
                 .world
                 .entity_manager
@@ -321,7 +322,7 @@ impl<'a> CombatService<'a> {
     pub(super) fn update_projectiles(
         &mut self,
         tilemap: &crate::assets::tilemap::TileMap,
-        atlas: &crate::assets::atlas::AtlasMeta,
+        tileset: &TileSetResolver<'_>,
         time_scale: f32,
     ) {
         let projectile_ids = self
@@ -388,7 +389,7 @@ impl<'a> CombatService<'a> {
             let (delta, new_pos_acc, new_tick_acc, consumed_ticks) =
                 scaled_projectile_move(velocity, pos_acc, tick_acc, time_scale);
             let new_position = current_position + delta;
-            if !self.can_entity_move_to_position(projectile_id, new_position, tilemap, atlas) {
+            if !self.can_entity_move_to_position(projectile_id, new_position, tilemap, tileset) {
                 tracing::debug!(
                     "Projectile {} blocked moving from {:?} to {:?} and will despawn",
                     projectile_id,

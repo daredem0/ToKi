@@ -1013,14 +1013,13 @@ impl EditorApp {
                     .preview_position
                     .map(|preview_position| {
                         let tilemap = scene_viewport.tilemap();
-                        let terrain_atlas =
-                            tilemap.map(|_| scene_viewport.resources().get_terrain_atlas());
+                        let tileset = scene_viewport.tileset_resolver();
                         scene_overlays::build_drag_preview_sprites(
                             &drag.dragged_entities,
                             drag.entity.position,
                             preview_position,
                             tilemap,
-                            terrain_atlas,
+                            tileset.as_ref(),
                         )
                     })
             })
@@ -1242,14 +1241,14 @@ impl EditorApp {
         drag_state: &crate::ui::editor_ui::EntityMoveDragState,
         preview_position: glam::Vec2,
         tilemap: Option<&toki_core::assets::tilemap::TileMap>,
-        terrain_atlas: Option<&toki_core::assets::atlas::AtlasMeta>,
+        tileset: Option<&toki_core::assets::tileset::TileSetResolver<'_>>,
     ) -> Vec<DragPreviewSprite> {
         scene_overlays::build_drag_preview_sprites(
             &drag_state.dragged_entities,
             drag_state.entity.position,
             preview_position,
             tilemap,
-            terrain_atlas,
+            tileset,
         )
     }
 }

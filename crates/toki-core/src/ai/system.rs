@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::animation::AnimationState;
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::entity::{AiBehavior, Entity, EntityId, EntityManager};
 use glam::{IVec2, UVec2};
 
@@ -49,7 +49,7 @@ impl AiSystem {
         player_id: Option<EntityId>,
         world_bounds: UVec2,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> Vec<AiUpdateResult> {
         self.frame_counter += 1;
 
@@ -57,7 +57,7 @@ impl AiSystem {
             .and_then(|id| entity_manager.get_entity(id))
             .map(|e| e.position);
 
-        let ctx = AiContext::new(entity_manager, world_bounds, tilemap, atlas);
+        let ctx = AiContext::new(entity_manager, world_bounds, tilemap, tileset);
         let mut results = Vec::new();
 
         // Collect entities with active AI behaviors

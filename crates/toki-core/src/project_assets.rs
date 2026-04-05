@@ -1,4 +1,6 @@
-use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use crate::assets::{
+    atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap, tileset::TileSetMeta,
+};
 use crate::dialog::DialogTree;
 use crate::entity::{build_decoration_entity, DecorationSpec, EntityDefinition, EntityGrounding};
 use crate::io::text::{
@@ -94,8 +96,8 @@ pub struct DiscoveredPaletteAsset {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedProjectResourcePaths {
     pub tilemap_path: PathBuf,
-    pub terrain_atlas_path: PathBuf,
-    pub tilemap_texture_path: Option<PathBuf>,
+    pub tileset_path: PathBuf,
+    pub tileset_atlas_paths: Vec<PathBuf>,
     pub sprite_texture_path: Option<PathBuf>,
     pub sprite_atlas_paths: Vec<PathBuf>,
     pub object_sheet_paths: Vec<PathBuf>,
@@ -512,27 +514,56 @@ pub fn load_project_palettes(
         .collect())
 }
 
-pub fn resolve_tilemap_atlas_path(
+pub fn resolve_tilemap_tileset_path(
     project_path: &Path,
     tilemap_path: &Path,
     tilemap: &TileMap,
 ) -> Option<PathBuf> {
-    let atlas_path = &tilemap.atlas;
-    if atlas_path.is_absolute() && atlas_path.exists() {
-        return Some(atlas_path.clone());
+    let tileset_path = &tilemap.tileset;
+    if tileset_path.is_absolute() && tileset_path.exists() {
+        return Some(tileset_path.clone());
     }
 
     let map_dir = tilemap_path.parent()?;
     first_existing_path(&[
-        map_dir.join(atlas_path),
-        project_path.join("assets").join("sprites").join(atlas_path),
+        project_path.join("assets").join("tilesets").join(tileset_path),
+        map_dir.join(tileset_path),
         project_path
             .join("assets")
             .join("tilemaps")
-            .join(atlas_path),
-        project_path.join("assets").join("maps").join(atlas_path),
-        project_path.join("assets").join(atlas_path),
+            .join(tileset_path),
+        project_path.join("assets").join("maps").join(tileset_path),
+        project_path.join("assets").join(tileset_path),
     ])
+}
+
+pub fn resolve_tileset_atlas_paths(
+    project_path: &Path,
+    tileset_path: &Path,
+    tileset: &TileSetMeta,
+) -> Vec<PathBuf> {
+    let tileset_dir = tileset_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut seen = std::collections::HashSet::new();
+    let mut resolved = Vec::new();
+
+    for entry in tileset.entries.values() {
+        if !seen.insert(entry.atlas_name.clone()) {
+            continue;
+        }
+        let atlas_name = PathBuf::from(&entry.atlas_name);
+        if let Some(path) = first_existing_path(&[
+            tileset_dir.join(&atlas_name),
+            project_path.join("assets").join("sprites").join(&atlas_name),
+            project_path.join("assets").join("tilemaps").join(&atlas_name),
+            project_path.join("assets").join("maps").join(&atlas_name),
+            project_path.join("assets").join(&atlas_name),
+        ]) {
+            resolved.push(path);
+        }
+    }
+
+    resolved.sort();
+    resolved
 }
 
 pub fn resolve_atlas_texture_path(atlas_path: &Path) -> Result<Option<PathBuf>, ProjectAssetError> {
@@ -623,22 +654,22 @@ pub fn resolve_project_resource_paths(
     let tilemap = TileMap::load_from_file(&tilemap_path)?;
     tilemap.validate().map_err(ProjectAssetError::Core)?;
 
-    let terrain_atlas_path = resolve_tilemap_atlas_path(project_path, &tilemap_path, &tilemap)
+    let tileset_path = resolve_tilemap_tileset_path(project_path, &tilemap_path, &tilemap)
         .ok_or_else(|| {
             ProjectAssetError::Validation(format!(
-                "Could not resolve tilemap atlas '{}' for map '{}'",
-                tilemap.atlas.display(),
+                "Could not resolve tilemap tileset '{}' for map '{}'",
+                tilemap.tileset.display(),
                 tilemap_path.display()
             ))
         })?;
-
-    let tilemap_texture_path = resolve_atlas_texture_path(&terrain_atlas_path)?;
+    let tileset = TileSetMeta::load_from_file(&tileset_path)?;
+    let tileset_atlas_paths = resolve_tileset_atlas_paths(project_path, &tileset_path, &tileset);
     let sprite_texture_path = resolve_atlas_texture_path(&sprite_metadata.sprite_atlas_paths[0])?;
 
     Ok(ResolvedProjectResourcePaths {
         tilemap_path,
-        terrain_atlas_path,
-        tilemap_texture_path,
+        tileset_path,
+        tileset_atlas_paths,
         sprite_texture_path,
         sprite_atlas_paths: sprite_metadata.sprite_atlas_paths,
         object_sheet_paths: sprite_metadata.object_sheet_paths,

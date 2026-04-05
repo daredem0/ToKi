@@ -437,7 +437,7 @@ pub fn build_drag_preview_sprites(
     anchor_entity_position: glam::IVec2,
     preview_position: glam::Vec2,
     tilemap: Option<&TileMap>,
-    terrain_atlas: Option<&toki_core::assets::atlas::AtlasMeta>,
+    tileset: Option<&toki_core::assets::tileset::TileSetResolver<'_>>,
 ) -> Vec<DragPreviewSprite> {
     let anchor_preview = glam::IVec2::new(
         preview_position.x.floor() as i32,
@@ -449,13 +449,13 @@ pub fn build_drag_preview_sprites(
         .iter()
         .map(|entity| {
             let world_position = entity.position + delta;
-            let is_valid = match (tilemap, terrain_atlas) {
-                (Some(tilemap), Some(terrain_atlas)) => {
+            let is_valid = match (tilemap, tileset) {
+                (Some(tilemap), Some(tileset)) => {
                     toki_core::collision::can_entity_move_to_position(
                         entity,
                         world_position,
                         tilemap,
-                        terrain_atlas,
+                        tileset,
                     )
                 }
                 _ => true,

@@ -12,7 +12,7 @@ fn create_test_tilemap() -> TileMap {
     TileMap {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -139,7 +139,7 @@ fn tilemap_validate_empty_map_passes() {
     let tilemap = TileMap {
         size: UVec2::new(0, 0),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers: vec![TileLayer::new("ground", vec![])],
     };
 
@@ -249,7 +249,7 @@ fn tilemap_generate_vertices_empty_map() {
     let tilemap = TileMap {
         size: UVec2::new(0, 0),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers: vec![TileLayer::new("ground", vec![])],
     };
     let atlas = create_test_atlas();
@@ -264,7 +264,7 @@ fn tilemap_generate_vertices_with_larger_map() {
     let tilemap = TileMap {
         size: UVec2::new(3, 2), // 3x2 map
         tile_size: UVec2::new(8, 8),
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -311,7 +311,7 @@ fn tilemap_row_major_indexing() {
     let tilemap = TileMap {
         size: UVec2::new(3, 2), // 3 wide, 2 tall
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -341,7 +341,7 @@ fn tilemap_single_tile_map() {
     let tilemap = TileMap {
         size: UVec2::new(1, 1),
         tile_size: UVec2::new(32, 32),
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers: vec![TileLayer::new("ground", vec!["single".to_string()])],
     };
 
@@ -359,7 +359,7 @@ fn tilemap_chunk_calculations() {
     let tilemap = TileMap {
         size: UVec2::new(64, 64),    // Your actual map size
         tile_size: UVec2::new(8, 8), // 8x8 pixel tiles
-        atlas: PathBuf::from("test.json"),
+        tileset: PathBuf::from("test.json"),
         layers: vec![TileLayer::new("ground", vec![])], // Empty for this test
     };
 
@@ -405,7 +405,7 @@ fn tilemap_serialization_round_trips_without_object_storage() {
     let tilemap = TileMap {
         size: UVec2::new(1, 1),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new("ground", vec!["grass".to_string()])],
     };
 

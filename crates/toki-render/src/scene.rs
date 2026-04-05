@@ -8,9 +8,11 @@ use toki_core::assets::atlas::AtlasMeta;
 use toki_core::assets::tile_animation::TileAnimationClock;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::graphics::image::DecodedImage;
+use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
 
 const SCENE_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY: usize = 64;
+const SCENE_TEXTURED_TILEMAP_PIPELINE_CACHE_CAPACITY: usize = 64;
 
 /// Data needed to render a scene
 #[derive(Debug)]
@@ -19,11 +21,21 @@ pub struct SceneData {
     pub atlas: Option<AtlasMeta>,
     pub texture_size: glam::UVec2,
     pub visible_chunks: Vec<(u32, u32)>,
+    pub tilemap_batches: Vec<SceneTilemapBatch>,
     pub sprites: Vec<SpriteInstance>,
     pub tile_animation_clock: Option<TileAnimationClock>,
     pub underlay_shapes: Vec<OverlayShape>,
     pub debug_shapes: Vec<DebugShape>,
     pub overlay_shapes: Vec<OverlayShape>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SceneTilemapBatch {
+    pub vertices: Vec<QuadVertex>,
+    pub texture_path: Option<std::path::PathBuf>,
+    pub texture_image: Option<DecodedImage>,
+    pub texture_cache_key: Option<String>,
+    pub above_entities: bool,
 }
 
 /// Sprite instance for rendering
@@ -77,6 +89,7 @@ impl Default for SceneData {
             atlas: None,
             texture_size: glam::UVec2::new(256, 256),
             visible_chunks: Vec::new(),
+            tilemap_batches: Vec::new(),
             sprites: Vec::new(),
             tile_animation_clock: None,
             underlay_shapes: Vec::new(),
@@ -91,8 +104,9 @@ pub struct SceneRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     format: wgpu::TextureFormat,
-    tilemap_pipeline: TilemapPipeline,
-    overlay_tilemap_pipeline: TilemapPipeline,
+    tilemap_pipelines_by_texture: PerFrameLruCache<std::path::PathBuf, TilemapPipeline>,
+    tilemap_batches_below: Vec<std::path::PathBuf>,
+    tilemap_batches_above: Vec<std::path::PathBuf>,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: PerFrameLruCache<std::path::PathBuf, SpritePipeline>,
     sprite_draw_batches: Vec<OrderedDrawBatch<SceneSpriteBatchKey>>,
@@ -138,10 +152,33 @@ impl SceneRenderer {
                 .map(TextureSource::path)
                 .unwrap_or_else(TextureSource::placeholder)
         };
-        let tilemap_pipeline =
-            TilemapPipeline::new(&device, &queue, surface_format, make_tilemap_source())?;
-        let overlay_tilemap_pipeline =
-            TilemapPipeline::new(&device, &queue, surface_format, make_tilemap_source())?;
+        let mut tilemap_pipelines_by_texture =
+            PerFrameLruCache::new(SCENE_TEXTURED_TILEMAP_PIPELINE_CACHE_CAPACITY);
+        tilemap_pipelines_by_texture.begin_frame();
+        if let Some(tilemap_texture) = tilemap_texture.as_deref() {
+            let key = tilemap_texture.to_path_buf();
+            tilemap_pipelines_by_texture
+                .get_or_try_insert_with(key, || {
+                    TilemapPipeline::new(
+                        &device,
+                        &queue,
+                        surface_format,
+                        TextureSource::path(tilemap_texture),
+                    )
+                })?
+                .expect("tilemap pipeline entry");
+        } else {
+            tilemap_pipelines_by_texture
+                .get_or_try_insert_with(std::path::PathBuf::new(), || {
+                    TilemapPipeline::new(
+                        &device,
+                        &queue,
+                        surface_format,
+                        make_tilemap_source(),
+                    )
+                })?
+                .expect("placeholder tilemap pipeline entry");
+        }
 
         // Clone sprite_texture for caching before moving it
         let sprite_texture_cache = sprite_texture.clone();
@@ -160,8 +197,9 @@ impl SceneRenderer {
             device,
             queue,
             format: surface_format,
-            tilemap_pipeline,
-            overlay_tilemap_pipeline,
+            tilemap_pipelines_by_texture,
+            tilemap_batches_below: Vec::new(),
+            tilemap_batches_above: Vec::new(),
             sprite_pipeline,
             sprite_pipelines_by_texture: PerFrameLruCache::new(
                 SCENE_TEXTURED_SPRITE_PIPELINE_CACHE_CAPACITY,
@@ -179,20 +217,18 @@ impl SceneRenderer {
         &mut self,
         texture_path: std::path::PathBuf,
     ) -> Result<(), RenderError> {
-        tracing::info!("Loading tilemap texture: {:?}", texture_path);
-        self.tilemap_pipeline = TilemapPipeline::new(
-            &self.device,
-            &self.queue,
-            self.format,
-            TextureSource::path(texture_path.as_path()),
-        )?;
-        self.overlay_tilemap_pipeline = TilemapPipeline::new(
-            &self.device,
-            &self.queue,
-            self.format,
-            TextureSource::path(texture_path.as_path()),
-        )?;
-        tracing::info!("Tilemap texture loaded successfully");
+        let key = texture_path.clone();
+        self.tilemap_pipelines_by_texture.begin_frame();
+        self.tilemap_pipelines_by_texture
+            .get_or_try_insert_with(key, || {
+                TilemapPipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.format,
+                    TextureSource::path(texture_path.as_path()),
+                )
+            })?
+            .expect("tilemap pipeline entry");
         Ok(())
     }
 
@@ -201,18 +237,17 @@ impl SceneRenderer {
         &mut self,
         image: &toki_core::graphics::image::DecodedImage,
     ) -> Result<(), RenderError> {
-        self.tilemap_pipeline = TilemapPipeline::new(
-            &self.device,
-            &self.queue,
-            self.format,
-            TextureSource::rgba8(image),
-        )?;
-        self.overlay_tilemap_pipeline = TilemapPipeline::new(
-            &self.device,
-            &self.queue,
-            self.format,
-            TextureSource::rgba8(image),
-        )?;
+        self.tilemap_pipelines_by_texture.begin_frame();
+        self.tilemap_pipelines_by_texture
+            .get_or_try_insert_with(std::path::PathBuf::from("__tilemap_rgba8__"), || {
+                TilemapPipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.format,
+                    TextureSource::rgba8(image),
+                )
+            })?
+            .expect("tilemap rgba8 pipeline entry");
         Ok(())
     }
 
@@ -438,40 +473,54 @@ impl SceneRenderer {
         }
     }
 
-    fn prepare_scene_pipelines(&mut self, scene_data: &SceneData) {
-        if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
-            let anim_clock = scene_data.tile_animation_clock.as_ref();
-            let split = if scene_data.visible_chunks.is_empty() {
-                tracing::trace!(
-                    "Generating split vertices for all tiles ({}x{})",
-                    tilemap.size.x,
-                    tilemap.size.y
-                );
-                tilemap.generate_split_vertices(atlas, scene_data.texture_size, anim_clock)
-            } else {
-                tracing::trace!(
-                    "Generating split vertices for {} visible chunks",
-                    scene_data.visible_chunks.len()
-                );
-                tilemap.generate_split_vertices_for_chunks(
-                    atlas,
-                    scene_data.texture_size,
-                    &scene_data.visible_chunks,
-                    anim_clock,
-                )
-            };
-            tracing::trace!(
-                "Updating tilemap pipelines: {} below, {} above vertices",
-                split.below.len(),
-                split.above.len()
-            );
-            self.tilemap_pipeline
-                .update_vertices(&self.device, &self.queue, &split.below);
-            self.overlay_tilemap_pipeline
-                .update_vertices(&self.device, &self.queue, &split.above);
-        } else {
-            tracing::trace!("No tilemap or atlas to render");
+    fn render_tilemap_batch_list<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        batch_keys: &[std::path::PathBuf],
+    ) {
+        for texture_key in batch_keys {
+            if let Some(pipeline) = self.tilemap_pipelines_by_texture.get(texture_key) {
+                pipeline.render(render_pass);
+            }
         }
+    }
+
+    fn prepare_scene_pipelines(&mut self, scene_data: &SceneData) {
+        self.tilemap_pipelines_by_texture.begin_frame();
+        self.tilemap_batches_below.clear();
+        self.tilemap_batches_above.clear();
+        for batch in &scene_data.tilemap_batches {
+            let texture_key = batch
+                .texture_cache_key
+                .clone()
+                .map(std::path::PathBuf::from)
+                .or_else(|| batch.texture_path.clone())
+                .unwrap_or_default();
+            let insert = self.tilemap_pipelines_by_texture.get_or_try_insert_with(
+                texture_key.clone(),
+                || {
+                    let source = if let Some(image) = batch.texture_image.as_ref() {
+                        TextureSource::rgba8(image)
+                    } else if let Some(texture_path) = batch.texture_path.as_deref() {
+                        TextureSource::path(texture_path)
+                    } else {
+                        TextureSource::placeholder()
+                    };
+                    TilemapPipeline::new(&self.device, &self.queue, self.format, source)
+                },
+            );
+            let Ok(Some(pipeline)) = insert else {
+                continue;
+            };
+            pipeline.update_projection(&self.queue, self.current_projection);
+            pipeline.update_vertices(&self.device, &self.queue, &batch.vertices);
+            if batch.above_entities {
+                self.tilemap_batches_above.push(texture_key);
+            } else {
+                self.tilemap_batches_below.push(texture_key);
+            }
+        }
+        self.tilemap_pipelines_by_texture.evict_unused_lru();
 
         tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
         self.clear_sprite_batches();
@@ -529,13 +578,13 @@ impl SceneRenderer {
             });
 
             tracing::trace!("Rendering tilemap pipeline (below entities)");
-            self.tilemap_pipeline.render(&mut render_pass);
+            self.render_tilemap_batch_list(&mut render_pass, &self.tilemap_batches_below);
             tracing::trace!("Rendering underlay pipeline");
             self.underlay_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
             self.render_sprite_batches(&mut render_pass);
             tracing::trace!("Rendering overlay tilemap pipeline (above entities)");
-            self.overlay_tilemap_pipeline.render(&mut render_pass);
+            self.render_tilemap_batch_list(&mut render_pass, &self.tilemap_batches_above);
             tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
@@ -614,10 +663,9 @@ impl SceneRenderer {
 
     fn update_projection(&mut self, projection: glam::Mat4) {
         self.current_projection = projection;
-        self.tilemap_pipeline
-            .update_projection(&self.queue, projection);
-        self.overlay_tilemap_pipeline
-            .update_projection(&self.queue, projection);
+        for pipeline in self.tilemap_pipelines_by_texture.values_mut() {
+            pipeline.update_projection(&self.queue, projection);
+        }
         self.update_sprite_projection(projection);
         self.underlay_pipeline
             .update_camera(&self.queue, projection);

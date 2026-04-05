@@ -43,6 +43,21 @@ pub enum CoreError {
     #[error("Atlas missing tile '{tile_name}' referenced in tilemap")]
     MissingTileInAtlas { tile_name: String },
 
+    #[error("Tileset missing entry '{entry_id}' referenced in tilemap")]
+    MissingTileInTileSet { entry_id: String },
+
+    #[error("Tileset entry '{entry_id}' references missing atlas '{atlas_name}'")]
+    MissingAtlasInTileSet { entry_id: String, atlas_name: String },
+
+    #[error(
+        "Tileset entry '{entry_id}' references missing source '{source_name}' in atlas '{atlas_name}'"
+    )]
+    MissingTileSourceInTileSet {
+        entry_id: String,
+        atlas_name: String,
+        source_name: String,
+    },
+
     #[error("Collision system not initialized")]
     CollisionSystemNotInitialized,
 

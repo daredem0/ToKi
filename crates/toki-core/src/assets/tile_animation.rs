@@ -33,10 +33,66 @@ impl TileAnimationClock {
         }
     }
 
+    pub fn sync_definitions_from_iter<'a>(
+        &mut self,
+        atlases: impl IntoIterator<Item = &'a AtlasMeta>,
+    ) {
+        let atlases = atlases.into_iter().collect::<Vec<_>>();
+        self.playbacks.retain(|name, _| {
+            atlases
+                .iter()
+                .any(|atlas| atlas.animated_tiles.contains_key(name))
+        });
+        for atlas in atlases {
+            for name in atlas.animated_tiles.keys() {
+                self.playbacks.entry(name.clone()).or_insert_with(|| {
+                    let mut p = ClipPlayback::new();
+                    p.play();
+                    p
+                });
+            }
+        }
+    }
+
     /// Advance all playbacks. Returns `true` if any frame changed.
     pub fn update(&mut self, delta_ms: f32, atlas: &AtlasMeta) -> bool {
         self.any_frame_changed = false;
         for (name, playback) in &mut self.playbacks {
+            let Some(def) = atlas.animated_tiles.get(name) else {
+                continue;
+            };
+            let loop_mode = def.loop_mode.into();
+            let event = playback.update(
+                delta_ms,
+                def.frame_count(),
+                |i| def.frame_duration_at(i),
+                &loop_mode,
+            );
+            if matches!(
+                event,
+                crate::animation::PlaybackEvent::FrameChanged { .. }
+                    | crate::animation::PlaybackEvent::LoopCompleted
+            ) {
+                self.any_frame_changed = true;
+            }
+        }
+        self.any_frame_changed
+    }
+
+    pub fn update_from_iter<'a>(
+        &mut self,
+        delta_ms: f32,
+        atlases: impl IntoIterator<Item = &'a AtlasMeta>,
+    ) -> bool {
+        let atlas_map = atlases
+            .into_iter()
+            .flat_map(|atlas| atlas.animated_tiles.keys().map(move |name| (name.clone(), atlas)))
+            .collect::<HashMap<_, _>>();
+        self.any_frame_changed = false;
+        for (name, playback) in &mut self.playbacks {
+            let Some(atlas) = atlas_map.get(name) else {
+                continue;
+            };
             let Some(def) = atlas.animated_tiles.get(name) else {
                 continue;
             };

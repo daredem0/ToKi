@@ -2,8 +2,8 @@
 //!
 //! Contains functions for checking entity overlap with trigger tiles.
 
-use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::entity::Entity;
 
 #[cfg(test)]
@@ -14,20 +14,24 @@ impl RuleEvaluationService<'_> {
     pub(in crate::game) fn any_entity_overlaps_trigger_tile(
         &self,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> bool {
         for entity_id in self.world.entity_manager.active_entities_iter() {
             let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
-            if Self::entity_overlaps_trigger_tile(entity, tilemap, atlas) {
+            if Self::entity_overlaps_trigger_tile(entity, tilemap, tileset) {
                 return true;
             }
         }
         false
     }
 
-    fn entity_overlaps_trigger_tile(entity: &Entity, tilemap: &TileMap, atlas: &AtlasMeta) -> bool {
+    fn entity_overlaps_trigger_tile(
+        entity: &Entity,
+        tilemap: &TileMap,
+        tileset: &TileSetResolver<'_>,
+    ) -> bool {
         if tilemap.tile_size.x == 0 || tilemap.tile_size.y == 0 {
             return false;
         }
@@ -51,10 +55,10 @@ impl RuleEvaluationService<'_> {
 
         for y in tile_range.min_y..=tile_range.max_y {
             for x in tile_range.min_x..=tile_range.max_x {
-                let Ok(tile_name) = tilemap.get_tile_name(x, y) else {
+                let Ok(_tile_name) = tilemap.get_tile_name(x, y) else {
                     continue;
                 };
-                if atlas.is_tile_trigger(tile_name) {
+                if tileset.is_tile_trigger_at(tilemap, x, y).unwrap_or(false) {
                     return true;
                 }
             }
@@ -70,10 +74,10 @@ impl GameState {
     pub(in crate::game) fn any_entity_overlaps_trigger_tile(
         &mut self,
         tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        tileset: &TileSetResolver<'_>,
     ) -> bool {
         self.rule_evaluation_service()
-            .any_entity_overlaps_trigger_tile(tilemap, atlas)
+            .any_entity_overlaps_trigger_tile(tilemap, tileset)
     }
 }
 

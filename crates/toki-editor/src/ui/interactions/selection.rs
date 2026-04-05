@@ -558,13 +558,15 @@ impl SelectionInteraction {
         world_pos_i32: glam::IVec2,
     ) -> bool {
         if let Some(tilemap) = viewport.tilemap() {
-            let terrain_atlas = viewport.resources().get_terrain_atlas();
-            toki_core::collision::can_entity_move_to_position(
-                entity,
-                world_pos_i32,
-                tilemap,
-                terrain_atlas,
-            )
+            let tileset = viewport.tileset_resolver();
+            tileset.as_ref().is_none_or(|tileset| {
+                toki_core::collision::can_entity_move_to_position(
+                    entity,
+                    world_pos_i32,
+                    tilemap,
+                    tileset,
+                )
+            })
         } else {
             true
         }

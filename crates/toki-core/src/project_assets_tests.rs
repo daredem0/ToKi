@@ -5,8 +5,8 @@ use crate::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
     discover_project_scene_paths, discover_sprite_metadata, load_entity_definition_from_path,
     load_project_palettes, load_scene_from_path, normalize_asset_name,
-    resolve_project_resource_paths, scene_file_path, tilemap_file_path, ProjectAudioFormat,
-    SpriteMetadataFileKind,
+    resolve_project_resource_paths, resolve_tilemap_tileset_path, scene_file_path,
+    tilemap_file_path, ProjectAudioFormat, SpriteMetadataFileKind,
 };
 use std::fs;
 
@@ -304,6 +304,40 @@ fn tilemap_file_path_returns_canonical_path() {
         path,
         project.join("assets").join("tilemaps").join("Level 1.json")
     );
+}
+
+#[test]
+fn resolve_tilemap_tileset_path_prefers_assets_tilesets_over_tilemap_dir_name_collision() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(project.join("assets").join("tilemaps")).expect("tilemaps dir");
+    std::fs::create_dir_all(project.join("assets").join("tilesets")).expect("tilesets dir");
+
+    let tilemap_path = project
+        .join("assets")
+        .join("tilemaps")
+        .join("MapEditor_Test_B.json");
+    std::fs::write(&tilemap_path, "{}").expect("tilemap placeholder");
+
+    let tileset_path = project
+        .join("assets")
+        .join("tilesets")
+        .join("MapEditor_Test_B.json");
+    std::fs::write(&tileset_path, "{}").expect("tileset placeholder");
+
+    let tilemap = crate::assets::tilemap::TileMap {
+        size: glam::UVec2::new(1, 1),
+        tile_size: glam::UVec2::new(8, 8),
+        tileset: std::path::PathBuf::from("MapEditor_Test_B.json"),
+        layers: vec![crate::assets::tilemap::TileLayer::new(
+            "ground",
+            vec!["terrain/tile/brick".to_string()],
+        )],
+    };
+
+    let resolved = resolve_tilemap_tileset_path(&project, &tilemap_path, &tilemap)
+        .expect("tileset path should resolve");
+    assert_eq!(resolved, tileset_path);
 }
 
 #[test]
@@ -1099,7 +1133,13 @@ indexed_palette_override = "gb_default"
             .and_then(|name| name.to_str()),
         Some("palette_demo_map.json")
     );
-    assert!(resolved.terrain_atlas_path.ends_with("terrain.json"));
-    assert!(resolved.tilemap_texture_path.is_some());
+    assert_eq!(
+        resolved.tileset_path.file_name().and_then(|name| name.to_str()),
+        Some("palette_demo_map.json")
+    );
+    assert!(resolved
+        .tileset_atlas_paths
+        .iter()
+        .any(|path| path.ends_with("terrain.json")));
     assert!(resolved.sprite_texture_path.is_some());
 }

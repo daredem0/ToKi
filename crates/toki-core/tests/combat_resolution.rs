@@ -1,6 +1,6 @@
 use glam::{IVec2, UVec2};
 mod support;
-use support::{test_atlas, test_entity_definition, test_tilemap};
+use support::{test_atlas, test_entity_definition, test_tilemap, test_tileset_context, test_tileset_resolver};
 use toki_core::animation::{AnimationClip, AnimationState, LoopMode};
 use toki_core::entity::{CombatComponent, EntityStats, MovementProfile, PrimaryProjectileDef};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -106,15 +106,17 @@ fn projectile_damage_resolves_and_despawns_on_hit() {
     let world_bounds = UVec2::new(160, 128);
     let tilemap = test_tilemap();
     let atlas = test_atlas();
+    let (tileset, atlases) = test_tileset_context(&atlas);
+    let resolver = test_tileset_resolver(&tileset, &atlases);
 
     InputSystem::handle_profile_action_press(
         game_state.runtime_mut(),
         MovementProfile::PlayerWasd,
         InputAction::Primary,
     );
-    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
-    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
-    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &resolver);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &resolver);
+    GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &resolver);
 
     let target = game_state
         .world()

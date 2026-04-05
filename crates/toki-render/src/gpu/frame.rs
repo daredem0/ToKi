@@ -24,6 +24,9 @@ impl GpuState {
             .update_with_queue(&self.device, &self.queue);
         self.overlay_tilemap_pipeline
             .update_with_queue(&self.device, &self.queue);
+        for pipeline in self.tilemap_pipelines_by_texture.values_mut() {
+            pipeline.update_with_queue(&self.device, &self.queue);
+        }
         self.sprite_pipeline
             .update_with_queue(&self.device, &self.queue);
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
@@ -186,7 +189,15 @@ impl GpuState {
         }
 
         if self.tilemap_render_enabled {
-            self.tilemap_pipeline.render(&mut render_pass);
+            if self.tilemap_batches_below.is_empty() {
+                self.tilemap_pipeline.render(&mut render_pass);
+            } else {
+                for texture_key in &self.tilemap_batches_below {
+                    if let Some(pipeline) = self.tilemap_pipelines_by_texture.get(texture_key) {
+                        pipeline.render(&mut render_pass);
+                    }
+                }
+            }
         }
         self.world_underlay_pipeline.render(&mut render_pass);
 
@@ -205,7 +216,15 @@ impl GpuState {
         }
 
         if self.tilemap_render_enabled {
-            self.overlay_tilemap_pipeline.render(&mut render_pass);
+            if self.tilemap_batches_above.is_empty() {
+                self.overlay_tilemap_pipeline.render(&mut render_pass);
+            } else {
+                for texture_key in &self.tilemap_batches_above {
+                    if let Some(pipeline) = self.tilemap_pipelines_by_texture.get(texture_key) {
+                        pipeline.render(&mut render_pass);
+                    }
+                }
+            }
         }
         self.debug_pipeline.render(&mut render_pass);
         self.ui_shape_pipeline.render(&mut render_pass);

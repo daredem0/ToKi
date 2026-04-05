@@ -60,7 +60,7 @@ impl GameSimulation {
         state: &mut GameState,
         world_bounds: glam::UVec2,
         tilemap: &crate::assets::tilemap::TileMap,
-        atlas: &crate::assets::atlas::AtlasMeta,
+        tileset: &crate::assets::tileset::TileSetResolver<'_>,
     ) -> GameUpdateResult<AudioEvent> {
         Self::tick(
             state,
@@ -68,7 +68,7 @@ impl GameSimulation {
                 time_scale: 1.0,
                 world_bounds,
                 tilemap,
-                atlas,
+                tileset,
             },
         )
     }
@@ -78,7 +78,7 @@ impl GameSimulation {
         delta_ms: f32,
         world_bounds: glam::UVec2,
         tilemap: &crate::assets::tilemap::TileMap,
-        atlas: &crate::assets::atlas::AtlasMeta,
+        tileset: &crate::assets::tileset::TileSetResolver<'_>,
     ) -> GameUpdateResult<AudioEvent> {
         Self::tick(
             state,
@@ -86,7 +86,7 @@ impl GameSimulation {
                 time_scale: delta_ms / DEFAULT_TIMESTEP_MS,
                 world_bounds,
                 tilemap,
-                atlas,
+                tileset,
             },
         )
     }
@@ -178,7 +178,7 @@ impl GameSimulation {
             state,
             phases.result.player_moved,
             world.tilemap,
-            world.atlas,
+            world.tileset,
         );
         let mut command_result = RuleSystem::apply_commands(
             state,

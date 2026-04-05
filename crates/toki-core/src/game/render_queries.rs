@@ -1,5 +1,6 @@
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
+use crate::assets::tileset::TileSetResolver;
 use crate::entity::{Entity, EntityId, EntityManager};
 use crate::project_assets::normalize_asset_name;
 use crate::sprite::SpriteFrame;
@@ -473,7 +474,11 @@ impl<'a> RenderQueryService<'a> {
         boxes
     }
 
-    pub fn solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn solid_tile_positions(
+        &self,
+        tilemap: &TileMap,
+        tileset: &TileSetResolver<'_>,
+    ) -> Vec<(u32, u32)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
@@ -481,7 +486,7 @@ impl<'a> RenderQueryService<'a> {
         let mut solid_tiles = Vec::new();
         for y in 0..tilemap.size.y {
             for x in 0..tilemap.size.x {
-                if let Ok(is_solid) = tilemap.is_tile_solid_at(atlas, x, y) {
+                if let Ok(is_solid) = tilemap.is_tile_solid_at(tileset, x, y) {
                     if is_solid {
                         solid_tiles.push((x, y));
                     }
@@ -491,7 +496,11 @@ impl<'a> RenderQueryService<'a> {
         solid_tiles
     }
 
-    pub fn trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn trigger_tile_positions(
+        &self,
+        tilemap: &TileMap,
+        tileset: &TileSetResolver<'_>,
+    ) -> Vec<(u32, u32)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
@@ -499,10 +508,8 @@ impl<'a> RenderQueryService<'a> {
         let mut trigger_tiles = Vec::new();
         for y in 0..tilemap.size.y {
             for x in 0..tilemap.size.x {
-                if let Ok(tile_name) = tilemap.get_tile_name(x, y) {
-                    if atlas.is_tile_trigger(tile_name) {
-                        trigger_tiles.push((x, y));
-                    }
+                if tileset.is_tile_trigger_at(tilemap, x, y).unwrap_or(false) {
+                    trigger_tiles.push((x, y));
                 }
             }
         }

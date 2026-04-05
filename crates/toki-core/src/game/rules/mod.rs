@@ -113,11 +113,11 @@ impl RuleSystem {
         state: &mut GameState,
         player_moved: bool,
         tilemap: &crate::assets::tilemap::TileMap,
-        atlas: &crate::assets::atlas::AtlasMeta,
+        tileset: &crate::assets::tileset::TileSetResolver<'_>,
     ) -> Vec<RuleCommand> {
         state
             .rule_evaluation_service()
-            .collect_reactive_rule_commands(player_moved, tilemap, atlas)
+            .collect_reactive_rule_commands(player_moved, tilemap, tileset)
     }
 
     pub fn set_rules(state: &mut GameState, rules: RuleSet) {

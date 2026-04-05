@@ -3,9 +3,11 @@ use crate::config::EditorConfig;
 #[cfg(test)]
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::undo_redo::History;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use toki_core::assets::atlas::{AtlasMeta, ImportedAutoTile};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
+use toki_core::assets::tileset::{TileSetAtlasSource, TileSetEntryKind, TileSetMeta};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -147,6 +149,13 @@ pub(crate) struct MapEditorBrushEntry {
     pub preview_tile_id: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct LoadedMapEditorBrushSource {
+    pub brush_entries: Vec<MapEditorBrushEntry>,
+    pub tileset: TileSetMeta,
+    pub atlases: HashMap<String, TileSetAtlasSource>,
+}
+
 fn imported_auto_tile_for_group<'a>(
     imported_auto_tiles: &'a [ImportedAutoTile],
     group_name: &str,
@@ -253,27 +262,93 @@ pub(crate) fn selected_map_editor_brush_entry<'a>(
     brush_entries.iter().find(|entry| entry.id == selected_tile)
 }
 
-pub(crate) fn resolve_map_editor_atlas_path(project_path: &Path, tilemap: &TileMap) -> PathBuf {
-    let tilemaps_path = project_path
-        .join("assets")
-        .join("tilemaps")
-        .join(&tilemap.atlas);
-    if tilemaps_path.exists() {
-        tilemaps_path
-    } else {
-        project_path
-            .join("assets")
-            .join("sprites")
-            .join(&tilemap.atlas)
+pub(crate) fn map_editor_brush_entry_atlas_name(entry_id: &str) -> Option<&str> {
+    entry_id.split('/').next().filter(|segment| !segment.is_empty())
+}
+
+fn build_map_editor_brush_entries_from_tileset(
+    tileset: &TileSetMeta,
+    atlases: &HashMap<String, TileSetAtlasSource>,
+) -> Vec<MapEditorBrushEntry> {
+    let mut entries = tileset
+        .entries
+        .iter()
+        .filter_map(|(entry_id, entry)| {
+            let atlas = atlases
+                .get(&entry.atlas_name)
+                .or_else(|| atlases.get(toki_core::project_assets::normalize_asset_name(&entry.atlas_name)))?;
+            let (kind, prefix, preview_tile_id) = match entry.kind {
+                TileSetEntryKind::Tile => (
+                    MapEditorBrushKind::Tile,
+                    "",
+                    Some(entry.source_name.clone()),
+                ),
+                TileSetEntryKind::AutoTileGroup => (
+                    MapEditorBrushKind::AutoTileGroup,
+                    "[A] ",
+                    auto_tile_preview_tile_id(&atlas.meta, &entry.source_name),
+                ),
+                TileSetEntryKind::AnimatedTile => (
+                    MapEditorBrushKind::AnimatedTile,
+                    "[~] ",
+                    animated_tile_preview_tile_id(&atlas.meta, &entry.source_name),
+                ),
+            };
+            Some(MapEditorBrushEntry {
+                id: entry_id.clone(),
+                kind,
+                display_label: format!(
+                    "{prefix}{}",
+                    entry.display_name.clone().unwrap_or_else(|| entry.source_name.clone())
+                ),
+                preview_tile_id,
+            })
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| left.display_label.cmp(&right.display_label).then(left.id.cmp(&right.id)));
+    entries
+}
+
+pub(crate) fn resolve_map_editor_tileset_path(project_path: &Path, tilemap: &TileMap) -> Option<PathBuf> {
+    toki_core::project_assets::resolve_tilemap_tileset_path(
+        project_path,
+        &project_path.join("assets").join("tilemaps").join("__editor__.json"),
+        tilemap,
+    )
+}
+
+pub(crate) fn load_map_editor_tileset_meta(
+    ui_state: &EditorUI,
+    config: Option<&EditorConfig>,
+    tilemap: &TileMap,
+) -> Option<TileSetMeta> {
+    load_map_editor_tileset_meta_from_project_path(
+        ui_state,
+        config?.current_project_path()?,
+        tilemap,
+    )
+}
+
+pub(crate) fn load_map_editor_tileset_meta_from_project_path(
+    ui_state: &EditorUI,
+    project_path: &Path,
+    tilemap: &TileMap,
+) -> Option<TileSetMeta> {
+    if let Some(tileset) = crate::ui::editor_context::map_state(ui_state)
+        .modified_tileset
+        .clone()
+    {
+        return Some(tileset);
     }
+    let tileset_path = resolve_map_editor_tileset_path(project_path, tilemap)?;
+    TileSetMeta::load_from_file(&tileset_path).ok()
 }
 
 pub(crate) fn load_map_editor_brush_source(
     ui_state: &EditorUI,
     config: Option<&EditorConfig>,
-) -> Option<(Vec<MapEditorBrushEntry>, AtlasMeta, PathBuf)> {
+) -> Option<LoadedMapEditorBrushSource> {
     let project_path = config?.current_project_path()?;
-
     let tilemap = if let Some(draft) = &crate::ui::editor_context::map_state(ui_state).draft {
         draft.tilemap.clone()
     } else {
@@ -288,24 +363,44 @@ pub(crate) fn load_map_editor_brush_source(
         )
         .ok()?
     };
+    load_map_editor_brush_source_for_tilemap(ui_state, project_path, &tilemap)
+}
 
-    let atlas_path = resolve_map_editor_atlas_path(project_path, &tilemap);
-    let atlas = if crate::ui::editor_context::map_state(ui_state)
-        .atlas_path
-        .as_deref()
-        == Some(atlas_path.as_path())
-    {
-        if let Some(cached) = &crate::ui::editor_context::map_state(ui_state).modified_atlas {
-            cached.clone()
-        } else {
-            toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?
-        }
-    } else {
-        toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?
-    };
-    let texture_path = atlas_path.parent()?.join(&atlas.image);
-    let brush_entries = build_map_editor_brush_entries(&atlas);
-    Some((brush_entries, atlas, texture_path))
+pub(crate) fn load_map_editor_brush_source_for_tilemap(
+    ui_state: &EditorUI,
+    project_path: &Path,
+    tilemap: &TileMap,
+) -> Option<LoadedMapEditorBrushSource> {
+    let tileset = load_map_editor_tileset_meta_from_project_path(ui_state, project_path, tilemap)?;
+    let tileset_path = resolve_map_editor_tileset_path(project_path, &tilemap)?;
+    let mut atlases = HashMap::new();
+    for atlas_path in toki_core::project_assets::resolve_tileset_atlas_paths(
+        project_path,
+        &tileset_path,
+        &tileset,
+    ) {
+        let atlas = AtlasMeta::load_from_file(&atlas_path).ok()?;
+        let atlas_name = atlas_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .map(toki_core::project_assets::normalize_asset_name)
+            .unwrap_or_default()
+            .to_string();
+        atlases.insert(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: atlas_name,
+                path: atlas_path,
+                meta: atlas,
+            },
+        );
+    }
+    let brush_entries = build_map_editor_brush_entries_from_tileset(&tileset, &atlases);
+    Some(LoadedMapEditorBrushSource {
+        brush_entries,
+        tileset,
+        atlases,
+    })
 }
 
 pub(crate) fn sync_map_editor_selection(ui_state: &mut EditorUI, available_map_names: &[String]) {
