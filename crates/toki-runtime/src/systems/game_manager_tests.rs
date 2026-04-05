@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
-use toki_core::game::{GameSimulation, RenderQueryService, SceneSystem};
+use toki_core::assets::tileset::{TileSetAtlasSource, TileSetMeta, TileSetResolver};
+use toki_core::game::{RenderQueryService, SceneSystem};
 use toki_core::sprite_render::{SpriteRenderOrigin, SpriteVisualRef};
 use toki_core::GameState;
 use winit::keyboard::KeyCode;
@@ -62,7 +63,7 @@ fn sample_tilemap() -> TileMap {
     TileMap {
         size: glam::UVec2::new(2, 1),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec!["solid".to_string(), "trigger".to_string()],
@@ -74,11 +75,47 @@ fn walkable_tilemap() -> TileMap {
     TileMap {
         size: glam::UVec2::new(2, 1),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec!["trigger".to_string(), "trigger".to_string()],
         )],
+    }
+}
+
+fn sample_tileset_context(atlas: &AtlasMeta) -> (TileSetMeta, HashMap<String, TileSetAtlasSource>) {
+    let atlas_name = "terrain.json".to_string();
+    (
+        TileSetMeta::from_legacy_atlas(&atlas_name, atlas),
+        HashMap::from([(
+            atlas_name.clone(),
+            TileSetAtlasSource {
+                name: "terrain".to_string(),
+                path: PathBuf::from(&atlas_name),
+                meta: atlas.clone(),
+            },
+        )]),
+    )
+}
+
+fn with_sample_resolver<T>(atlas: &AtlasMeta, f: impl FnOnce(&TileSetResolver<'_>) -> T) -> T {
+    let (tileset, atlases) = sample_tileset_context(atlas);
+    let resolver = TileSetResolver::new(&tileset, &atlases);
+    f(&resolver)
+}
+
+struct GameSimulation;
+
+impl GameSimulation {
+    fn tick_fixed(
+        state: &mut GameState,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> toki_core::GameUpdateResult<toki_core::game::AudioEvent> {
+        with_sample_resolver(atlas, |resolver| {
+            toki_core::game::GameSimulation::tick_fixed(state, world_bounds, tilemap, resolver)
+        })
     }
 }
 
@@ -92,6 +129,22 @@ fn render_queries(manager: &GameManager) -> RenderQueryService<'_> {
 
 fn player_position(manager: &GameManager) -> glam::IVec2 {
     render_queries(manager).player_position()
+}
+
+fn solid_tile_positions(
+    queries: &RenderQueryService<'_>,
+    tilemap: &TileMap,
+    atlas: &AtlasMeta,
+) -> Vec<(u32, u32)> {
+    with_sample_resolver(atlas, |resolver| queries.solid_tile_positions(tilemap, resolver))
+}
+
+fn trigger_tile_positions(
+    queries: &RenderQueryService<'_>,
+    tilemap: &TileMap,
+    atlas: &AtlasMeta,
+) -> Vec<(u32, u32)> {
+    with_sample_resolver(atlas, |resolver| queries.trigger_tile_positions(tilemap, resolver))
 }
 
 #[test]
@@ -224,18 +277,15 @@ fn debug_collision_wrappers_return_tiles_and_boxes_when_enabled() {
 
     let queries = render_queries(&manager);
     assert!(queries.entity_collision_boxes().is_empty());
-    assert!(queries.solid_tile_positions(&tilemap, &atlas).is_empty());
-    assert!(queries.trigger_tile_positions(&tilemap, &atlas).is_empty());
+    assert!(solid_tile_positions(&queries, &tilemap, &atlas).is_empty());
+    assert!(trigger_tile_positions(&queries, &tilemap, &atlas).is_empty());
 
     manager.handle_keyboard_input(KeyCode::F4, true);
 
     let queries = render_queries(&manager);
     assert!(!queries.entity_collision_boxes().is_empty());
-    assert_eq!(queries.solid_tile_positions(&tilemap, &atlas), vec![(0, 0)]);
-    assert_eq!(
-        queries.trigger_tile_positions(&tilemap, &atlas),
-        vec![(1, 0)]
-    );
+    assert_eq!(solid_tile_positions(&queries, &tilemap, &atlas), vec![(0, 0)]);
+    assert_eq!(trigger_tile_positions(&queries, &tilemap, &atlas), vec![(1, 0)]);
 }
 
 #[test]

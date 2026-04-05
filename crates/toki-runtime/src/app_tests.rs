@@ -513,7 +513,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         0
     );
     assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
-    assert_eq!(resources.get_tilemap().atlas, terrain_atlas_path);
+    assert_eq!(resources.get_tilemap().tileset, terrain_atlas_path);
     assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
 }
 
@@ -886,11 +886,12 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         Some("Main")
     );
 
+    let resolver = resources.tileset_resolver();
     let result = GameSimulation::tick_fixed(
         &mut game_state,
         glam::UVec2::new(16, 16),
         resources.get_tilemap(),
-        resources.get_terrain_atlas(),
+        &resolver,
     );
     let request = result
         .scene_switch_request

@@ -19,7 +19,7 @@ pub fn test_tilemap() -> TileMap {
     TileMap {
         size: UVec2::new(10, 10),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
+        tileset: PathBuf::from("test_atlas.json"),
         layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 100])],
     }
 }

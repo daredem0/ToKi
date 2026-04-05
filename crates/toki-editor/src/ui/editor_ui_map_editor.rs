@@ -156,6 +156,7 @@ pub(crate) struct LoadedMapEditorBrushSource {
     pub atlases: HashMap<String, TileSetAtlasSource>,
 }
 
+#[allow(dead_code)]
 fn imported_auto_tile_for_group<'a>(
     imported_auto_tiles: &'a [ImportedAutoTile],
     group_name: &str,
@@ -165,6 +166,7 @@ fn imported_auto_tile_for_group<'a>(
         .find(|import| import.group_name == group_name)
 }
 
+#[allow(dead_code)]
 fn imported_auto_tile_display_name(imported: &ImportedAutoTile) -> Option<String> {
     imported
         .source_path
@@ -205,6 +207,7 @@ fn animated_tile_preview_tile_id(atlas: &AtlasMeta, tile_name: &str) -> Option<S
     })
 }
 
+#[allow(dead_code)]
 fn brush_entry_for_tile(atlas: &AtlasMeta, tile_name: &str) -> MapEditorBrushEntry {
     if atlas.is_auto_tile_group(tile_name) {
         let display_name = imported_auto_tile_for_group(&atlas.imported_auto_tiles, tile_name)
@@ -235,6 +238,7 @@ fn brush_entry_for_tile(atlas: &AtlasMeta, tile_name: &str) -> MapEditorBrushEnt
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn build_map_editor_brush_entries(atlas: &AtlasMeta) -> Vec<MapEditorBrushEntry> {
     let mut brush_ids = atlas.tiles.keys().cloned().collect::<Vec<_>>();
     for group_name in atlas.auto_tile_groups.keys() {
@@ -317,6 +321,7 @@ pub(crate) fn resolve_map_editor_tileset_path(project_path: &Path, tilemap: &Til
     )
 }
 
+#[allow(dead_code)]
 pub(crate) fn load_map_editor_tileset_meta(
     ui_state: &EditorUI,
     config: Option<&EditorConfig>,
@@ -372,7 +377,7 @@ pub(crate) fn load_map_editor_brush_source_for_tilemap(
     tilemap: &TileMap,
 ) -> Option<LoadedMapEditorBrushSource> {
     let tileset = load_map_editor_tileset_meta_from_project_path(ui_state, project_path, tilemap)?;
-    let tileset_path = resolve_map_editor_tileset_path(project_path, &tilemap)?;
+    let tileset_path = resolve_map_editor_tileset_path(project_path, tilemap)?;
     let mut atlases = HashMap::new();
     for atlas_path in toki_core::project_assets::resolve_tileset_atlas_paths(
         project_path,

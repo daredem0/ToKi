@@ -10,19 +10,17 @@ use crate::project_runtime::{
     PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings, RuntimePostProcessSettings,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct IndexedPresentationSettings {
     pub indexed_palette_override: Option<String>,
     pub post_process: RuntimePostProcessSettings,
 }
 
-impl Default for IndexedPresentationSettings {
-    fn default() -> Self {
-        Self {
-            indexed_palette_override: None,
-            post_process: RuntimePostProcessSettings::default(),
-        }
-    }
+#[derive(Debug, Clone, Copy, Default)]
+pub struct IndexedImageMaterialization<'a> {
+    pub local_override: Option<&'a str>,
+    pub asset_palette: Option<&'a str>,
+    pub apply_post_process: bool,
 }
 
 impl IndexedPresentationSettings {
@@ -114,17 +112,15 @@ pub fn materialize_indexed_image(
     color_mode: ColorMode,
     available_palettes: &BTreeMap<String, Palette>,
     settings: &IndexedPresentationSettings,
-    local_override: Option<&str>,
-    asset_palette: Option<&str>,
-    apply_post_process: bool,
+    options: IndexedImageMaterialization<'_>,
 ) -> Result<ResolvedIndexedPresentation, String> {
     let resolved_post_process = settings.resolve_post_process(available_palettes);
     let resolved_palette = resolve_indexed_palette(
         color_mode,
         available_palettes,
         settings,
-        local_override,
-        asset_palette,
+        options.local_override,
+        options.asset_palette,
     )?;
     let palette_id = resolved_palette.as_ref().map(|(palette_id, _)| palette_id.clone());
 
@@ -134,11 +130,11 @@ pub fn materialize_indexed_image(
         decoded.clone()
     };
 
-    if apply_post_process {
+    if options.apply_post_process {
         apply_post_process_to_image(&mut image, &resolved_post_process);
     }
 
-    let cache_key = if apply_post_process {
+    let cache_key = if options.apply_post_process {
         texture_preview_cache_key(
             cache_source,
             color_mode,
@@ -172,9 +168,11 @@ pub fn load_materialized_indexed_image(
         color_mode,
         available_palettes,
         settings,
-        local_override,
-        asset_palette,
-        apply_post_process,
+        IndexedImageMaterialization {
+            local_override,
+            asset_palette,
+            apply_post_process,
+        },
     )
 }
 
@@ -195,9 +193,11 @@ pub fn materialize_tilemap_batches(
                     ColorMode::PaletteIndexed,
                     available_palettes,
                     settings,
-                    Some(palette_id.as_str()),
-                    None,
-                    false,
+                    IndexedImageMaterialization {
+                        local_override: Some(palette_id.as_str()),
+                        asset_palette: None,
+                        apply_post_process: false,
+                    },
                 )?;
                 PresentedTextureSource::Rgba8 {
                     image: presentation.image,
@@ -514,9 +514,11 @@ mod tests {
             ColorMode::PaletteIndexed,
             &palettes,
             &IndexedPresentationSettings::default(),
-            None,
-            Some("poison"),
-            false,
+            IndexedImageMaterialization {
+                local_override: None,
+                asset_palette: Some("poison"),
+                apply_post_process: false,
+            },
         )
         .expect("presentation should resolve");
 

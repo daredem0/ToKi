@@ -120,6 +120,7 @@ pub(crate) fn sync_selected_object_name(
     *selected_object_name = Some(object_names[0].clone());
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn ensure_object_sheet_preview_texture(
     preview_image_path: &mut Option<PathBuf>,
     preview_texture: &mut Option<egui::TextureId>,

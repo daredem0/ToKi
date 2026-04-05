@@ -83,6 +83,13 @@ impl RenderFrameControl for FakeBackend {
     }
 
     fn update_overlay_tilemap_vertices(&mut self, _vertices: &[QuadVertex]) {}
+
+    fn set_tilemap_batches(&mut self, batches: &[toki_render::SceneTilemapBatch]) {
+        let total_vertices = batches.iter().map(|batch| batch.vertices.len()).sum();
+        self.tilemap_vertex_counts
+            .borrow_mut()
+            .push(total_vertices);
+    }
 }
 
 impl TextureBackend for FakeBackend {

@@ -5,6 +5,7 @@ use crate::ui::EditorUI;
 
 use super::canvas::{render_canvas_viewport, render_empty_canvas_slot};
 
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_no_canvas_message(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
@@ -46,6 +47,7 @@ pub fn render_no_canvas_message(
 }
 
 /// Render dual viewports side-by-side (horizontal layout)
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_dual_viewports_horizontal(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
@@ -123,6 +125,7 @@ pub fn render_dual_viewports_horizontal(
 }
 
 /// Render dual viewports stacked (vertical layout)
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_dual_viewports_vertical(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,

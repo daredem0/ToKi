@@ -81,6 +81,7 @@ pub enum ViewportSizingMode {
 pub struct SceneViewport {
     // Inlined from SceneManager (removed middle-man)
     game_state: GameState,
+    #[allow(dead_code)]
     resources: ResourceManager,
     tilemap: Option<TileMap>,
     tilemap_path: Option<std::path::PathBuf>,
@@ -505,6 +506,7 @@ impl SceneViewport {
     }
 
     /// Get reference to resources
+    #[allow(dead_code)]
     pub fn resources(&self) -> &ResourceManager {
         &self.resources
     }
@@ -662,6 +664,7 @@ impl SceneViewport {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_indexed_palette_override(&mut self, palette_id: Option<String>) {
         let mut settings = self.indexed_presentation_settings.clone();
         settings.indexed_palette_override = palette_id;

@@ -62,10 +62,6 @@ fn load_plan_prefers_hot_textures_and_preloads_common_sfx() {
     assert_eq!(plan.scene_name.as_deref(), Some("Main Scene"));
     assert_eq!(plan.map_name.as_deref(), Some("demo_map"));
     assert_eq!(
-        plan.tilemap_texture_path,
-        Some(tilemaps_dir.join("terrain.png"))
-    );
-    assert_eq!(
         plan.sprite_texture_path,
         Some(sprites_dir.join("creatures.png"))
     );

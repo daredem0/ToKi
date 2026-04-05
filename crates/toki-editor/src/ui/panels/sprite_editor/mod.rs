@@ -12,6 +12,7 @@ use crate::ui::editor_ui::DualCanvasLayout;
 use crate::ui::EditorUI;
 
 /// Renders the sprite editor panel
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_sprite_editor(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
@@ -35,7 +36,13 @@ pub fn render_sprite_editor(
     match crate::ui::editor_context::sprite_state_mut(ui_state).layout {
         DualCanvasLayout::Single => {
             if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
-                canvas::render_canvas_viewport(ui, ui_state, ctx, None, renderer.as_deref_mut());
+                canvas::render_canvas_viewport(
+                    ui,
+                    ui_state,
+                    ctx,
+                    None,
+                    renderer.as_deref_mut(),
+                );
             } else {
                 layout::render_no_canvas_message(ui, ui_state, sprites_dir.as_deref());
             }

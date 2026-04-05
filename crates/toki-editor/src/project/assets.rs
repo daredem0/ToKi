@@ -67,6 +67,7 @@ pub struct TilemapAsset {
 #[derive(Debug, Clone)]
 pub struct TilesetAsset {
     /// Full path to tileset file
+    #[allow(dead_code)]
     pub path: PathBuf,
 }
 

@@ -6,7 +6,7 @@ use toki_core::assets::atlas::ColorMode;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::indexed_presentation::{
     load_materialized_indexed_image, materialize_indexed_image, resolve_indexed_palette,
-    texture_preview_cache_key, IndexedPresentationSettings,
+    texture_preview_cache_key, IndexedImageMaterialization, IndexedPresentationSettings,
 };
 use toki_core::palette::Palette;
 use toki_core::project_runtime::{
@@ -146,6 +146,7 @@ impl EditorPreviewRenderer {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn texture_preview_from_path(
         &mut self,
         egui_renderer: &mut egui_wgpu::Renderer,
@@ -192,6 +193,7 @@ impl EditorPreviewRenderer {
         .map_err(|error| error.to_string())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn texture_preview_from_image(
         &mut self,
         egui_renderer: &mut egui_wgpu::Renderer,
@@ -228,9 +230,11 @@ impl EditorPreviewRenderer {
             color_mode,
             available_palettes,
             settings,
-            local_override,
-            asset_palette,
-            false,
+            IndexedImageMaterialization {
+                local_override,
+                asset_palette,
+                apply_post_process: false,
+            },
         )?;
         self.render_full_image_preview(
             egui_renderer,

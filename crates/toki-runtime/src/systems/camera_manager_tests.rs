@@ -19,7 +19,7 @@ fn sample_tilemap() -> TileMap {
     TileMap {
         size: glam::UVec2::new(4, 4),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: std::path::PathBuf::from("atlas.json"),
+        tileset: std::path::PathBuf::from("atlas.json"),
         layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 16])],
     }
 }
@@ -28,7 +28,7 @@ fn multi_chunk_tilemap() -> TileMap {
     TileMap {
         size: glam::UVec2::new(48, 16),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: std::path::PathBuf::from("atlas.json"),
+        tileset: std::path::PathBuf::from("atlas.json"),
         layers: vec![TileLayer::new("ground", vec!["floor".to_string(); 48 * 16])],
     }
 }

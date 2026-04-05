@@ -1,6 +1,9 @@
 use glam::{IVec2, UVec2};
 mod support;
-use support::{scene_with_test_player, test_atlas, test_tilemap};
+use support::{
+    scene_with_test_player, test_atlas, test_tilemap, test_tileset_context,
+    test_tileset_resolver,
+};
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
@@ -8,8 +11,7 @@ use toki_core::assets::{
 };
 use toki_core::flags::FlagValue;
 use toki_core::game::{
-    AudioChannel, AudioEvent, GameSimulation, InputSystem, RenderQueryService, RuleSystem,
-    SceneSystem,
+    AudioChannel, AudioEvent, InputSystem, RenderQueryService, RuleSystem, SceneSystem,
 };
 use toki_core::rules::{
     InteractionMode, Rule, RuleAction, RuleCondition, RuleFlagValueSource, RuleIntSource, RuleKey,
@@ -20,6 +22,21 @@ use toki_core::{
     scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind},
     GameState, InputKey, Scene,
 };
+
+struct GameSimulation;
+
+impl GameSimulation {
+    fn tick_fixed(
+        state: &mut GameState,
+        world_bounds: UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> toki_core::GameUpdateResult<AudioEvent> {
+        let (tileset, atlases) = test_tileset_context(atlas);
+        let resolver = test_tileset_resolver(&tileset, &atlases);
+        toki_core::game::GameSimulation::tick_fixed(state, world_bounds, tilemap, &resolver)
+    }
+}
 
 fn create_test_tilemap() -> TileMap {
     test_tilemap()

@@ -11,6 +11,7 @@ use crate::ui::object_sheet_browser::{
 };
 
 impl InspectorSystem {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn render_scene_viewport_toolbox(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,

@@ -31,16 +31,8 @@ fn four_bit_combinations() {
 
 // --- 8-bit mask tests ---
 
-fn full_neighbors(
-    n: bool,
-    ne: bool,
-    e: bool,
-    se: bool,
-    s: bool,
-    sw: bool,
-    w: bool,
-    nw: bool,
-) -> FullNeighbors {
+fn full_neighbors(bits: [bool; 8]) -> FullNeighbors {
+    let [n, ne, e, se, s, sw, w, nw] = bits;
     FullNeighbors {
         n,
         ne,
@@ -55,33 +47,23 @@ fn full_neighbors(
 
 #[test]
 fn eight_bit_no_neighbors() {
-    assert_eq!(
-        compute_8bit_mask(&full_neighbors(
-            false, false, false, false, false, false, false, false
-        )),
-        0
-    );
+    assert_eq!(compute_8bit_mask(&full_neighbors([false; 8])), 0);
 }
 
 #[test]
 fn eight_bit_corners_ignored_without_adjacent_edges() {
-    let with_corner = compute_8bit_mask(&full_neighbors(
-        false, true, false, false, false, false, false, false,
-    ));
-    let without = compute_8bit_mask(&full_neighbors(
-        false, false, false, false, false, false, false, false,
-    ));
+    let with_corner =
+        compute_8bit_mask(&full_neighbors([false, true, false, false, false, false, false, false]));
+    let without = compute_8bit_mask(&full_neighbors([false; 8]));
     assert_eq!(with_corner, without);
 }
 
 #[test]
 fn eight_bit_corner_kept_with_adjacent_edges() {
-    let with_corner = compute_8bit_mask(&full_neighbors(
-        true, true, true, false, false, false, false, false,
-    ));
-    let without = compute_8bit_mask(&full_neighbors(
-        true, false, true, false, false, false, false, false,
-    ));
+    let with_corner =
+        compute_8bit_mask(&full_neighbors([true, true, true, false, false, false, false, false]));
+    let without =
+        compute_8bit_mask(&full_neighbors([true, false, true, false, false, false, false, false]));
     assert_ne!(with_corner, without);
 }
 
@@ -90,7 +72,7 @@ fn eight_bit_produces_47_unique_indices() {
     let mut indices = HashSet::new();
     for raw in 0u16..256 {
         let r = raw as u8;
-        let idx = compute_8bit_mask(&full_neighbors(
+        let idx = compute_8bit_mask(&full_neighbors([
             r & 0x01 != 0,
             r & 0x02 != 0,
             r & 0x04 != 0,
@@ -99,7 +81,7 @@ fn eight_bit_produces_47_unique_indices() {
             r & 0x20 != 0,
             r & 0x40 != 0,
             r & 0x80 != 0,
-        ));
+        ]));
         indices.insert(idx);
     }
     assert_eq!(indices.len(), 47);

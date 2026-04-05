@@ -1,7 +1,7 @@
 use glam::IVec2;
 mod support;
 use std::collections::HashMap;
-use support::{test_atlas, test_tilemap};
+use support::{test_atlas, test_tilemap, test_tileset_context, test_tileset_resolver};
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::entity::{
     AudioDef, CollisionDef, CombatComponent, ComponentsDef, EntityDefinition, EntityStats,
@@ -101,18 +101,20 @@ fn game_simulation_fixed_and_delta_ticks_match_for_default_timestep() {
 
     let tilemap = test_tilemap();
     let atlas = test_atlas();
+    let (tileset, atlases) = test_tileset_context(&atlas);
+    let resolver = test_tileset_resolver(&tileset, &atlases);
     let world_bounds = glam::UVec2::new(256, 256);
 
     InputSystem::handle_key_press(fixed.runtime_mut(), InputKey::Right);
     InputSystem::handle_key_press(delta.runtime_mut(), InputKey::Right);
 
-    let fixed_result = GameSimulation::tick_fixed(&mut fixed, world_bounds, &tilemap, &atlas);
+    let fixed_result = GameSimulation::tick_fixed(&mut fixed, world_bounds, &tilemap, &resolver);
     let delta_result = GameSimulation::tick_with_delta(
         &mut delta,
         DEFAULT_TIMESTEP_MS,
         world_bounds,
         &tilemap,
-        &atlas,
+        &resolver,
     );
 
     let fixed_query = RenderQueryService::new(
@@ -251,6 +253,8 @@ fn input_system_held_key_behavior_matches_runtime_movement_expectations() {
 
     let tilemap = test_tilemap();
     let atlas = test_atlas();
+    let (tileset, atlases) = test_tileset_context(&atlas);
+    let resolver = test_tileset_resolver(&tileset, &atlases);
     let world_bounds = glam::UVec2::new(256, 256);
 
     let initial = RenderQueryService::new(
@@ -261,7 +265,7 @@ fn input_system_held_key_behavior_matches_runtime_movement_expectations() {
     .player_position();
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &resolver);
     let after_first = RenderQueryService::new(
         state.world().entity_manager(),
         state.world().player_id(),
@@ -269,7 +273,7 @@ fn input_system_held_key_behavior_matches_runtime_movement_expectations() {
     )
     .player_position();
 
-    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &resolver);
     let after_second = RenderQueryService::new(
         state.world().entity_manager(),
         state.world().player_id(),
@@ -278,7 +282,7 @@ fn input_system_held_key_behavior_matches_runtime_movement_expectations() {
     .player_position();
 
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
-    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &resolver);
     let after_release = RenderQueryService::new(
         state.world().entity_manager(),
         state.world().player_id(),
@@ -320,7 +324,11 @@ fn rule_system_dialog_completion_path_uses_subsystem_api() {
     RuleSystem::record_dialog_completion(&mut state, "intro", "accepted");
 
     let world_bounds = glam::UVec2::new(64, 64);
-    let _ = GameSimulation::tick_fixed(&mut state, world_bounds, &test_tilemap(), &test_atlas());
+    let tilemap = test_tilemap();
+    let atlas = test_atlas();
+    let (tileset, atlases) = test_tileset_context(&atlas);
+    let resolver = test_tileset_resolver(&tileset, &atlases);
+    let _ = GameSimulation::tick_fixed(&mut state, world_bounds, &tilemap, &resolver);
 
     assert_eq!(
         state.flag("accepted"),

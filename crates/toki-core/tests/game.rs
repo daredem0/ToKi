@@ -1,18 +1,53 @@
 use glam::{IVec2, UVec2};
 mod support;
-use support::{test_atlas, test_entity_definition, test_tilemap};
+use support::{
+    test_atlas, test_entity_definition, test_tilemap, test_tileset_context,
+    test_tileset_resolver,
+};
 use toki_core::entity::{
     build_decoration_entity, CombatComponent, DecorationSpec, Entity, EntityFootprint,
     EntityGrounding, EntityKind, EntityStats, MovementComponent, MovementProfile,
     OptionalEntityComponents, PickupDef, PrimaryProjectileDef, StoredEntity,
 };
 use toki_core::game::{
-    AudioChannel, AudioEvent, GameSimulation, InputAction, InputSystem, RenderQueryService,
-    SceneSystem,
+    AudioChannel, AudioEvent, InputAction, InputSystem, RenderQueryService, SceneSystem,
 };
 use toki_core::scene::Scene;
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, InputKey, DEFAULT_TIMESTEP_MS};
+
+struct GameSimulation;
+
+impl GameSimulation {
+    fn tick_fixed(
+        state: &mut GameState,
+        world_bounds: UVec2,
+        tilemap: &toki_core::assets::tilemap::TileMap,
+        atlas: &toki_core::assets::atlas::AtlasMeta,
+    ) -> toki_core::GameUpdateResult<AudioEvent> {
+        let (tileset, atlases) = test_tileset_context(atlas);
+        let resolver = test_tileset_resolver(&tileset, &atlases);
+        toki_core::game::GameSimulation::tick_fixed(state, world_bounds, tilemap, &resolver)
+    }
+
+    fn tick_with_delta(
+        state: &mut GameState,
+        delta_ms: f32,
+        world_bounds: UVec2,
+        tilemap: &toki_core::assets::tilemap::TileMap,
+        atlas: &toki_core::assets::atlas::AtlasMeta,
+    ) -> toki_core::GameUpdateResult<AudioEvent> {
+        let (tileset, atlases) = test_tileset_context(atlas);
+        let resolver = test_tileset_resolver(&tileset, &atlases);
+        toki_core::game::GameSimulation::tick_with_delta(
+            state,
+            delta_ms,
+            world_bounds,
+            tilemap,
+            &resolver,
+        )
+    }
+}
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {

@@ -28,6 +28,7 @@ use std::path::Path;
 use toki_core::indexed_presentation::resolve_indexed_palette;
 
 /// Renders the animation editor panel
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_animation_editor(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
@@ -167,7 +168,13 @@ fn render_editor_content(
             egui::vec2(center_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
-                render_center_panel(ui, ui_state, ctx, renderer.as_deref_mut());
+                #[allow(clippy::needless_option_as_deref)]
+                render_center_panel(
+                    ui,
+                    ui_state,
+                    ctx,
+                    renderer.as_deref_mut(),
+                );
             },
         );
 

@@ -12,6 +12,7 @@ use toki_core::palette::Palette;
 use super::shortcuts::handle_undo_redo_shortcuts;
 use super::tools::{handle_tool_interaction, handle_tool_shortcuts};
 
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_canvas_viewport(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
@@ -136,7 +137,12 @@ pub fn render_canvas_viewport(
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.canvas.is_some() {
-        ensure_canvas_texture_for_side(ui_state, ctx, render_side, renderer.as_deref_mut());
+        ensure_canvas_texture_for_side(
+            ui_state,
+            ctx,
+            render_side,
+            renderer.as_deref_mut(),
+        );
     }
 
     // Draw checkerboard and canvas
@@ -234,7 +240,12 @@ pub fn render_canvas_viewport(
     }
 
     // Keep floating-selection texture in sync before drawing
-    ensure_floating_texture(ui_state, ctx, render_side, renderer.as_deref_mut());
+    ensure_floating_texture(
+        ui_state,
+        ctx,
+        render_side,
+        renderer.as_deref_mut(),
+    );
 
     // Draw floating selection overlay OR static selection overlay
     let canvas_state =
@@ -1288,9 +1299,11 @@ mod tests {
             ColorMode::PaletteIndexed,
             &palettes,
             &settings,
-            None,
-            Some("preview"),
-            false,
+            toki_core::indexed_presentation::IndexedImageMaterialization {
+                local_override: None,
+                asset_palette: Some("preview"),
+                apply_post_process: false,
+            },
         )
         .expect("preview image should materialize");
 
@@ -1323,9 +1336,11 @@ mod tests {
             ColorMode::PaletteIndexed,
             &palettes,
             &settings,
-            None,
-            Some("preview"),
-            false,
+            toki_core::indexed_presentation::IndexedImageMaterialization {
+                local_override: None,
+                asset_palette: Some("preview"),
+                apply_post_process: false,
+            },
         )
         .expect("preview image should materialize");
 
@@ -1369,9 +1384,11 @@ mod tests {
             ColorMode::PaletteIndexed,
             &palettes,
             &settings,
-            None,
-            Some("authored"),
-            true,
+            toki_core::indexed_presentation::IndexedImageMaterialization {
+                local_override: None,
+                asset_palette: Some("authored"),
+                apply_post_process: true,
+            },
         )
         .expect("preview image should materialize");
 

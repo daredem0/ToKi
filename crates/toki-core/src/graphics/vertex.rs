@@ -9,16 +9,10 @@ pub struct QuadVertex {
 }
 
 impl QuadVertex {
-    pub fn quad(
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        u0: f32,
-        v0: f32,
-        u1: f32,
-        v1: f32,
-    ) -> [Self; 6] {
+    pub fn quad(position: [f32; 2], size: [f32; 2], tex_coords: [f32; 4]) -> [Self; 6] {
+        let [x, y] = position;
+        let [width, height] = size;
+        let [u0, v0, u1, v1] = tex_coords;
         [
             Self {
                 position: [x, y],

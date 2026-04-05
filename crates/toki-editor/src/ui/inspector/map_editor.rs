@@ -270,6 +270,7 @@ impl InspectorSystem {
         ui.small("Auto-tiles are linked through the map tileset; atlas merge import is not used here.");
     }
 
+    #[allow(dead_code)]
     fn render_import_auto_tile_button(
         _ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
@@ -278,6 +279,7 @@ impl InspectorSystem {
         ui.small("Use tileset composition to link auto-tiles from source atlases.");
     }
 
+    #[allow(dead_code)]
     fn discover_auto_tile_atlases(
         project_path: &std::path::Path,
     ) -> Vec<(String, std::path::PathBuf)> {
@@ -304,6 +306,7 @@ impl InspectorSystem {
             .collect()
     }
 
+    #[allow(dead_code)]
     fn execute_auto_tile_import(
         _ui_state: &mut EditorUI,
         _config: Option<&EditorConfig>,
@@ -430,6 +433,7 @@ impl InspectorSystem {
         }
     }
 
+    #[allow(clippy::needless_option_as_deref)]
     pub(crate) fn render_map_editor_inspector(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
@@ -530,6 +534,7 @@ impl InspectorSystem {
         });
     }
 
+    #[allow(dead_code)]
     fn update_tile_property(
         _ui_state: &mut EditorUI,
         _config: Option<&EditorConfig>,

@@ -15,6 +15,7 @@ use crate::ui::widgets::separators::render_vertical_separator;
 use crate::ui::EditorUI;
 
 /// Renders the entity editor panel
+#[allow(clippy::needless_option_as_deref)]
 pub fn render_entity_editor(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
@@ -104,6 +105,7 @@ fn render_main_content(
                     ui_state,
                     project_path,
                     ctx,
+                    #[allow(clippy::needless_option_as_deref)]
                     renderer.as_deref_mut(),
                 );
             },

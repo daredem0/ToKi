@@ -13,20 +13,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-mod pathbuf_as_string {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::path::PathBuf;
-
-    pub fn serialize<S: Serializer>(path: &PathBuf, s: S) -> Result<S::Ok, S::Error> {
-        path.to_string_lossy().serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<PathBuf, D::Error> {
-        let s = String::deserialize(d)?;
-        Ok(PathBuf::from(s))
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TileSetEntryKind {
     #[serde(rename = "tile")]
@@ -252,9 +238,8 @@ impl TileSetMeta {
         let mut entry_ids = self
             .entries
             .iter()
-            .filter_map(|(entry_id, entry)| {
-                (entry.kind == TileSetEntryKind::Tile).then(|| entry_id.clone())
-            })
+            .filter(|(_, entry)| entry.kind == TileSetEntryKind::Tile)
+            .map(|(entry_id, _)| entry_id.clone())
             .collect::<Vec<_>>();
         entry_ids.sort();
         entry_ids.into_iter().next()
@@ -402,23 +387,20 @@ impl<'a> TileSetResolver<'a> {
         let atlas = &atlas_source.meta;
         let concrete_tile_name = match entry.kind {
             TileSetEntryKind::Tile => entry.source_name.clone(),
-            TileSetEntryKind::AutoTileGroup => {
-                let resolved = Self::resolve_auto_tile_name(
-                    entry_id,
-                    &entry.source_name,
-                    x,
-                    y,
-                    tiles,
-                    tilemap.size,
-                    atlas,
-                )
-                .map_err(|_| CoreError::MissingTileSourceInTileSet {
-                    entry_id: entry_id.to_string(),
-                    atlas_name: entry.atlas_name.clone(),
-                    source_name: entry.source_name.clone(),
-                })?;
-                resolved
-            }
+            TileSetEntryKind::AutoTileGroup => Self::resolve_auto_tile_name(
+                entry_id,
+                &entry.source_name,
+                x,
+                y,
+                tiles,
+                tilemap.size,
+                atlas,
+            )
+            .map_err(|_| CoreError::MissingTileSourceInTileSet {
+                entry_id: entry_id.to_string(),
+                atlas_name: entry.atlas_name.clone(),
+                source_name: entry.source_name.clone(),
+            })?,
             TileSetEntryKind::AnimatedTile => entry.source_name.clone(),
         };
 
@@ -534,7 +516,7 @@ impl<'a> TileSetResolver<'a> {
         indexed_palette_override: Option<&str>,
     ) -> Result<Vec<TilemapRenderBatch>, CoreError> {
         let mut batches = Vec::<TilemapRenderBatch>::new();
-        let chunk_set = visible_chunks.map(|chunks| chunks.iter().copied().collect::<Vec<_>>());
+        let chunk_set = visible_chunks.map(|chunks| chunks.to_vec());
 
         for layer in &tilemap.layers {
             if !layer.visible {
@@ -595,14 +577,9 @@ impl<'a> TileSetResolver<'a> {
                     };
 
                     batch.vertices.extend_from_slice(&QuadVertex::quad(
-                        world_x,
-                        world_y,
-                        tilemap.tile_size.x as f32,
-                        tilemap.tile_size.y as f32,
-                        uvs[0],
-                        uvs[1],
-                        uvs[2],
-                        uvs[3],
+                        [world_x, world_y],
+                        [tilemap.tile_size.x as f32, tilemap.tile_size.y as f32],
+                        uvs,
                     ));
                 }
             }

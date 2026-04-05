@@ -84,7 +84,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
     let tilemap = TileMap {
         size: UVec2::new(2, 2),
         tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new(
             "ground",
             vec![
@@ -112,6 +112,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
         atlas: Some(atlas),
         texture_size: UVec2::new(16, 16),
         visible_chunks,
+        tilemap_batches: Vec::new(),
         tile_animation_clock: None,
         sprites: vec![SpriteInstance {
             frame: SpriteFrame {

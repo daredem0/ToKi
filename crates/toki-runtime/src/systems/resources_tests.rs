@@ -1,6 +1,7 @@
 use super::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
-    resolve_project_resource_paths, resolve_tilemap_atlas_path, ResourceManager,
+    resolve_project_resource_paths, resolve_tilemap_tileset_path as resolve_tilemap_atlas_path,
+    ResourceManager,
     SpriteMetadataFileKind,
 };
 use std::fs;
@@ -111,7 +112,7 @@ fn resolve_tilemap_atlas_path_prefers_map_directory_relative_atlas() {
     let tilemap = TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
     };
 
@@ -135,7 +136,7 @@ fn resolve_tilemap_atlas_path_falls_back_to_project_sprites_dir() {
     let tilemap = TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
-        atlas: PathBuf::from("terrain.json"),
+        tileset: PathBuf::from("terrain.json"),
         layers: vec![TileLayer::new("ground", vec!["floor".to_string()])],
     };
 
@@ -339,8 +340,8 @@ fn resolve_project_resource_paths_returns_expected_texture_paths() {
     let resolved = resolve_project_resource_paths(&project_dir, Some("demo_map"))
         .expect("project resource paths should resolve");
     assert_eq!(
-        resolved.tilemap_texture_path,
-        Some(tilemaps_dir.join("terrain.png"))
+        resolved.tileset_atlas_paths,
+        vec![tilemaps_dir.join("terrain.json")]
     );
     assert_eq!(
         resolved.sprite_texture_path,

@@ -81,6 +81,7 @@ impl WindowRenderer {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn preview_texture_from_image(
         &mut self,
         cache_source: &str,

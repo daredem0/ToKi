@@ -453,6 +453,7 @@ pub(super) fn movement_sound_trigger_label(trigger: MovementSoundTrigger) -> &'s
 
 impl InspectorSystem {
     /// Renders the main inspector panel on the right side of the screen
+    #[allow(clippy::needless_option_as_deref)]
     pub fn render_inspector_panel(
         ui_state: &mut EditorUI,
         ctx: &egui::Context,
@@ -525,6 +526,7 @@ impl InspectorSystem {
             });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_selection_inspector_contents(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
@@ -535,27 +537,27 @@ impl InspectorSystem {
         config: Option<&EditorConfig>,
         renderer: Option<&mut crate::rendering::WindowRenderer>,
     ) {
-        let mut host = super::editor_context::InspectorHost {
-            project: match project.as_mut() {
-                Some(project) => Some(&mut **project),
-                None => None,
-            },
-            project_assets: match project_assets.as_mut() {
-                Some(project_assets) => Some(&mut **project_assets),
-                None => None,
-            },
-            config_readonly: config,
-            renderer,
+        let (project, renderer) = {
+            let mut host = super::editor_context::InspectorHost {
+                project: match project.as_mut() {
+                    Some(project) => Some(&mut **project),
+                    None => None,
+                },
+                project_assets: match project_assets.as_mut() {
+                    Some(project_assets) => Some(&mut **project_assets),
+                    None => None,
+                },
+                config_readonly: config,
+                renderer,
+            };
+            let handled = ui_state.with_active_context(|context, shell| {
+                context.render_inspector(shell, ui, ctx, game_state, &mut host)
+            });
+            if handled {
+                return;
+            }
+            (host.project.take(), host.renderer.take())
         };
-        let handled = ui_state.with_active_context(|context, shell| {
-            context.render_inspector(shell, ui, ctx, game_state, &mut host)
-        });
-        if handled {
-            return;
-        }
-        let project = host.project.take();
-        let renderer = host.renderer.take();
-        drop(host);
 
         // Use trait-based dispatch for selection inspectors
         use super::inspector_trait::InspectorContext;
@@ -574,6 +576,7 @@ impl InspectorSystem {
         inspector.render(ui, &mut inspector_ctx);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_toolbox_panel_contents(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
