@@ -1049,11 +1049,13 @@ mod tests {
             kind: SpriteAssetKind::TileAtlas,
         };
 
-        let mut state = SpriteEditorState::default();
-        state.autotile_info = Some(AutoTileSpriteInfo {
-            group_name: "stale".to_string(),
-            mode: AutoTileMode::EightBit,
-        });
+        let mut state = SpriteEditorState {
+            autotile_info: Some(AutoTileSpriteInfo {
+                group_name: "stale".to_string(),
+                mode: AutoTileMode::EightBit,
+            }),
+            ..Default::default()
+        };
 
         state
             .load_sprite_asset(&asset)
@@ -1084,11 +1086,13 @@ mod tests {
             kind: SpriteAssetKind::TileAtlas,
         };
 
-        let mut state = SpriteEditorState::default();
-        state.autotile_info = Some(AutoTileSpriteInfo {
-            group_name: "stale".to_string(),
-            mode: AutoTileMode::FourBit,
-        });
+        let mut state = SpriteEditorState {
+            autotile_info: Some(AutoTileSpriteInfo {
+                group_name: "stale".to_string(),
+                mode: AutoTileMode::FourBit,
+            }),
+            ..Default::default()
+        };
 
         state
             .load_sprite_asset(&asset)
