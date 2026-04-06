@@ -58,6 +58,16 @@ pub struct SpriteEditorState {
     pub scatter_density: f32,
     /// Scatter color variation amount.
     pub scatter_color_variation: f32,
+    /// Cluster scatter radius in pixels.
+    pub cluster_radius: u32,
+    /// Cluster scatter density multiplier.
+    pub cluster_density: f32,
+    /// Minimum spacing between scattered clusters.
+    pub cluster_spacing: u32,
+    /// Position jitter for scattered clusters.
+    pub cluster_jitter: f32,
+    /// Cluster scatter color variation amount.
+    pub cluster_color_variation: f32,
     /// Procedural noise scale.
     pub noise_scale: f32,
     /// Procedural noise threshold.
@@ -162,6 +172,11 @@ impl Default for SpriteEditorState {
             scatter_radius: 3,
             scatter_density: 0.18,
             scatter_color_variation: 0.15,
+            cluster_radius: 6,
+            cluster_density: 0.45,
+            cluster_spacing: 4,
+            cluster_jitter: 0.5,
+            cluster_color_variation: 0.1,
             noise_scale: 6.0,
             noise_threshold: 0.5,
             pattern_stamps: default_pattern_stamps(),
@@ -208,9 +223,11 @@ impl Default for SpriteEditorState {
 
 fn default_pattern_stamps() -> Vec<SpriteCanvas> {
     vec![
-        pattern_from_rows(&["010", "111", "010"]),
-        pattern_from_rows(&["0010", "0111", "0010"]),
-        pattern_from_rows(&["0100", "1110", "0100"]),
+        pattern_from_rows(&["010", "111", "101"]),
+        pattern_from_rows(&["0010", "0111", "1100"]),
+        pattern_from_rows(&["0110", "1111", "0010"]),
+        pattern_from_rows(&["0100", "1110", "0110"]),
+        pattern_from_rows(&["001", "111", "010"]),
     ]
 }
 

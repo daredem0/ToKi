@@ -25,6 +25,21 @@ pub struct NoiseFillParams {
     pub seed_origin: IVec2,
 }
 
+pub struct ClusterScatterParams<'a> {
+    pub center: IVec2,
+    pub radius: u32,
+    pub density: f32,
+    pub spacing: u32,
+    pub jitter: f32,
+    pub color: PixelColor,
+    pub color_variation: f32,
+    pub indexed_slot: Option<usize>,
+    pub palette_size: PaletteSize,
+    pub stamps: &'a [SpriteCanvas],
+    pub random_flip: bool,
+    pub seed: u64,
+}
+
 pub struct PatternStampParams<'a> {
     pub position: IVec2,
     pub stamp: &'a SpriteCanvas,
@@ -58,6 +73,14 @@ impl SimpleRng {
 
     fn next_bool(&mut self) -> bool {
         self.next_u32() & 1 == 0
+    }
+
+    fn next_usize(&mut self, upper: usize) -> usize {
+        if upper <= 1 {
+            0
+        } else {
+            (self.next_u32() as usize) % upper
+        }
     }
 }
 
@@ -113,6 +136,76 @@ pub fn apply_noise_fill(
                 continue;
             }
             changed |= canvas.set_pixel(x, y, color);
+        }
+    }
+
+    changed
+}
+
+pub fn apply_cluster_scatter(
+    canvas: &mut SpriteCanvas,
+    params: &ClusterScatterParams<'_>,
+    selection: Option<&SelectionMask>,
+    placed_positions: &mut Vec<IVec2>,
+) -> bool {
+    if params.radius == 0 || params.density <= 0.0 || params.stamps.is_empty() {
+        return false;
+    }
+
+    let area = std::f32::consts::PI * (params.radius as f32).powi(2);
+    let spacing = params.spacing.max(1);
+    let sample_count = (params.density * area / (spacing * spacing) as f32)
+        .ceil()
+        .max(1.0) as usize;
+    let jitter_radius = params.jitter.clamp(0.0, 1.0) * spacing as f32;
+    let min_distance_sq = (spacing as i32).pow(2);
+    let mut rng = SimpleRng::new(params.seed);
+    let mut changed = false;
+
+    for sample_idx in 0..sample_count {
+        let stamp_index = rng.next_usize(params.stamps.len());
+        let stamp = &params.stamps[stamp_index];
+        let radius = params.radius as f32 * rng.next_f32().sqrt();
+        let angle = rng.next_f32() * std::f32::consts::TAU;
+        let offset = glam::Vec2::new(angle.cos(), angle.sin()) * radius;
+        let jitter = glam::Vec2::new(
+            (rng.next_f32() * 2.0 - 1.0) * jitter_radius,
+            (rng.next_f32() * 2.0 - 1.0) * jitter_radius,
+        );
+        let stamp_center = params.center + (offset + jitter).round().as_ivec2();
+        if placed_positions.iter().any(|previous| {
+            let delta = stamp_center - *previous;
+            delta.x * delta.x + delta.y * delta.y < min_distance_sq
+        }) {
+            continue;
+        }
+
+        let stamp_origin = stamp_center
+            - IVec2::new((stamp.width / 2) as i32, (stamp.height / 2) as i32);
+        let color = vary_color(
+            &ScatterParams {
+                center: params.center,
+                radius: params.radius,
+                density: params.density,
+                color: params.color,
+                color_variation: params.color_variation,
+                indexed_slot: params.indexed_slot,
+                palette_size: params.palette_size,
+                seed: params.seed + sample_idx as u64,
+            },
+            &mut rng,
+        );
+        let stamp_params = PatternStampParams {
+            position: stamp_origin,
+            stamp,
+            color,
+            random_flip: params.random_flip,
+            seed: params.seed + sample_idx as u64 + stamp_index as u64 + 1,
+        };
+
+        if apply_pattern_stamp(canvas, &stamp_params, selection) {
+            changed = true;
+            placed_positions.push(stamp_center);
         }
     }
 
@@ -396,6 +489,99 @@ mod tests {
         assert!(apply_noise_fill(&mut a, &base, None));
         assert!(apply_noise_fill(&mut b, &shifted, None));
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn cluster_scatter_places_only_inside_selection_mask() {
+        let mut canvas = SpriteCanvas::new(16, 16);
+        let stamps = vec![SpriteCanvas::filled(1, 1, PixelColor::white())];
+        let params = ClusterScatterParams {
+            center: IVec2::new(8, 8),
+            radius: 4,
+            density: 0.6,
+            spacing: 2,
+            jitter: 0.25,
+            color: PixelColor::rgb(10, 20, 30),
+            color_variation: 0.0,
+            indexed_slot: None,
+            palette_size: PaletteSize::Pal4,
+            stamps: &stamps,
+            random_flip: true,
+            seed: 13,
+        };
+        let mut selection = SelectionMask::new(16, 16);
+        selection.select_rect(6, 6, 4, 4);
+        let mut positions = Vec::new();
+
+        assert!(apply_cluster_scatter(
+            &mut canvas,
+            &params,
+            Some(&selection),
+            &mut positions,
+        ));
+        for y in 0..canvas.height {
+            for x in 0..canvas.width {
+                if canvas.get_pixel(x, y) == Some(PixelColor::transparent()) {
+                    continue;
+                }
+                assert!(selection.is_selected(x, y));
+            }
+        }
+    }
+
+    #[test]
+    fn cluster_scatter_seed_changes_pattern() {
+        let mut a = SpriteCanvas::new(16, 16);
+        let mut b = SpriteCanvas::new(16, 16);
+        let stamps = vec![SpriteCanvas::filled(1, 1, PixelColor::white())];
+        let base = ClusterScatterParams {
+            center: IVec2::new(8, 8),
+            radius: 5,
+            density: 0.5,
+            spacing: 2,
+            jitter: 0.5,
+            color: PixelColor::rgb(255, 255, 255),
+            color_variation: 0.0,
+            indexed_slot: None,
+            palette_size: PaletteSize::Pal4,
+            stamps: &stamps,
+            random_flip: true,
+            seed: 21,
+        };
+        let shifted = ClusterScatterParams { seed: 22, ..base };
+
+        assert!(apply_cluster_scatter(&mut a, &base, None, &mut Vec::new()));
+        assert!(apply_cluster_scatter(&mut b, &shifted, None, &mut Vec::new()));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn cluster_scatter_respects_minimum_spacing() {
+        let mut canvas = SpriteCanvas::new(16, 16);
+        let stamps = vec![SpriteCanvas::filled(1, 1, PixelColor::white())];
+        let params = ClusterScatterParams {
+            center: IVec2::new(8, 8),
+            radius: 5,
+            density: 0.9,
+            spacing: 3,
+            jitter: 0.0,
+            color: PixelColor::rgb(255, 255, 255),
+            color_variation: 0.0,
+            indexed_slot: None,
+            palette_size: PaletteSize::Pal4,
+            stamps: &stamps,
+            random_flip: true,
+            seed: 7,
+        };
+        let mut positions = Vec::new();
+
+        assert!(apply_cluster_scatter(&mut canvas, &params, None, &mut positions));
+        for (idx, a) in positions.iter().enumerate() {
+            for b in positions.iter().skip(idx + 1) {
+                let delta = *a - *b;
+                assert!(delta.x * delta.x + delta.y * delta.y >= 9);
+            }
+        }
     }
 
     #[test]

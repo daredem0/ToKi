@@ -107,6 +107,8 @@ pub struct CanvasState {
     pub pixel_perfect_history: Vec<(glam::IVec2, PixelColor)>,
     /// Last pattern-stamp position during a procedural brush drag.
     pub procedural_last_stamp_pos: Option<glam::IVec2>,
+    /// Recorded procedural stamp centers during the active stroke.
+    pub procedural_stamp_positions: Vec<glam::IVec2>,
     /// Whether currently in a paint stroke
     pub is_painting: bool,
     /// Save dialog: asset name (without extension)
@@ -155,6 +157,7 @@ impl Default for CanvasState {
             canvas_before_stroke: None,
             pixel_perfect_history: Vec::new(),
             procedural_last_stamp_pos: None,
+            procedural_stamp_positions: Vec::new(),
             is_painting: false,
             save_asset_name: String::new(),
             save_asset_kind: SpriteAssetKind::ObjectSheet,
@@ -178,5 +181,6 @@ mod tests {
         assert!(state.show_autotile_guides);
         assert!(state.pixel_perfect_history.is_empty());
         assert!(state.procedural_last_stamp_pos.is_none());
+        assert!(state.procedural_stamp_positions.is_empty());
     }
 }

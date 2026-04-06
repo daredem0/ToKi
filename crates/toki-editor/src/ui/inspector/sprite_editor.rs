@@ -197,7 +197,7 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             render_gradient_options(ui, ui_state);
         }
         SpriteEditorTool::ProceduralBrush => {
-            ui.label("Organic painting tools for scatter, noise fill, and stamp-based textures.");
+            ui.label("Organic painting tools for pixel breakup, grass clumps, textured fills, and stamp-based details.");
             render_procedural_brush_options(ui, ui_state);
         }
         SpriteEditorTool::Fill => {
@@ -588,7 +588,12 @@ fn render_procedural_brush_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.selectable_value(
             &mut crate::ui::editor_context::sprite_state_mut(ui_state).procedural_mode,
             ProceduralBrushMode::Scatter,
-            "Scatter",
+            "Pixel Scatter",
+        );
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).procedural_mode,
+            ProceduralBrushMode::ClusterScatter,
+            "Cluster Scatter",
         );
         ui.selectable_value(
             &mut crate::ui::editor_context::sprite_state_mut(ui_state).procedural_mode,
@@ -604,6 +609,7 @@ fn render_procedural_brush_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     match crate::ui::editor_context::sprite_state(ui_state).procedural_mode {
         ProceduralBrushMode::Scatter => render_scatter_options(ui, ui_state),
+        ProceduralBrushMode::ClusterScatter => render_cluster_scatter_options(ui, ui_state),
         ProceduralBrushMode::NoiseFill => render_noise_fill_options(ui, ui_state),
         ProceduralBrushMode::PatternStamp => render_pattern_stamp_options(ui, ui_state),
     }
@@ -643,7 +649,7 @@ fn render_scatter_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_noise_fill_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    ui.label("Uses foreground and gradient end color.");
+    ui.label("Best for mottled texture fills, not primary grass clump authoring.");
     render_gradient_end_color_picker(ui, ui_state);
     ui.horizontal(|ui| {
         ui.label("Scale:");
@@ -667,12 +673,75 @@ fn render_noise_fill_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     });
 }
 
+fn render_cluster_scatter_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.label("Randomly scatters small grass-clump stamps from the shared pattern library.");
+    ui.horizontal(|ui| {
+        ui.label("Radius:");
+        ui.add(
+            egui::DragValue::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).cluster_radius,
+            )
+            .range(1..=64),
+        );
+        ui.label("px");
+    });
+    ui.horizontal(|ui| {
+        ui.label("Density:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).cluster_density,
+                0.05..=2.0,
+            )
+            .logarithmic(false),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.label("Spacing:");
+        ui.add(
+            egui::DragValue::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).cluster_spacing,
+            )
+            .range(1..=32),
+        );
+        ui.label("px");
+    });
+    ui.horizontal(|ui| {
+        ui.label("Jitter:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).cluster_jitter,
+                0.0..=1.0,
+            )
+            .show_value(true),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.label("Variation:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .cluster_color_variation,
+                0.0..=1.0,
+            )
+            .show_value(true),
+        );
+    });
+    ui.checkbox(
+        &mut crate::ui::editor_context::sprite_state_mut(ui_state).pattern_random_flip,
+        "Random Flip",
+    );
+    render_pattern_library_options(ui, ui_state, false);
+}
+
 fn render_pattern_stamp_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.checkbox(
         &mut crate::ui::editor_context::sprite_state_mut(ui_state).pattern_random_flip,
         "Random Flip",
     );
+    render_pattern_library_options(ui, ui_state, true);
+}
 
+fn render_pattern_library_options(ui: &mut egui::Ui, ui_state: &mut EditorUI, allow_selection: bool) {
     let can_capture = crate::ui::editor_context::sprite_state(ui_state)
         .active()
         .selection
@@ -688,7 +757,11 @@ fn render_pattern_stamp_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         capture_pattern_from_selection(ui_state);
     }
 
-    ui.label("Patterns:");
+    ui.label(if allow_selection {
+        "Patterns:"
+    } else {
+        "Pattern Library:"
+    });
     let stamp_count = crate::ui::editor_context::sprite_state(ui_state)
         .pattern_stamps
         .len();
@@ -702,13 +775,13 @@ fn render_pattern_stamp_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         .spacing([6.0, 6.0])
         .show(ui, |ui| {
             for index in 0..stamp_count {
-                let is_selected = crate::ui::editor_context::sprite_state(ui_state)
-                    .selected_pattern
-                    == Some(index);
+                let is_selected = allow_selection
+                    && crate::ui::editor_context::sprite_state(ui_state).selected_pattern
+                        == Some(index);
                 let stamp =
                     crate::ui::editor_context::sprite_state(ui_state).pattern_stamps[index].clone();
                 let response = render_pattern_stamp_preview(ui, &stamp, is_selected);
-                if response.clicked() {
+                if allow_selection && response.clicked() {
                     crate::ui::editor_context::sprite_state_mut(ui_state).selected_pattern =
                         Some(index);
                 }

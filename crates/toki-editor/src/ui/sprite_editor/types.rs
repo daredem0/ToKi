@@ -53,6 +53,7 @@ pub enum GradientStyle {
 pub enum ProceduralBrushMode {
     #[default]
     Scatter,
+    ClusterScatter,
     NoiseFill,
     PatternStamp,
 }

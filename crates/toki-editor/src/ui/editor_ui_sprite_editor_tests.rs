@@ -549,6 +549,9 @@ fn sprite_editor_state_default_values() {
     assert_eq!(state.procedural_mode, ProceduralBrushMode::Scatter);
     assert_eq!(state.scatter_radius, 3);
     assert!(state.scatter_density > 0.0);
+    assert!(state.cluster_radius > 0);
+    assert!(state.cluster_density > 0.0);
+    assert!(state.cluster_spacing > 0);
     assert!(!state.pattern_stamps.is_empty());
     assert_eq!(state.selected_pattern, Some(0));
     assert!(state.pattern_random_flip);
