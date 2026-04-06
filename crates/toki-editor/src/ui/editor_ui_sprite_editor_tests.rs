@@ -542,6 +542,7 @@ fn sprite_editor_state_default_values() {
     assert!(!state.active().dirty);
     assert_eq!(state.tool, SpriteEditorTool::Drag);
     assert_eq!(state.brush_size, 1);
+    assert!(!state.pixel_perfect);
     assert!(state.active().show_grid);
     assert!(state.active().show_autotile_labels);
     assert!(state.active().show_autotile_guides);

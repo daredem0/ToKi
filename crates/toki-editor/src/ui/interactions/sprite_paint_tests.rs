@@ -108,6 +108,70 @@ fn paint_brush_paints_area() {
     assert_eq!(canvas.get_pixel(2, 4), Some(PixelColor::transparent()));
 }
 
+#[test]
+fn paint_pixel_perfect_removes_l_shaped_middle_pixel() {
+    let mut canvas = create_test_canvas(4, 4);
+    let color = PixelColor::rgb(0, 255, 0);
+    let mut history = Vec::new();
+
+    assert!(SpritePaintInteraction::paint_pixel_perfect(
+        &mut canvas,
+        IVec2::new(0, 0),
+        color,
+        &mut history,
+    ));
+    assert!(SpritePaintInteraction::paint_pixel_perfect(
+        &mut canvas,
+        IVec2::new(1, 0),
+        color,
+        &mut history,
+    ));
+    assert!(SpritePaintInteraction::paint_pixel_perfect(
+        &mut canvas,
+        IVec2::new(1, 1),
+        color,
+        &mut history,
+    ));
+
+    assert_eq!(canvas.get_pixel(0, 0), Some(color));
+    assert_eq!(canvas.get_pixel(1, 0), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(1, 1), Some(color));
+    assert_eq!(
+        history.iter().map(|(pos, _)| *pos).collect::<Vec<_>>(),
+        vec![IVec2::new(0, 0), IVec2::new(1, 1),]
+    );
+}
+
+#[test]
+fn paint_pixel_perfect_preserves_straight_line_pixels() {
+    let mut canvas = create_test_canvas(4, 4);
+    let color = PixelColor::rgb(0, 255, 0);
+    let mut history = Vec::new();
+
+    SpritePaintInteraction::paint_pixel_perfect(&mut canvas, IVec2::new(0, 0), color, &mut history);
+    SpritePaintInteraction::paint_pixel_perfect(&mut canvas, IVec2::new(1, 0), color, &mut history);
+    SpritePaintInteraction::paint_pixel_perfect(&mut canvas, IVec2::new(2, 0), color, &mut history);
+
+    assert_eq!(canvas.get_pixel(0, 0), Some(color));
+    assert_eq!(canvas.get_pixel(1, 0), Some(color));
+    assert_eq!(canvas.get_pixel(2, 0), Some(color));
+}
+
+#[test]
+fn paint_pixel_perfect_preserves_pure_diagonal_pixels() {
+    let mut canvas = create_test_canvas(4, 4);
+    let color = PixelColor::rgb(0, 255, 0);
+    let mut history = Vec::new();
+
+    SpritePaintInteraction::paint_pixel_perfect(&mut canvas, IVec2::new(0, 0), color, &mut history);
+    SpritePaintInteraction::paint_pixel_perfect(&mut canvas, IVec2::new(1, 1), color, &mut history);
+    SpritePaintInteraction::paint_pixel_perfect(&mut canvas, IVec2::new(2, 2), color, &mut history);
+
+    assert_eq!(canvas.get_pixel(0, 0), Some(color));
+    assert_eq!(canvas.get_pixel(1, 1), Some(color));
+    assert_eq!(canvas.get_pixel(2, 2), Some(color));
+}
+
 // ============================================================================
 // Erase Brush Tests
 // ============================================================================

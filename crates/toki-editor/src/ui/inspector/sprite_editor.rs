@@ -173,6 +173,14 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui.label("Click/drag to draw pixels.");
             render_brush_size(ui, ui_state);
             render_dither_selector(ui, ui_state);
+            let pixel_perfect_enabled =
+                crate::ui::editor_context::sprite_state(ui_state).brush_size == 1;
+            ui.add_enabled_ui(pixel_perfect_enabled, |ui| {
+                ui.checkbox(
+                    &mut crate::ui::editor_context::sprite_state_mut(ui_state).pixel_perfect,
+                    "Pixel Perfect",
+                );
+            });
         }
         SpriteEditorTool::Eraser => {
             ui.label("Click/drag to erase pixels.");

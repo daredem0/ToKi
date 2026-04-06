@@ -316,6 +316,46 @@ impl SpritePaintInteraction {
         changed
     }
 
+    /// Paint a single-pixel freehand stroke while removing doubled corner pixels.
+    pub fn paint_pixel_perfect(
+        canvas: &mut SpriteCanvas,
+        pos: IVec2,
+        color: PixelColor,
+        history: &mut Vec<(IVec2, PixelColor)>,
+    ) -> bool {
+        if pos.x < 0 || pos.y < 0 || pos.x >= canvas.width as i32 || pos.y >= canvas.height as i32 {
+            return false;
+        }
+
+        if history.last().is_some_and(|(last_pos, _)| *last_pos == pos) {
+            return Self::paint_pixel(canvas, pos, color);
+        }
+
+        let original_color = canvas
+            .get_pixel(pos.x as u32, pos.y as u32)
+            .unwrap_or(PixelColor::transparent());
+        let mut changed = Self::paint_pixel(canvas, pos, color);
+        history.push((pos, original_color));
+
+        if history.len() >= 3 {
+            let len = history.len();
+            let a = history[len - 3].0;
+            let (b_pos, b_original) = history[len - 2];
+            let c = history[len - 1].0;
+
+            if forms_pixel_perfect_corner(a, b_pos, c) {
+                changed |= Self::paint_pixel(canvas, b_pos, b_original);
+                history.remove(len - 2);
+            }
+        }
+
+        while history.len() > 2 {
+            history.remove(0);
+        }
+
+        changed
+    }
+
     /// Erase (set to transparent) with a brush at the given center position.
     pub fn erase_brush(canvas: &mut SpriteCanvas, center_pos: IVec2, brush_size: u32) -> bool {
         Self::paint_brush(canvas, center_pos, PixelColor::transparent(), brush_size)
@@ -848,6 +888,19 @@ impl SpritePaintInteraction {
         }
         canvas.get_pixel(pos.x as u32, pos.y as u32)
     }
+}
+
+fn forms_pixel_perfect_corner(a: IVec2, b: IVec2, c: IVec2) -> bool {
+    let ab = b - a;
+    let bc = c - b;
+
+    let ab_is_axis_aligned = (ab.x == 0) ^ (ab.y == 0);
+    let bc_is_axis_aligned = (bc.x == 0) ^ (bc.y == 0);
+    let axis_turn = (ab.x == 0) != (bc.x == 0);
+    let ab_is_unit = ab.abs().x + ab.abs().y == 1;
+    let bc_is_unit = bc.abs().x + bc.abs().y == 1;
+
+    ab_is_axis_aligned && bc_is_axis_aligned && axis_turn && ab_is_unit && bc_is_unit
 }
 
 /// Draw ellipse outline using the midpoint algorithm.

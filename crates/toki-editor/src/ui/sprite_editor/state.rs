@@ -42,6 +42,8 @@ pub struct SpriteEditorState {
     pub authored_palette_id: Option<String>,
     /// Brush size in pixels (shared across canvases)
     pub brush_size: u32,
+    /// When true, 1px freehand brush strokes avoid doubled corner pixels.
+    pub pixel_perfect: bool,
     /// Whether shape tools (rectangle, ellipse) draw filled or outline
     pub shape_filled: bool,
     /// Dithering pattern for brush tool
@@ -128,6 +130,7 @@ impl Default for SpriteEditorState {
             color_mode: ColorMode::TrueColor,
             authored_palette_id: None,
             brush_size: 1,
+            pixel_perfect: false,
             shape_filled: false,
             dither_pattern: DitherPattern::None,
             symmetry_horizontal: false,

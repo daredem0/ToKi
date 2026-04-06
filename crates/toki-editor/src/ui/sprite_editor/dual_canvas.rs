@@ -4,7 +4,7 @@ use super::canvas::SpriteCanvas;
 use super::floating::FloatingSelection;
 use super::history::SpriteEditorHistory;
 use super::selection::SelectionMask;
-use super::types::SpriteAssetKind;
+use super::types::{PixelColor, SpriteAssetKind};
 use super::viewport::SpriteCanvasViewport;
 
 /// Layout mode for dual canvas view
@@ -103,6 +103,8 @@ pub struct CanvasState {
     pub selection_start_pos: Option<glam::IVec2>,
     /// Canvas state before current stroke (for undo)
     pub canvas_before_stroke: Option<SpriteCanvas>,
+    /// Recent 1px brush positions for pixel-perfect stroke cleanup.
+    pub pixel_perfect_history: Vec<(glam::IVec2, PixelColor)>,
     /// Whether currently in a paint stroke
     pub is_painting: bool,
     /// Save dialog: asset name (without extension)
@@ -149,6 +151,7 @@ impl Default for CanvasState {
             line_start_pos: None,
             selection_start_pos: None,
             canvas_before_stroke: None,
+            pixel_perfect_history: Vec::new(),
             is_painting: false,
             save_asset_name: String::new(),
             save_asset_kind: SpriteAssetKind::ObjectSheet,
@@ -170,5 +173,6 @@ mod tests {
         let state = CanvasState::default();
         assert!(state.show_autotile_labels);
         assert!(state.show_autotile_guides);
+        assert!(state.pixel_perfect_history.is_empty());
     }
 }

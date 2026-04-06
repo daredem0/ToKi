@@ -92,21 +92,33 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
             crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color,
             selected_palette(ui_state),
         );
-        let brush_size = crate::ui::editor_context::sprite_state_mut(ui_state).brush_size;
-        let pattern = crate::ui::editor_context::sprite_state_mut(ui_state).dither_pattern;
+        let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+        let brush_size = sprite_state.brush_size;
+        let pattern = sprite_state.dither_pattern;
         let sym = symmetry_config(ui_state);
-        if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
-            .active_mut()
-            .canvas
-        {
-            if SpritePaintInteraction::paint_brush_dithered_symmetric(
-                canvas, canvas_pos, color, brush_size, pattern, &sym,
-            ) {
-                crate::ui::editor_context::sprite_state_mut(ui_state)
-                    .active_mut()
-                    .dirty = true;
-                invalidate_canvas_texture(ui_state);
-            }
+        let pixel_perfect = sprite_state.pixel_perfect
+            && brush_size == 1
+            && pattern == crate::ui::sprite_editor::DitherPattern::None
+            && !sym.horizontal
+            && !sym.vertical;
+
+        let cs = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut();
+        let changed = if pixel_perfect {
+            let (canvas, history) = (&mut cs.canvas, &mut cs.pixel_perfect_history);
+            canvas.as_mut().is_some_and(|canvas| {
+                SpritePaintInteraction::paint_pixel_perfect(canvas, canvas_pos, color, history)
+            })
+        } else {
+            cs.canvas.as_mut().is_some_and(|canvas| {
+                SpritePaintInteraction::paint_brush_dithered_symmetric(
+                    canvas, canvas_pos, color, brush_size, pattern, &sym,
+                )
+            })
+        };
+
+        if changed {
+            cs.dirty = true;
+            invalidate_canvas_texture(ui_state);
         }
     }
 
@@ -966,6 +978,10 @@ fn start_paint_stroke(ui_state: &mut EditorUI) {
             .active()
             .canvas
             .clone();
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .pixel_perfect_history
+            .clear();
     }
 }
 
@@ -984,6 +1000,10 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
         {
             crate::ui::editor_context::sprite_state_mut(ui_state).push_undo_state(before);
         }
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .pixel_perfect_history
+            .clear();
         let foreground_color = crate::ui::editor_context::sprite_state(ui_state).foreground_color;
         ui_state
             .sprite_editor_context_mut()
