@@ -41,23 +41,23 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Drag => handle_drag_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Brush => handle_brush_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eraser => handle_eraser_tool(ui_state, response, canvas_pos),
-        SpriteEditorTool::Gradient => handle_gradient_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Gradient => handle_gradient_tool(ui_state, response, rect, canvas_pos),
         SpriteEditorTool::ProceduralBrush => {
             handle_procedural_brush_tool(ui_state, response, canvas_pos)
         }
         SpriteEditorTool::Fill => handle_fill_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eyedropper => handle_eyedropper_tool(ui_state, response, canvas_pos),
-        SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Line => handle_line_tool(ui_state, response, rect, canvas_pos),
         SpriteEditorTool::Select => handle_select_tool(ui_state, response, rect, ctx, canvas_pos),
         SpriteEditorTool::MagicWand => handle_magic_wand_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::MagicErase => handle_magic_erase_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::AddOutline => handle_add_outline_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::AddShadow => handle_add_shadow_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Rectangle => {
-            handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Rectangle)
+            handle_shape_tool(ui_state, response, rect, canvas_pos, ShapeKind::Rectangle)
         }
         SpriteEditorTool::Ellipse => {
-            handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Ellipse)
+            handle_shape_tool(ui_state, response, rect, canvas_pos, ShapeKind::Ellipse)
         }
     }
 }
@@ -239,12 +239,14 @@ fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
 fn handle_gradient_tool(
     ui_state: &mut EditorUI,
     response: &egui::Response,
+    rect: egui::Rect,
     canvas_pos: glam::IVec2,
 ) {
     if response.drag_started_by(egui::PointerButton::Primary) {
+        let start_pos = pointer_press_canvas_pos(ui_state, response, rect).unwrap_or(canvas_pos);
         crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
-            .line_start_pos = Some(canvas_pos);
+            .line_start_pos = Some(start_pos);
         start_paint_stroke(ui_state);
     }
 
@@ -360,8 +362,13 @@ fn handle_eyedropper_tool(
     }
 }
 
-fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
-    handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Line);
+fn handle_line_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    rect: egui::Rect,
+    canvas_pos: glam::IVec2,
+) {
+    handle_shape_tool(ui_state, response, rect, canvas_pos, ShapeKind::Line);
 }
 
 #[derive(Clone, Copy)]
@@ -374,27 +381,30 @@ enum ShapeKind {
 fn handle_shape_tool(
     ui_state: &mut EditorUI,
     response: &egui::Response,
+    rect: egui::Rect,
     canvas_pos: glam::IVec2,
     kind: ShapeKind,
 ) {
     if response.drag_started_by(egui::PointerButton::Primary) {
+        let start_pos = pointer_press_canvas_pos(ui_state, response, rect).unwrap_or(canvas_pos);
         crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
             .stroke_erases = false;
         crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
-            .line_start_pos = Some(canvas_pos);
+            .line_start_pos = Some(start_pos);
         start_paint_stroke(ui_state);
     }
 
     // Right-click drag: erase version of the shape.
     if response.drag_started_by(egui::PointerButton::Secondary) {
+        let start_pos = pointer_press_canvas_pos(ui_state, response, rect).unwrap_or(canvas_pos);
         crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
             .stroke_erases = true;
         crate::ui::editor_context::sprite_state_mut(ui_state)
             .active_mut()
-            .line_start_pos = Some(canvas_pos);
+            .line_start_pos = Some(start_pos);
         start_paint_stroke(ui_state);
     }
 
@@ -1270,6 +1280,26 @@ fn clicked_tile_bounds(
 
     let (width, height) = crate::ui::editor_context::sprite_state(ui_state).canvas_dimensions()?;
     Some((glam::UVec2::ZERO, glam::UVec2::new(width, height)))
+}
+
+fn pointer_press_canvas_pos(
+    ui_state: &EditorUI,
+    response: &egui::Response,
+    rect: egui::Rect,
+) -> Option<glam::IVec2> {
+    let press_origin = response.ctx.input(|input| input.pointer.press_origin())?;
+    if !rect.contains(press_origin) {
+        return None;
+    }
+
+    let canvas_pos = crate::ui::editor_context::sprite_state(ui_state)
+        .active()
+        .viewport
+        .screen_to_canvas(glam::Vec2::new(press_origin.x, press_origin.y), rect);
+    Some(glam::IVec2::new(
+        canvas_pos.x.floor() as i32,
+        canvas_pos.y.floor() as i32,
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
