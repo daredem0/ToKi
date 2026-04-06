@@ -3,6 +3,7 @@ use super::{
     screen_to_world_from_camera, world_to_i32_floor, SceneViewport, ViewportSizingMode,
 };
 use crate::project::assets::ProjectAssets;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::game::RenderQueryService;
 use toki_core::graphics::image::save_image_rgba8;
 use toki_core::palette::resolve_palette;
@@ -18,6 +19,60 @@ fn make_unique_temp_dir() -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("toki_editor_viewport_tests_{nanos}"));
     std::fs::create_dir_all(&dir).expect("temp dir should be created");
     dir
+}
+
+fn simple_tilemap() -> TileMap {
+    TileMap {
+        size: glam::UVec2::new(2, 2),
+        tile_size: glam::UVec2::new(16, 16),
+        tileset: std::path::PathBuf::from("terrain.json"),
+        layers: vec![TileLayer::new_empty("ground", 4)],
+    }
+}
+
+fn viewport_for_cache_tests() -> SceneViewport {
+    let tmp = make_unique_temp_dir();
+    let sprites_dir = tmp.join("assets").join("sprites");
+    std::fs::create_dir_all(&sprites_dir).expect("sprites dir");
+    let atlas_json = serde_json::json!({
+        "image": "terrain.png",
+        "tile_size": [16, 16],
+        "tiles": {
+            "grass": {
+                "position": [0, 0],
+                "properties": { "solid": false, "trigger": false }
+            }
+        }
+    })
+    .to_string();
+    std::fs::write(tmp.join("terrain.json"), &atlas_json).expect("terrain atlas");
+    std::fs::write(tmp.join("creatures.json"), &atlas_json).expect("creatures atlas");
+    std::fs::write(sprites_dir.join("terrain.json"), &atlas_json).expect("sprite terrain atlas");
+    std::fs::write(sprites_dir.join("creatures.json"), &atlas_json)
+        .expect("sprite creatures atlas");
+    std::fs::write(
+        tmp.join("tilemap.json"),
+        serde_json::json!({
+            "size": [1, 1],
+            "tile_size": [16, 16],
+            "atlas": "terrain.json",
+            "tiles": ["grass"],
+            "objects": []
+        })
+        .to_string(),
+    )
+    .expect("tilemap");
+    let resources = toki_core::ResourceManager::load_with_paths(
+        &tmp.join("terrain.json"),
+        &tmp.join("creatures.json"),
+        &tmp.join("tilemap.json"),
+    )
+    .expect("resources");
+    SceneViewport::with_game_state_and_resources_for_tests(
+        toki_core::GameState::new_empty(),
+        resources,
+    )
+    .expect("viewport")
 }
 
 #[test]
@@ -142,6 +197,99 @@ fn responsive_initialized_viewport_defers_resize_until_render_phase() {
     assert!(changed);
     assert_eq!(current_size, (160, 144));
     assert_eq!(requested_size, Some((640, 480)));
+}
+
+#[test]
+fn camera_drag_requests_redraw_without_invalidating_tilemap_cache() {
+    let mut viewport = viewport_for_cache_tests();
+    viewport.tilemap_render_cache_dirty = false;
+    viewport
+        .cached_tilemap_batches
+        .push(toki_render::SceneTilemapBatch {
+            vertices: Vec::new(),
+            texture_path: None,
+            texture_image: None,
+            texture_cache_key: None,
+            above_entities: false,
+        });
+    viewport.needs_render = false;
+    viewport.last_mouse_pos = Some(glam::Vec2::new(4.0, 6.0));
+
+    viewport.update_camera_drag(glam::Vec2::new(12.0, 18.0), 1.0);
+
+    assert!(viewport.needs_render);
+    assert!(!viewport.tilemap_render_cache_dirty);
+    assert_eq!(viewport.cached_tilemap_batches.len(), 1);
+}
+
+#[test]
+fn zoom_requests_redraw_without_invalidating_tilemap_cache() {
+    let mut viewport = viewport_for_cache_tests();
+    viewport.tilemap_render_cache_dirty = false;
+    viewport
+        .cached_tilemap_batches
+        .push(toki_render::SceneTilemapBatch {
+            vertices: Vec::new(),
+            texture_path: None,
+            texture_image: None,
+            texture_cache_key: None,
+            above_entities: false,
+        });
+    viewport.needs_render = false;
+
+    viewport.zoom_in();
+
+    assert!(viewport.needs_render);
+    assert!(!viewport.tilemap_render_cache_dirty);
+    assert_eq!(viewport.cached_tilemap_batches.len(), 1);
+}
+
+#[test]
+fn set_tilemap_invalidates_tilemap_render_cache() {
+    let mut viewport = viewport_for_cache_tests();
+    viewport.tilemap_render_cache_dirty = false;
+    viewport
+        .cached_tilemap_batches
+        .push(toki_render::SceneTilemapBatch {
+            vertices: Vec::new(),
+            texture_path: None,
+            texture_image: None,
+            texture_cache_key: None,
+            above_entities: false,
+        });
+    viewport.needs_render = false;
+    let revision_before = viewport.tilemap_revision();
+
+    viewport.set_tilemap(simple_tilemap()).expect("set tilemap");
+
+    assert!(viewport.needs_render);
+    assert!(viewport.tilemap_render_cache_dirty);
+    assert!(viewport.cached_tilemap_batches.is_empty());
+    assert!(viewport.tilemap_revision() > revision_before);
+}
+
+#[test]
+fn indexed_presentation_settings_invalidate_tilemap_render_cache() {
+    let mut viewport = viewport_for_cache_tests();
+    viewport.tilemap_render_cache_dirty = false;
+    viewport
+        .cached_tilemap_batches
+        .push(toki_render::SceneTilemapBatch {
+            vertices: Vec::new(),
+            texture_path: None,
+            texture_image: None,
+            texture_cache_key: None,
+            above_entities: false,
+        });
+    viewport.needs_render = false;
+    let mut settings = viewport.indexed_presentation_settings().clone();
+    settings.indexed_palette_override = Some("swamp_16".to_string());
+
+    viewport.set_indexed_presentation_settings(settings);
+
+    assert!(viewport.needs_render);
+    assert!(viewport.tilemap_render_cache_dirty);
+    assert!(viewport.cached_tilemap_batches.is_empty());
 }
 
 #[test]

@@ -225,22 +225,20 @@ impl PanelSystem {
         );
         let display_rect = viewport_ctx.display_rect();
 
+        Self::handle_map_editor_middle_drag(ui, viewport, &response, config.as_deref());
+
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
                 crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
                 Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
             }
-            MapEditorTool::Brush => {
-                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
-            }
             MapEditorTool::Fill => {
                 crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
-                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
             MapEditorTool::PickTile => {
                 crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
-                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
+            MapEditorTool::Brush => {}
         }
 
         if response.hovered() {
@@ -265,7 +263,7 @@ impl PanelSystem {
         ui.painter()
             .rect_filled(rect, 0.0, egui::Color32::from_rgb(34, 37, 41));
         viewport.render(ui, rect, project_path.as_deref(), renderer.as_deref_mut());
-        Self::paint_map_editor_empty_tile_checkerboard(ui, viewport, &viewport_ctx);
+        Self::paint_map_editor_empty_tile_checkerboard(ui, ui_state, viewport, &viewport_ctx);
         if let Some(cfg) = config.as_deref() {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }

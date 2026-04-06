@@ -89,52 +89,65 @@ impl SceneViewport {
                     self.tileset_atlas_cache.values().map(|source| &source.meta),
                 );
                 scene_data.tile_animation_clock = Some(self.tile_animation_clock.clone());
-                if let Some(resolver) = self.tileset_resolver() {
-                    let presentation_settings = self.indexed_presentation_settings().clone();
-                    match tilemap.generate_render_batches(
-                        &resolver,
-                        Some(&self.tile_animation_clock),
-                        presentation_settings.indexed_palette_override.as_deref(),
-                    ) {
-                        Ok(batches) => match materialize_tilemap_batches(
-                            batches,
-                            &self.available_palettes,
-                            &presentation_settings,
-                        ) {
-                            Ok(batches) => {
-                                for batch in batches {
-                                    let (texture_path, texture_image, texture_cache_key) =
-                                        match batch.texture {
-                                            PresentedTextureSource::File(path) => {
-                                                (Some(path), None, None)
-                                            }
-                                            PresentedTextureSource::Rgba8 { image, cache_key } => {
-                                                (None, Some(image), Some(cache_key))
-                                            }
-                                        };
-                                    scene_data.tilemap_batches.push(
-                                        toki_render::SceneTilemapBatch {
-                                            vertices: batch.vertices,
-                                            texture_path,
-                                            texture_image,
-                                            texture_cache_key,
-                                            above_entities: batch.above_entities,
-                                        },
-                                    );
-                                }
-                            }
-                            Err(error) => {
-                                tracing::error!("Failed to materialize tilemap batches: {error}");
-                            }
-                        },
-                        Err(error) => tracing::error!("Failed to build tilemap batches: {error}"),
+                if self.tilemap_render_cache_dirty || self.cached_tilemap_batches.is_empty() {
+                    if let Err(error) =
+                        self.rebuild_cached_tilemap_batches(&tilemap, project_path, &tilemap_path)
+                    {
+                        tracing::error!("Failed to rebuild tilemap render cache: {error}");
                     }
                 }
+                scene_data
+                    .tilemap_batches
+                    .extend(self.cached_tilemap_batches.iter().cloned());
             }
             Err(error) => {
                 tracing::error!("Failed to load tileset: {}", error);
             }
         }
+    }
+
+    fn rebuild_cached_tilemap_batches(
+        &mut self,
+        tilemap: &toki_core::assets::tilemap::TileMap,
+        _project_path: &std::path::Path,
+        _tilemap_path: &std::path::Path,
+    ) -> Result<()> {
+        let Some(resolver) = self.tileset_resolver() else {
+            self.cached_tilemap_batches.clear();
+            self.tilemap_render_cache_dirty = false;
+            return Ok(());
+        };
+
+        let presentation_settings = self.indexed_presentation_settings().clone();
+        let batches = tilemap.generate_render_batches(
+            &resolver,
+            Some(&self.tile_animation_clock),
+            presentation_settings.indexed_palette_override.as_deref(),
+        )?;
+        let batches =
+            materialize_tilemap_batches(batches, &self.available_palettes, &presentation_settings)
+                .map_err(|error| anyhow::anyhow!(error))?;
+
+        self.cached_tilemap_batches = batches
+            .into_iter()
+            .map(|batch| {
+                let (texture_path, texture_image, texture_cache_key) = match batch.texture {
+                    PresentedTextureSource::File(path) => (Some(path), None, None),
+                    PresentedTextureSource::Rgba8 { image, cache_key } => {
+                        (None, Some(image), Some(cache_key))
+                    }
+                };
+                toki_render::SceneTilemapBatch {
+                    vertices: batch.vertices,
+                    texture_path,
+                    texture_image,
+                    texture_cache_key,
+                    above_entities: batch.above_entities,
+                }
+            })
+            .collect();
+        self.tilemap_render_cache_dirty = false;
+        Ok(())
     }
 
     pub(super) fn prepare_sprite_data(

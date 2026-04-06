@@ -16,7 +16,7 @@ use toki_core::indexed_presentation::IndexedPresentationSettings;
 use toki_core::palette::{builtin_palettes, Palette};
 use toki_core::project_runtime::{default_resolution_height, default_resolution_width};
 use toki_core::{Camera, GameState, ResourceManager};
-use toki_render::{SceneData, SceneRenderer};
+use toki_render::{SceneData, SceneRenderer, SceneTilemapBatch};
 
 #[path = "viewport_assets.rs"]
 mod viewport_assets;
@@ -101,7 +101,10 @@ pub struct SceneViewport {
     tileset_atlas_cache: std::collections::HashMap<String, TileSetAtlasSource>,
     tile_animation_clock: TileAnimationClock,
     needs_render: bool, // Track if scene needs re-rendering
-    camera: Camera,     // Camera for zoom and pan
+    tilemap_render_cache_dirty: bool,
+    cached_tilemap_batches: Vec<SceneTilemapBatch>,
+    tilemap_revision: u64,
+    camera: Camera, // Camera for zoom and pan
     editor_zoom_scale: f32,
     // Mouse interaction state
     last_mouse_pos: Option<glam::Vec2>, // For camera panning
@@ -214,6 +217,9 @@ impl SceneViewport {
             tileset_atlas_cache: std::collections::HashMap::new(),
             tile_animation_clock: TileAnimationClock::new(),
             needs_render: true,
+            tilemap_render_cache_dirty: true,
+            cached_tilemap_batches: Vec::new(),
+            tilemap_revision: 0,
             camera,
             editor_zoom_scale: 1.0,
             last_mouse_pos: None,
@@ -310,7 +316,7 @@ impl SceneViewport {
                 .resize(device, new_size)
                 .map_err(|e| anyhow::anyhow!("Failed to resize viewport target: {}", e))?;
         }
-        self.needs_render = true;
+        self.request_render();
         Ok(())
     }
 
@@ -330,7 +336,7 @@ impl SceneViewport {
         if !self.is_initialized {
             self.set_viewport_size_immediate(current_size);
         }
-        self.needs_render = true;
+        self.request_render();
         true
     }
 
@@ -355,7 +361,7 @@ impl SceneViewport {
             EDITOR_FRAME_DELTA_MS,
             self.tileset_atlas_cache.values().map(|source| &source.meta),
         ) {
-            self.needs_render = true;
+            self.invalidate_tilemap_render_cache();
         }
     }
 
@@ -642,7 +648,23 @@ impl SceneViewport {
     /// Mark the scene as needing a re-render
     pub fn mark_dirty(&mut self) {
         tracing::trace!("Scene viewport marked dirty - will re-render on next frame");
+        self.invalidate_tilemap_render_cache();
+    }
+
+    pub fn request_render(&mut self) {
+        tracing::trace!("Scene viewport redraw requested");
         self.needs_render = true;
+    }
+
+    pub fn invalidate_tilemap_render_cache(&mut self) {
+        self.cached_tilemap_batches.clear();
+        self.tilemap_render_cache_dirty = true;
+        self.tilemap_revision = self.tilemap_revision.wrapping_add(1);
+        self.request_render();
+    }
+
+    pub fn tilemap_revision(&self) -> u64 {
+        self.tilemap_revision
     }
 
     pub fn clear_asset_caches(&mut self) {
@@ -657,20 +679,20 @@ impl SceneViewport {
         if let Some(scene_renderer) = &mut self.scene_renderer {
             scene_renderer.clear_sprite_texture_cache();
         }
-        self.mark_dirty();
+        self.invalidate_tilemap_render_cache();
     }
 
     pub fn set_available_palettes(&mut self, palettes: &BTreeMap<String, Palette>) {
         self.available_palettes = palettes.clone();
         self.recolored_sprite_images.clear();
         self.tilemap_texture_cache_key = None;
-        self.mark_dirty();
+        self.invalidate_tilemap_render_cache();
     }
 
     pub fn set_indexed_presentation_settings(&mut self, settings: IndexedPresentationSettings) {
         if self.indexed_presentation_settings != settings {
             self.indexed_presentation_settings = settings;
-            self.mark_dirty();
+            self.invalidate_tilemap_render_cache();
         }
     }
 
@@ -679,12 +701,12 @@ impl SceneViewport {
         if let Some(scene_renderer) = &mut self.scene_renderer {
             scene_renderer.set_clear_color(clear_color);
         }
-        self.mark_dirty();
+        self.request_render();
     }
 
     pub fn set_ui_background_fill(&mut self, fill: Option<egui::Color32>) {
         self.ui_background_fill = fill;
-        self.mark_dirty();
+        self.request_render();
     }
 
     #[allow(dead_code)]
@@ -722,7 +744,7 @@ impl SceneViewport {
             }
         }
         if changed {
-            self.mark_dirty();
+            self.request_render();
         }
     }
 
@@ -730,7 +752,7 @@ impl SceneViewport {
     pub fn clear_suppressed_entity_rendering(&mut self) {
         if !self.suppressed_entity_ids.is_empty() {
             self.suppressed_entity_ids.clear();
-            self.mark_dirty();
+            self.request_render();
         }
     }
 
@@ -739,7 +761,7 @@ impl SceneViewport {
         let next_scale = next_zoom_in_scale(self.editor_zoom_scale);
         if (next_scale - self.editor_zoom_scale).abs() > f32::EPSILON {
             self.editor_zoom_scale = next_scale;
-            self.mark_dirty();
+            self.request_render();
             tracing::debug!("Zoomed in to editor scale {}", self.editor_zoom_scale);
         } else {
             tracing::trace!("Already at minimum zoom level: {}", self.editor_zoom_scale);
@@ -751,7 +773,7 @@ impl SceneViewport {
         let next_scale = next_zoom_out_scale(self.editor_zoom_scale);
         if (next_scale - self.editor_zoom_scale).abs() > f32::EPSILON {
             self.editor_zoom_scale = next_scale;
-            self.mark_dirty();
+            self.request_render();
             tracing::debug!("Zoomed out to editor scale {}", self.editor_zoom_scale);
         } else {
             tracing::trace!("Already at maximum zoom level: {}", self.editor_zoom_scale);

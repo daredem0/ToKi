@@ -1,0 +1,164 @@
+{
+  "tile_size": [
+    8,
+    8
+  ],
+  "entries": {
+    "terrain/tile/terrain_preview": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_preview",
+      "display_name": "Swamp_0_1: terrain_preview"
+    },
+    "terrain/tile/sand": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "sand",
+      "display_name": "Swamp_0_1: sand"
+    },
+    "terrain/tile/terrain_0": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_0",
+      "display_name": "Swamp_0_1: terrain_0"
+    },
+    "terrain/tile/water": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "water",
+      "display_name": "Swamp_0_1: water"
+    },
+    "terrain/tile/wood": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "wood",
+      "display_name": "Swamp_0_1: wood"
+    },
+    "terrain/tile/terrain_6": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_6",
+      "display_name": "Swamp_0_1: terrain_6"
+    },
+    "terrain/tile/terrain_15": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_15",
+      "display_name": "Swamp_0_1: terrain_15"
+    },
+    "terrain/tile/brick": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "brick",
+      "display_name": "Swamp_0_1: brick"
+    },
+    "terrain/tile/terrain_3": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_3",
+      "display_name": "Swamp_0_1: terrain_3"
+    },
+    "terrain/tile/terrain_11": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_11",
+      "display_name": "Swamp_0_1: terrain_11"
+    },
+    "terrain/tile/terrain_4": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_4",
+      "display_name": "Swamp_0_1: terrain_4"
+    },
+    "terrain/tile/terrain_9": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_9",
+      "display_name": "Swamp_0_1: terrain_9"
+    },
+    "terrain/tile/grass": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "grass",
+      "display_name": "Swamp_0_1: grass"
+    },
+    "terrain/tile/terrain_7": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_7",
+      "display_name": "Swamp_0_1: terrain_7"
+    },
+    "terrain/tile/terrain_12": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_12",
+      "display_name": "Swamp_0_1: terrain_12"
+    },
+    "terrain/tile/terrain_13": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_13",
+      "display_name": "Swamp_0_1: terrain_13"
+    },
+    "terrain/tile/terrain_10": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_10",
+      "display_name": "Swamp_0_1: terrain_10"
+    },
+    "AutoTile_GrassV4/autotile/AutoTile_GrassV4": {
+      "atlas_name": "AutoTile_GrassV4.json",
+      "kind": "autotile",
+      "source_name": "AutoTile_GrassV4",
+      "display_name": "AutoTile_GrassV4: AutoTile_GrassV4"
+    },
+    "terrain/tile/dirt": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "dirt",
+      "display_name": "Swamp_0_1: dirt"
+    },
+    "terrain/tile/terrain_1": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_1",
+      "display_name": "Swamp_0_1: terrain_1"
+    },
+    "terrain/tile/terrain_2": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_2",
+      "display_name": "Swamp_0_1: terrain_2"
+    },
+    "terrain/tile/terrain_5": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_5",
+      "display_name": "Swamp_0_1: terrain_5"
+    },
+    "terrain/tile/terrain_8": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_8",
+      "display_name": "Swamp_0_1: terrain_8"
+    },
+    "terrain/tile/roof": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "roof",
+      "display_name": "Swamp_0_1: roof"
+    },
+    "terrain/tile/stone": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "stone",
+      "display_name": "Swamp_0_1: stone"
+    },
+    "terrain/tile/terrain_14": {
+      "atlas_name": "terrain.json",
+      "kind": "tile",
+      "source_name": "terrain_14",
+      "display_name": "Swamp_0_1: terrain_14"
+    }
+  }
+}

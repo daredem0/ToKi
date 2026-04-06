@@ -57,7 +57,7 @@ impl SceneViewport {
         self.tileset_cache_path = Some(tileset_path);
         self.tileset_atlas_cache.clear();
         self.tilemap_texture_cache_key = None;
-        self.mark_dirty();
+        self.invalidate_tilemap_render_cache();
         Ok(())
     }
 
@@ -116,7 +116,9 @@ impl SceneViewport {
                 )
             })?;
 
-        let tileset = if self.tileset_cache_path.as_deref() == Some(tileset_path.as_path()) {
+        let reuse_tileset_cache =
+            self.tileset_cache_path.as_deref() == Some(tileset_path.as_path());
+        let tileset = if reuse_tileset_cache {
             if let Some(tileset) = self.tileset_cache.clone() {
                 tileset
             } else {
@@ -137,32 +139,34 @@ impl SceneViewport {
             loaded
         };
 
-        let atlas_paths = resolve_tileset_atlas_paths(project_path, &tileset_path, &tileset);
-        let mut atlas_cache = std::collections::HashMap::new();
-        for atlas_path in atlas_paths {
-            let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to load linked atlas '{}': {}",
-                    atlas_path.display(),
-                    e
-                )
-            })?;
-            let atlas_name = atlas_path
-                .file_stem()
-                .and_then(|stem| stem.to_str())
-                .map(normalize_asset_name)
-                .unwrap_or_default()
-                .to_string();
-            atlas_cache.insert(
-                atlas_name.clone(),
-                toki_core::assets::tileset::TileSetAtlasSource {
-                    name: atlas_name,
-                    path: atlas_path,
-                    meta: atlas,
-                },
-            );
+        if !reuse_tileset_cache || self.tileset_atlas_cache.is_empty() {
+            let atlas_paths = resolve_tileset_atlas_paths(project_path, &tileset_path, &tileset);
+            let mut atlas_cache = std::collections::HashMap::new();
+            for atlas_path in atlas_paths {
+                let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to load linked atlas '{}': {}",
+                        atlas_path.display(),
+                        e
+                    )
+                })?;
+                let atlas_name = atlas_path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .map(normalize_asset_name)
+                    .unwrap_or_default()
+                    .to_string();
+                atlas_cache.insert(
+                    atlas_name.clone(),
+                    toki_core::assets::tileset::TileSetAtlasSource {
+                        name: atlas_name,
+                        path: atlas_path,
+                        meta: atlas,
+                    },
+                );
+            }
+            self.tileset_atlas_cache = atlas_cache;
         }
-        self.tileset_atlas_cache = atlas_cache;
         tracing::info!(
             "Loaded tileset '{}' with {} linked atlases",
             tileset_path.display(),

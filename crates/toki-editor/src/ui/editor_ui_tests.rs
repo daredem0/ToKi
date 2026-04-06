@@ -149,6 +149,57 @@ fn setup_auto_tile_composition_ui(_project_path: &std::path::Path) -> EditorUI {
 }
 
 #[test]
+fn draft_map_brush_source_uses_modified_tileset_before_save() {
+    let project_dir = tempdir().expect("temp dir");
+    write_test_sprite_atlas(
+        project_dir.path(),
+        "terrain.json",
+        &sample_plain_brush_atlas(),
+    );
+
+    let mut ui = EditorUI::new();
+    let tilemap = toki_core::assets::tilemap::TileMap {
+        size: UVec2::new(2, 2),
+        tile_size: UVec2::new(8, 8),
+        tileset: PathBuf::from("DraftMap.json"),
+        layers: vec![toki_core::assets::tilemap::TileLayer::new_empty(
+            "ground", 4,
+        )],
+    };
+    crate::ui::editor_ui::set_map_editor_draft(
+        &mut ui,
+        MapEditorDraft {
+            name: "DraftMap".to_string(),
+            tilemap: tilemap.clone(),
+        },
+    );
+    crate::ui::editor_context::map_state_mut(&mut ui).modified_tileset =
+        Some(toki_core::assets::tileset::TileSetMeta::from_atlas(
+            "terrain.json",
+            &sample_plain_brush_atlas(),
+        ));
+
+    let source = crate::ui::editor_ui::load_map_editor_brush_source_for_tilemap(
+        &ui,
+        project_dir.path(),
+        &tilemap,
+    )
+    .expect("draft brush source");
+
+    assert!(
+        !source.brush_entries.is_empty(),
+        "draft map should expose brush entries before first save"
+    );
+    assert!(
+        source
+            .brush_entries
+            .iter()
+            .any(|entry| entry.display_label.contains("grass")),
+        "draft brush source should include atlas-backed tiles from the in-memory tileset"
+    );
+}
+
+#[test]
 fn editor_ui_groups_workspace_state_defaults() {
     let ui = EditorUI::new();
 

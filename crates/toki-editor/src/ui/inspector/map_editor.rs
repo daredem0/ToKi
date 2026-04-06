@@ -58,6 +58,7 @@ impl InspectorSystem {
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
                 ui.label("Primary drag pans the map editor camera.");
+                ui.label("Middle drag also pans in every map editor tool.");
                 if let Some(tile_info) =
                     &crate::ui::editor_context::map_state_mut(ui_state).selected_tile_info
                 {
@@ -208,17 +209,12 @@ impl InspectorSystem {
                 } else {
                     ui.label("No tileset entries available for the current map.");
                 }
-                ui.label(
-                    match crate::ui::editor_context::map_state_mut(ui_state).tool {
-                        MapEditorTool::Brush => "Secondary drag pans the camera.",
-                        MapEditorTool::Fill => "Secondary drag pans the camera.",
-                        MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
-                    },
-                );
+                ui.label("Middle drag pans the camera.");
             }
             MapEditorTool::PickTile => {
                 ui.label("Click a tile in the map to pick it.");
                 ui.label("After picking, the tool switches back to Brush automatically.");
+                ui.label("Middle drag pans the camera.");
                 if let Some(tile_name) = crate::ui::editor_context::map_state_mut(ui_state)
                     .selected_tile
                     .as_deref()

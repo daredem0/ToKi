@@ -261,24 +261,24 @@
   "auto_tile_groups": {
     "terrain": {
       "mode": "four_bit",
-      "preview_tile": "terrain_preview",
+      "preview_tile": "terrain_5",
       "variants": {
-        "13": "terrain_13",
-        "15": "terrain_15",
-        "6": "terrain_6",
-        "10": "terrain_10",
-        "5": "terrain_5",
-        "1": "terrain_1",
-        "11": "terrain_11",
-        "0": "terrain_0",
-        "3": "terrain_3",
-        "12": "terrain_12",
-        "8": "terrain_8",
-        "7": "terrain_7",
-        "14": "terrain_14",
-        "4": "terrain_4",
-        "9": "terrain_9",
-        "2": "terrain_2"
+        "0": "terrain_15",
+        "1": "terrain_3",
+        "2": "terrain_7",
+        "3": "terrain_8",
+        "4": "terrain_11",
+        "5": "terrain_13",
+        "6": "terrain_0",
+        "7": "terrain_4",
+        "8": "terrain_12",
+        "9": "terrain_10",
+        "10": "terrain_14",
+        "11": "terrain_9",
+        "12": "terrain_2",
+        "13": "terrain_6",
+        "14": "terrain_1",
+        "15": "terrain_5"
       }
     }
   },

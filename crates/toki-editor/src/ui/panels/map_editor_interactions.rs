@@ -11,7 +11,7 @@ impl PanelSystem {
         CameraInteraction::handle_drag(viewport, response, config);
     }
 
-    pub(super) fn handle_map_editor_secondary_drag(
+    pub(super) fn handle_map_editor_middle_drag(
         ui: &egui::Ui,
         viewport: &mut SceneViewport,
         response: &egui::Response,
@@ -21,15 +21,19 @@ impl PanelSystem {
             .map(|c| c.editor_settings.camera.pan_speed)
             .unwrap_or(1.0);
 
-        if response.hovered() && ui.input(|input| input.pointer.secondary_pressed()) {
+        if response.hovered()
+            && ui.input(|input| input.pointer.button_pressed(egui::PointerButton::Middle))
+        {
             if let Some(start_pos) = ui.input(|input| input.pointer.interact_pos()) {
                 viewport.start_camera_drag(glam::Vec2::new(start_pos.x, start_pos.y));
             }
-        } else if response.hovered() && ui.input(|input| input.pointer.secondary_down()) {
+        } else if response.hovered()
+            && ui.input(|input| input.pointer.button_down(egui::PointerButton::Middle))
+        {
             if let Some(drag_pos) = ui.input(|input| input.pointer.interact_pos()) {
                 viewport.update_camera_drag(glam::Vec2::new(drag_pos.x, drag_pos.y), pan_speed);
             }
-        } else if ui.input(|input| input.pointer.secondary_released()) {
+        } else if ui.input(|input| input.pointer.button_released(egui::PointerButton::Middle)) {
             viewport.stop_camera_drag();
         }
     }
@@ -57,37 +61,40 @@ impl PanelSystem {
         }
 
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let Some(tilemap) = viewport.tilemap_mut() else {
-            return false;
-        };
-        if ui.input(|input| input.pointer.primary_pressed()) {
-            crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
-        }
-        let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos) else {
-            return false;
-        };
-
         let map_state = crate::ui::editor_context::map_state(ui_state);
         let active_layer = map_state.active_layer;
         let solid_stamp = map_state.brush_stamp_solid;
-        let mut changed = MapPaintInteraction::paint_brush(
-            tilemap,
-            active_layer,
-            tile_pos,
-            selected_tile,
-            brush_size_tiles,
-        );
-        if let Some(solid) = solid_stamp {
-            changed |= Self::stamp_solid_in_footprint(
+        let changed = {
+            let Some(tilemap) = viewport.tilemap_mut() else {
+                return false;
+            };
+            if ui.input(|input| input.pointer.primary_pressed()) {
+                crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
+            }
+            let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos)
+            else {
+                return false;
+            };
+            let mut changed = MapPaintInteraction::paint_brush(
                 tilemap,
                 active_layer,
                 tile_pos,
+                selected_tile,
                 brush_size_tiles,
-                solid,
             );
-        }
+            if let Some(solid) = solid_stamp {
+                changed |= Self::stamp_solid_in_footprint(
+                    tilemap,
+                    active_layer,
+                    tile_pos,
+                    brush_size_tiles,
+                    solid,
+                );
+            }
+            changed
+        };
         if changed {
-            viewport.mark_dirty();
+            viewport.invalidate_tilemap_render_cache();
             return true;
         }
 
@@ -132,15 +139,21 @@ impl PanelSystem {
             return false;
         }
 
-        let Some(tilemap) = viewport.tilemap_mut() else {
-            return false;
-        };
-        crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
-
         let active_layer = crate::ui::editor_context::map_state(ui_state).active_layer;
-        if MapPaintInteraction::fill_all(tilemap, active_layer, selected_tile) {
-            crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
-            viewport.mark_dirty();
+        let changed = {
+            let Some(tilemap) = viewport.tilemap_mut() else {
+                return false;
+            };
+            crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
+            if MapPaintInteraction::fill_all(tilemap, active_layer, selected_tile) {
+                crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
+                true
+            } else {
+                false
+            }
+        };
+        if changed {
+            viewport.invalidate_tilemap_render_cache();
             return true;
         }
 

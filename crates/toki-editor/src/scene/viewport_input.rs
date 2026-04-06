@@ -48,7 +48,7 @@ impl SceneViewport {
             self.camera
                 .move_by(glam::IVec2::new(world_delta_x as i32, world_delta_y as i32));
 
-            self.mark_dirty();
+            self.request_render();
 
             tracing::trace!(
                 "Camera dragged by screen delta: {:?}, world delta: ({}, {}) [pan_speed: {}]",

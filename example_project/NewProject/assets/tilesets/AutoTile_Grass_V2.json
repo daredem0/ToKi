@@ -1,0 +1,14 @@
+{
+  "tile_size": [
+    8,
+    8
+  ],
+  "entries": {
+    "AutoTile_Grass_V2/autotile/terrain": {
+      "atlas_name": "AutoTile_Grass_V2.json",
+      "kind": "autotile",
+      "source_name": "terrain",
+      "display_name": "AutoTile_Grass_V2"
+    }
+  }
+}

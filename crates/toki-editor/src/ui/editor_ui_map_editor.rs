@@ -708,7 +708,13 @@ pub(crate) fn load_map_editor_brush_source_for_tilemap(
     tilemap: &TileMap,
 ) -> Option<LoadedMapEditorBrushSource> {
     let tileset = load_map_editor_tileset_meta_from_project_path(ui_state, project_path, tilemap)?;
-    let tileset_path = resolve_map_editor_tileset_path(project_path, tilemap)?;
+    let tileset_path =
+        resolve_map_editor_tileset_path(project_path, tilemap).unwrap_or_else(|| {
+            project_path
+                .join("assets")
+                .join("tilesets")
+                .join(&tilemap.tileset)
+        });
     let mut atlases = HashMap::new();
     for atlas_path in toki_core::project_assets::resolve_tileset_atlas_paths(
         project_path,

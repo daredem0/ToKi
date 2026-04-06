@@ -6,6 +6,7 @@ use crate::ui::EditorUI;
 impl PanelSystem {
     pub(super) fn paint_map_editor_empty_tile_checkerboard(
         ui: &egui::Ui,
+        ui_state: &mut EditorUI,
         viewport: &SceneViewport,
         viewport_ctx: &EditorViewportContext,
     ) {
@@ -38,24 +39,37 @@ impl PanelSystem {
             return;
         }
 
+        let texture = Self::ensure_map_editor_empty_checkerboard_texture(
+            ui_state,
+            ui.ctx(),
+            viewport,
+            tilemap,
+            visible_min,
+            visible_max,
+        );
+        let Some(texture) = texture else {
+            return;
+        };
+        let Some(first_tile_rect) = viewport_ctx.tile_screen_rect(
+            tile_size,
+            glam::UVec2::new(visible_min.x as u32, visible_min.y as u32),
+        ) else {
+            return;
+        };
+        let Some(last_tile_rect) = viewport_ctx.tile_screen_rect(
+            tile_size,
+            glam::UVec2::new(visible_max.x as u32, visible_max.y as u32),
+        ) else {
+            return;
+        };
+        let checkerboard_rect = egui::Rect::from_min_max(first_tile_rect.min, last_tile_rect.max);
         let painter = ui.painter().with_clip_rect(viewport_ctx.display_rect());
-        for tile_y in visible_min.y as u32..=visible_max.y as u32 {
-            for tile_x in visible_min.x as u32..=visible_max.x as u32 {
-                if !Self::map_editor_tile_is_empty(tilemap, tile_x, tile_y) {
-                    continue;
-                }
-                let Some(tile_screen_rect) =
-                    viewport_ctx.tile_screen_rect(tile_size, glam::UVec2::new(tile_x, tile_y))
-                else {
-                    continue;
-                };
-                painter.rect_filled(
-                    tile_screen_rect,
-                    0.0,
-                    Self::map_editor_checkerboard_color(tile_x, tile_y),
-                );
-            }
-        }
+        painter.image(
+            texture.id(),
+            checkerboard_rect,
+            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            egui::Color32::WHITE,
+        );
     }
 
     pub(super) fn paint_map_editor_brush_preview(
@@ -250,5 +264,68 @@ impl PanelSystem {
         } else {
             dark
         }
+    }
+
+    fn ensure_map_editor_empty_checkerboard_texture(
+        ui_state: &mut EditorUI,
+        ctx: &egui::Context,
+        viewport: &SceneViewport,
+        tilemap: &toki_core::assets::tilemap::TileMap,
+        visible_min: glam::IVec2,
+        visible_max: glam::IVec2,
+    ) -> Option<egui::TextureHandle> {
+        let width = (visible_max.x - visible_min.x + 1).max(0) as usize;
+        let height = (visible_max.y - visible_min.y + 1).max(0) as usize;
+        if width == 0 || height == 0 {
+            return None;
+        }
+
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let viewport_size = viewport.viewport_size();
+        let cache_key = format!(
+            "rev:{}:cam:{}:{}:scale:{}:vp:{}x{}:tiles:{}:{}-{}:{}",
+            viewport.tilemap_revision(),
+            camera_position.x,
+            camera_position.y,
+            camera_scale.to_bits(),
+            viewport_size.0,
+            viewport_size.1,
+            visible_min.x,
+            visible_min.y,
+            visible_max.x,
+            visible_max.y
+        );
+        let state = crate::ui::editor_context::map_state_mut(ui_state);
+        if state.empty_checkerboard_cache_key.as_deref() == Some(cache_key.as_str()) {
+            if let Some(texture) = state.empty_checkerboard_texture.clone() {
+                return Some(texture);
+            }
+        }
+
+        let mut pixels = vec![0_u8; width * height * 4];
+        for (row, tile_y) in (visible_min.y as u32..=visible_max.y as u32).enumerate() {
+            for (col, tile_x) in (visible_min.x as u32..=visible_max.x as u32).enumerate() {
+                if !Self::map_editor_tile_is_empty(tilemap, tile_x, tile_y) {
+                    continue;
+                }
+                let color = Self::map_editor_checkerboard_color(tile_x, tile_y);
+                let pixel_index = (row * width + col) * 4;
+                pixels[pixel_index] = color.r();
+                pixels[pixel_index + 1] = color.g();
+                pixels[pixel_index + 2] = color.b();
+                pixels[pixel_index + 3] = color.a();
+            }
+        }
+
+        let image = egui::ColorImage::from_rgba_unmultiplied([width, height], &pixels);
+        let texture = ctx.load_texture(
+            "map_editor_empty_checkerboard",
+            image,
+            egui::TextureOptions::NEAREST,
+        );
+        let state = crate::ui::editor_context::map_state_mut(ui_state);
+        state.empty_checkerboard_cache_key = Some(cache_key);
+        state.empty_checkerboard_texture = Some(texture.clone());
+        Some(texture)
     }
 }
