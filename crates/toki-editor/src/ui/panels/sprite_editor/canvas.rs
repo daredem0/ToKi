@@ -1,11 +1,14 @@
 //! Canvas rendering and drawing operations.
 
+use std::borrow::Cow;
+
 use crate::ui::editor_ui::{
     CanvasSide, PixelColor, SelectionMask, SpriteCanvas, SpriteCanvasViewport, SpriteEditorTool,
 };
 use crate::ui::sprite_editor::{FloatingOrigin, FloatingSelection};
 use crate::ui::EditorUI;
 use toki_core::assets::atlas::ColorMode;
+use toki_core::assets::autotile::{canonical_8bit_mask_for_slot, AutoTileMode};
 use toki_core::graphics::image::DecodedImage;
 use toki_core::palette::Palette;
 
@@ -196,6 +199,25 @@ pub fn render_canvas_viewport(
                 canvas_state.cell_size,
             );
         }
+    }
+
+    // Draw autotile authoring overlay
+    let autotile_info = crate::ui::editor_context::sprite_state(ui_state)
+        .autotile_info
+        .clone();
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    if let (Some(canvas), Some(autotile_info)) = (&canvas_state.canvas, autotile_info.as_ref()) {
+        draw_autotile_overlay(
+            &painter,
+            rect,
+            &canvas_state.viewport,
+            canvas,
+            canvas_state.cell_size,
+            autotile_info,
+            canvas_state.show_autotile_labels,
+            canvas_state.show_autotile_guides,
+        );
     }
 
     // Draw hovered pixel highlight
@@ -811,6 +833,231 @@ fn draw_cell_cross(
     }
 }
 
+const AUTOTILE_LABEL_MIN_SCREEN_SIZE: f32 = 24.0;
+const AUTOTILE_GUIDE_MIN_SCREEN_SIZE: f32 = 12.0;
+
+const GUIDE_N: u8 = 0x01;
+const GUIDE_NE: u8 = 0x02;
+const GUIDE_E: u8 = 0x04;
+const GUIDE_SE: u8 = 0x08;
+const GUIDE_S: u8 = 0x10;
+const GUIDE_SW: u8 = 0x20;
+const GUIDE_W: u8 = 0x40;
+const GUIDE_NW: u8 = 0x80;
+
+fn draw_autotile_overlay(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+    cell_size: glam::UVec2,
+    autotile_info: &crate::ui::sprite_editor::AutoTileSpriteInfo,
+    show_labels: bool,
+    show_guides: bool,
+) {
+    if cell_size.x == 0 || cell_size.y == 0 || (!show_labels && !show_guides) {
+        return;
+    }
+
+    let cols = canvas.width / cell_size.x.max(1);
+    let rows = canvas.height / cell_size.y.max(1);
+    if cols == 0 || rows == 0 {
+        return;
+    }
+
+    let screen_cell_size = autotile_overlay_screen_cell_size(cell_size, viewport.zoom);
+    let labels_visible = show_labels && autotile_labels_visible(screen_cell_size);
+    let guides_visible = show_guides && autotile_guides_visible(screen_cell_size);
+    if !labels_visible && !guides_visible {
+        return;
+    }
+
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+    let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+    let canvas_screen_max = egui::pos2(
+        canvas_screen_min.x + canvas.width as f32 * zoom,
+        canvas_screen_min.y + canvas.height as f32 * zoom,
+    );
+    let clip_rect = rect.intersect(egui::Rect::from_min_max(
+        canvas_screen_min,
+        canvas_screen_max,
+    ));
+    if !clip_rect.is_positive() {
+        return;
+    }
+
+    let painter = painter.with_clip_rect(clip_rect);
+
+    for row in 0..rows {
+        for col in 0..cols {
+            let slot_index = (row * cols + col) as usize;
+            let cell_min = egui::pos2(
+                canvas_screen_min.x + (col * cell_size.x) as f32 * zoom,
+                canvas_screen_min.y + (row * cell_size.y) as f32 * zoom,
+            );
+            let cell_max = egui::pos2(
+                cell_min.x + cell_size.x as f32 * zoom,
+                cell_min.y + cell_size.y as f32 * zoom,
+            );
+            let cell_rect = egui::Rect::from_min_max(cell_min, cell_max);
+            if !cell_rect.intersects(clip_rect) {
+                continue;
+            }
+
+            if guides_visible {
+                if let Some(guide_mask) =
+                    autotile_guide_mask_for_slot(autotile_info.mode, slot_index)
+                {
+                    draw_autotile_guides(&painter, cell_rect, guide_mask);
+                }
+            }
+
+            if labels_visible {
+                if let Some(label) = autotile_label_for_slot(autotile_info.mode, slot_index) {
+                    draw_autotile_label(&painter, cell_rect, label.as_ref());
+                }
+            }
+        }
+    }
+}
+
+fn autotile_overlay_screen_cell_size(cell_size: glam::UVec2, zoom: f32) -> f32 {
+    (cell_size.x.min(cell_size.y) as f32 * zoom).max(0.0)
+}
+
+fn autotile_labels_visible(screen_cell_size: f32) -> bool {
+    screen_cell_size >= AUTOTILE_LABEL_MIN_SCREEN_SIZE
+}
+
+fn autotile_guides_visible(screen_cell_size: f32) -> bool {
+    screen_cell_size >= AUTOTILE_GUIDE_MIN_SCREEN_SIZE
+}
+
+fn autotile_label_for_slot(mode: AutoTileMode, slot_index: usize) -> Option<Cow<'static, str>> {
+    match mode {
+        AutoTileMode::FourBit => {
+            crate::ui::sprite_editor::four_bit_visual_label_for_slot(slot_index as u8)
+                .map(Cow::Borrowed)
+        }
+        AutoTileMode::EightBit => canonical_8bit_mask_for_slot(slot_index as u8)
+            .map(|_| Cow::Owned(slot_index.to_string())),
+    }
+}
+
+fn autotile_guide_mask_for_slot(mode: AutoTileMode, slot_index: usize) -> Option<u8> {
+    match mode {
+        AutoTileMode::FourBit => {
+            if slot_index >= 16 {
+                return None;
+            }
+            let neighbor_mask =
+                crate::ui::sprite_editor::four_bit_mask_for_visual_slot(slot_index as u8);
+            let mut guide_mask = 0u8;
+            if neighbor_mask & 0x01 != 0 {
+                guide_mask |= GUIDE_N;
+            }
+            if neighbor_mask & 0x02 != 0 {
+                guide_mask |= GUIDE_E;
+            }
+            if neighbor_mask & 0x04 != 0 {
+                guide_mask |= GUIDE_S;
+            }
+            if neighbor_mask & 0x08 != 0 {
+                guide_mask |= GUIDE_W;
+            }
+            Some(guide_mask)
+        }
+        AutoTileMode::EightBit => canonical_8bit_mask_for_slot(slot_index as u8),
+    }
+}
+
+fn draw_autotile_label(painter: &egui::Painter, cell_rect: egui::Rect, label: &str) {
+    let font_size = (cell_rect.width().min(cell_rect.height()) * 0.35).clamp(10.0, 18.0);
+    let font_id = egui::FontId::monospace(font_size);
+    let shadow_pos = cell_rect.center() + egui::vec2(1.0, 1.0);
+    painter.text(
+        shadow_pos,
+        egui::Align2::CENTER_CENTER,
+        label,
+        font_id.clone(),
+        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 220),
+    );
+    painter.text(
+        cell_rect.center(),
+        egui::Align2::CENTER_CENTER,
+        label,
+        font_id,
+        egui::Color32::from_rgba_unmultiplied(255, 255, 255, 235),
+    );
+}
+
+fn draw_autotile_guides(painter: &egui::Painter, cell_rect: egui::Rect, guide_mask: u8) {
+    let min_dim = cell_rect.width().min(cell_rect.height());
+    let inset = (min_dim * 0.18).clamp(2.0, 8.0);
+    let tick_len = (min_dim * 0.18).clamp(2.0, 10.0);
+    let stroke = egui::Stroke::new(
+        (min_dim * 0.08).clamp(1.25, 3.0),
+        egui::Color32::from_rgba_unmultiplied(255, 210, 90, 230),
+    );
+    let dot_radius = (min_dim * 0.07).clamp(1.5, 3.5);
+
+    let left = cell_rect.left() + inset;
+    let right = cell_rect.right() - inset;
+    let top = cell_rect.top() + inset;
+    let bottom = cell_rect.bottom() - inset;
+    let center = cell_rect.center();
+
+    if guide_mask & GUIDE_N != 0 {
+        painter.line_segment(
+            [
+                egui::pos2(center.x, top),
+                egui::pos2(center.x, top + tick_len),
+            ],
+            stroke,
+        );
+    }
+    if guide_mask & GUIDE_E != 0 {
+        painter.line_segment(
+            [
+                egui::pos2(right - tick_len, center.y),
+                egui::pos2(right, center.y),
+            ],
+            stroke,
+        );
+    }
+    if guide_mask & GUIDE_S != 0 {
+        painter.line_segment(
+            [
+                egui::pos2(center.x, bottom - tick_len),
+                egui::pos2(center.x, bottom),
+            ],
+            stroke,
+        );
+    }
+    if guide_mask & GUIDE_W != 0 {
+        painter.line_segment(
+            [
+                egui::pos2(left, center.y),
+                egui::pos2(left + tick_len, center.y),
+            ],
+            stroke,
+        );
+    }
+    if guide_mask & GUIDE_NE != 0 {
+        painter.circle_filled(egui::pos2(right, top), dot_radius, stroke.color);
+    }
+    if guide_mask & GUIDE_SE != 0 {
+        painter.circle_filled(egui::pos2(right, bottom), dot_radius, stroke.color);
+    }
+    if guide_mask & GUIDE_SW != 0 {
+        painter.circle_filled(egui::pos2(left, bottom), dot_radius, stroke.color);
+    }
+    if guide_mask & GUIDE_NW != 0 {
+        painter.circle_filled(egui::pos2(left, top), dot_radius, stroke.color);
+    }
+}
+
 fn draw_selection_mask(
     painter: &egui::Painter,
     rect: egui::Rect,
@@ -1419,5 +1666,59 @@ mod tests {
         assert_eq!(checkerboard_color_for_pixel(1, 1, light, dark), light);
         assert_eq!(checkerboard_color_for_pixel(5, 7, light, dark), light);
         assert_eq!(checkerboard_color_for_pixel(6, 7, light, dark), dark);
+    }
+
+    #[test]
+    fn autotile_overlay_visibility_thresholds_use_on_screen_cell_size() {
+        let cell_size = glam::UVec2::new(8, 8);
+
+        assert!(!autotile_labels_visible(autotile_overlay_screen_cell_size(
+            cell_size, 2.0
+        )));
+        assert!(autotile_labels_visible(autotile_overlay_screen_cell_size(
+            cell_size, 3.0
+        )));
+
+        assert!(!autotile_guides_visible(autotile_overlay_screen_cell_size(
+            cell_size, 1.0
+        )));
+        assert!(autotile_guides_visible(autotile_overlay_screen_cell_size(
+            cell_size, 1.5
+        )));
+    }
+
+    #[test]
+    fn four_bit_autotile_guide_mask_follows_runtime_neighbor_bits() {
+        assert_eq!(
+            autotile_guide_mask_for_slot(AutoTileMode::FourBit, 0),
+            Some(GUIDE_E | GUIDE_S)
+        );
+        assert_eq!(
+            autotile_guide_mask_for_slot(AutoTileMode::FourBit, 5),
+            Some(GUIDE_N | GUIDE_E | GUIDE_S | GUIDE_W)
+        );
+        assert_eq!(
+            autotile_guide_mask_for_slot(AutoTileMode::FourBit, 15),
+            Some(0)
+        );
+        assert_eq!(
+            autotile_guide_mask_for_slot(AutoTileMode::FourBit, 16),
+            None
+        );
+    }
+
+    #[test]
+    fn eight_bit_autotile_guide_mask_matches_canonical_slot_mask() {
+        for slot in 0..47usize {
+            assert_eq!(
+                autotile_guide_mask_for_slot(AutoTileMode::EightBit, slot),
+                canonical_8bit_mask_for_slot(slot as u8)
+            );
+        }
+
+        assert_eq!(
+            autotile_guide_mask_for_slot(AutoTileMode::EightBit, 47),
+            None
+        );
     }
 }

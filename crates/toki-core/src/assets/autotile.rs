@@ -90,13 +90,20 @@ fn reduce_8bit_raw(raw: u8) -> u8 {
 
 const WANG_47_COUNT: usize = 47;
 
+const CANONICAL_WANG_47_MASKS: [u8; WANG_47_COUNT] = canonical_wang_masks();
+
+/// Returns the canonical reduced 8-bit Wang mask for a slot index in the 47-tile set.
+///
+/// The slot order matches the sprite editor's authored 8-bit autotile sheet order.
+pub fn canonical_8bit_mask_for_slot(slot_index: u8) -> Option<u8> {
+    CANONICAL_WANG_47_MASKS.get(slot_index as usize).copied()
+}
+
 /// Lookup table mapping all 256 reduced 8-bit masks to Wang-47 indices (0..46).
 /// Built from the canonical 47 unique reduced masks in ascending order.
 static WANG_47_LOOKUP: [u8; 256] = build_wang_47_lookup();
 
 const fn build_wang_47_lookup() -> [u8; 256] {
-    // First, collect the 47 canonical reduced masks in order.
-    let canonical = canonical_wang_masks();
     let mut table = [0u8; 256];
 
     let mut raw: u16 = 0;
@@ -106,7 +113,7 @@ const fn build_wang_47_lookup() -> [u8; 256] {
         let mut idx: u8 = 0;
         let mut j = 0;
         while j < WANG_47_COUNT {
-            if canonical[j] == reduced {
+            if CANONICAL_WANG_47_MASKS[j] == reduced {
                 idx = j as u8;
                 break;
             }

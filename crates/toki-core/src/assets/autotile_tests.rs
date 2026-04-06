@@ -91,6 +91,50 @@ fn eight_bit_produces_47_unique_indices() {
     assert!(*indices.iter().max().unwrap() < 47);
 }
 
+#[test]
+fn eight_bit_canonical_slot_masks_match_runtime_slot_order() {
+    let variant_count = AutoTileGroup {
+        mode: AutoTileMode::EightBit,
+        preview_tile: None,
+        variants: HashMap::new(),
+    }
+    .expected_variant_count() as u8;
+
+    let mut previous = None;
+    let mut seen = HashSet::new();
+
+    for slot in 0..variant_count {
+        let mask = canonical_8bit_mask_for_slot(slot).expect("slot should have a canonical mask");
+        if let Some(previous) = previous {
+            assert!(
+                previous < mask,
+                "canonical slot masks should stay in ascending order"
+            );
+        }
+        previous = Some(mask);
+        seen.insert(mask);
+
+        let neighbors = full_neighbors([
+            mask & 0x01 != 0,
+            mask & 0x02 != 0,
+            mask & 0x04 != 0,
+            mask & 0x08 != 0,
+            mask & 0x10 != 0,
+            mask & 0x20 != 0,
+            mask & 0x40 != 0,
+            mask & 0x80 != 0,
+        ]);
+        assert_eq!(
+            compute_8bit_mask(&neighbors),
+            slot,
+            "canonical mask should resolve back to its slot index"
+        );
+    }
+
+    assert_eq!(seen.len(), variant_count as usize);
+    assert!(canonical_8bit_mask_for_slot(variant_count).is_none());
+}
+
 // --- Resolve variant tests ---
 
 #[test]

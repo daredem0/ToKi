@@ -867,6 +867,26 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui.label("Selected: None (click to select)");
         }
     }
+
+    if crate::ui::editor_context::sprite_state(ui_state)
+        .autotile_info
+        .is_some()
+    {
+        ui.separator();
+        ui.label("Autotile Overlay:");
+        ui.checkbox(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .show_autotile_labels,
+            "Show Autotile Labels",
+        );
+        ui.checkbox(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .show_autotile_guides,
+            "Show Autotile Guides",
+        );
+    }
 }
 
 fn render_floating_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {

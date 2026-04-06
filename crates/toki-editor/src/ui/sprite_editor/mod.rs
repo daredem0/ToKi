@@ -19,7 +19,9 @@ mod types;
 mod viewport;
 
 // Re-export all public types
-pub(crate) use autotile_layout::{four_bit_mask_for_visual_slot, FOUR_BIT_VISUAL_LAYOUT_TEXT};
+pub(crate) use autotile_layout::{
+    four_bit_mask_for_visual_slot, four_bit_visual_label_for_slot, FOUR_BIT_VISUAL_LAYOUT_TEXT,
+};
 pub use canvas::SpriteCanvas;
 pub use dual_canvas::{CanvasSide, CanvasState, DualCanvasLayout};
 pub use floating::{FloatingOrigin, FloatingSelection};

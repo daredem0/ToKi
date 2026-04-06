@@ -91,6 +91,10 @@ pub struct CanvasState {
     pub show_cell_grid: bool,
     /// Whether to show symmetry cross lines at each cell's center
     pub show_cell_cross: bool,
+    /// Whether to show autotile role labels over each sheet cell.
+    pub show_autotile_labels: bool,
+    /// Whether to show autotile connectivity guides over each sheet cell.
+    pub show_autotile_guides: bool,
     /// Show 3x3 tiled preview around the active tile
     pub tile_preview: bool,
     /// Line tool: start position when dragging
@@ -139,6 +143,8 @@ impl Default for CanvasState {
             selected_cell: None,
             show_cell_grid: false,
             show_cell_cross: false,
+            show_autotile_labels: true,
+            show_autotile_guides: true,
             tile_preview: false,
             line_start_pos: None,
             selection_start_pos: None,
@@ -152,5 +158,17 @@ impl Default for CanvasState {
             resize_drag: None,
             stroke_erases: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canvas_state_defaults_enable_autotile_overlay_toggles() {
+        let state = CanvasState::default();
+        assert!(state.show_autotile_labels);
+        assert!(state.show_autotile_guides);
     }
 }
