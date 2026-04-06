@@ -994,67 +994,65 @@ fn draw_autotile_label(painter: &egui::Painter, cell_rect: egui::Rect, label: &s
 
 fn draw_autotile_guides(painter: &egui::Painter, cell_rect: egui::Rect, guide_mask: u8) {
     let min_dim = cell_rect.width().min(cell_rect.height());
-    let inset = (min_dim * 0.18).clamp(2.0, 8.0);
-    let tick_len = (min_dim * 0.18).clamp(2.0, 10.0);
-    let stroke = egui::Stroke::new(
-        (min_dim * 0.08).clamp(1.25, 3.0),
-        egui::Color32::from_rgba_unmultiplied(255, 210, 90, 230),
+    let edge_inset = (min_dim * 0.06).clamp(0.75, 2.5);
+    let edge_shadow = egui::Stroke::new(
+        (min_dim * 0.14).clamp(2.5, 5.0),
+        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 35),
     );
-    let dot_radius = (min_dim * 0.07).clamp(1.5, 3.5);
+    let edge_stroke = egui::Stroke::new(
+        (min_dim * 0.085).clamp(2.0, 3.5),
+        egui::Color32::from_rgba_unmultiplied(255, 222, 120, 125),
+    );
+    let corner_radius = (min_dim * 0.055).clamp(1.5, 3.5);
+    let corner_fill = egui::Color32::from_rgba_unmultiplied(255, 222, 120, 95);
 
-    let left = cell_rect.left() + inset;
-    let right = cell_rect.right() - inset;
-    let top = cell_rect.top() + inset;
-    let bottom = cell_rect.bottom() - inset;
-    let center = cell_rect.center();
+    for edge in [GUIDE_N, GUIDE_E, GUIDE_S, GUIDE_W] {
+        if guide_mask & edge == 0 {
+            continue;
+        }
+        let [start, end] = autotile_edge_highlight_segment(cell_rect, edge, edge_inset);
+        painter.line_segment([start, end], edge_shadow);
+        painter.line_segment([start, end], edge_stroke);
+    }
 
-    if guide_mask & GUIDE_N != 0 {
-        painter.line_segment(
-            [
-                egui::pos2(center.x, top),
-                egui::pos2(center.x, top + tick_len),
-            ],
-            stroke,
-        );
+    for corner in [GUIDE_NE, GUIDE_SE, GUIDE_SW, GUIDE_NW] {
+        if guide_mask & corner == 0 {
+            continue;
+        }
+        let center = autotile_corner_highlight_center(cell_rect, corner, edge_inset);
+        painter.circle_filled(center, corner_radius, corner_fill);
     }
-    if guide_mask & GUIDE_E != 0 {
-        painter.line_segment(
-            [
-                egui::pos2(right - tick_len, center.y),
-                egui::pos2(right, center.y),
-            ],
-            stroke,
-        );
+}
+
+fn autotile_edge_highlight_segment(cell_rect: egui::Rect, edge: u8, inset: f32) -> [egui::Pos2; 2] {
+    match edge {
+        GUIDE_N => [
+            egui::pos2(cell_rect.left(), cell_rect.top() + inset),
+            egui::pos2(cell_rect.right(), cell_rect.top() + inset),
+        ],
+        GUIDE_E => [
+            egui::pos2(cell_rect.right() - inset, cell_rect.top()),
+            egui::pos2(cell_rect.right() - inset, cell_rect.bottom()),
+        ],
+        GUIDE_S => [
+            egui::pos2(cell_rect.left(), cell_rect.bottom() - inset),
+            egui::pos2(cell_rect.right(), cell_rect.bottom() - inset),
+        ],
+        GUIDE_W => [
+            egui::pos2(cell_rect.left() + inset, cell_rect.top()),
+            egui::pos2(cell_rect.left() + inset, cell_rect.bottom()),
+        ],
+        _ => [cell_rect.center(), cell_rect.center()],
     }
-    if guide_mask & GUIDE_S != 0 {
-        painter.line_segment(
-            [
-                egui::pos2(center.x, bottom - tick_len),
-                egui::pos2(center.x, bottom),
-            ],
-            stroke,
-        );
-    }
-    if guide_mask & GUIDE_W != 0 {
-        painter.line_segment(
-            [
-                egui::pos2(left, center.y),
-                egui::pos2(left + tick_len, center.y),
-            ],
-            stroke,
-        );
-    }
-    if guide_mask & GUIDE_NE != 0 {
-        painter.circle_filled(egui::pos2(right, top), dot_radius, stroke.color);
-    }
-    if guide_mask & GUIDE_SE != 0 {
-        painter.circle_filled(egui::pos2(right, bottom), dot_radius, stroke.color);
-    }
-    if guide_mask & GUIDE_SW != 0 {
-        painter.circle_filled(egui::pos2(left, bottom), dot_radius, stroke.color);
-    }
-    if guide_mask & GUIDE_NW != 0 {
-        painter.circle_filled(egui::pos2(left, top), dot_radius, stroke.color);
+}
+
+fn autotile_corner_highlight_center(cell_rect: egui::Rect, corner: u8, inset: f32) -> egui::Pos2 {
+    match corner {
+        GUIDE_NE => egui::pos2(cell_rect.right() - inset, cell_rect.top() + inset),
+        GUIDE_SE => egui::pos2(cell_rect.right() - inset, cell_rect.bottom() - inset),
+        GUIDE_SW => egui::pos2(cell_rect.left() + inset, cell_rect.bottom() - inset),
+        GUIDE_NW => egui::pos2(cell_rect.left() + inset, cell_rect.top() + inset),
+        _ => cell_rect.center(),
     }
 }
 
@@ -1720,5 +1718,27 @@ mod tests {
             autotile_guide_mask_for_slot(AutoTileMode::EightBit, 47),
             None
         );
+    }
+
+    #[test]
+    fn autotile_edge_highlight_segment_hugs_requested_edge() {
+        let rect = egui::Rect::from_min_max(egui::pos2(10.0, 20.0), egui::pos2(42.0, 52.0));
+        let north = autotile_edge_highlight_segment(rect, GUIDE_N, 2.0);
+        let east = autotile_edge_highlight_segment(rect, GUIDE_E, 3.0);
+
+        assert_eq!(north[0], egui::pos2(10.0, 22.0));
+        assert_eq!(north[1], egui::pos2(42.0, 22.0));
+        assert_eq!(east[0], egui::pos2(39.0, 20.0));
+        assert_eq!(east[1], egui::pos2(39.0, 52.0));
+    }
+
+    #[test]
+    fn autotile_corner_highlight_center_hugs_requested_corner() {
+        let rect = egui::Rect::from_min_max(egui::pos2(10.0, 20.0), egui::pos2(42.0, 52.0));
+        let ne = autotile_corner_highlight_center(rect, GUIDE_NE, 2.5);
+        let sw = autotile_corner_highlight_center(rect, GUIDE_SW, 3.0);
+
+        assert_eq!(ne, egui::pos2(39.5, 22.5));
+        assert_eq!(sw, egui::pos2(13.0, 49.0));
     }
 }
