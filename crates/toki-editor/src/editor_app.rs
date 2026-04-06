@@ -415,6 +415,10 @@ impl ApplicationHandler for EditorApp {
             || SceneViewport::with_game_state_responsive(GameState::new_empty()),
             "map editor viewport",
         );
+        if let Some(viewport) = self.viewport_manager.map_editor.as_mut() {
+            viewport.set_clear_color(wgpu::Color::TRANSPARENT);
+            viewport.set_ui_background_fill(None);
+        }
 
         tracing::info!("Editor initialized successfully");
         if !self.project_session.startup_project_auto_open_done {
@@ -1133,6 +1137,7 @@ impl EditorApp {
         self.handle_map_requests();
         self.handle_new_map_editor_requests();
         self.handle_pending_map_editor_tilemap_sync();
+        self.handle_pending_map_editor_tileset_sync();
         self.handle_save_map_editor_request();
         self.handle_map_editor_map_requests();
         self.handle_sprite_asset_rescan();

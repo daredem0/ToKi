@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use toki_core::assets::atlas::{AtlasMeta, ImportedAutoTile};
 use toki_core::assets::tilemap::{TileLayer, TileMap};
-use toki_core::assets::tileset::{TileSetAtlasSource, TileSetEntryKind, TileSetMeta};
+use toki_core::assets::tileset::{TileSetAtlasSource, TileSetEntry, TileSetEntryKind, TileSetMeta};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -134,6 +134,37 @@ pub struct NewMapRequest {
     pub tile_height: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct MapResizeSpec {
+    pub remove_north: u32,
+    pub remove_east: u32,
+    pub remove_south: u32,
+    pub remove_west: u32,
+    pub add_north: u32,
+    pub add_east: u32,
+    pub add_south: u32,
+    pub add_west: u32,
+}
+
+impl MapResizeSpec {
+    fn resulting_size(self, size: glam::UVec2) -> Option<glam::UVec2> {
+        let width = i64::from(size.x) + i64::from(self.add_west) + i64::from(self.add_east)
+            - i64::from(self.remove_west)
+            - i64::from(self.remove_east);
+        let height = i64::from(size.y) + i64::from(self.add_north) + i64::from(self.add_south)
+            - i64::from(self.remove_north)
+            - i64::from(self.remove_south);
+        if width < 1 || height < 1 {
+            return None;
+        }
+        Some(glam::UVec2::new(width as u32, height as u32))
+    }
+
+    fn is_noop(self) -> bool {
+        self == Self::default()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MapEditorBrushKind {
     Tile,
@@ -154,6 +185,16 @@ pub(crate) struct LoadedMapEditorBrushSource {
     pub brush_entries: Vec<MapEditorBrushEntry>,
     pub tileset: TileSetMeta,
     pub atlases: HashMap<String, TileSetAtlasSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MapEditorAutoTileSource {
+    pub id: String,
+    pub atlas_file_name: String,
+    pub atlas_display_name: String,
+    pub group_name: String,
+    pub display_label: String,
+    pub disabled_reason: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -367,6 +408,278 @@ pub(crate) fn load_map_editor_tileset_meta_from_project_path(
     TileSetMeta::load_from_file(&tileset_path).ok()
 }
 
+fn ensure_map_editor_modified_tileset<'a>(
+    ui_state: &'a mut EditorUI,
+    project_path: &Path,
+    tilemap: &TileMap,
+) -> Option<&'a mut TileSetMeta> {
+    if crate::ui::editor_context::map_state(ui_state)
+        .modified_tileset
+        .is_none()
+    {
+        let loaded =
+            load_map_editor_tileset_meta_from_project_path(ui_state, project_path, tilemap)?;
+        crate::ui::editor_context::map_state_mut(ui_state).modified_tileset = Some(loaded);
+    }
+    crate::ui::editor_context::map_state_mut(ui_state)
+        .modified_tileset
+        .as_mut()
+}
+
+fn auto_tile_source_id(atlas_file_name: &str, group_name: &str) -> String {
+    format!("{atlas_file_name}::{group_name}")
+}
+
+fn auto_tile_display_name(atlas_display_name: &str, group_name: &str) -> String {
+    if group_name == "terrain" {
+        atlas_display_name.to_string()
+    } else {
+        format!("{atlas_display_name}: {group_name}")
+    }
+}
+
+pub(crate) fn available_map_editor_auto_tile_sources(
+    ui_state: &mut EditorUI,
+    project_path: &Path,
+    tilemap: &TileMap,
+) -> Vec<MapEditorAutoTileSource> {
+    let Some(tileset) =
+        ensure_map_editor_modified_tileset(ui_state, project_path, tilemap).cloned()
+    else {
+        return Vec::new();
+    };
+
+    let linked_pairs = tileset
+        .entries
+        .values()
+        .filter(|entry| entry.kind == TileSetEntryKind::AutoTileGroup)
+        .map(|entry| (entry.atlas_name.clone(), entry.source_name.clone()))
+        .collect::<std::collections::HashSet<_>>();
+
+    let sprites_dir = project_path.join("assets").join("sprites");
+    let Ok(entries) = std::fs::read_dir(&sprites_dir) else {
+        return Vec::new();
+    };
+
+    let mut sources = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .filter_map(|path| {
+            let atlas = AtlasMeta::load_from_file(&path).ok()?;
+            let atlas_file_name = path.file_name()?.to_str()?.to_string();
+            let atlas_display_name = path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or_default()
+                .to_string();
+            Some((atlas_file_name, atlas_display_name, atlas))
+        })
+        .flat_map(|(atlas_file_name, atlas_display_name, atlas)| {
+            let mut group_names = atlas.auto_tile_groups.keys().cloned().collect::<Vec<_>>();
+            group_names.sort();
+            let linked_pairs = linked_pairs.clone();
+            group_names.into_iter().map(move |group_name| {
+                let disabled_reason =
+                    if linked_pairs.contains(&(atlas_file_name.clone(), group_name.clone())) {
+                        Some("Already added to this map tileset".to_string())
+                    } else if atlas.tile_size != tileset.tile_size {
+                        Some(format!(
+                            "Tile size mismatch (atlas {}×{}, map {}×{})",
+                            atlas.tile_size.x,
+                            atlas.tile_size.y,
+                            tileset.tile_size.x,
+                            tileset.tile_size.y
+                        ))
+                    } else {
+                        None
+                    };
+                MapEditorAutoTileSource {
+                    id: auto_tile_source_id(&atlas_file_name, &group_name),
+                    atlas_file_name: atlas_file_name.clone(),
+                    atlas_display_name: atlas_display_name.clone(),
+                    group_name: group_name.clone(),
+                    display_label: auto_tile_display_name(&atlas_display_name, &group_name),
+                    disabled_reason,
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    sources.sort_by(|left, right| {
+        left.atlas_display_name
+            .cmp(&right.atlas_display_name)
+            .then(left.group_name.cmp(&right.group_name))
+    });
+    sources
+}
+
+pub(crate) fn auto_tile_entry_usage_count(tilemap: &TileMap, entry_id: &str) -> usize {
+    tilemap
+        .layers
+        .iter()
+        .map(|layer| {
+            layer
+                .tiles
+                .iter()
+                .filter(|tile| tile.as_str() == entry_id)
+                .count()
+        })
+        .sum()
+}
+
+fn clear_auto_tile_entry_usage(tilemap: &mut TileMap, entry_id: &str) -> bool {
+    let mut changed = false;
+    for layer in &mut tilemap.layers {
+        for tile in &mut layer.tiles {
+            if tile == entry_id {
+                tile.clear();
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+pub(crate) fn add_auto_tile_to_map_tileset(
+    ui_state: &mut EditorUI,
+    project_path: &Path,
+    source_id: &str,
+) -> bool {
+    let Some(tilemap) = crate::ui::editor_context::map_state(ui_state)
+        .draft
+        .as_ref()
+        .map(|draft| draft.tilemap.clone())
+    else {
+        return false;
+    };
+    let Some(source) = available_map_editor_auto_tile_sources(ui_state, project_path, &tilemap)
+        .into_iter()
+        .find(|source| source.id == source_id && source.disabled_reason.is_none())
+    else {
+        return false;
+    };
+    let Some(tileset) = ensure_map_editor_modified_tileset(ui_state, project_path, &tilemap) else {
+        return false;
+    };
+
+    let entry_id = TileSetMeta::build_entry_id(
+        &source.atlas_file_name,
+        TileSetEntryKind::AutoTileGroup,
+        &source.group_name,
+    );
+    if tileset.entries.contains_key(&entry_id) {
+        return false;
+    }
+    tileset.entries.insert(
+        entry_id.clone(),
+        TileSetEntry {
+            atlas_name: source.atlas_file_name,
+            kind: TileSetEntryKind::AutoTileGroup,
+            source_name: source.group_name,
+            display_name: Some(source.display_label),
+        },
+    );
+    let state = crate::ui::editor_context::map_state_mut(ui_state);
+    state.pending_tileset_sync = state.modified_tileset.clone();
+    state.dirty = true;
+    true
+}
+
+pub(crate) fn rename_map_auto_tile_display_name(
+    ui_state: &mut EditorUI,
+    project_path: &Path,
+    entry_id: &str,
+    new_display_name: &str,
+) -> bool {
+    let Some(tilemap) = crate::ui::editor_context::map_state(ui_state)
+        .draft
+        .as_ref()
+        .map(|draft| draft.tilemap.clone())
+    else {
+        return false;
+    };
+    let Some(tileset) = ensure_map_editor_modified_tileset(ui_state, project_path, &tilemap) else {
+        return false;
+    };
+    let Some(entry) = tileset.entries.get_mut(entry_id) else {
+        return false;
+    };
+    if entry.kind != TileSetEntryKind::AutoTileGroup {
+        return false;
+    }
+    let trimmed = new_display_name.trim();
+    let next_display_name = if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    };
+    if entry.display_name == next_display_name {
+        return false;
+    }
+    entry.display_name = next_display_name;
+    crate::ui::editor_context::map_state_mut(ui_state).dirty = true;
+    true
+}
+
+pub(crate) fn remove_auto_tile_from_map_tileset(
+    ui_state: &mut EditorUI,
+    project_path: &Path,
+    entry_id: &str,
+    clear_used_cells: bool,
+) -> bool {
+    let Some(tilemap) = crate::ui::editor_context::map_state(ui_state)
+        .draft
+        .as_ref()
+        .map(|draft| draft.tilemap.clone())
+    else {
+        return false;
+    };
+    let Some(tileset) = ensure_map_editor_modified_tileset(ui_state, project_path, &tilemap) else {
+        return false;
+    };
+    let Some(entry) = tileset.entries.get(entry_id) else {
+        return false;
+    };
+    if entry.kind != TileSetEntryKind::AutoTileGroup {
+        return false;
+    }
+
+    let usage_count = auto_tile_entry_usage_count(&tilemap, entry_id);
+    if usage_count > 0 && !clear_used_cells {
+        return false;
+    }
+
+    let state = crate::ui::editor_context::map_state_mut(ui_state);
+    if usage_count > 0 {
+        let Some(draft) = &mut state.draft else {
+            return false;
+        };
+        let before = draft.tilemap.clone();
+        if clear_auto_tile_entry_usage(&mut draft.tilemap, entry_id) {
+            state.history.push(MapEditorEditCommand {
+                map_name: state
+                    .active_map
+                    .clone()
+                    .unwrap_or_else(|| draft.name.clone()),
+                is_draft: true,
+                before,
+                after: draft.tilemap.clone(),
+            });
+            state.pending_tilemap_sync = Some(draft.tilemap.clone());
+        }
+    }
+    state
+        .modified_tileset
+        .as_mut()
+        .expect("tileset just loaded")
+        .entries
+        .remove(entry_id);
+    state.pending_tileset_sync = state.modified_tileset.clone();
+    state.dirty = true;
+    true
+}
+
 pub(crate) fn load_map_editor_brush_source(
     ui_state: &EditorUI,
     config: Option<&EditorConfig>,
@@ -481,6 +794,21 @@ pub(crate) fn begin_new_map_dialog(ui_state: &mut EditorUI) {
             .max(1);
 }
 
+pub(crate) fn begin_resize_map_dialog(ui_state: &mut EditorUI) {
+    let state = crate::ui::editor_context::map_state_mut(ui_state);
+    state.show_resize_map_dialog = true;
+    state.resize_remove_north = 0;
+    state.resize_remove_east = 0;
+    state.resize_remove_south = 0;
+    state.resize_remove_west = 0;
+    state.resize_add_north = 0;
+    state.resize_add_east = 0;
+    state.resize_add_south = 0;
+    state.resize_add_west = 0;
+    state.resize_remove_all = 0;
+    state.resize_add_all = 0;
+}
+
 pub(crate) fn submit_new_map_request(ui_state: &mut EditorUI) {
     let name = crate::ui::editor_context::map_state_mut(ui_state)
         .new_map_name
@@ -513,11 +841,108 @@ pub(crate) fn set_map_editor_draft(ui_state: &mut EditorUI, draft: MapEditorDraf
     crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = None;
     crate::ui::editor_context::map_state_mut(ui_state).draft = Some(draft);
     crate::ui::editor_context::map_state_mut(ui_state).dirty = true;
+    crate::ui::editor_context::map_state_mut(ui_state).selected_auto_tile_source = None;
+    crate::ui::editor_context::map_state_mut(ui_state).pending_auto_tile_removal_entry_id = None;
     crate::ui::editor_context::map_state_mut(ui_state)
         .history
         .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
+    crate::ui::editor_context::map_state_mut(ui_state).pending_tileset_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
+}
+
+fn resize_tilemap(tilemap: &TileMap, spec: MapResizeSpec) -> Option<TileMap> {
+    let new_size = spec.resulting_size(tilemap.size)?;
+    if new_size == tilemap.size && spec.is_noop() {
+        return Some(tilemap.clone());
+    }
+
+    let retain_min_x = spec.remove_west;
+    let retain_max_x = tilemap.size.x.saturating_sub(spec.remove_east);
+    let retain_min_y = spec.remove_north;
+    let retain_max_y = tilemap.size.y.saturating_sub(spec.remove_south);
+    let offset_x = spec.add_west as i32 - spec.remove_west as i32;
+    let offset_y = spec.add_north as i32 - spec.remove_north as i32;
+
+    let layers = tilemap
+        .layers
+        .iter()
+        .map(|layer| {
+            let mut resized = TileLayer {
+                name: layer.name.clone(),
+                tiles: vec![String::new(); (new_size.x * new_size.y) as usize],
+                visible: layer.visible,
+                collision_enabled: layer.collision_enabled,
+                above_entities: layer.above_entities,
+                collision_overrides: HashMap::new(),
+            };
+
+            for y in retain_min_y..retain_max_y {
+                for x in retain_min_x..retain_max_x {
+                    let source_index = (y * tilemap.size.x + x) as usize;
+                    let new_x = x as i32 + offset_x;
+                    let new_y = y as i32 + offset_y;
+                    if new_x < 0
+                        || new_y < 0
+                        || new_x as u32 >= new_size.x
+                        || new_y as u32 >= new_size.y
+                    {
+                        continue;
+                    }
+                    let dest_index = new_y as usize * new_size.x as usize + new_x as usize;
+                    resized.tiles[dest_index] = layer.tiles[source_index].clone();
+                    if let Some(&override_value) =
+                        layer.collision_overrides.get(&(source_index as u32))
+                    {
+                        resized
+                            .collision_overrides
+                            .insert(dest_index as u32, override_value);
+                    }
+                }
+            }
+
+            resized
+        })
+        .collect();
+
+    Some(TileMap {
+        size: new_size,
+        tile_size: tilemap.tile_size,
+        tileset: tilemap.tileset.clone(),
+        layers,
+    })
+}
+
+pub(crate) fn resize_map(ui_state: &mut EditorUI, spec: MapResizeSpec) -> bool {
+    let map_state = crate::ui::editor_context::map_state_mut(ui_state);
+    let Some(draft) = &mut map_state.draft else {
+        return false;
+    };
+    let Some(resized) = resize_tilemap(&draft.tilemap, spec) else {
+        return false;
+    };
+    if resized == draft.tilemap {
+        return false;
+    }
+
+    let before = draft.tilemap.clone();
+    draft.tilemap = resized.clone();
+    map_state.active_layer = map_state
+        .active_layer
+        .min(draft.tilemap.layers.len().saturating_sub(1));
+    let map_name = map_state
+        .active_map
+        .clone()
+        .unwrap_or_else(|| draft.name.clone());
+    map_state.history.push(MapEditorEditCommand {
+        map_name,
+        is_draft: true,
+        before,
+        after: resized.clone(),
+    });
+    map_state.pending_tilemap_sync = Some(resized);
+    map_state.dirty = true;
+    true
 }
 
 pub(crate) fn map_editor_selected_label(ui_state: &EditorUI) -> String {
@@ -583,16 +1008,20 @@ pub(crate) fn finalize_saved_map_editor_draft(ui_state: &mut EditorUI, saved_nam
     crate::ui::editor_context::map_state_mut(ui_state).active_map = Some(saved_name.clone());
     crate::ui::editor_context::map_state_mut(ui_state).map_load_requested = Some(saved_name);
     crate::ui::editor_context::map_state_mut(ui_state).save_requested = false;
+    crate::ui::editor_context::map_state_mut(ui_state).selected_auto_tile_source = None;
+    crate::ui::editor_context::map_state_mut(ui_state).pending_auto_tile_removal_entry_id = None;
     crate::ui::editor_context::map_state_mut(ui_state)
         .history
         .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
+    crate::ui::editor_context::map_state_mut(ui_state).pending_tileset_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
 }
 
 pub(crate) fn finalize_saved_existing_map(ui_state: &mut EditorUI) {
     crate::ui::editor_context::map_state_mut(ui_state).dirty = false;
     crate::ui::editor_context::map_state_mut(ui_state).save_requested = false;
+    crate::ui::editor_context::map_state_mut(ui_state).pending_tileset_sync = None;
 }
 
 pub(crate) fn clear_map_editor_history(ui_state: &mut EditorUI) {
@@ -600,6 +1029,7 @@ pub(crate) fn clear_map_editor_history(ui_state: &mut EditorUI) {
         .history
         .clear();
     crate::ui::editor_context::map_state_mut(ui_state).pending_tilemap_sync = None;
+    crate::ui::editor_context::map_state_mut(ui_state).pending_tileset_sync = None;
     crate::ui::editor_context::map_state_mut(ui_state).edit_before = None;
 }
 
@@ -651,6 +1081,12 @@ pub(crate) fn cancel_map_editor_edit(ui_state: &mut EditorUI) {
 pub(crate) fn take_pending_map_editor_tilemap_sync(ui_state: &mut EditorUI) -> Option<TileMap> {
     crate::ui::editor_context::map_state_mut(ui_state)
         .pending_tilemap_sync
+        .take()
+}
+
+pub(crate) fn take_pending_map_editor_tileset_sync(ui_state: &mut EditorUI) -> Option<TileSetMeta> {
+    crate::ui::editor_context::map_state_mut(ui_state)
+        .pending_tileset_sync
         .take()
 }
 

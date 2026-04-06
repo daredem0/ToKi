@@ -108,6 +108,46 @@ fn sample_auto_tile_brush_atlas() -> toki_core::assets::atlas::AtlasMeta {
     }
 }
 
+fn write_test_sprite_atlas(
+    project_path: &std::path::Path,
+    file_name: &str,
+    atlas: &toki_core::assets::atlas::AtlasMeta,
+) {
+    let sprites_dir = project_path.join("assets").join("sprites");
+    std::fs::create_dir_all(&sprites_dir).expect("sprites dir should be created");
+    std::fs::write(
+        sprites_dir.join(file_name),
+        serde_json::to_vec_pretty(atlas).expect("atlas json"),
+    )
+    .expect("atlas should be written");
+}
+
+fn setup_auto_tile_composition_ui(_project_path: &std::path::Path) -> EditorUI {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_ui::set_map_editor_draft(
+        &mut ui,
+        MapEditorDraft {
+            name: "CompositionMap".to_string(),
+            tilemap: toki_core::assets::tilemap::TileMap {
+                size: UVec2::new(2, 2),
+                tile_size: UVec2::new(8, 8),
+                tileset: PathBuf::from("CompositionMap.json"),
+                layers: vec![
+                    toki_core::assets::tilemap::TileLayer::new_empty("ground", 4),
+                    toki_core::assets::tilemap::TileLayer::new_empty("detail", 4),
+                ],
+            },
+        },
+    );
+    crate::ui::editor_context::map_state_mut(&mut ui).modified_tileset =
+        Some(toki_core::assets::tileset::TileSetMeta {
+            tile_size: UVec2::new(8, 8),
+            entries: HashMap::new(),
+        });
+    crate::ui::editor_context::map_state_mut(&mut ui).dirty = false;
+    ui
+}
+
 #[test]
 fn editor_ui_groups_workspace_state_defaults() {
     let ui = EditorUI::new();
@@ -849,6 +889,209 @@ fn build_map_editor_brush_entries_use_import_source_name_for_auto_tile_labels() 
 }
 
 #[test]
+fn available_map_editor_auto_tile_sources_discovers_compatible_and_incompatible_groups() {
+    let temp_dir = tempdir().expect("temp dir should exist");
+    let mut ui = setup_auto_tile_composition_ui(temp_dir.path());
+
+    write_test_sprite_atlas(
+        temp_dir.path(),
+        "AutoGrass.json",
+        &sample_auto_tile_brush_atlas(),
+    );
+    write_test_sprite_atlas(temp_dir.path(), "Plain.json", &sample_plain_brush_atlas());
+    let mut mismatch = sample_auto_tile_brush_atlas();
+    mismatch.tile_size = UVec2::new(16, 16);
+    write_test_sprite_atlas(temp_dir.path(), "LargeAuto.json", &mismatch);
+
+    let tilemap = crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .expect("draft")
+        .tilemap
+        .clone();
+    let sources = crate::ui::editor_ui::available_map_editor_auto_tile_sources(
+        &mut ui,
+        temp_dir.path(),
+        &tilemap,
+    );
+
+    assert_eq!(sources.len(), 2, "plain atlases should be excluded");
+    let compatible = sources
+        .iter()
+        .find(|source| source.atlas_file_name == "AutoGrass.json")
+        .expect("compatible autotile source");
+    assert!(compatible.disabled_reason.is_none());
+
+    let incompatible = sources
+        .iter()
+        .find(|source| source.atlas_file_name == "LargeAuto.json")
+        .expect("mismatched autotile source");
+    assert!(incompatible
+        .disabled_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("Tile size mismatch")));
+}
+
+#[test]
+fn add_auto_tile_to_map_tileset_updates_modified_tileset_and_pending_sync() {
+    let temp_dir = tempdir().expect("temp dir should exist");
+    let mut ui = setup_auto_tile_composition_ui(temp_dir.path());
+    write_test_sprite_atlas(
+        temp_dir.path(),
+        "AutoGrass.json",
+        &sample_auto_tile_brush_atlas(),
+    );
+
+    let tilemap = crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .expect("draft")
+        .tilemap
+        .clone();
+    let source_id = crate::ui::editor_ui::available_map_editor_auto_tile_sources(
+        &mut ui,
+        temp_dir.path(),
+        &tilemap,
+    )
+    .into_iter()
+    .find(|source| source.disabled_reason.is_none())
+    .expect("addable source")
+    .id;
+
+    assert!(crate::ui::editor_ui::add_auto_tile_to_map_tileset(
+        &mut ui,
+        temp_dir.path(),
+        &source_id,
+    ));
+    assert!(!crate::ui::editor_ui::add_auto_tile_to_map_tileset(
+        &mut ui,
+        temp_dir.path(),
+        &source_id,
+    ));
+
+    let entry_id = toki_core::assets::tileset::TileSetMeta::build_entry_id(
+        "AutoGrass.json",
+        toki_core::assets::tileset::TileSetEntryKind::AutoTileGroup,
+        "terrain",
+    );
+    let state = crate::ui::editor_context::map_state(&ui);
+    let entry = state
+        .modified_tileset
+        .as_ref()
+        .and_then(|tileset| tileset.entries.get(&entry_id))
+        .expect("added autotile entry");
+    assert_eq!(entry.atlas_name, "AutoGrass.json");
+    assert_eq!(entry.source_name, "terrain");
+    assert_eq!(entry.display_name.as_deref(), Some("AutoGrass"));
+    assert!(state.pending_tileset_sync.is_some());
+    assert!(state.dirty);
+}
+
+#[test]
+fn rename_map_auto_tile_display_name_only_updates_label() {
+    let temp_dir = tempdir().expect("temp dir should exist");
+    let mut ui = setup_auto_tile_composition_ui(temp_dir.path());
+    let entry_id = toki_core::assets::tileset::TileSetMeta::build_entry_id(
+        "AutoGrass.json",
+        toki_core::assets::tileset::TileSetEntryKind::AutoTileGroup,
+        "terrain",
+    );
+    crate::ui::editor_context::map_state_mut(&mut ui)
+        .modified_tileset
+        .as_mut()
+        .expect("tileset")
+        .entries
+        .insert(
+            entry_id.clone(),
+            toki_core::assets::tileset::TileSetEntry {
+                atlas_name: "AutoGrass.json".to_string(),
+                kind: toki_core::assets::tileset::TileSetEntryKind::AutoTileGroup,
+                source_name: "terrain".to_string(),
+                display_name: Some("Old".to_string()),
+            },
+        );
+
+    assert!(crate::ui::editor_ui::rename_map_auto_tile_display_name(
+        &mut ui,
+        temp_dir.path(),
+        &entry_id,
+        " Meadow ",
+    ));
+
+    let entry = crate::ui::editor_context::map_state(&ui)
+        .modified_tileset
+        .as_ref()
+        .and_then(|tileset| tileset.entries.get(&entry_id))
+        .expect("renamed entry");
+    assert_eq!(entry.display_name.as_deref(), Some("Meadow"));
+    assert_eq!(entry.atlas_name, "AutoGrass.json");
+    assert_eq!(entry.source_name, "terrain");
+}
+
+#[test]
+fn remove_auto_tile_from_map_tileset_clears_used_cells_across_layers() {
+    let temp_dir = tempdir().expect("temp dir should exist");
+    let mut ui = setup_auto_tile_composition_ui(temp_dir.path());
+    let entry_id = toki_core::assets::tileset::TileSetMeta::build_entry_id(
+        "AutoGrass.json",
+        toki_core::assets::tileset::TileSetEntryKind::AutoTileGroup,
+        "terrain",
+    );
+    crate::ui::editor_context::map_state_mut(&mut ui)
+        .modified_tileset
+        .as_mut()
+        .expect("tileset")
+        .entries
+        .insert(
+            entry_id.clone(),
+            toki_core::assets::tileset::TileSetEntry {
+                atlas_name: "AutoGrass.json".to_string(),
+                kind: toki_core::assets::tileset::TileSetEntryKind::AutoTileGroup,
+                source_name: "terrain".to_string(),
+                display_name: Some("AutoGrass".to_string()),
+            },
+        );
+    {
+        let draft = &mut crate::ui::editor_context::map_state_mut(&mut ui)
+            .draft
+            .as_mut()
+            .expect("draft")
+            .tilemap;
+        draft.layers[0].tiles[0] = entry_id.clone();
+        draft.layers[1].tiles[3] = entry_id.clone();
+    }
+
+    assert!(!crate::ui::editor_ui::remove_auto_tile_from_map_tileset(
+        &mut ui,
+        temp_dir.path(),
+        &entry_id,
+        false,
+    ));
+    assert!(crate::ui::editor_ui::remove_auto_tile_from_map_tileset(
+        &mut ui,
+        temp_dir.path(),
+        &entry_id,
+        true,
+    ));
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    let draft = &state.draft.as_ref().expect("draft").tilemap;
+    assert_eq!(draft.layers[0].tiles[0], "");
+    assert_eq!(draft.layers[1].tiles[3], "");
+    assert_eq!(
+        crate::ui::editor_ui::auto_tile_entry_usage_count(draft, &entry_id),
+        0
+    );
+    assert!(state
+        .modified_tileset
+        .as_ref()
+        .is_some_and(|tileset| !tileset.entries.contains_key(&entry_id)));
+    assert!(state.pending_tilemap_sync.is_some());
+    assert!(state.pending_tileset_sync.is_some());
+    assert!(state.history.can_undo());
+}
+
+#[test]
 fn map_editor_defaults_to_drag_tool() {
     let ui = EditorUI::new();
     assert_eq!(
@@ -1437,6 +1680,42 @@ fn setup_layer_test() -> EditorUI {
     ui
 }
 
+fn resize_test_draft() -> MapEditorDraft {
+    let mut ground = toki_core::assets::tilemap::TileLayer::new(
+        "ground",
+        ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+    );
+    ground.visible = false;
+    ground.collision_enabled = true;
+    ground.above_entities = true;
+    ground.collision_overrides.insert(4, true);
+
+    let detail = toki_core::assets::tilemap::TileLayer {
+        name: "detail".to_string(),
+        tiles: ["j", "k", "l", "m", "n", "o", "p", "q", "r"]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        visible: true,
+        collision_enabled: false,
+        above_entities: false,
+        collision_overrides: HashMap::new(),
+    };
+
+    MapEditorDraft {
+        name: "resize_map".to_string(),
+        tilemap: toki_core::assets::tilemap::TileMap {
+            size: glam::UVec2::new(3, 3),
+            tile_size: glam::UVec2::new(8, 8),
+            tileset: std::path::PathBuf::from("terrain.json"),
+            layers: vec![ground, detail],
+        },
+    }
+}
+
 #[test]
 fn add_layer_increases_count_and_sets_active() {
     let mut ui = setup_layer_test();
@@ -1540,4 +1819,168 @@ fn set_active_layer_clamps_to_bounds() {
 
     let state = crate::ui::editor_context::map_state(&ui);
     assert_eq!(state.active_layer, 0); // only 1 layer, max index is 0
+}
+
+#[test]
+fn begin_resize_map_dialog_resets_fields() {
+    let mut ui = setup_layer_test();
+    {
+        let state = crate::ui::editor_context::map_state_mut(&mut ui);
+        state.resize_add_all = 3;
+        state.resize_remove_west = 2;
+    }
+
+    crate::ui::editor_ui::begin_resize_map_dialog(&mut ui);
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    assert!(state.show_resize_map_dialog);
+    assert_eq!(state.resize_add_all, 0);
+    assert_eq!(state.resize_remove_west, 0);
+    assert_eq!(state.resize_add_north, 0);
+    assert_eq!(state.resize_remove_south, 0);
+}
+
+#[test]
+fn resize_map_expand_west_and_north_shifts_layers_and_collision_overrides() {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, resize_test_draft());
+
+    assert!(crate::ui::editor_ui::resize_map(
+        &mut ui,
+        crate::ui::editor_ui::MapResizeSpec {
+            add_north: 1,
+            add_west: 1,
+            ..Default::default()
+        },
+    ));
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    let tilemap = &state.draft.as_ref().expect("draft").tilemap;
+    assert_eq!(tilemap.size, UVec2::new(4, 4));
+    assert_eq!(tilemap.layers[0].tiles[0], "");
+    assert_eq!(tilemap.layers[0].tiles[5], "a");
+    assert_eq!(tilemap.layers[1].tiles[5], "j");
+    assert_eq!(tilemap.layers[0].tiles[10], "e");
+    assert_eq!(tilemap.layers[0].collision_overrides.get(&10), Some(&true));
+    assert!(!tilemap.layers[0].visible);
+    assert!(tilemap.layers[0].collision_enabled);
+    assert!(tilemap.layers[0].above_entities);
+    assert!(state.pending_tilemap_sync.is_some());
+    assert!(state.history.can_undo());
+}
+
+#[test]
+fn resize_map_shrink_all_sides_keeps_center_tile() {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, resize_test_draft());
+
+    assert!(crate::ui::editor_ui::resize_map(
+        &mut ui,
+        crate::ui::editor_ui::MapResizeSpec {
+            remove_north: 1,
+            remove_east: 1,
+            remove_south: 1,
+            remove_west: 1,
+            ..Default::default()
+        },
+    ));
+
+    let tilemap = &crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .expect("draft")
+        .tilemap;
+    assert_eq!(tilemap.size, UVec2::new(1, 1));
+    assert_eq!(tilemap.layers[0].tiles, vec!["e".to_string()]);
+    assert_eq!(tilemap.layers[1].tiles, vec!["n".to_string()]);
+    assert_eq!(tilemap.layers[0].collision_overrides.get(&0), Some(&true));
+}
+
+#[test]
+fn resize_map_combined_add_and_remove_repositions_content() {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, resize_test_draft());
+
+    assert!(crate::ui::editor_ui::resize_map(
+        &mut ui,
+        crate::ui::editor_ui::MapResizeSpec {
+            remove_west: 1,
+            add_east: 2,
+            remove_south: 1,
+            ..Default::default()
+        },
+    ));
+
+    let tilemap = &crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .expect("draft")
+        .tilemap;
+    assert_eq!(tilemap.size, UVec2::new(4, 2));
+    assert_eq!(
+        tilemap.layers[0].tiles,
+        vec![
+            "b".to_string(),
+            "c".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "e".to_string(),
+            "f".to_string(),
+            "".to_string(),
+            "".to_string(),
+        ]
+    );
+    assert_eq!(tilemap.layers[0].collision_overrides.get(&4), Some(&true));
+}
+
+#[test]
+fn resize_map_rejects_invalid_result_size() {
+    let mut ui = EditorUI::new();
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, resize_test_draft());
+    let before = crate::ui::editor_context::map_state(&ui)
+        .draft
+        .as_ref()
+        .expect("draft")
+        .tilemap
+        .clone();
+
+    assert!(!crate::ui::editor_ui::resize_map(
+        &mut ui,
+        crate::ui::editor_ui::MapResizeSpec {
+            remove_north: 3,
+            remove_south: 1,
+            ..Default::default()
+        },
+    ));
+
+    let state = crate::ui::editor_context::map_state(&ui);
+    assert_eq!(state.draft.as_ref().expect("draft").tilemap, before);
+    assert!(state.pending_tilemap_sync.is_none());
+}
+
+#[test]
+fn resize_map_undo_and_redo_round_trip() {
+    let mut ui = EditorUI::new();
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, resize_test_draft());
+
+    assert!(crate::ui::editor_ui::resize_map(
+        &mut ui,
+        crate::ui::editor_ui::MapResizeSpec {
+            add_east: 2,
+            add_south: 1,
+            ..Default::default()
+        },
+    ));
+    assert!(ui.can_undo());
+
+    assert!(ui.undo());
+    let undone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
+        .expect("undo should queue tilemap sync");
+    assert_eq!(undone.size, UVec2::new(3, 3));
+
+    assert!(ui.redo());
+    let redone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
+        .expect("redo should queue tilemap sync");
+    assert_eq!(redone.size, UVec2::new(5, 4));
 }

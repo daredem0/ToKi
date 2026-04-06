@@ -719,8 +719,7 @@ fn render_cluster_scatter_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.label("Variation:");
         ui.add(
             egui::Slider::new(
-                &mut crate::ui::editor_context::sprite_state_mut(ui_state)
-                    .cluster_color_variation,
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).cluster_color_variation,
                 0.0..=1.0,
             )
             .show_value(true),
@@ -741,7 +740,11 @@ fn render_pattern_stamp_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     render_pattern_library_options(ui, ui_state, true);
 }
 
-fn render_pattern_library_options(ui: &mut egui::Ui, ui_state: &mut EditorUI, allow_selection: bool) {
+fn render_pattern_library_options(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    allow_selection: bool,
+) {
     let can_capture = crate::ui::editor_context::sprite_state(ui_state)
         .active()
         .selection

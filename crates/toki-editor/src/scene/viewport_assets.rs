@@ -28,6 +28,39 @@ fn load_cached_string_keyed<T: Clone>(
 }
 
 impl SceneViewport {
+    pub fn set_tileset_for_current_tilemap(
+        &mut self,
+        project_path: &std::path::Path,
+        tileset: TileSetMeta,
+    ) -> Result<()> {
+        let Some(tilemap) = self.tilemap.as_ref() else {
+            return Err(anyhow::anyhow!(
+                "Cannot apply in-memory tileset without an active tilemap"
+            ));
+        };
+        let tilemap_path = self.tilemap_path.clone().unwrap_or_else(|| {
+            project_path
+                .join("assets")
+                .join("tilemaps")
+                .join("__draft__.json")
+        });
+        let tileset_path = resolve_tilemap_tileset_path(project_path, &tilemap_path, tilemap)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to resolve tileset '{}' for tilemap '{}'",
+                    tilemap.tileset.display(),
+                    tilemap_path.display()
+                )
+            })?;
+
+        self.tileset_cache = Some(tileset);
+        self.tileset_cache_path = Some(tileset_path);
+        self.tileset_atlas_cache.clear();
+        self.tilemap_texture_cache_key = None;
+        self.mark_dirty();
+        Ok(())
+    }
+
     fn decoded_sprite_image(&mut self, texture_path: &std::path::Path) -> Result<DecodedImage> {
         Ok(clone_cached_or_load(
             self.decoded_sprite_images.get(texture_path).cloned(),

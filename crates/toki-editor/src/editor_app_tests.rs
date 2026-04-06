@@ -371,7 +371,7 @@ fn split_new_project_destination_accepts_project_toml_destination() {
 }
 
 #[test]
-fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
+fn build_map_editor_draft_prefers_terrain_atlas_and_starts_empty() {
     let temp_dir = tempfile::tempdir().expect("temp dir should exist");
     let project_path = temp_dir.path().to_path_buf();
     fs::create_dir_all(project_path.join("assets").join("sprites"))
@@ -418,11 +418,7 @@ fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
     assert_eq!(draft.tilemap.tile_size, UVec2::new(16, 16));
     assert_eq!(draft.tilemap.tileset, PathBuf::from("new_map.json"));
     assert_eq!(draft.tilemap.tiles().len(), 20);
-    assert!(draft
-        .tilemap
-        .tiles()
-        .iter()
-        .all(|tile| tile == "terrain/tile/grass"));
+    assert!(draft.tilemap.tiles().iter().all(|tile| tile.is_empty()));
 }
 
 #[test]

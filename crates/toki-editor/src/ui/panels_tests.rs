@@ -2,6 +2,7 @@ use super::{GraphValidationFixCommand, PanelSystem};
 use crate::editor_viewport::{compute_display_rect, EditorViewportContext};
 use crate::ui::rule_graph::RuleGraph;
 use std::collections::HashMap;
+use toki_core::assets::tilemap::{TileLayer, TileMap};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
 };
@@ -139,6 +140,48 @@ fn map_editor_tile_screen_rect_maps_tile_bounds_through_camera_scale() {
 
     assert_eq!(tile_rect.min, egui::pos2(16.0, 32.0));
     assert_eq!(tile_rect.max, egui::pos2(32.0, 48.0));
+}
+
+#[test]
+fn map_editor_tile_is_empty_only_when_no_visible_layer_draws() {
+    let tilemap = TileMap {
+        size: glam::UVec2::new(2, 1),
+        tile_size: glam::UVec2::new(16, 16),
+        tileset: std::path::PathBuf::from("terrain.json"),
+        layers: vec![
+            TileLayer {
+                name: "hidden".to_string(),
+                tiles: vec!["grass".to_string(), String::new()],
+                visible: false,
+                collision_enabled: true,
+                above_entities: false,
+                collision_overrides: HashMap::new(),
+            },
+            TileLayer {
+                name: "visible".to_string(),
+                tiles: vec![String::new(), "stone".to_string()],
+                visible: true,
+                collision_enabled: true,
+                above_entities: false,
+                collision_overrides: HashMap::new(),
+            },
+        ],
+    };
+
+    assert!(PanelSystem::map_editor_tile_is_empty(&tilemap, 0, 0));
+    assert!(!PanelSystem::map_editor_tile_is_empty(&tilemap, 1, 0));
+}
+
+#[test]
+fn map_editor_checkerboard_color_alternates_by_tile_parity() {
+    let even = PanelSystem::map_editor_checkerboard_color(0, 0);
+    let odd_x = PanelSystem::map_editor_checkerboard_color(1, 0);
+    let odd_y = PanelSystem::map_editor_checkerboard_color(0, 1);
+    let even_offset = PanelSystem::map_editor_checkerboard_color(3, 5);
+
+    assert_ne!(even, odd_x);
+    assert_eq!(odd_x, odd_y);
+    assert_eq!(even, even_offset);
 }
 
 #[test]

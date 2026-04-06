@@ -243,79 +243,241 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         config: Option<&EditorConfig>,
     ) {
+        let Some(project_path) = config.and_then(EditorConfig::current_project_path) else {
+            return;
+        };
         let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config) else {
             return;
         };
-        let mut auto_tile_entries = brush_source
-            .brush_entries
-            .iter()
-            .filter(|entry| entry.kind == crate::ui::editor_ui::MapEditorBrushKind::AutoTileGroup)
-            .collect::<Vec<_>>();
-        auto_tile_entries.sort_by(|left, right| left.display_label.cmp(&right.display_label));
-        if auto_tile_entries.is_empty() {
-            ui.label("Auto-Tile Groups: none");
+        let Some(tilemap) = crate::ui::editor_context::map_state(ui_state)
+            .draft
+            .as_ref()
+            .map(|draft| draft.tilemap.clone())
+        else {
             return;
+        };
+
+        ui.label("Auto-Tile Composition");
+
+        let atlas_label = |atlas_name: &str| {
+            atlas_name
+                .strip_suffix(".json")
+                .unwrap_or(atlas_name)
+                .to_string()
+        };
+        let default_entry_label = |atlas_name: &str, group_name: &str| {
+            let atlas_label = atlas_label(atlas_name);
+            if group_name == "terrain" {
+                atlas_label
+            } else {
+                format!("{atlas_label}: {group_name}")
+            }
+        };
+
+        let mut linked_entries = brush_source
+            .tileset
+            .entries
+            .iter()
+            .filter(|(_, entry)| {
+                entry.kind == toki_core::assets::tileset::TileSetEntryKind::AutoTileGroup
+            })
+            .map(|(entry_id, entry)| {
+                let usage_count =
+                    crate::ui::editor_ui::auto_tile_entry_usage_count(&tilemap, entry_id);
+                let display_name = entry
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| default_entry_label(&entry.atlas_name, &entry.source_name));
+                (
+                    entry_id.clone(),
+                    entry.atlas_name.clone(),
+                    entry.source_name.clone(),
+                    display_name,
+                    usage_count,
+                )
+            })
+            .collect::<Vec<_>>();
+        linked_entries.sort_by(|left, right| left.3.cmp(&right.3).then(left.0.cmp(&right.0)));
+
+        if linked_entries.is_empty() {
+            ui.small("No auto-tiles are currently linked into this map tileset.");
+        } else {
+            for (entry_id, atlas_name, group_name, display_name, usage_count) in linked_entries {
+                let mut pending_display_name = display_name.clone();
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(&display_name).strong());
+                        ui.small(format!(
+                            "source: {} / {}",
+                            atlas_label(&atlas_name),
+                            group_name
+                        ));
+                        if usage_count > 0 {
+                            ui.small(format!("used on {usage_count} cell(s)"));
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Display:");
+                        let response = ui.text_edit_singleline(&mut pending_display_name);
+                        if response.changed() {
+                            crate::ui::editor_ui::rename_map_auto_tile_display_name(
+                                ui_state,
+                                project_path,
+                                &entry_id,
+                                &pending_display_name,
+                            );
+                        }
+
+                        if ui.small_button("Remove").clicked() {
+                            if usage_count > 0 {
+                                crate::ui::editor_context::map_state_mut(ui_state)
+                                    .pending_auto_tile_removal_entry_id = Some(entry_id.clone());
+                            } else {
+                                crate::ui::editor_ui::remove_auto_tile_from_map_tileset(
+                                    ui_state,
+                                    project_path,
+                                    &entry_id,
+                                    false,
+                                );
+                            }
+                        }
+                    });
+                });
+            }
         }
-        ui.label("Auto-Tile Groups");
-        for entry in auto_tile_entries {
+
+        if let Some(entry_id) = crate::ui::editor_context::map_state(ui_state)
+            .pending_auto_tile_removal_entry_id
+            .clone()
+        {
+            let usage_count =
+                crate::ui::editor_ui::auto_tile_entry_usage_count(&tilemap, &entry_id);
+            if usage_count > 0 {
+                ui.add_space(4.0);
+                ui.group(|ui| {
+                    ui.label(
+                        egui::RichText::new("Remove Used Auto-Tile").strong().color(egui::Color32::from_rgb(220, 180, 120)),
+                    );
+                    ui.small(format!(
+                        "This auto-tile is still used on {usage_count} cell(s). Confirming will clear those cells across all layers and then remove the tileset entry."
+                    ));
+                    ui.horizontal(|ui| {
+                        if ui.button("Confirm Remove").clicked() {
+                            crate::ui::editor_ui::remove_auto_tile_from_map_tileset(
+                                ui_state,
+                                project_path,
+                                &entry_id,
+                                true,
+                            );
+                            crate::ui::editor_context::map_state_mut(ui_state)
+                                .pending_auto_tile_removal_entry_id = None;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            crate::ui::editor_context::map_state_mut(ui_state)
+                                .pending_auto_tile_removal_entry_id = None;
+                        }
+                    });
+                });
+            } else {
+                crate::ui::editor_context::map_state_mut(ui_state)
+                    .pending_auto_tile_removal_entry_id = None;
+            }
+        }
+
+        ui.add_space(6.0);
+        ui.separator();
+        ui.label("Add Auto-Tile");
+
+        let available_sources = crate::ui::editor_ui::available_map_editor_auto_tile_sources(
+            ui_state,
+            project_path,
+            &tilemap,
+        );
+        let addable_sources = available_sources
+            .iter()
+            .filter(|source| source.disabled_reason.is_none())
+            .cloned()
+            .collect::<Vec<_>>();
+
+        {
+            let state = crate::ui::editor_context::map_state_mut(ui_state);
+            if state
+                .selected_auto_tile_source
+                .as_ref()
+                .is_none_or(|selected| !addable_sources.iter().any(|source| &source.id == selected))
+            {
+                state.selected_auto_tile_source =
+                    addable_sources.first().map(|source| source.id.clone());
+            }
+        }
+
+        if addable_sources.is_empty() {
+            ui.small("No compatible auto-tile sources are currently available to add.");
+        } else {
+            let selected_source_id = crate::ui::editor_context::map_state(ui_state)
+                .selected_auto_tile_source
+                .clone();
+            let selected_label = addable_sources
+                .iter()
+                .find(|source| Some(&source.id) == selected_source_id.as_ref())
+                .map(|source| source.display_label.as_str())
+                .unwrap_or("Select auto-tile source");
+
             ui.horizontal(|ui| {
-                ui.label(&entry.display_label);
-                if let Some(atlas_name) =
-                    crate::ui::editor_ui::map_editor_brush_entry_atlas_name(&entry.id)
-                {
-                    ui.small(format!("source: {atlas_name}"));
+                egui::ComboBox::from_id_salt("map_editor_auto_tile_source_selector")
+                    .selected_text(selected_label)
+                    .show_ui(ui, |ui| {
+                        for source in &addable_sources {
+                            let is_selected = crate::ui::editor_context::map_state(ui_state)
+                                .selected_auto_tile_source
+                                .as_deref()
+                                == Some(source.id.as_str());
+                            if ui
+                                .selectable_label(is_selected, &source.display_label)
+                                .clicked()
+                            {
+                                crate::ui::editor_context::map_state_mut(ui_state)
+                                    .selected_auto_tile_source = Some(source.id.clone());
+                            }
+                        }
+                    });
+                if ui.button("Add Auto-Tile").clicked() {
+                    if let Some(source_id) = crate::ui::editor_context::map_state(ui_state)
+                        .selected_auto_tile_source
+                        .clone()
+                    {
+                        crate::ui::editor_ui::add_auto_tile_to_map_tileset(
+                            ui_state,
+                            project_path,
+                            &source_id,
+                        );
+                    }
                 }
             });
         }
-        ui.small(
-            "Auto-tiles are linked through the map tileset; atlas merge import is not used here.",
-        );
-    }
 
-    #[allow(dead_code)]
-    fn render_import_auto_tile_button(
-        _ui_state: &mut EditorUI,
-        ui: &mut egui::Ui,
-        _config: Option<&EditorConfig>,
-    ) {
-        ui.small("Use tileset composition to link auto-tiles from source atlases.");
-    }
-
-    #[allow(dead_code)]
-    fn discover_auto_tile_atlases(
-        project_path: &std::path::Path,
-    ) -> Vec<(String, std::path::PathBuf)> {
-        let sprites_dir = project_path.join("assets").join("sprites");
-        let Ok(entries) = std::fs::read_dir(&sprites_dir) else {
-            return Vec::new();
-        };
-        entries
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
-            .filter_map(|e| {
-                let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(e.path()).ok()?;
-                if atlas.auto_tile_groups.is_empty() {
-                    return None;
-                }
-                let name = e
-                    .path()
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                Some((name, e.path()))
+        let unavailable_sources = available_sources
+            .iter()
+            .filter_map(|source| {
+                source
+                    .disabled_reason
+                    .as_ref()
+                    .map(|reason| (source.display_label.clone(), reason.clone()))
             })
-            .collect()
-    }
+            .collect::<Vec<_>>();
+        if !unavailable_sources.is_empty() {
+            ui.collapsing("Unavailable Sources", |ui| {
+                for (label, reason) in unavailable_sources {
+                    ui.horizontal(|ui| {
+                        ui.label(label);
+                        ui.small(reason);
+                    });
+                }
+            });
+        }
 
-    #[allow(dead_code)]
-    fn execute_auto_tile_import(
-        _ui_state: &mut EditorUI,
-        _config: Option<&EditorConfig>,
-        _project_path: &std::path::Path,
-        _source_path: &std::path::Path,
-    ) {
-        tracing::warn!("Auto-tile atlas import via atlas merge is not used in tileset-based maps");
+        ui.small("Auto-tile links are part of the current map-local tileset and stay in memory until you save the map.");
     }
 
     fn render_layer_panel(ui_state: &mut EditorUI, ui: &mut egui::Ui) {

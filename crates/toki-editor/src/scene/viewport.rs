@@ -94,6 +94,8 @@ pub struct SceneViewport {
     sizing_mode: ViewportSizingMode,
     viewport_size: (u32, u32),
     requested_viewport_size: Option<(u32, u32)>,
+    scene_clear_color: wgpu::Color,
+    ui_background_fill: Option<egui::Color32>,
     tileset_cache: Option<TileSetMeta>,
     tileset_cache_path: Option<std::path::PathBuf>,
     tileset_atlas_cache: std::collections::HashMap<String, TileSetAtlasSource>,
@@ -200,6 +202,13 @@ impl SceneViewport {
             sizing_mode,
             viewport_size: (resolution_width, resolution_height),
             requested_viewport_size: None,
+            scene_clear_color: wgpu::Color {
+                r: 0.1,
+                g: 0.1,
+                b: 0.12,
+                a: 1.0,
+            },
+            ui_background_fill: Some(egui::Color32::from_rgb(20, 20, 25)),
             tileset_cache: None,
             tileset_cache_path: None,
             tileset_atlas_cache: std::collections::HashMap::new(),
@@ -250,6 +259,8 @@ impl SceneViewport {
             crate::rendering::PresentedOffscreenTexture::new(&device, self.viewport_size)
                 .map_err(|e| anyhow::anyhow!("Failed to create viewport target: {}", e))?;
 
+        let mut scene_renderer = scene_renderer;
+        scene_renderer.set_clear_color(self.scene_clear_color);
         self.scene_renderer = Some(scene_renderer);
         self.presentation_target = Some(presentation_target);
         self.device = Some(device);
@@ -474,9 +485,9 @@ impl SceneViewport {
 
                 // Mouse interaction now handled in editor_ui.rs
 
-                // Fill background with dark color for letterbox areas
-                ui.painter()
-                    .rect_filled(rect, 0.0, egui::Color32::from_rgb(20, 20, 25));
+                if let Some(fill) = self.ui_background_fill {
+                    ui.painter().rect_filled(rect, 0.0, fill);
+                }
 
                 // Draw the viewport texture with preserved aspect ratio
                 ui.painter().image(
@@ -661,6 +672,19 @@ impl SceneViewport {
             self.indexed_presentation_settings = settings;
             self.mark_dirty();
         }
+    }
+
+    pub fn set_clear_color(&mut self, clear_color: wgpu::Color) {
+        self.scene_clear_color = clear_color;
+        if let Some(scene_renderer) = &mut self.scene_renderer {
+            scene_renderer.set_clear_color(clear_color);
+        }
+        self.mark_dirty();
+    }
+
+    pub fn set_ui_background_fill(&mut self, fill: Option<egui::Color32>) {
+        self.ui_background_fill = fill;
+        self.mark_dirty();
     }
 
     #[allow(dead_code)]

@@ -4,6 +4,60 @@ use crate::ui::editor_ui::MapEditorTool;
 use crate::ui::EditorUI;
 
 impl PanelSystem {
+    pub(super) fn paint_map_editor_empty_tile_checkerboard(
+        ui: &egui::Ui,
+        viewport: &SceneViewport,
+        viewport_ctx: &EditorViewportContext,
+    ) {
+        let Some(tilemap) = viewport.tilemap() else {
+            return;
+        };
+        if tilemap.size.x == 0 || tilemap.size.y == 0 {
+            return;
+        }
+
+        let tile_size = tilemap.tile_size.max(glam::UVec2::ONE);
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let (viewport_width, viewport_height) = viewport.viewport_size();
+        let world_span_x = (viewport_width as f32 * camera_scale).ceil() as i32;
+        let world_span_y = (viewport_height as f32 * camera_scale).ceil() as i32;
+        let visible_min = EditorViewportContext::world_to_tile_coords(camera_position, tile_size)
+            .max(glam::IVec2::ZERO);
+        let visible_max = EditorViewportContext::world_to_tile_coords(
+            glam::IVec2::new(
+                camera_position.x + world_span_x.saturating_sub(1),
+                camera_position.y + world_span_y.saturating_sub(1),
+            ),
+            tile_size,
+        )
+        .min(glam::IVec2::new(
+            tilemap.size.x.saturating_sub(1) as i32,
+            tilemap.size.y.saturating_sub(1) as i32,
+        ));
+        if visible_min.x > visible_max.x || visible_min.y > visible_max.y {
+            return;
+        }
+
+        let painter = ui.painter().with_clip_rect(viewport_ctx.display_rect());
+        for tile_y in visible_min.y as u32..=visible_max.y as u32 {
+            for tile_x in visible_min.x as u32..=visible_max.x as u32 {
+                if !Self::map_editor_tile_is_empty(tilemap, tile_x, tile_y) {
+                    continue;
+                }
+                let Some(tile_screen_rect) =
+                    viewport_ctx.tile_screen_rect(tile_size, glam::UVec2::new(tile_x, tile_y))
+                else {
+                    continue;
+                };
+                painter.rect_filled(
+                    tile_screen_rect,
+                    0.0,
+                    Self::map_editor_checkerboard_color(tile_x, tile_y),
+                );
+            }
+        }
+    }
+
     pub(super) fn paint_map_editor_brush_preview(
         ui: &egui::Ui,
         ui_state: &mut EditorUI,
@@ -170,5 +224,31 @@ impl PanelSystem {
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_texture =
             Some(texture.texture_id);
         Some(texture.texture_id)
+    }
+
+    pub(super) fn map_editor_tile_is_empty(
+        tilemap: &toki_core::assets::tilemap::TileMap,
+        tile_x: u32,
+        tile_y: u32,
+    ) -> bool {
+        if tile_x >= tilemap.size.x || tile_y >= tilemap.size.y {
+            return true;
+        }
+        let index = (tile_y * tilemap.size.x + tile_x) as usize;
+        !tilemap
+            .layers
+            .iter()
+            .filter(|layer| layer.visible)
+            .any(|layer| layer.tiles.get(index).is_some_and(|tile| !tile.is_empty()))
+    }
+
+    pub(super) fn map_editor_checkerboard_color(tile_x: u32, tile_y: u32) -> egui::Color32 {
+        let light = egui::Color32::from_rgb(98, 98, 98);
+        let dark = egui::Color32::from_rgb(82, 82, 82);
+        if (tile_x + tile_y).is_multiple_of(2) {
+            light
+        } else {
+            dark
+        }
     }
 }

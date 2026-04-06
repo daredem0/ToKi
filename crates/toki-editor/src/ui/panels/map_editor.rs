@@ -40,6 +40,17 @@ impl PanelSystem {
             }
             if ui
                 .add_enabled(
+                    crate::ui::editor_context::map_state(ui_state)
+                        .draft
+                        .is_some(),
+                    egui::Button::new("Resize Map..."),
+                )
+                .clicked()
+            {
+                crate::ui::editor_ui::begin_resize_map_dialog(ui_state);
+            }
+            if ui
+                .add_enabled(
                     crate::ui::editor_ui::has_unsaved_map_editor_changes(ui_state),
                     egui::Button::new("Save Map"),
                 )
@@ -174,6 +185,8 @@ impl PanelSystem {
             crate::ui::editor_context::map_state_mut(ui_state).show_new_map_dialog = open;
         }
 
+        Self::render_resize_map_dialog(ui_state, ui.ctx());
+
         let Some(viewport) = map_editor_viewport else {
             ui.label("Map editor viewport not initialized.");
             return;
@@ -249,7 +262,10 @@ impl PanelSystem {
             }
         }
 
+        ui.painter()
+            .rect_filled(rect, 0.0, egui::Color32::from_rgb(34, 37, 41));
         viewport.render(ui, rect, project_path.as_deref(), renderer.as_deref_mut());
+        Self::paint_map_editor_empty_tile_checkerboard(ui, viewport, &viewport_ctx);
         if let Some(cfg) = config.as_deref() {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }
@@ -333,5 +349,225 @@ impl PanelSystem {
                 }
             }
         }
+    }
+
+    fn render_resize_map_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
+        if !crate::ui::editor_context::map_state(ui_state).show_resize_map_dialog {
+            return;
+        }
+
+        let Some(current_size) = crate::ui::editor_context::map_state(ui_state)
+            .draft
+            .as_ref()
+            .map(|draft| draft.tilemap.size)
+        else {
+            crate::ui::editor_context::map_state_mut(ui_state).show_resize_map_dialog = false;
+            return;
+        };
+
+        let spec = crate::ui::editor_ui::MapResizeSpec {
+            remove_north: crate::ui::editor_context::map_state(ui_state).resize_remove_north,
+            remove_east: crate::ui::editor_context::map_state(ui_state).resize_remove_east,
+            remove_south: crate::ui::editor_context::map_state(ui_state).resize_remove_south,
+            remove_west: crate::ui::editor_context::map_state(ui_state).resize_remove_west,
+            add_north: crate::ui::editor_context::map_state(ui_state).resize_add_north,
+            add_east: crate::ui::editor_context::map_state(ui_state).resize_add_east,
+            add_south: crate::ui::editor_context::map_state(ui_state).resize_add_south,
+            add_west: crate::ui::editor_context::map_state(ui_state).resize_add_west,
+        };
+        let result_width =
+            i64::from(current_size.x) + i64::from(spec.add_west) + i64::from(spec.add_east)
+                - i64::from(spec.remove_west)
+                - i64::from(spec.remove_east);
+        let result_height =
+            i64::from(current_size.y) + i64::from(spec.add_north) + i64::from(spec.add_south)
+                - i64::from(spec.remove_north)
+                - i64::from(spec.remove_south);
+        let valid = result_width >= 1 && result_height >= 1;
+
+        let mut open = crate::ui::editor_context::map_state(ui_state).show_resize_map_dialog;
+        let mut apply_clicked = false;
+        let mut cancel_clicked = false;
+
+        egui::Window::new("Resize Map")
+            .collapsible(false)
+            .resizable(false)
+            .open(&mut open)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Current Size:");
+                    ui.label(format!("{} × {} tiles", current_size.x, current_size.y));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Result Size:");
+                    if valid {
+                        ui.label(format!("{} × {} tiles", result_width, result_height));
+                    } else {
+                        ui.colored_label(
+                            egui::Color32::LIGHT_RED,
+                            "Invalid (must stay at least 1 × 1)",
+                        );
+                    }
+                });
+                ui.separator();
+
+                ui.label("Remove Tiles");
+                ui.horizontal(|ui| {
+                    ui.label("All:");
+                    let changed = ui
+                        .add(
+                            egui::DragValue::new(
+                                &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                    .resize_remove_all,
+                            )
+                            .range(0..=512)
+                            .speed(1),
+                        )
+                        .changed();
+                    ui.label("tiles");
+                    if changed {
+                        let value =
+                            crate::ui::editor_context::map_state(ui_state).resize_remove_all;
+                        let state = crate::ui::editor_context::map_state_mut(ui_state);
+                        state.resize_remove_north = value;
+                        state.resize_remove_east = value;
+                        state.resize_remove_south = value;
+                        state.resize_remove_west = value;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("North:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                .resize_remove_north,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                    ui.label("East:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                .resize_remove_east,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("South:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                .resize_remove_south,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                    ui.label("West:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                .resize_remove_west,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                });
+
+                ui.separator();
+                ui.label("Add Tiles");
+                ui.horizontal(|ui| {
+                    ui.label("All:");
+                    let changed = ui
+                        .add(
+                            egui::DragValue::new(
+                                &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                    .resize_add_all,
+                            )
+                            .range(0..=512)
+                            .speed(1),
+                        )
+                        .changed();
+                    ui.label("tiles");
+                    if changed {
+                        let value = crate::ui::editor_context::map_state(ui_state).resize_add_all;
+                        let state = crate::ui::editor_context::map_state_mut(ui_state);
+                        state.resize_add_north = value;
+                        state.resize_add_east = value;
+                        state.resize_add_south = value;
+                        state.resize_add_west = value;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("North:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                .resize_add_north,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                    ui.label("East:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state).resize_add_east,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("South:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state)
+                                .resize_add_south,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                    ui.label("West:");
+                    ui.add(
+                        egui::DragValue::new(
+                            &mut crate::ui::editor_context::map_state_mut(ui_state).resize_add_west,
+                        )
+                        .range(0..=512)
+                        .speed(1),
+                    );
+                });
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui.add_enabled(valid, egui::Button::new("Apply")).clicked() {
+                        apply_clicked = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel_clicked = true;
+                    }
+                });
+            });
+
+        if apply_clicked {
+            let spec = crate::ui::editor_ui::MapResizeSpec {
+                remove_north: crate::ui::editor_context::map_state(ui_state).resize_remove_north,
+                remove_east: crate::ui::editor_context::map_state(ui_state).resize_remove_east,
+                remove_south: crate::ui::editor_context::map_state(ui_state).resize_remove_south,
+                remove_west: crate::ui::editor_context::map_state(ui_state).resize_remove_west,
+                add_north: crate::ui::editor_context::map_state(ui_state).resize_add_north,
+                add_east: crate::ui::editor_context::map_state(ui_state).resize_add_east,
+                add_south: crate::ui::editor_context::map_state(ui_state).resize_add_south,
+                add_west: crate::ui::editor_context::map_state(ui_state).resize_add_west,
+            };
+            let _ = crate::ui::editor_ui::resize_map(ui_state, spec);
+            open = false;
+        }
+        if cancel_clicked {
+            open = false;
+        }
+
+        crate::ui::editor_context::map_state_mut(ui_state).show_resize_map_dialog = open;
     }
 }

@@ -1367,7 +1367,10 @@ fn selection_mask_from_bounds(
     selection
 }
 
-fn procedural_target_mask_at(ui_state: &EditorUI, canvas_pos: glam::IVec2) -> Option<SelectionMask> {
+fn procedural_target_mask_at(
+    ui_state: &EditorUI,
+    canvas_pos: glam::IVec2,
+) -> Option<SelectionMask> {
     let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
     if let Some(selection) = sprite_state.active().selection.clone() {
         return Some(selection);

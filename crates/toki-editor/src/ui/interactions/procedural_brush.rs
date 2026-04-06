@@ -1,6 +1,6 @@
 use crate::ui::editor_ui::{PixelColor, SelectionMask, SpriteCanvas};
-use crate::ui::sprite_editor::canonical_indexed_color_for_size;
 use crate::ui::interactions::noise::sample_value_noise;
+use crate::ui::sprite_editor::canonical_indexed_color_for_size;
 use glam::IVec2;
 use toki_core::palette::PaletteSize;
 
@@ -180,8 +180,8 @@ pub fn apply_cluster_scatter(
             continue;
         }
 
-        let stamp_origin = stamp_center
-            - IVec2::new((stamp.width / 2) as i32, (stamp.height / 2) as i32);
+        let stamp_origin =
+            stamp_center - IVec2::new((stamp.width / 2) as i32, (stamp.height / 2) as i32);
         let color = vary_color(
             &ScatterParams {
                 center: params.center,
@@ -226,7 +226,10 @@ fn color_for_noise_fill(params: &NoiseFillParams, x: u32, y: u32) -> PixelColor 
         let slot = raw.round() as usize;
         let min_slot = start_slot.min(end_slot);
         let max_slot = start_slot.max(end_slot);
-        return canonical_indexed_color_for_size(slot.clamp(min_slot, max_slot), params.palette_size);
+        return canonical_indexed_color_for_size(
+            slot.clamp(min_slot, max_slot),
+            params.palette_size,
+        );
     }
 
     if noise >= threshold {
@@ -551,7 +554,12 @@ mod tests {
         let shifted = ClusterScatterParams { seed: 22, ..base };
 
         assert!(apply_cluster_scatter(&mut a, &base, None, &mut Vec::new()));
-        assert!(apply_cluster_scatter(&mut b, &shifted, None, &mut Vec::new()));
+        assert!(apply_cluster_scatter(
+            &mut b,
+            &shifted,
+            None,
+            &mut Vec::new()
+        ));
         assert_ne!(a, b);
     }
 
@@ -575,7 +583,12 @@ mod tests {
         };
         let mut positions = Vec::new();
 
-        assert!(apply_cluster_scatter(&mut canvas, &params, None, &mut positions));
+        assert!(apply_cluster_scatter(
+            &mut canvas,
+            &params,
+            None,
+            &mut positions
+        ));
         for (idx, a) in positions.iter().enumerate() {
             for b in positions.iter().skip(idx + 1) {
                 let delta = *a - *b;

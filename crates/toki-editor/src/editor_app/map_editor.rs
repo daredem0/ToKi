@@ -17,48 +17,17 @@ impl EditorApp {
             return Err(anyhow::anyhow!("Map name cannot contain path separators"));
         }
 
-        let mut atlas_names = project_assets
-            .sprite_atlases
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
-        atlas_names.sort();
-
-        let chosen_atlas_name = if project_assets.sprite_atlases.contains_key("terrain") {
-            "terrain".to_string()
-        } else {
-            atlas_names
-                .into_iter()
-                .next()
-                .ok_or_else(|| anyhow::anyhow!("No sprite atlases available for new map"))?
-        };
-
-        let atlas_asset = project_assets
-            .sprite_atlases
-            .get(&chosen_atlas_name)
-            .ok_or_else(|| anyhow::anyhow!("Missing atlas asset '{}'", chosen_atlas_name))?;
-        let atlas_meta = AtlasMeta::load_from_file(&atlas_asset.path)
-            .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", chosen_atlas_name, e))?;
-        let atlas_file_name = atlas_asset
-            .path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| anyhow::anyhow!("Atlas path has no valid file name"))?;
-        let tileset = TileSetMeta::from_atlas(atlas_file_name, &atlas_meta);
-        let fill_tile = tileset.first_tile_entry_id().ok_or_else(|| {
-            anyhow::anyhow!(
-                "Atlas '{}' does not define any paintable tiles",
-                chosen_atlas_name
-            )
-        })?;
+        if project_assets.sprite_atlases.is_empty() {
+            return Err(anyhow::anyhow!("No sprite atlases available for new map"));
+        }
 
         let tilemap = TileMap {
             size: glam::UVec2::new(width.max(1), height.max(1)),
             tile_size: glam::UVec2::new(tile_width.max(1), tile_height.max(1)),
             tileset: PathBuf::from(format!("{}.json", name.trim())),
-            layers: vec![TileLayer::new(
+            layers: vec![TileLayer::new_empty(
                 "ground",
-                vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
+                width.max(1) as usize * height.max(1) as usize,
             )],
         };
 
@@ -237,7 +206,17 @@ impl EditorApp {
 
                 crate::ui::editor_ui::set_map_editor_draft(&mut self.tabs.ui, draft);
                 crate::ui::editor_context::map_state_mut(&mut self.tabs.ui).modified_tileset =
-                    Some(tileset);
+                    Some(tileset.clone());
+                if let Some(project_path) = self.core.config.current_project_path().cloned() {
+                    if let Err(error) =
+                        viewport.set_tileset_for_current_tilemap(&project_path, tileset)
+                    {
+                        tracing::error!(
+                            "Failed to seed new map editor draft tileset into viewport: {}",
+                            error
+                        );
+                    }
+                }
                 viewport.mark_dirty();
             }
             Err(error) => {
@@ -479,6 +458,28 @@ impl EditorApp {
                 "Failed to apply pending map editor undo/redo snapshot to viewport: {}",
                 error
             ),
+        }
+    }
+
+    pub(super) fn handle_pending_map_editor_tileset_sync(&mut self) {
+        let Some(tileset) =
+            crate::ui::editor_ui::take_pending_map_editor_tileset_sync(&mut self.tabs.ui)
+        else {
+            return;
+        };
+
+        let Some(project_path) = self.core.config.current_project_path().cloned() else {
+            return;
+        };
+        let Some(viewport) = &mut self.viewport_manager.map_editor else {
+            return;
+        };
+
+        if let Err(error) = viewport.set_tileset_for_current_tilemap(&project_path, tileset) {
+            tracing::error!(
+                "Failed to apply pending map editor tileset snapshot to viewport: {}",
+                error
+            );
         }
     }
 }

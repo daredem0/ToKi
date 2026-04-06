@@ -311,6 +311,7 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
                 group_name: state.new_autotile_group_name.clone(),
                 mode: state.new_autotile_mode,
             });
+            state.active_mut().save_asset_kind = SpriteAssetKind::TileAtlas;
         } else {
             crate::ui::editor_context::sprite_state_mut(ui_state).autotile_info = None;
         }
@@ -354,23 +355,37 @@ fn render_save_dialog(
 
             ui.separator();
 
-            ui.horizontal(|ui| {
-                ui.label("Save as:");
-                ui.selectable_value(
-                    &mut crate::ui::editor_context::sprite_state_mut(ui_state)
-                        .active_mut()
-                        .save_asset_kind,
-                    SpriteAssetKind::ObjectSheet,
-                    "Object Sheet",
-                );
-                ui.selectable_value(
-                    &mut crate::ui::editor_context::sprite_state_mut(ui_state)
-                        .active_mut()
-                        .save_asset_kind,
-                    SpriteAssetKind::TileAtlas,
-                    "Tile Atlas",
-                );
-            });
+            let is_autotile_sheet = crate::ui::editor_context::sprite_state(ui_state)
+                .autotile_info
+                .is_some();
+            if is_autotile_sheet {
+                crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .active_mut()
+                    .save_asset_kind = SpriteAssetKind::TileAtlas;
+                ui.horizontal(|ui| {
+                    ui.label("Save as:");
+                    ui.label("Tile Atlas");
+                });
+                ui.small("Auto-tile spritesheets are always saved as tile atlases.");
+            } else {
+                ui.horizontal(|ui| {
+                    ui.label("Save as:");
+                    ui.selectable_value(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .active_mut()
+                            .save_asset_kind,
+                        SpriteAssetKind::ObjectSheet,
+                        "Object Sheet",
+                    );
+                    ui.selectable_value(
+                        &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+                            .active_mut()
+                            .save_asset_kind,
+                        SpriteAssetKind::TileAtlas,
+                        "Tile Atlas",
+                    );
+                });
+            }
 
             ui.add_space(4.0);
             if crate::ui::editor_context::sprite_state_mut(ui_state).is_sheet() {
