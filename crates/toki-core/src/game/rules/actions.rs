@@ -421,3 +421,385 @@ impl RuleEngine<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::engine::{RuleEngine, RuleEngineContext};
+    use super::{
+        AudioCommand, EntityCommand, InventoryCommand, ProgressCommand, RuleCommand, SceneCommand,
+        UiCommand,
+    };
+    use crate::entity::{
+        EntityId, EntityKind, EntityManager, EntityRendering, OptionalEntityComponents,
+    };
+    use crate::flags::{FlagValue, GameFlags};
+    use crate::game::RuleRuntimeState;
+    use crate::rules::{
+        RuleAction, RuleFlagValueSource, RuleIntSource, RuleSet, RuleSoundChannel,
+        RuleSpawnEntityType, RuleTarget, RuleVec2IntSource, TriggerContext,
+    };
+    use glam::{IVec2, UVec2};
+
+    fn make_engine<'a>(
+        manager: &'a EntityManager,
+        rules: &'a RuleSet,
+        flags: &'a GameFlags,
+        runtime: &'a mut RuleRuntimeState,
+    ) -> RuleEngine<'a> {
+        RuleEngine::new(
+            RuleEngineContext {
+                entity_manager: manager,
+                player_id: None,
+                held_keys: &[],
+                game_flags: flags,
+                rules,
+            },
+            runtime,
+        )
+    }
+
+    fn buffer(
+        manager: &EntityManager,
+        action: &RuleAction,
+        context: &TriggerContext,
+    ) -> Vec<RuleCommand> {
+        let rules = RuleSet::default();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+        let engine = make_engine(manager, &rules, &flags, &mut runtime);
+        let mut commands = Vec::new();
+        engine.buffer_rule_action("r", false, action, context, &mut commands);
+        commands
+    }
+
+    fn spawn_npc(manager: &mut EntityManager) -> EntityId {
+        manager.spawn_entity(
+            EntityKind::Npc,
+            IVec2::ZERO,
+            UVec2::new(16, 16),
+            EntityRendering::default(),
+            false,
+            true,
+            OptionalEntityComponents::default(),
+        )
+    }
+
+    // --- Scene / Dialog ---
+
+    #[test]
+    fn start_dialog_pushes_scene_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::StartDialog {
+            dialog_id: "intro".into(),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Scene(SceneCommand::StartDialog { dialog_id, .. })] if dialog_id.as_str() == "intro"
+        ));
+    }
+
+    #[test]
+    fn start_dialog_empty_id_produces_no_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::StartDialog {
+            dialog_id: "".into(),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    #[test]
+    fn start_dialog_whitespace_id_produces_no_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::StartDialog {
+            dialog_id: "   ".into(),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    #[test]
+    fn switch_scene_pushes_scene_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::SwitchScene {
+            scene_name: "overworld".into(),
+            spawn_point_id: "start".to_string(),
+            transition: None,
+            duration_ms: None,
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Scene(SceneCommand::SwitchScene { scene_name, .. })] if scene_name.as_str() == "overworld"
+        ));
+    }
+
+    // --- Audio ---
+
+    #[test]
+    fn play_sound_pushes_audio_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::PlaySound {
+            channel: RuleSoundChannel::Movement,
+            sound_id: "footstep".to_string(),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Audio(AudioCommand::PlaySound { sound_id, .. })] if sound_id == "footstep"
+        ));
+    }
+
+    #[test]
+    fn play_sound_empty_id_produces_no_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::PlaySound {
+            channel: RuleSoundChannel::Movement,
+            sound_id: "".to_string(),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    #[test]
+    fn play_music_pushes_audio_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::PlayMusic {
+            track_id: "battle_theme".to_string(),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Audio(AudioCommand::PlayMusic { track_id })] if track_id == "battle_theme"
+        ));
+    }
+
+    #[test]
+    fn play_music_empty_id_produces_no_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::PlayMusic {
+            track_id: "".to_string(),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    // --- Progress / Flags ---
+
+    #[test]
+    fn set_flag_pushes_progress_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::SetFlag {
+            flag: "done".to_string(),
+            value: RuleFlagValueSource::Literal(FlagValue::Bool(true)),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Progress(ProgressCommand::SetFlag { flag, value: FlagValue::Bool(true) })] if flag == "done"
+        ));
+    }
+
+    #[test]
+    fn set_flag_empty_name_produces_no_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::SetFlag {
+            flag: "  ".to_string(),
+            value: RuleFlagValueSource::Literal(FlagValue::Bool(true)),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    #[test]
+    fn increment_flag_pushes_progress_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::IncrementFlag {
+            flag: "coins".to_string(),
+            amount: RuleIntSource::literal(5),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Progress(ProgressCommand::IncrementFlag { flag, amount: 5 })] if flag == "coins"
+        ));
+    }
+
+    #[test]
+    fn clear_flag_pushes_progress_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::ClearFlag {
+            flag: "temp".to_string(),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Progress(ProgressCommand::ClearFlag { flag })] if flag == "temp"
+        ));
+    }
+
+    #[test]
+    fn clear_flag_empty_name_produces_no_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::ClearFlag {
+            flag: "".to_string(),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    // --- Entity mutations ---
+
+    #[test]
+    fn damage_entity_pushes_entity_command() {
+        let mut manager = EntityManager::new();
+        let id = spawn_npc(&mut manager);
+        let action = RuleAction::DamageEntity {
+            target: RuleTarget::Entity(id),
+            amount: RuleIntSource::literal(10),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Entity(EntityCommand::DamageEntity { entity_id, amount: 10 })]
+                if *entity_id == id
+        ));
+    }
+
+    #[test]
+    fn damage_entity_unresolvable_target_produces_no_command() {
+        // RuleTarget::TriggerSelf with no trigger context resolves to None → no command.
+        let manager = EntityManager::new();
+        let action = RuleAction::DamageEntity {
+            target: RuleTarget::TriggerSelf,
+            amount: RuleIntSource::literal(10),
+        };
+        assert!(buffer(&manager, &action, &TriggerContext::empty()).is_empty());
+    }
+
+    #[test]
+    fn set_entity_active_pushes_entity_command() {
+        let mut manager = EntityManager::new();
+        let id = spawn_npc(&mut manager);
+        let action = RuleAction::SetEntityActive {
+            target: RuleTarget::Entity(id),
+            active: false,
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Entity(EntityCommand::SetEntityActive { entity_id, active: false })]
+                if *entity_id == id
+        ));
+    }
+
+    #[test]
+    fn heal_entity_pushes_entity_command() {
+        let mut manager = EntityManager::new();
+        let id = spawn_npc(&mut manager);
+        let action = RuleAction::HealEntity {
+            target: RuleTarget::Entity(id),
+            amount: RuleIntSource::literal(20),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Entity(EntityCommand::HealEntity { entity_id, amount: 20 })]
+                if *entity_id == id
+        ));
+    }
+
+    // --- Inventory ---
+
+    #[test]
+    fn add_inventory_item_pushes_inventory_command() {
+        let mut manager = EntityManager::new();
+        let id = spawn_npc(&mut manager);
+        let action = RuleAction::AddInventoryItem {
+            target: RuleTarget::Entity(id),
+            item_id: "key".to_string(),
+            count: 1,
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Inventory(InventoryCommand::AddInventoryItem { entity_id, item_id, count: 1 })]
+                if *entity_id == id && item_id == "key"
+        ));
+    }
+
+    #[test]
+    fn remove_inventory_item_pushes_inventory_command() {
+        let mut manager = EntityManager::new();
+        let id = spawn_npc(&mut manager);
+        let action = RuleAction::RemoveInventoryItem {
+            target: RuleTarget::Entity(id),
+            item_id: "key".to_string(),
+            count: 1,
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Inventory(InventoryCommand::RemoveInventoryItem { entity_id, item_id, count: 1 })]
+                if *entity_id == id && item_id == "key"
+        ));
+    }
+
+    // --- Spawn ---
+
+    #[test]
+    fn spawn_pushes_entity_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::Spawn {
+            entity_type: RuleSpawnEntityType::Npc,
+            position: RuleVec2IntSource::literal([4, 8]),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Entity(EntityCommand::Spawn {
+                entity_type: RuleSpawnEntityType::Npc,
+                position,
+            })] if position.x == 4 && position.y == 8
+        ));
+    }
+
+    // --- UI ---
+
+    #[test]
+    fn show_ui_pushes_ui_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::ShowUi {
+            ui_id: "hud".into(),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Ui(UiCommand::ShowUi { ui_id })] if ui_id.as_str() == "hud"
+        ));
+    }
+
+    #[test]
+    fn hide_ui_pushes_ui_command() {
+        let manager = EntityManager::new();
+        let action = RuleAction::HideUi {
+            ui_id: "hud".into(),
+        };
+        let cmds = buffer(&manager, &action, &TriggerContext::empty());
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Ui(UiCommand::HideUi { ui_id })] if ui_id.as_str() == "hud"
+        ));
+    }
+
+    #[test]
+    fn trigger_self_context_attached_to_start_dialog() {
+        let mut manager = EntityManager::new();
+        let self_id = spawn_npc(&mut manager);
+        let action = RuleAction::StartDialog {
+            dialog_id: "chat".into(),
+        };
+        let ctx = TriggerContext::with_self_only(self_id);
+        let cmds = buffer(&manager, &action, &ctx);
+        assert!(matches!(
+            cmds.as_slice(),
+            [RuleCommand::Scene(SceneCommand::StartDialog { dialog_id, context })]
+                if dialog_id.as_str() == "chat" && context.interactor == Some(self_id)
+        ));
+    }
+}

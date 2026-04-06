@@ -264,6 +264,53 @@ mod tests {
     }
 
     #[test]
+    fn decoration_with_movement_ai_combat_warns_for_each() {
+        let mut definition = base_definition("decoration");
+        definition.components.movement = Some(Default::default());
+        definition.components.ai = Some(Default::default());
+        definition.components.combat = Some(Default::default());
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.iter().any(|w| w.contains("MovementComponent")));
+        assert!(warnings.iter().any(|w| w.contains("AiComponent")));
+        assert!(warnings.iter().any(|w| w.contains("CombatComponent")));
+    }
+
+    #[test]
+    fn item_with_ai_warns() {
+        let mut definition = base_definition("item");
+        definition.components.ai = Some(Default::default());
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.iter().any(|w| w.contains("AiComponent")));
+    }
+
+    #[test]
+    fn valid_item_pickup_produces_no_warnings() {
+        let mut definition = base_definition("item");
+        definition.components.pickup = Some(crate::entity::PickupDef {
+            item_id: "coin".to_string(),
+            count: 1,
+        });
+        // base_definition already sets collision.enabled=true, trigger=true
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+    }
+
+    #[test]
+    fn item_pickup_with_whitespace_only_id_warns() {
+        let mut definition = base_definition("item");
+        definition.components.pickup = Some(crate::entity::PickupDef {
+            item_id: "   ".to_string(),
+            count: 1,
+        });
+
+        let warnings = validate_entity_definition_warnings(&definition);
+        assert!(warnings.iter().any(|w| w.contains("missing item_id")));
+    }
+
+    #[test]
     fn validation_warns_for_non_idle_or_multiple_decoration_animations() {
         let mut definition = base_definition("decoration");
         definition.rendering.static_object = None;

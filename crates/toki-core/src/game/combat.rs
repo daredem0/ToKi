@@ -589,3 +589,88 @@ impl GameState {
             .deal_damage_to_entity(target_id, damage, attacker_id);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::scaled_projectile_move;
+
+    fn ivec(x: i32, y: i32) -> glam::IVec2 {
+        glam::IVec2::new(x, y)
+    }
+
+    #[test]
+    fn time_scale_zero_produces_no_movement_and_no_tick() {
+        let (delta, acc, tick_rem, consumed) =
+            scaled_projectile_move(ivec(10, 5), [0.0, 0.0], 0.0, 0.0);
+        assert_eq!(delta, ivec(0, 0));
+        assert_eq!(acc, [0.0, 0.0]);
+        assert_eq!(tick_rem, 0.0);
+        assert_eq!(consumed, 0);
+    }
+
+    #[test]
+    fn full_tick_integer_velocity_produces_exact_displacement() {
+        let (delta, acc, tick_rem, consumed) =
+            scaled_projectile_move(ivec(5, 3), [0.0, 0.0], 0.0, 1.0);
+        assert_eq!(delta, ivec(5, 3));
+        assert_eq!(acc, [0.0, 0.0]);
+        assert_eq!(tick_rem, 0.0);
+        assert_eq!(consumed, 1);
+    }
+
+    #[test]
+    fn half_tick_accumulates_sub_pixel_remainder() {
+        let (delta, acc, tick_rem, consumed) =
+            scaled_projectile_move(ivec(3, 0), [0.0, 0.0], 0.0, 0.5);
+        assert_eq!(delta, ivec(1, 0));
+        assert!((acc[0] - 0.5).abs() < 1e-6);
+        assert_eq!(acc[1], 0.0);
+        assert!((tick_rem - 0.5).abs() < 1e-6);
+        assert_eq!(consumed, 0);
+    }
+
+    #[test]
+    fn two_half_ticks_sum_to_full_displacement() {
+        let (delta1, acc1, tick1, _) = scaled_projectile_move(ivec(3, 0), [0.0, 0.0], 0.0, 0.5);
+        let (delta2, acc2, tick2, consumed) = scaled_projectile_move(ivec(3, 0), acc1, tick1, 0.5);
+        assert_eq!(delta1 + delta2, ivec(3, 0));
+        assert!((acc2[0]).abs() < 1e-6);
+        assert!((tick2).abs() < 1e-6);
+        assert_eq!(consumed, 1);
+    }
+
+    #[test]
+    fn double_time_scale_doubles_displacement() {
+        let (delta_1x, _, _, _) = scaled_projectile_move(ivec(4, 2), [0.0, 0.0], 0.0, 1.0);
+        let (delta_2x, _, _, _) = scaled_projectile_move(ivec(4, 2), [0.0, 0.0], 0.0, 2.0);
+        assert_eq!(delta_2x, delta_1x * 2);
+    }
+
+    #[test]
+    fn negative_velocity_produces_negative_delta() {
+        let (delta, acc, _, _) = scaled_projectile_move(ivec(-6, -4), [0.0, 0.0], 0.0, 1.0);
+        assert_eq!(delta, ivec(-6, -4));
+        assert_eq!(acc, [0.0, 0.0]);
+    }
+
+    #[test]
+    fn sub_pixel_accumulator_carries_over_between_calls() {
+        let v = ivec(1, 0);
+        let (_, acc1, t1, _) = scaled_projectile_move(v, [0.0, 0.0], 0.0, 0.3);
+        let (_, acc2, t2, _) = scaled_projectile_move(v, acc1, t1, 0.3);
+        let (_, acc3, t3, _) = scaled_projectile_move(v, acc2, t2, 0.3);
+        let (delta4, _, _, _) = scaled_projectile_move(v, acc3, t3, 0.3);
+        assert_eq!(delta4, ivec(1, 0));
+    }
+
+    #[test]
+    fn tick_accumulator_carries_and_consumes_correctly() {
+        let v = ivec(0, 0);
+        let (_, _, t1, c1) = scaled_projectile_move(v, [0.0, 0.0], 0.0, 0.4);
+        assert_eq!(c1, 0);
+        let (_, _, t2, c2) = scaled_projectile_move(v, [0.0, 0.0], t1, 0.4);
+        assert_eq!(c2, 0);
+        let (_, _, _, c3) = scaled_projectile_move(v, [0.0, 0.0], t2, 0.4);
+        assert_eq!(c3, 1);
+    }
+}

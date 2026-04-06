@@ -527,3 +527,163 @@ impl GameState {
             .collect_rule_commands_for_key_triggers(command_buffer);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::engine::{RuleEngine, RuleEngineContext};
+    use super::RuleCommand;
+    use crate::entity::EntityManager;
+    use crate::flags::GameFlags;
+    use crate::game::RuleRuntimeState;
+    use crate::rules::{Rule, RuleAction, RuleSet, RuleTrigger};
+
+    fn make_rule(id: &str, priority: i32, once: bool, enabled: bool) -> Rule {
+        Rule {
+            id: id.to_string(),
+            enabled,
+            priority,
+            once,
+            log_enabled: false,
+            trigger: RuleTrigger::OnStart,
+            conditions: vec![],
+            actions: vec![RuleAction::StartDialog {
+                dialog_id: id.into(),
+            }],
+        }
+    }
+
+    fn make_engine_with_rules<'a>(
+        rules: &'a RuleSet,
+        manager: &'a EntityManager,
+        flags: &'a GameFlags,
+        runtime: &'a mut RuleRuntimeState,
+    ) -> RuleEngine<'a> {
+        RuleEngine::new(
+            RuleEngineContext {
+                entity_manager: manager,
+                player_id: None,
+                held_keys: &[],
+                game_flags: flags,
+                rules,
+            },
+            runtime,
+        )
+    }
+
+    // --- rule_is_collectible ---
+
+    #[test]
+    fn rule_is_collectible_false_for_disabled_rule() {
+        let rules = RuleSet::default();
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+        let engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+        let rule = make_rule("r", 0, false, false); // enabled = false
+        assert!(!engine.rule_is_collectible(&rule));
+    }
+
+    #[test]
+    fn rule_is_collectible_true_for_enabled_rule_not_yet_fired() {
+        let rules = RuleSet::default();
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+        let engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+        let rule = make_rule("r", 0, true, true);
+        assert!(engine.rule_is_collectible(&rule));
+    }
+
+    #[test]
+    fn rule_is_collectible_false_for_once_rule_already_fired() {
+        let rules = RuleSet::default();
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+        runtime.fired_once_rules.insert("r".to_string());
+        let engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+        let rule = make_rule("r", 0, true, true);
+        assert!(!engine.rule_is_collectible(&rule));
+    }
+
+    // --- sort_rule_indices ---
+
+    #[test]
+    fn sort_rule_indices_higher_priority_first() {
+        let rules = RuleSet {
+            rules: vec![
+                make_rule("low", 1, false, true),
+                make_rule("high", 10, false, true),
+            ],
+        };
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+        let engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+        let mut indices = vec![0, 1]; // [low, high]
+        engine.sort_rule_indices(&mut indices);
+        assert_eq!(indices, vec![1, 0]); // high comes first
+    }
+
+    #[test]
+    fn sort_rule_indices_ties_broken_by_id_ascending() {
+        let rules = RuleSet {
+            rules: vec![
+                make_rule("b", 5, false, true),
+                make_rule("a", 5, false, true),
+            ],
+        };
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+        let engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+        let mut indices = vec![0, 1]; // [b, a]
+        engine.sort_rule_indices(&mut indices);
+        assert_eq!(indices, vec![1, 0]); // "a" before "b"
+    }
+
+    // --- once-fired tracking ---
+
+    #[test]
+    fn once_rule_fires_only_on_first_collect() {
+        let rules = RuleSet {
+            rules: vec![make_rule("once_rule", 0, true, true)],
+        };
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+
+        // First collection: commands generated.
+        {
+            let mut engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+            let mut commands: Vec<RuleCommand> = Vec::new();
+            engine.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut commands);
+            assert_eq!(commands.len(), 1);
+        }
+
+        // Second collection: once rule already fired, no commands.
+        {
+            let mut engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+            let mut commands: Vec<RuleCommand> = Vec::new();
+            engine.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut commands);
+            assert!(commands.is_empty());
+        }
+    }
+
+    #[test]
+    fn non_once_rule_fires_on_every_collect() {
+        let rules = RuleSet {
+            rules: vec![make_rule("repeat_rule", 0, false, true)],
+        };
+        let manager = EntityManager::new();
+        let flags = GameFlags::default();
+        let mut runtime = RuleRuntimeState::default();
+
+        for _ in 0..3 {
+            let mut engine = make_engine_with_rules(&rules, &manager, &flags, &mut runtime);
+            let mut commands: Vec<RuleCommand> = Vec::new();
+            engine.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut commands);
+            assert_eq!(commands.len(), 1);
+        }
+    }
+}
