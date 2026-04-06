@@ -7,6 +7,53 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-04-06
+
+### Added
+- Added multi-atlas tileset system (`TileSet` asset type) that maps tile entry IDs to multiple atlas sources, decoupling tilemaps from a single-atlas dependency; tileset files are auto-generated from legacy atlas references on project load.
+- Added multi-layer tilemap support with backward-compatible serde (old flat `tiles` field auto-upgrades to a single "ground" layer) and per-layer render ordering relative to entities.
+- Added full auto-tiling and animated tile support for tilemaps: bitmask-based auto-tile groups (4-bit and 8-bit Wang variants), animated tile definitions with per-frame durations and loop modes, runtime playback via `TileAnimationClock`, and live editor preview.
+- Added auto-tile import/merge workflow in the map editor: import spritesheets into the terrain atlas, browse available auto-tile sources by tile-size compatibility, add/remove/rename group entries in the map tileset, and stamp collision overrides per tile placement.
+- Added visual collision box editor and editable tile property inspector (solid/trigger checkboxes) directly in the map editor.
+- Added map resize dialog with per-edge crop/expand controls, an "All sides" shortcut, live result-size preview, and full undo/redo support.
+- Added map tileset composition inspector and live tileset sync pipeline so in-memory tileset mutations reach the viewport without a disk round-trip.
+- Added variable-size palette system supporting 4 to 256 colors, replacing the fixed 4-color model.
+- Added palette-indexed color mode for object sheets and palette-indexed tilemap rendering.
+- Added sprite-based drop shadows for entities with soft edges via a 3×3 alpha blur pass in the sprite shader.
+- Added FPS-independent projectile movement using sub-pixel position and tick accumulators.
+- Added sprite editor gradient tool with linear and radial modes and dithered or smooth blending.
+- Added sprite editor procedural brush with scatter, noise fill, and pattern stamp modes; extended with a ClusterScatter mode for stamp-based organic painting.
+- Added pixel-perfect stroke mode for the 1px freehand brush in the sprite editor.
+- Added autotile authoring overlay on the sprite editor canvas showing neighbor pattern indicators per cell.
+- Added right-click erase, symmetric fill, brush cursor preview, and floating selection centering to the sprite editor.
+- Added unit tests covering rule engine condition evaluation (all 16 `RuleCondition` variants), collector sorting and once-fired tracking, action buffering, and sub-pixel projectile movement math.
+
+### Changed
+- Refactored tilemap rendering to use a per-texture LRU pipeline cache in `SceneRenderer`, replacing the single tilemap/overlay pipeline pair; `SceneTilemapBatch` carries multi-atlas tile data for rendering.
+- Refactored indexed-color presentation into a shared `IndexedPresentationSettings` in `toki-core`; editor viewports now consume full runtime display settings instead of a palette override only.
+- Refactored scene graph editor to use rich dialog-style canvas nodes (title, kind label, badge pills, Bézier curve connections); merged the Scene Rules top-level tab into the Scene Editor tab as a Graph/Rules sub-view toggle.
+- Replaced per-pixel `rect_filled` draws with GPU texture blits in the sprite editor canvas for lower CPU overhead.
+- Cached tilemap render batches and checkerboard texture in the map editor viewport to reduce per-frame work.
+- Changed autotile guide rendering to use full-edge highlights instead of inset ticks for better readability.
+- Generalized canonical indexed colors to support variable palette sizes.
+- New map drafts start with empty tiles instead of pre-filling from the first atlas entry; empty-tile checkerboard overlay renders on cells where all visible layers are empty.
+
+### Fixed
+- Fixed sprite editor line tool so strokes begin exactly at the click position rather than 2 pixels offset.
+- Fixed checkerboard background disappearing after the GPU backend switch in the sprite editor canvas.
+- Fixed drop shadow shader to use `textureLoad` instead of `textureSample` in the blur loop, avoiding sampler coordinate issues.
+- Fixed noisy sprite warning that was informational, not a real warning.
+- Fixed clippy warnings in editor UI modules and applied workspace-wide formatting.
+- Fixed CI badge to point to the correct workflow file.
+
+### Tests
+- Added ~85 inline unit tests across `rules/evaluation.rs`, `rules/collectors.rs`, `rules/actions.rs`, `game/combat.rs`, and `entity/validation.rs` covering previously untested logic paths.
+
+### Docs
+- Updated system design document and README.
+- Consolidated all roadmap files (main roadmap, editor architecture, sprite editor, Lua scripting, Rust plugins, user-facing versions) into a single `ROADMAP.md`.
+- Consolidated the codebase quality analysis and editor architecture refactoring plan into a single `REFACTORING.md`.
+
 ## [0.2.4] - 2026-04-03
 
 ### Added
@@ -512,7 +559,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/daredem0/ToKi/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/daredem0/ToKi/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/daredem0/ToKi/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/daredem0/ToKi/compare/v0.2.1...v0.2.2
