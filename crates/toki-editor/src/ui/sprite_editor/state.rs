@@ -3,7 +3,7 @@
 use super::{
     canonical_indexed_color_for_size, indexed_slot_for_authored_color, CanvasSide, CanvasState,
     DiscoveredSpriteAsset, DitherPattern, DualCanvasLayout, GradientMode, GradientStyle,
-    PixelColor, ResizeAnchor, SpriteCanvas, SpriteEditorTool,
+    PixelColor, ProceduralBrushMode, ResizeAnchor, SpriteCanvas, SpriteEditorTool,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -50,6 +50,24 @@ pub struct SpriteEditorState {
     pub gradient_mode: GradientMode,
     /// Gradient tool rendering style.
     pub gradient_style: GradientStyle,
+    /// Procedural brush sub-mode.
+    pub procedural_mode: ProceduralBrushMode,
+    /// Scatter brush radius in pixels.
+    pub scatter_radius: u32,
+    /// Scatter density multiplier.
+    pub scatter_density: f32,
+    /// Scatter color variation amount.
+    pub scatter_color_variation: f32,
+    /// Procedural noise scale.
+    pub noise_scale: f32,
+    /// Procedural noise threshold.
+    pub noise_threshold: f32,
+    /// Pattern-stamp library.
+    pub pattern_stamps: Vec<SpriteCanvas>,
+    /// Selected pattern-stamp index.
+    pub selected_pattern: Option<usize>,
+    /// Randomly flip stamped patterns.
+    pub pattern_random_flip: bool,
     /// Whether shape tools (rectangle, ellipse) draw filled or outline
     pub shape_filled: bool,
     /// Dithering pattern for brush tool
@@ -140,6 +158,15 @@ impl Default for SpriteEditorState {
             pixel_perfect: false,
             gradient_mode: GradientMode::Linear,
             gradient_style: GradientStyle::Smooth,
+            procedural_mode: ProceduralBrushMode::Scatter,
+            scatter_radius: 3,
+            scatter_density: 0.18,
+            scatter_color_variation: 0.15,
+            noise_scale: 6.0,
+            noise_threshold: 0.5,
+            pattern_stamps: default_pattern_stamps(),
+            selected_pattern: Some(0),
+            pattern_random_flip: true,
             shape_filled: false,
             dither_pattern: DitherPattern::None,
             symmetry_horizontal: false,
@@ -177,6 +204,28 @@ impl Default for SpriteEditorState {
             needs_asset_rescan: false,
         }
     }
+}
+
+fn default_pattern_stamps() -> Vec<SpriteCanvas> {
+    vec![
+        pattern_from_rows(&["010", "111", "010"]),
+        pattern_from_rows(&["0010", "0111", "0010"]),
+        pattern_from_rows(&["0100", "1110", "0100"]),
+    ]
+}
+
+fn pattern_from_rows(rows: &[&str]) -> SpriteCanvas {
+    let height = rows.len() as u32;
+    let width = rows.first().map_or(0, |row| row.len()) as u32;
+    let mut canvas = SpriteCanvas::new(width.max(1), height.max(1));
+    for (y, row) in rows.iter().enumerate() {
+        for (x, ch) in row.chars().enumerate() {
+            if ch == '1' {
+                canvas.set_pixel(x as u32, y as u32, PixelColor::white());
+            }
+        }
+    }
+    canvas
 }
 
 impl SpriteEditorState {

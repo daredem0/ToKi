@@ -13,6 +13,7 @@ pub enum SpriteEditorTool {
     Brush,
     Eraser,
     Gradient,
+    ProceduralBrush,
     Fill,
     Eyedropper,
     Select,
@@ -45,6 +46,15 @@ pub enum GradientStyle {
     #[default]
     Smooth,
     Dithered,
+}
+
+/// Procedural brush behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ProceduralBrushMode {
+    #[default]
+    Scatter,
+    NoiseFill,
+    PatternStamp,
 }
 
 /// Type of sprite asset being edited

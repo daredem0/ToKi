@@ -1,5 +1,7 @@
 use super::*;
-use crate::ui::sprite_editor::{canonical_indexed_color_for_size, indexed_slot_for_authored_color};
+use crate::ui::sprite_editor::{
+    canonical_indexed_color_for_size, extract_masked_selection, indexed_slot_for_authored_color,
+};
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::{validate_indexed_rgba8, PaletteSize};
 
@@ -100,6 +102,7 @@ fn tool_label(tool: crate::ui::editor_ui::SpriteEditorTool) -> &'static str {
         SpriteEditorTool::Brush => "Brush",
         SpriteEditorTool::Eraser => "Eraser",
         SpriteEditorTool::Gradient => "Gradient",
+        SpriteEditorTool::ProceduralBrush => "Procedural Brush",
         SpriteEditorTool::Fill => "Fill",
         SpriteEditorTool::Eyedropper => "Eyedropper",
         SpriteEditorTool::Select => "Select",
@@ -125,13 +128,14 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         &[
             (SpriteEditorTool::Line, "Line"),
             (SpriteEditorTool::Gradient, "Gradient"),
-            (SpriteEditorTool::Fill, "Fill"),
+            (SpriteEditorTool::ProceduralBrush, "Proc Brush"),
         ],
         &[
+            (SpriteEditorTool::Fill, "Fill"),
             (SpriteEditorTool::Eyedropper, "Eyedrop"),
             (SpriteEditorTool::Select, "Select"),
-            (SpriteEditorTool::MagicWand, "Magic Wand"),
         ],
+        &[(SpriteEditorTool::MagicWand, "Magic Wand")],
         &[(SpriteEditorTool::MagicErase, "Magic Erase")],
         &[
             (SpriteEditorTool::Rectangle, "Rect"),
@@ -191,6 +195,10 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         SpriteEditorTool::Gradient => {
             ui.label("Click and drag to preview and apply a gradient.");
             render_gradient_options(ui, ui_state);
+        }
+        SpriteEditorTool::ProceduralBrush => {
+            ui.label("Organic painting tools for scatter, noise fill, and stamp-based textures.");
+            render_procedural_brush_options(ui, ui_state);
         }
         SpriteEditorTool::Fill => {
             ui.label("Click to fill connected area.");
@@ -570,6 +578,221 @@ fn render_gradient_end_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) 
         let hex = format!("#{:02X}{:02X}{:02X}", color.r(), color.g(), color.b());
         ui.label(hex);
     });
+}
+
+fn render_procedural_brush_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    use crate::ui::editor_ui::ProceduralBrushMode;
+
+    ui.label("Mode:");
+    ui.horizontal(|ui| {
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).procedural_mode,
+            ProceduralBrushMode::Scatter,
+            "Scatter",
+        );
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).procedural_mode,
+            ProceduralBrushMode::NoiseFill,
+            "Noise Fill",
+        );
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).procedural_mode,
+            ProceduralBrushMode::PatternStamp,
+            "Pattern Stamp",
+        );
+    });
+
+    match crate::ui::editor_context::sprite_state(ui_state).procedural_mode {
+        ProceduralBrushMode::Scatter => render_scatter_options(ui, ui_state),
+        ProceduralBrushMode::NoiseFill => render_noise_fill_options(ui, ui_state),
+        ProceduralBrushMode::PatternStamp => render_pattern_stamp_options(ui, ui_state),
+    }
+}
+
+fn render_scatter_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.horizontal(|ui| {
+        ui.label("Radius:");
+        ui.add(
+            egui::DragValue::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).scatter_radius,
+            )
+            .range(1..=64),
+        );
+        ui.label("px");
+    });
+    ui.horizontal(|ui| {
+        ui.label("Density:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).scatter_density,
+                0.01..=0.75,
+            )
+            .logarithmic(false),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.label("Variation:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).scatter_color_variation,
+                0.0..=1.0,
+            )
+            .show_value(true),
+        );
+    });
+}
+
+fn render_noise_fill_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.label("Uses foreground and gradient end color.");
+    render_gradient_end_color_picker(ui, ui_state);
+    ui.horizontal(|ui| {
+        ui.label("Scale:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).noise_scale,
+                1.0..=32.0,
+            )
+            .logarithmic(true),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.label("Threshold:");
+        ui.add(
+            egui::Slider::new(
+                &mut crate::ui::editor_context::sprite_state_mut(ui_state).noise_threshold,
+                0.0..=1.0,
+            )
+            .show_value(true),
+        );
+    });
+}
+
+fn render_pattern_stamp_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.checkbox(
+        &mut crate::ui::editor_context::sprite_state_mut(ui_state).pattern_random_flip,
+        "Random Flip",
+    );
+
+    let can_capture = crate::ui::editor_context::sprite_state(ui_state)
+        .active()
+        .selection
+        .is_some()
+        && crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .canvas
+            .is_some();
+    if ui
+        .add_enabled(can_capture, egui::Button::new("Capture From Selection"))
+        .clicked()
+    {
+        capture_pattern_from_selection(ui_state);
+    }
+
+    ui.label("Patterns:");
+    let stamp_count = crate::ui::editor_context::sprite_state(ui_state)
+        .pattern_stamps
+        .len();
+    if stamp_count == 0 {
+        ui.label("No patterns available.");
+        return;
+    }
+
+    egui::Grid::new("procedural_pattern_grid")
+        .num_columns(3)
+        .spacing([6.0, 6.0])
+        .show(ui, |ui| {
+            for index in 0..stamp_count {
+                let is_selected = crate::ui::editor_context::sprite_state(ui_state)
+                    .selected_pattern
+                    == Some(index);
+                let stamp =
+                    crate::ui::editor_context::sprite_state(ui_state).pattern_stamps[index].clone();
+                let response = render_pattern_stamp_preview(ui, &stamp, is_selected);
+                if response.clicked() {
+                    crate::ui::editor_context::sprite_state_mut(ui_state).selected_pattern =
+                        Some(index);
+                }
+                if (index + 1) % 3 == 0 {
+                    ui.end_row();
+                }
+            }
+        });
+}
+
+fn capture_pattern_from_selection(ui_state: &mut EditorUI) {
+    let selection = crate::ui::editor_context::sprite_state(ui_state)
+        .active()
+        .selection
+        .clone();
+    let canvas = crate::ui::editor_context::sprite_state(ui_state)
+        .active()
+        .canvas
+        .clone();
+    let Some(selection) = selection else {
+        return;
+    };
+    let Some(canvas) = canvas else {
+        return;
+    };
+    let Some(pattern) = extract_masked_selection(&canvas, &selection) else {
+        return;
+    };
+    let state = crate::ui::editor_context::sprite_state_mut(ui_state);
+    state.pattern_stamps.push(pattern);
+    state.selected_pattern = Some(state.pattern_stamps.len() - 1);
+}
+
+fn render_pattern_stamp_preview(
+    ui: &mut egui::Ui,
+    stamp: &crate::ui::editor_ui::SpriteCanvas,
+    selected: bool,
+) -> egui::Response {
+    let size = egui::vec2(52.0, 52.0);
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    let bg = if selected {
+        egui::Color32::from_rgb(50, 66, 78)
+    } else {
+        egui::Color32::from_gray(28)
+    };
+    ui.painter().rect_filled(rect, 4.0, bg);
+    ui.painter().rect_stroke(
+        rect,
+        4.0,
+        egui::Stroke::new(
+            if selected { 2.0 } else { 1.0 },
+            if selected {
+                egui::Color32::WHITE
+            } else {
+                egui::Color32::GRAY
+            },
+        ),
+        egui::StrokeKind::Outside,
+    );
+
+    let pixel_size = ((rect.width() - 8.0) / stamp.width.max(stamp.height) as f32).max(2.0);
+    let draw_size = egui::vec2(
+        stamp.width as f32 * pixel_size,
+        stamp.height as f32 * pixel_size,
+    );
+    let origin = rect.center() - draw_size * 0.5;
+    for y in 0..stamp.height {
+        for x in 0..stamp.width {
+            let Some(color) = stamp.get_pixel(x, y) else {
+                continue;
+            };
+            if color.a == 0 {
+                continue;
+            }
+            let pixel_rect = egui::Rect::from_min_size(
+                origin + egui::vec2(x as f32 * pixel_size, y as f32 * pixel_size),
+                egui::vec2(pixel_size, pixel_size),
+            );
+            ui.painter()
+                .rect_filled(pixel_rect, 0.0, color.to_color32());
+        }
+    }
+
+    response
 }
 
 fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {

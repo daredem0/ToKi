@@ -27,7 +27,8 @@ pub use dual_canvas::{CanvasSide, CanvasState, DualCanvasLayout};
 pub use floating::{FloatingOrigin, FloatingSelection};
 pub use history::{SpriteEditCommand, SpriteEditorHistory};
 #[cfg(test)]
-pub use selection::{clear_masked_pixels, extract_masked_selection};
+pub use selection::clear_masked_pixels;
+pub use selection::extract_masked_selection;
 pub use selection::{SelectionMask, SpriteSelection};
 pub use state::{AutoTileSpriteInfo, SpriteEditorState};
 #[cfg(test)]
@@ -35,6 +36,7 @@ pub use types::canonical_indexed_color;
 pub use types::{
     canonical_indexed_color_for_size, indexed_slot_for_authored_color, nearest_palette_slot,
     preview_indexed_color, DiscoveredSpriteAsset, DitherPattern, GradientMode, GradientStyle,
-    PixelColor, ResizeAnchor, ResizeCorner, ResizeDrag, SpriteAssetKind, SpriteEditorTool,
+    PixelColor, ProceduralBrushMode, ResizeAnchor, ResizeCorner, ResizeDrag, SpriteAssetKind,
+    SpriteEditorTool,
 };
 pub use viewport::SpriteCanvasViewport;

@@ -546,6 +546,12 @@ fn sprite_editor_state_default_values() {
     assert_eq!(state.gradient_mode, GradientMode::Linear);
     assert_eq!(state.gradient_style, GradientStyle::Smooth);
     assert_eq!(state.gradient_end_color, PixelColor::white());
+    assert_eq!(state.procedural_mode, ProceduralBrushMode::Scatter);
+    assert_eq!(state.scatter_radius, 3);
+    assert!(state.scatter_density > 0.0);
+    assert!(!state.pattern_stamps.is_empty());
+    assert_eq!(state.selected_pattern, Some(0));
+    assert!(state.pattern_random_flip);
     assert!(state.active().show_grid);
     assert!(state.active().show_autotile_labels);
     assert!(state.active().show_autotile_guides);

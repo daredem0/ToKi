@@ -5,7 +5,9 @@ pub mod gradient;
 pub mod grid;
 pub mod map_objects;
 pub mod map_paint;
+pub mod noise;
 pub mod placement;
+pub mod procedural_brush;
 pub mod selection;
 pub mod sprite_paint;
 

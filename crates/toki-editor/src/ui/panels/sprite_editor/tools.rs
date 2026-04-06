@@ -2,6 +2,10 @@
 
 use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::gradient::{apply_gradient, GradientParams};
+use crate::ui::interactions::procedural_brush::{
+    apply_noise_fill, apply_pattern_stamp, apply_scatter, NoiseFillParams, PatternStampParams,
+    ScatterParams,
+};
 use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{
@@ -38,6 +42,9 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Brush => handle_brush_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eraser => handle_eraser_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Gradient => handle_gradient_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::ProceduralBrush => {
+            handle_procedural_brush_tool(ui_state, response, canvas_pos)
+        }
         SpriteEditorTool::Fill => handle_fill_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eyedropper => handle_eyedropper_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
@@ -254,6 +261,59 @@ fn handle_gradient_tool(
     }
 }
 
+fn handle_procedural_brush_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    let mode = crate::ui::editor_context::sprite_state(ui_state).procedural_mode;
+    match mode {
+        crate::ui::editor_ui::ProceduralBrushMode::Scatter => {
+            if response.drag_started_by(egui::PointerButton::Primary) {
+                start_paint_stroke(ui_state);
+            }
+            if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
+                if response.clicked() {
+                    start_paint_stroke(ui_state);
+                }
+                apply_scatter_at_cursor(ui_state, canvas_pos);
+                if response.clicked() {
+                    finish_paint_stroke(ui_state);
+                }
+            }
+            if response.drag_stopped_by(egui::PointerButton::Primary) {
+                finish_paint_stroke(ui_state);
+            }
+        }
+        crate::ui::editor_ui::ProceduralBrushMode::NoiseFill => {
+            if response.drag_started_by(egui::PointerButton::Primary)
+                || response.clicked_by(egui::PointerButton::Primary)
+            {
+                start_paint_stroke(ui_state);
+                apply_noise_fill_at_cursor(ui_state, canvas_pos);
+                finish_paint_stroke(ui_state);
+            }
+        }
+        crate::ui::editor_ui::ProceduralBrushMode::PatternStamp => {
+            if response.drag_started_by(egui::PointerButton::Primary) {
+                start_paint_stroke(ui_state);
+                apply_pattern_stamp_at_cursor(ui_state, canvas_pos, true);
+            }
+            if response.dragged_by(egui::PointerButton::Primary) {
+                apply_pattern_stamp_at_cursor(ui_state, canvas_pos, false);
+            }
+            if response.clicked() {
+                start_paint_stroke(ui_state);
+                apply_pattern_stamp_at_cursor(ui_state, canvas_pos, true);
+                finish_paint_stroke(ui_state);
+            }
+            if response.drag_stopped_by(egui::PointerButton::Primary) {
+                finish_paint_stroke(ui_state);
+            }
+        }
+    }
+}
+
 fn handle_eyedropper_tool(
     ui_state: &mut EditorUI,
     response: &egui::Response,
@@ -436,6 +496,144 @@ fn preview_gradient(ui_state: &mut EditorUI, canvas_pos: glam::IVec2) {
     }
 }
 
+fn apply_scatter_at_cursor(ui_state: &mut EditorUI, canvas_pos: glam::IVec2) {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    let palette = selected_palette(ui_state);
+    let palette_size = palette.map_or(toki_core::palette::PaletteSize::Pal4, |palette| {
+        palette.size()
+    });
+    let color = effective_paint_color(
+        sprite_state.color_mode,
+        sprite_state.foreground_color,
+        palette,
+    );
+    let selection = procedural_target_mask(ui_state);
+    let params = ScatterParams {
+        center: canvas_pos,
+        radius: sprite_state.scatter_radius,
+        density: sprite_state.scatter_density,
+        color,
+        color_variation: sprite_state.scatter_color_variation,
+        indexed_slot: (sprite_state.color_mode == ColorMode::PaletteIndexed).then(|| {
+            indexed_slot_for_authored_color(sprite_state.foreground_color, palette)
+                .unwrap_or(palette_size.color_count() - 1)
+        }),
+        palette_size,
+        seed: procedural_seed(canvas_pos, sprite_state.scatter_radius as u64),
+    };
+
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
+        if apply_scatter(canvas, &params, selection.as_ref()) {
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+}
+
+fn apply_noise_fill_at_cursor(ui_state: &mut EditorUI, canvas_pos: glam::IVec2) {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    let palette = selected_palette(ui_state);
+    let palette_size = palette.map_or(toki_core::palette::PaletteSize::Pal4, |palette| {
+        palette.size()
+    });
+    let color_a = effective_paint_color(
+        sprite_state.color_mode,
+        sprite_state.foreground_color,
+        palette,
+    );
+    let color_b = effective_paint_color(
+        sprite_state.color_mode,
+        sprite_state.gradient_end_color,
+        palette,
+    );
+    let selection = procedural_target_mask_at(ui_state, canvas_pos);
+    let params = NoiseFillParams {
+        color_a,
+        color_b,
+        scale: sprite_state.noise_scale,
+        threshold: sprite_state.noise_threshold,
+        indexed_slots: (sprite_state.color_mode == ColorMode::PaletteIndexed).then(|| {
+            (
+                indexed_slot_for_authored_color(sprite_state.foreground_color, palette)
+                    .unwrap_or(palette_size.color_count() - 1),
+                indexed_slot_for_authored_color(sprite_state.gradient_end_color, palette)
+                    .unwrap_or(palette_size.color_count() - 1),
+            )
+        }),
+        palette_size,
+        seed_origin: canvas_pos,
+    };
+
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
+        if apply_noise_fill(canvas, &params, selection.as_ref()) {
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+}
+
+fn apply_pattern_stamp_at_cursor(ui_state: &mut EditorUI, canvas_pos: glam::IVec2, force: bool) {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    let Some(pattern_index) = sprite_state.selected_pattern else {
+        return;
+    };
+    let Some(stamp) = sprite_state.pattern_stamps.get(pattern_index).cloned() else {
+        return;
+    };
+
+    let stamp_origin =
+        canvas_pos - glam::IVec2::new((stamp.width / 2) as i32, (stamp.height / 2) as i32);
+    let spacing = (stamp.width.max(stamp.height) as i32 / 2).max(1);
+    let last = crate::ui::editor_context::sprite_state(ui_state)
+        .active()
+        .procedural_last_stamp_pos;
+    if !force
+        && last.is_some_and(|last| {
+            let delta = stamp_origin - last;
+            delta.x * delta.x + delta.y * delta.y < spacing * spacing
+        })
+    {
+        return;
+    }
+
+    let palette = selected_palette(ui_state);
+    let color = effective_paint_color(
+        sprite_state.color_mode,
+        sprite_state.foreground_color,
+        palette,
+    );
+    let selection = procedural_target_mask(ui_state);
+    let params = PatternStampParams {
+        position: stamp_origin,
+        stamp: &stamp,
+        color,
+        random_flip: sprite_state.pattern_random_flip,
+        seed: procedural_seed(stamp_origin, pattern_index as u64 + 1),
+    };
+
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
+        if apply_pattern_stamp(canvas, &params, selection.as_ref()) {
+            let cs = crate::ui::editor_context::sprite_state_mut(ui_state).active_mut();
+            cs.procedural_last_stamp_pos = Some(stamp_origin);
+            cs.dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+}
+
 fn gradient_target_mask(ui_state: &EditorUI) -> Option<SelectionMask> {
     let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
     if let Some(selection) = sprite_state.active().selection.clone() {
@@ -450,12 +648,7 @@ fn gradient_target_mask(ui_state: &EditorUI) -> Option<SelectionMask> {
     let (start_x, start_y, end_x, end_y) = sprite_state.cell_bounds(cell_idx)?;
     let (width, height) = sprite_state.canvas_dimensions()?;
     Some(selection_mask_from_bounds(
-        width,
-        height,
-        start_x,
-        start_y,
-        end_x,
-        end_y,
+        width, height, start_x, start_y, end_x, end_y,
     ))
 }
 
@@ -1077,6 +1270,42 @@ fn selection_mask_from_bounds(
     selection
 }
 
+fn procedural_target_mask(ui_state: &EditorUI) -> Option<SelectionMask> {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    if let Some(selection) = sprite_state.active().selection.clone() {
+        return Some(selection);
+    }
+    if !sprite_state.is_sheet() {
+        return None;
+    }
+    let cell_idx = sprite_state.active().selected_cell?;
+    let (start_x, start_y, end_x, end_y) = sprite_state.cell_bounds(cell_idx)?;
+    let (width, height) = sprite_state.canvas_dimensions()?;
+    Some(selection_mask_from_bounds(
+        width, height, start_x, start_y, end_x, end_y,
+    ))
+}
+
+fn procedural_target_mask_at(ui_state: &EditorUI, canvas_pos: glam::IVec2) -> Option<SelectionMask> {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    if let Some(selection) = sprite_state.active().selection.clone() {
+        return Some(selection);
+    }
+    if !sprite_state.is_sheet() {
+        return None;
+    }
+
+    let clicked_cell = (canvas_pos.x >= 0 && canvas_pos.y >= 0)
+        .then(|| sprite_state.cell_at_position(canvas_pos.x as u32, canvas_pos.y as u32))
+        .flatten();
+    let cell_idx = clicked_cell.or(sprite_state.active().selected_cell)?;
+    let (start_x, start_y, end_x, end_y) = sprite_state.cell_bounds(cell_idx)?;
+    let (width, height) = sprite_state.canvas_dimensions()?;
+    Some(selection_mask_from_bounds(
+        width, height, start_x, start_y, end_x, end_y,
+    ))
+}
+
 fn merge_selection_masks(
     base: Option<&SelectionMask>,
     incoming: &SelectionMask,
@@ -1123,6 +1352,9 @@ fn start_paint_stroke(ui_state: &mut EditorUI) {
             .active_mut()
             .pixel_perfect_history
             .clear();
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .procedural_last_stamp_pos = None;
     }
 }
 
@@ -1145,6 +1377,9 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
             .active_mut()
             .pixel_perfect_history
             .clear();
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .procedural_last_stamp_pos = None;
         let foreground_color = crate::ui::editor_context::sprite_state(ui_state).foreground_color;
         ui_state
             .sprite_editor_context_mut()
@@ -1215,6 +1450,10 @@ fn compute_symmetry_bounds(ui_state: &EditorUI) -> (UVec2, UVec2) {
     (UVec2::ZERO, UVec2::new(w, h))
 }
 
+fn procedural_seed(pos: glam::IVec2, salt: u64) -> u64 {
+    ((pos.x as u64) << 32) ^ (pos.y as u32 as u64) ^ salt.wrapping_mul(0x9e37_79b9_7f4a_7c15)
+}
+
 pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     use SpriteEditorTool::*;
 
@@ -1222,6 +1461,7 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
         (egui::Key::B, Brush),
         (egui::Key::E, Eraser),
         (egui::Key::G, Fill),
+        (egui::Key::P, ProceduralBrush),
         (egui::Key::T, Gradient),
         (egui::Key::I, Eyedropper),
         (egui::Key::M, Select),
