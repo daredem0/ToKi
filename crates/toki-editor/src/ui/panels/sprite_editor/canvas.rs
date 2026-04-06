@@ -845,6 +845,7 @@ const GUIDE_SW: u8 = 0x20;
 const GUIDE_W: u8 = 0x40;
 const GUIDE_NW: u8 = 0x80;
 
+#[allow(clippy::too_many_arguments)]
 fn draw_autotile_overlay(
     painter: &egui::Painter,
     rect: egui::Rect,

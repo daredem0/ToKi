@@ -1,6 +1,7 @@
 //! Sprite editor tool interaction handling.
 
 use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
+use crate::ui::interactions::gradient::{apply_gradient, GradientParams};
 use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{
@@ -36,6 +37,7 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Drag => handle_drag_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Brush => handle_brush_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eraser => handle_eraser_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Gradient => handle_gradient_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Fill => handle_fill_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eyedropper => handle_eyedropper_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
@@ -227,6 +229,31 @@ fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
     }
 }
 
+fn handle_gradient_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .line_start_pos = Some(canvas_pos);
+        start_paint_stroke(ui_state);
+    }
+
+    if response.dragged_by(egui::PointerButton::Primary) {
+        preview_gradient(ui_state, canvas_pos);
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        preview_gradient(ui_state, canvas_pos);
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .line_start_pos = None;
+        finish_paint_stroke(ui_state);
+    }
+}
+
 fn handle_eyedropper_tool(
     ui_state: &mut EditorUI,
     response: &egui::Response,
@@ -374,6 +401,102 @@ fn build_shape_params(ui_state: &EditorUI, start: glam::IVec2, end: glam::IVec2)
         color,
         brush_size: crate::ui::editor_context::sprite_state(ui_state).brush_size,
         filled: crate::ui::editor_context::sprite_state(ui_state).shape_filled,
+    }
+}
+
+fn preview_gradient(ui_state: &mut EditorUI, canvas_pos: glam::IVec2) {
+    let Some(start) = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .line_start_pos
+    else {
+        return;
+    };
+
+    if let Some(before) = &crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active()
+        .canvas_before_stroke
+    {
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .canvas = Some(before.clone());
+    }
+
+    let params = build_gradient_params(ui_state, start, canvas_pos);
+    let selection = gradient_target_mask(ui_state);
+    if let Some(canvas) = &mut crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas
+    {
+        if apply_gradient(canvas, &params, selection.as_ref()) {
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+}
+
+fn gradient_target_mask(ui_state: &EditorUI) -> Option<SelectionMask> {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    if let Some(selection) = sprite_state.active().selection.clone() {
+        return Some(selection);
+    }
+
+    if !sprite_state.is_sheet() {
+        return None;
+    }
+
+    let cell_idx = sprite_state.active().selected_cell?;
+    let (start_x, start_y, end_x, end_y) = sprite_state.cell_bounds(cell_idx)?;
+    let (width, height) = sprite_state.canvas_dimensions()?;
+    Some(selection_mask_from_bounds(
+        width,
+        height,
+        start_x,
+        start_y,
+        end_x,
+        end_y,
+    ))
+}
+
+fn build_gradient_params(
+    ui_state: &EditorUI,
+    start: glam::IVec2,
+    end: glam::IVec2,
+) -> GradientParams {
+    let sprite_state = crate::ui::editor_context::sprite_state(ui_state);
+    let palette = selected_palette(ui_state);
+    let palette_size = palette.map_or(toki_core::palette::PaletteSize::Pal4, |palette| {
+        palette.size()
+    });
+    let start_color = effective_paint_color(
+        sprite_state.color_mode,
+        sprite_state.foreground_color,
+        palette,
+    );
+    let end_color = effective_paint_color(
+        sprite_state.color_mode,
+        sprite_state.gradient_end_color,
+        palette,
+    );
+
+    GradientParams {
+        start,
+        end,
+        start_color,
+        end_color,
+        mode: sprite_state.gradient_mode,
+        style: sprite_state.gradient_style,
+        color_mode: sprite_state.color_mode,
+        palette_size,
+        indexed_slots: (sprite_state.color_mode == ColorMode::PaletteIndexed).then(|| {
+            (
+                indexed_slot_for_authored_color(sprite_state.foreground_color, palette)
+                    .unwrap_or(palette_size.color_count() - 1),
+                indexed_slot_for_authored_color(sprite_state.gradient_end_color, palette)
+                    .unwrap_or(palette_size.color_count() - 1),
+            )
+        }),
     }
 }
 
@@ -936,6 +1059,24 @@ fn selection_mask_from_rect(width: u32, height: u32, rect: SpriteSelection) -> S
     selection
 }
 
+fn selection_mask_from_bounds(
+    width: u32,
+    height: u32,
+    start_x: u32,
+    start_y: u32,
+    end_x: u32,
+    end_y: u32,
+) -> SelectionMask {
+    let mut selection = SelectionMask::new(width, height);
+    selection.select_rect(
+        start_x,
+        start_y,
+        end_x.saturating_sub(start_x),
+        end_y.saturating_sub(start_y),
+    );
+    selection
+}
+
 fn merge_selection_masks(
     base: Option<&SelectionMask>,
     incoming: &SelectionMask,
@@ -1081,6 +1222,7 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
         (egui::Key::B, Brush),
         (egui::Key::E, Eraser),
         (egui::Key::G, Fill),
+        (egui::Key::T, Gradient),
         (egui::Key::I, Eyedropper),
         (egui::Key::M, Select),
         (egui::Key::D, Drag),
@@ -1139,6 +1281,16 @@ mod tests {
         let selection = create_selection(glam::IVec2::new(4, 6), glam::IVec2::new(4, 6));
 
         assert_eq!(selection, SpriteSelection::new(4, 6, 1, 1));
+    }
+
+    #[test]
+    fn selection_mask_from_bounds_selects_expected_region() {
+        let selection = selection_mask_from_bounds(8, 8, 2, 3, 5, 6);
+
+        assert!(selection.is_selected(2, 3));
+        assert!(selection.is_selected(4, 5));
+        assert!(!selection.is_selected(5, 6));
+        assert!(!selection.is_selected(1, 3));
     }
 
     #[test]

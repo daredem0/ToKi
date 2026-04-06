@@ -34,7 +34,7 @@ pub use state::{AutoTileSpriteInfo, SpriteEditorState};
 pub use types::canonical_indexed_color;
 pub use types::{
     canonical_indexed_color_for_size, indexed_slot_for_authored_color, nearest_palette_slot,
-    preview_indexed_color, DiscoveredSpriteAsset, DitherPattern, PixelColor, ResizeAnchor,
-    ResizeCorner, ResizeDrag, SpriteAssetKind, SpriteEditorTool,
+    preview_indexed_color, DiscoveredSpriteAsset, DitherPattern, GradientMode, GradientStyle,
+    PixelColor, ResizeAnchor, ResizeCorner, ResizeDrag, SpriteAssetKind, SpriteEditorTool,
 };
 pub use viewport::SpriteCanvasViewport;

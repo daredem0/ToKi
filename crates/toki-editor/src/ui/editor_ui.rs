@@ -81,8 +81,8 @@ pub(crate) use editor_ui_menu_editor::{
 };
 pub(crate) use editor_ui_sprite_editor::{
     begin_new_sprite_canvas_dialog, cancel_new_sprite_canvas_dialog, CanvasSide, DualCanvasLayout,
-    PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
-    SpriteEditorState, SpriteEditorTool, SpriteSelection,
+    GradientMode, GradientStyle, PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind,
+    SpriteCanvas, SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 pub(crate) use editor_ui_ui_editor::{
     clear_ui_layout_view_dirty, export_ui_layout_views_for_project, is_ui_layout_view_dirty,

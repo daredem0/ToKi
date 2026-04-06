@@ -12,6 +12,7 @@ pub enum SpriteEditorTool {
     Drag,
     Brush,
     Eraser,
+    Gradient,
     Fill,
     Eyedropper,
     Select,
@@ -28,6 +29,22 @@ pub enum SpriteEditorTool {
     Rectangle,
     /// Draw an ellipse (outline or filled)
     Ellipse,
+}
+
+/// Gradient direction/shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GradientMode {
+    #[default]
+    Linear,
+    Radial,
+}
+
+/// Gradient rendering style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GradientStyle {
+    #[default]
+    Smooth,
+    Dithered,
 }
 
 /// Type of sprite asset being edited

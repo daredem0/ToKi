@@ -2,8 +2,8 @@
 
 use super::{
     canonical_indexed_color_for_size, indexed_slot_for_authored_color, CanvasSide, CanvasState,
-    DiscoveredSpriteAsset, DitherPattern, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
-    SpriteEditorTool,
+    DiscoveredSpriteAsset, DitherPattern, DualCanvasLayout, GradientMode, GradientStyle,
+    PixelColor, ResizeAnchor, SpriteCanvas, SpriteEditorTool,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -36,6 +36,8 @@ pub struct SpriteEditorState {
     pub clipboard: Option<SpriteCanvas>,
     /// Current foreground color (shared across canvases)
     pub foreground_color: PixelColor,
+    /// Secondary color used by the gradient tool.
+    pub gradient_end_color: PixelColor,
     /// Current color interpretation mode for atlas authoring.
     pub color_mode: ColorMode,
     /// Palette id authored into indexed atlas metadata.
@@ -44,6 +46,10 @@ pub struct SpriteEditorState {
     pub brush_size: u32,
     /// When true, 1px freehand brush strokes avoid doubled corner pixels.
     pub pixel_perfect: bool,
+    /// Gradient tool interpolation mode.
+    pub gradient_mode: GradientMode,
+    /// Gradient tool rendering style.
+    pub gradient_style: GradientStyle,
     /// Whether shape tools (rectangle, ellipse) draw filled or outline
     pub shape_filled: bool,
     /// Dithering pattern for brush tool
@@ -127,10 +133,13 @@ impl Default for SpriteEditorState {
             tool: SpriteEditorTool::Drag,
             clipboard: None,
             foreground_color: PixelColor::black(),
+            gradient_end_color: PixelColor::white(),
             color_mode: ColorMode::TrueColor,
             authored_palette_id: None,
             brush_size: 1,
             pixel_perfect: false,
+            gradient_mode: GradientMode::Linear,
+            gradient_style: GradientStyle::Smooth,
             shape_filled: false,
             dither_pattern: DitherPattern::None,
             symmetry_horizontal: false,
@@ -198,6 +207,15 @@ impl SpriteEditorState {
                 .as_ref()
                 .map_or(PaletteSize::Pal4, |p| p.size());
             self.foreground_color = canonical_indexed_color_for_size(size.color_count() - 1, size);
+        }
+        if indexed_slot_for_authored_color(self.gradient_end_color, selected_palette.as_ref())
+            .is_none()
+        {
+            let size = selected_palette
+                .as_ref()
+                .map_or(PaletteSize::Pal4, |p| p.size());
+            self.gradient_end_color =
+                canonical_indexed_color_for_size(size.color_count() - 1, size);
         }
     }
 }

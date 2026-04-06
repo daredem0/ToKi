@@ -99,6 +99,7 @@ fn tool_label(tool: crate::ui::editor_ui::SpriteEditorTool) -> &'static str {
         SpriteEditorTool::Drag => "Drag",
         SpriteEditorTool::Brush => "Brush",
         SpriteEditorTool::Eraser => "Eraser",
+        SpriteEditorTool::Gradient => "Gradient",
         SpriteEditorTool::Fill => "Fill",
         SpriteEditorTool::Eyedropper => "Eyedropper",
         SpriteEditorTool::Select => "Select",
@@ -123,14 +124,15 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ],
         &[
             (SpriteEditorTool::Line, "Line"),
+            (SpriteEditorTool::Gradient, "Gradient"),
             (SpriteEditorTool::Fill, "Fill"),
-            (SpriteEditorTool::Eyedropper, "Eyedrop"),
         ],
         &[
+            (SpriteEditorTool::Eyedropper, "Eyedrop"),
             (SpriteEditorTool::Select, "Select"),
             (SpriteEditorTool::MagicWand, "Magic Wand"),
-            (SpriteEditorTool::MagicErase, "Magic Erase"),
         ],
+        &[(SpriteEditorTool::MagicErase, "Magic Erase")],
         &[
             (SpriteEditorTool::Rectangle, "Rect"),
             (SpriteEditorTool::Ellipse, "Ellipse"),
@@ -185,6 +187,10 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         SpriteEditorTool::Eraser => {
             ui.label("Click/drag to erase pixels.");
             render_brush_size(ui, ui_state);
+        }
+        SpriteEditorTool::Gradient => {
+            ui.label("Click and drag to preview and apply a gradient.");
+            render_gradient_options(ui, ui_state);
         }
         SpriteEditorTool::Fill => {
             ui.label("Click to fill connected area.");
@@ -313,6 +319,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             == ColorMode::PaletteIndexed
         {
             ensure_valid_indexed_foreground_color(ui_state);
+            ensure_valid_indexed_gradient_end_color(ui_state);
         }
         crate::ui::editor_context::sprite_state_mut(ui_state).invalidate_all_canvas_textures();
     }
@@ -358,6 +365,7 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         });
 
         ensure_valid_indexed_foreground_color(ui_state);
+        ensure_valid_indexed_gradient_end_color(ui_state);
         if previous_palette_id
             != crate::ui::editor_context::sprite_state_mut(ui_state).authored_palette_id
         {
@@ -455,6 +463,112 @@ fn render_dither_selector(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     );
                 }
             });
+    });
+}
+
+fn render_gradient_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    use crate::ui::editor_ui::{GradientMode, GradientStyle};
+
+    ui.label("Mode:");
+    ui.horizontal(|ui| {
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).gradient_mode,
+            GradientMode::Linear,
+            "Linear",
+        );
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).gradient_mode,
+            GradientMode::Radial,
+            "Radial",
+        );
+    });
+
+    ui.label("Style:");
+    ui.horizontal(|ui| {
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).gradient_style,
+            GradientStyle::Smooth,
+            "Smooth",
+        );
+        ui.selectable_value(
+            &mut crate::ui::editor_context::sprite_state_mut(ui_state).gradient_style,
+            GradientStyle::Dithered,
+            "Dithered",
+        );
+    });
+
+    render_gradient_end_color_picker(ui, ui_state);
+}
+
+fn render_gradient_end_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    use super::super::editor_ui::PixelColor;
+
+    ui.label("End Color:");
+
+    if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode == ColorMode::PaletteIndexed
+    {
+        ensure_valid_indexed_gradient_end_color(ui_state);
+        if let Some(palette_id) = crate::ui::editor_context::sprite_state_mut(ui_state)
+            .authored_palette_id
+            .clone()
+        {
+            if let Some(palette) = ui_state
+                .project
+                .available_palettes
+                .get(&palette_id)
+                .cloned()
+            {
+                let selected_slot = indexed_slot_for_authored_color(
+                    crate::ui::editor_context::sprite_state(ui_state).gradient_end_color,
+                    Some(&palette),
+                );
+                ui.horizontal_wrapped(|ui| {
+                    for (slot, color) in palette.colors().iter().copied().enumerate() {
+                        let pixel_color = PixelColor::from_rgba_array(color);
+                        let is_selected = selected_slot == Some(slot);
+                        let (rect, response) =
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::click());
+                        ui.painter()
+                            .rect_filled(rect, 3.0, pixel_color.to_color32());
+                        ui.painter().rect_stroke(
+                            rect,
+                            3.0,
+                            egui::Stroke::new(
+                                if is_selected { 2.0 } else { 1.0 },
+                                if is_selected {
+                                    egui::Color32::WHITE
+                                } else {
+                                    egui::Color32::GRAY
+                                },
+                            ),
+                            egui::StrokeKind::Outside,
+                        );
+                        if response.clicked() {
+                            crate::ui::editor_context::sprite_state_mut(ui_state)
+                                .gradient_end_color =
+                                canonical_indexed_color_for_size(slot, palette.size());
+                        }
+                    }
+                });
+                return;
+            }
+        }
+
+        ui.label("No palette available for indexed editing.");
+        return;
+    }
+
+    let mut color = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .gradient_end_color
+        .to_color32();
+
+    ui.horizontal(|ui| {
+        if ui.color_edit_button_srgba(&mut color).changed() {
+            crate::ui::editor_context::sprite_state_mut(ui_state).gradient_end_color =
+                PixelColor::from_color32(color);
+        }
+        let hex = format!("#{:02X}{:02X}{:02X}", color.r(), color.g(), color.b());
+        ui.label(hex);
     });
 }
 
@@ -596,6 +710,27 @@ fn ensure_valid_indexed_foreground_color(ui_state: &mut EditorUI) {
     if indexed_slot_for_authored_color(foreground_color, selected_palette).is_none() {
         let size = selected_palette.map_or(PaletteSize::Pal4, |p| p.size());
         crate::ui::editor_context::sprite_state_mut(ui_state).foreground_color =
+            canonical_indexed_color_for_size(size.color_count() - 1, size);
+    }
+}
+
+fn ensure_valid_indexed_gradient_end_color(ui_state: &mut EditorUI) {
+    if crate::ui::editor_context::sprite_state_mut(ui_state).color_mode != ColorMode::PaletteIndexed
+    {
+        return;
+    }
+
+    let gradient_end_color = crate::ui::editor_context::sprite_state(ui_state).gradient_end_color;
+    let selected_palette = ui_state
+        .sprite_editor_context()
+        .sprite
+        .authored_palette_id
+        .as_ref()
+        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id));
+
+    if indexed_slot_for_authored_color(gradient_end_color, selected_palette).is_none() {
+        let size = selected_palette.map_or(PaletteSize::Pal4, |p| p.size());
+        crate::ui::editor_context::sprite_state_mut(ui_state).gradient_end_color =
             canonical_indexed_color_for_size(size.color_count() - 1, size);
     }
 }

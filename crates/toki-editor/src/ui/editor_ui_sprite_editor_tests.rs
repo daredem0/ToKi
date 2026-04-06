@@ -543,6 +543,9 @@ fn sprite_editor_state_default_values() {
     assert_eq!(state.tool, SpriteEditorTool::Drag);
     assert_eq!(state.brush_size, 1);
     assert!(!state.pixel_perfect);
+    assert_eq!(state.gradient_mode, GradientMode::Linear);
+    assert_eq!(state.gradient_style, GradientStyle::Smooth);
+    assert_eq!(state.gradient_end_color, PixelColor::white());
     assert!(state.active().show_grid);
     assert!(state.active().show_autotile_labels);
     assert!(state.active().show_autotile_guides);

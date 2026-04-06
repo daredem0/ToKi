@@ -133,6 +133,7 @@ fn tool_label(tool: SpriteEditorTool) -> &'static str {
         SpriteEditorTool::Drag => "Drag",
         SpriteEditorTool::Brush => "Brush",
         SpriteEditorTool::Eraser => "Eraser",
+        SpriteEditorTool::Gradient => "Gradient",
         SpriteEditorTool::Fill => "Fill",
         SpriteEditorTool::Eyedropper => "Eyedropper",
         SpriteEditorTool::Select => "Select",
