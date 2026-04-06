@@ -241,8 +241,8 @@ impl SceneViewport {
             device.clone(),
             queue.clone(),
             wgpu::TextureFormat::Rgba8UnormSrgb,
-            None,                                // No default tilemap texture
-            None,                                // No default sprite texture
+            None, // No default tilemap texture
+            None, // No default sprite texture
         )
         .map_err(|e| anyhow::anyhow!("Failed to create scene renderer: {}", e))?;
 
@@ -440,56 +440,55 @@ impl SceneViewport {
         // Display the pre-rendered texture or show fallback message
         if let Some(target) = &self.presentation_target {
             if let Some(texture_id) = target.texture_id() {
-                    // Calculate aspect ratio preserving viewport size
-                    let display_rect = if self.sizing_mode == ViewportSizingMode::Responsive {
-                        rect
+                // Calculate aspect ratio preserving viewport size
+                let display_rect = if self.sizing_mode == ViewportSizingMode::Responsive {
+                    rect
+                } else {
+                    let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
+                    let available_size = rect.size();
+                    let available_aspect = available_size.x / available_size.y;
+
+                    let display_size = if available_aspect > viewport_aspect {
+                        egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
                     } else {
-                        let viewport_aspect =
-                            self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
-                        let available_size = rect.size();
-                        let available_aspect = available_size.x / available_size.y;
-
-                        let display_size = if available_aspect > viewport_aspect {
-                            egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
-                        } else {
-                            egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
-                        };
-
-                        let offset = (available_size - display_size) * 0.5;
-                        egui::Rect::from_min_size(rect.min + offset, display_size)
+                        egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
                     };
 
-                    // Handle mouse interaction for camera panning and future entity selection
-                    let response = ui.allocate_response(rect.size(), egui::Sense::click_and_drag());
+                    let offset = (available_size - display_size) * 0.5;
+                    egui::Rect::from_min_size(rect.min + offset, display_size)
+                };
 
-                    // Log once when UI response is created (only if mouse is interacting)
-                    if response.hovered() || response.clicked() || response.dragged() {
-                        tracing::trace!(
-                            "UI response - rect size: {:?}, hovered: {}, clicked: {}, dragged: {}",
-                            rect.size(),
-                            response.hovered(),
-                            response.clicked(),
-                            response.dragged()
-                        );
-                    }
+                // Handle mouse interaction for camera panning and future entity selection
+                let response = ui.allocate_response(rect.size(), egui::Sense::click_and_drag());
 
-                    // Mouse interaction now handled in editor_ui.rs
-
-                    // Fill background with dark color for letterbox areas
-                    ui.painter()
-                        .rect_filled(rect, 0.0, egui::Color32::from_rgb(20, 20, 25));
-
-                    // Draw the viewport texture with preserved aspect ratio
-                    ui.painter().image(
-                        texture_id,
-                        display_rect,
-                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                        egui::Color32::WHITE,
+                // Log once when UI response is created (only if mouse is interacting)
+                if response.hovered() || response.clicked() || response.dragged() {
+                    tracing::trace!(
+                        "UI response - rect size: {:?}, hovered: {}, clicked: {}, dragged: {}",
+                        rect.size(),
+                        response.hovered(),
+                        response.clicked(),
+                        response.dragged()
                     );
-                } else {
-                    // Show status instead of error - this is normal during initialization
-                    self.render_debug_status(ui, rect, "Texture rendering in progress...");
                 }
+
+                // Mouse interaction now handled in editor_ui.rs
+
+                // Fill background with dark color for letterbox areas
+                ui.painter()
+                    .rect_filled(rect, 0.0, egui::Color32::from_rgb(20, 20, 25));
+
+                // Draw the viewport texture with preserved aspect ratio
+                ui.painter().image(
+                    texture_id,
+                    display_rect,
+                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    egui::Color32::WHITE,
+                );
+            } else {
+                // Show status instead of error - this is normal during initialization
+                self.render_debug_status(ui, rect, "Texture rendering in progress...");
+            }
         } else {
             self.render_error(ui, rect, "Viewport target not initialized");
         }

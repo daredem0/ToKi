@@ -91,8 +91,7 @@ impl InspectorSystem {
                         MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
                     },
                 );
-                if let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config)
-                {
+                if let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config) {
                     let selected_entry = crate::ui::editor_ui::selected_map_editor_brush_entry(
                         &brush_source.brush_entries,
                         crate::ui::editor_context::map_state(ui_state)
@@ -182,7 +181,8 @@ impl InspectorSystem {
                     });
                     Self::render_collision_stamp_toggle(ui_state, ui);
 
-                    if let (Some(selected_entry), Some(atlas_source)) = (selected_entry, selected_atlas)
+                    if let (Some(selected_entry), Some(atlas_source)) =
+                        (selected_entry, selected_atlas)
                     {
                         let texture_path = atlas_source
                             .path
@@ -267,7 +267,9 @@ impl InspectorSystem {
                 }
             });
         }
-        ui.small("Auto-tiles are linked through the map tileset; atlas merge import is not used here.");
+        ui.small(
+            "Auto-tiles are linked through the map tileset; atlas merge import is not used here.",
+        );
     }
 
     #[allow(dead_code)]
@@ -466,8 +468,7 @@ impl InspectorSystem {
                 ui.label(if tile_info.trigger { "Yes" } else { "No" });
             });
 
-            if let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config)
-            {
+            if let Some(brush_source) = Self::load_map_editor_brush_source(ui_state, config) {
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label("Preview:");
@@ -599,12 +600,8 @@ impl InspectorSystem {
             egui::Stroke::new(1.0, egui::Color32::GRAY),
             egui::StrokeKind::Outside,
         );
-        ui.painter().image(
-            texture,
-            rect.shrink(2.0),
-            uv_rect,
-            egui::Color32::WHITE,
-        );
+        ui.painter()
+            .image(texture, rect.shrink(2.0), uv_rect, egui::Color32::WHITE);
         response.on_hover_text(&brush_entry.display_label);
     }
 
@@ -700,14 +697,14 @@ impl InspectorSystem {
 
         let texture = renderer
             .preview_texture_from_path(
-            texture_path,
-            atlas.color_mode,
-            &ui_state.project.available_palettes,
-            &presentation_settings,
-            None,
-            atlas.palette.as_deref(),
-        )
-        .ok()?;
+                texture_path,
+                atlas.color_mode,
+                &ui_state.project.available_palettes,
+                &presentation_settings,
+                None,
+                atlas.palette.as_deref(),
+            )
+            .ok()?;
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_cache_key =
             Some(cache_key);
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path =

@@ -575,14 +575,12 @@ impl PlacementInteraction {
         tileset: Option<&TileSetResolver<'_>>,
     ) -> bool {
         match (tilemap, tileset) {
-            (Some(tilemap), Some(tileset)) => {
-                toki_core::collision::can_entity_move_to_position(
-                    entity,
-                    world_pos_i32,
-                    tilemap,
-                    tileset,
-                )
-            }
+            (Some(tilemap), Some(tileset)) => toki_core::collision::can_entity_move_to_position(
+                entity,
+                world_pos_i32,
+                tilemap,
+                tileset,
+            ),
             _ => true,
         }
     }

@@ -249,12 +249,7 @@ impl PanelSystem {
             }
         }
 
-        viewport.render(
-            ui,
-            rect,
-            project_path.as_deref(),
-            renderer.as_deref_mut(),
-        );
+        viewport.render(ui, rect, project_path.as_deref(), renderer.as_deref_mut());
         if let Some(cfg) = config.as_deref() {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }

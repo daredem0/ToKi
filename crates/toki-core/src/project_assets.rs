@@ -526,7 +526,10 @@ pub fn resolve_tilemap_tileset_path(
 
     let map_dir = tilemap_path.parent()?;
     first_existing_path(&[
-        project_path.join("assets").join("tilesets").join(tileset_path),
+        project_path
+            .join("assets")
+            .join("tilesets")
+            .join(tileset_path),
         map_dir.join(tileset_path),
         project_path
             .join("assets")
@@ -553,8 +556,14 @@ pub fn resolve_tileset_atlas_paths(
         let atlas_name = PathBuf::from(&entry.atlas_name);
         if let Some(path) = first_existing_path(&[
             tileset_dir.join(&atlas_name),
-            project_path.join("assets").join("sprites").join(&atlas_name),
-            project_path.join("assets").join("tilemaps").join(&atlas_name),
+            project_path
+                .join("assets")
+                .join("sprites")
+                .join(&atlas_name),
+            project_path
+                .join("assets")
+                .join("tilemaps")
+                .join(&atlas_name),
             project_path.join("assets").join("maps").join(&atlas_name),
             project_path.join("assets").join(&atlas_name),
         ]) {

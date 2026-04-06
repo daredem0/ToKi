@@ -137,9 +137,10 @@ impl DecodedProjectCache {
         &mut self,
         tileset_path: &Path,
     ) -> Result<TileSetMeta, toki_core::CoreError> {
-        self.tilesets.get_or_load(tileset_path.to_path_buf(), |path| {
-            TileSetMeta::load_from_file(path)
-        })
+        self.tilesets
+            .get_or_load(tileset_path.to_path_buf(), |path| {
+                TileSetMeta::load_from_file(path)
+            })
     }
 
     pub fn load_object_sheet_from_path(

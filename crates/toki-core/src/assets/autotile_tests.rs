@@ -52,18 +52,21 @@ fn eight_bit_no_neighbors() {
 
 #[test]
 fn eight_bit_corners_ignored_without_adjacent_edges() {
-    let with_corner =
-        compute_8bit_mask(&full_neighbors([false, true, false, false, false, false, false, false]));
+    let with_corner = compute_8bit_mask(&full_neighbors([
+        false, true, false, false, false, false, false, false,
+    ]));
     let without = compute_8bit_mask(&full_neighbors([false; 8]));
     assert_eq!(with_corner, without);
 }
 
 #[test]
 fn eight_bit_corner_kept_with_adjacent_edges() {
-    let with_corner =
-        compute_8bit_mask(&full_neighbors([true, true, true, false, false, false, false, false]));
-    let without =
-        compute_8bit_mask(&full_neighbors([true, false, true, false, false, false, false, false]));
+    let with_corner = compute_8bit_mask(&full_neighbors([
+        true, true, true, false, false, false, false, false,
+    ]));
+    let without = compute_8bit_mask(&full_neighbors([
+        true, false, true, false, false, false, false, false,
+    ]));
     assert_ne!(with_corner, without);
 }
 

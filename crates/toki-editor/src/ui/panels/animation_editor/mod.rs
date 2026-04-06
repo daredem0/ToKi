@@ -169,12 +169,7 @@ fn render_editor_content(
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
                 #[allow(clippy::needless_option_as_deref)]
-                render_center_panel(
-                    ui,
-                    ui_state,
-                    ctx,
-                    renderer.as_deref_mut(),
-                );
+                render_center_panel(ui, ui_state, ctx, renderer.as_deref_mut());
             },
         );
 

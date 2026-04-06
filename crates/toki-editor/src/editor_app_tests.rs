@@ -418,13 +418,11 @@ fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
     assert_eq!(draft.tilemap.tile_size, UVec2::new(16, 16));
     assert_eq!(draft.tilemap.tileset, PathBuf::from("new_map.json"));
     assert_eq!(draft.tilemap.tiles().len(), 20);
-    assert!(
-        draft
-            .tilemap
-            .tiles()
-            .iter()
-            .all(|tile| tile == "terrain/tile/grass")
-    );
+    assert!(draft
+        .tilemap
+        .tiles()
+        .iter()
+        .all(|tile| tile == "terrain/tile/grass"));
 }
 
 #[test]
@@ -608,7 +606,11 @@ fn collision_assets_with_center_solid_tile(
         },
     )]);
 
-    (tilemap, TileSetMeta::from_atlas("test_atlas", &atlas), atlas_sources)
+    (
+        tilemap,
+        TileSetMeta::from_atlas("test_atlas", &atlas),
+        atlas_sources,
+    )
 }
 
 fn solid_entity(id: u32, position: IVec2) -> Entity {
@@ -1491,7 +1493,8 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
     project_assets
         .scan_assets()
         .expect("project assets should scan");
-    let presentation_settings = toki_core::indexed_presentation::IndexedPresentationSettings::default();
+    let presentation_settings =
+        toki_core::indexed_presentation::IndexedPresentationSettings::default();
 
     let mut app = super::EditorApp::new(None);
     let first = super::EditorApp::cached_preview_sprite_frame(

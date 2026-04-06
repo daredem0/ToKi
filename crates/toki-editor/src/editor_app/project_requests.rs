@@ -35,8 +35,7 @@ impl EditorApp {
                 Self::project_indexed_presentation_settings(Some(current_project));
             self.tabs.ui.project.indexed_palette_override =
                 presentation_settings.indexed_palette_override.clone();
-            self.tabs.ui.project.runtime_post_process =
-                presentation_settings.post_process.clone();
+            self.tabs.ui.project.runtime_post_process = presentation_settings.post_process.clone();
             if let Some(viewport) = self.viewport_manager.scene.as_mut() {
                 viewport.set_available_palettes(&self.tabs.ui.project.available_palettes);
                 viewport.set_indexed_presentation_settings(presentation_settings.clone());

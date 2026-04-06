@@ -136,7 +136,9 @@ fn solid_tile_positions(
     tilemap: &TileMap,
     atlas: &AtlasMeta,
 ) -> Vec<(u32, u32)> {
-    with_sample_resolver(atlas, |resolver| queries.solid_tile_positions(tilemap, resolver))
+    with_sample_resolver(atlas, |resolver| {
+        queries.solid_tile_positions(tilemap, resolver)
+    })
 }
 
 fn trigger_tile_positions(
@@ -144,7 +146,9 @@ fn trigger_tile_positions(
     tilemap: &TileMap,
     atlas: &AtlasMeta,
 ) -> Vec<(u32, u32)> {
-    with_sample_resolver(atlas, |resolver| queries.trigger_tile_positions(tilemap, resolver))
+    with_sample_resolver(atlas, |resolver| {
+        queries.trigger_tile_positions(tilemap, resolver)
+    })
 }
 
 #[test]
@@ -284,8 +288,14 @@ fn debug_collision_wrappers_return_tiles_and_boxes_when_enabled() {
 
     let queries = render_queries(&manager);
     assert!(!queries.entity_collision_boxes().is_empty());
-    assert_eq!(solid_tile_positions(&queries, &tilemap, &atlas), vec![(0, 0)]);
-    assert_eq!(trigger_tile_positions(&queries, &tilemap, &atlas), vec![(1, 0)]);
+    assert_eq!(
+        solid_tile_positions(&queries, &tilemap, &atlas),
+        vec![(0, 0)]
+    );
+    assert_eq!(
+        trigger_tile_positions(&queries, &tilemap, &atlas),
+        vec![(1, 0)]
+    );
 }
 
 #[test]

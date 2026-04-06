@@ -109,6 +109,7 @@ pub struct SceneRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     format: wgpu::TextureFormat,
+    clear_color: wgpu::Color,
     tilemap_pipelines_by_texture: PerFrameLruCache<std::path::PathBuf, TilemapPipeline>,
     tilemap_batches_below: Vec<std::path::PathBuf>,
     tilemap_batches_above: Vec<std::path::PathBuf>,
@@ -201,12 +202,7 @@ impl SceneRenderer {
         } else {
             tilemap_pipelines_by_texture
                 .get_or_try_insert_with(std::path::PathBuf::new(), || {
-                    TilemapPipeline::new(
-                        &device,
-                        &queue,
-                        surface_format,
-                        make_tilemap_source(),
-                    )
+                    TilemapPipeline::new(&device, &queue, surface_format, make_tilemap_source())
                 })?
                 .expect("placeholder tilemap pipeline entry");
         }
@@ -229,6 +225,12 @@ impl SceneRenderer {
             device,
             queue,
             format: surface_format,
+            clear_color: wgpu::Color {
+                r: 0.1,
+                g: 0.1,
+                b: 0.12,
+                a: 1.0,
+            },
             tilemap_pipelines_by_texture,
             tilemap_batches_below: Vec::new(),
             tilemap_batches_above: Vec::new(),
@@ -245,6 +247,10 @@ impl SceneRenderer {
             current_sprite_texture_path: sprite_texture_cache,
             current_projection: glam::Mat4::IDENTITY,
         })
+    }
+
+    pub fn set_clear_color(&mut self, clear_color: wgpu::Color) {
+        self.clear_color = clear_color;
     }
 
     /// Load new tilemap texture
@@ -598,12 +604,7 @@ impl SceneRenderer {
                     view: target.get_render_view()?,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.1,
-                            b: 0.12,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -664,7 +665,7 @@ impl SceneRenderer {
                     view: target.get_render_view()?,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

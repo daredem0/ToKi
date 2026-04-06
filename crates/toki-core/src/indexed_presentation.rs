@@ -5,7 +5,9 @@ use crate::assets::atlas::ColorMode;
 use crate::assets::tileset::{TileRenderMaterial, TilemapRenderBatch};
 use crate::graphics::image::{load_image_rgba8, DecodedImage};
 use crate::graphics::vertex::QuadVertex;
-use crate::palette::{builtin_palettes, recolor_indexed_image, resolve_palette, Palette, PaletteSize};
+use crate::palette::{
+    builtin_palettes, recolor_indexed_image, resolve_palette, Palette, PaletteSize,
+};
 use crate::project_runtime::{
     PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings, RuntimePostProcessSettings,
 };
@@ -42,7 +44,10 @@ pub struct ResolvedIndexedPresentation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PresentedTextureSource {
     File(PathBuf),
-    Rgba8 { image: DecodedImage, cache_key: String },
+    Rgba8 {
+        image: DecodedImage,
+        cache_key: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -122,7 +127,9 @@ pub fn materialize_indexed_image(
         options.local_override,
         options.asset_palette,
     )?;
-    let palette_id = resolved_palette.as_ref().map(|(palette_id, _)| palette_id.clone());
+    let palette_id = resolved_palette
+        .as_ref()
+        .map(|(palette_id, _)| palette_id.clone());
 
     let mut image = if let Some((_, palette)) = resolved_palette {
         recolor_indexed_image(decoded, &palette).map_err(|error| error.to_string())?
@@ -186,7 +193,8 @@ pub fn materialize_tilemap_batches(
         let texture = match batch.key.material {
             TileRenderMaterial::TrueColor => PresentedTextureSource::File(batch.texture_path),
             TileRenderMaterial::PaletteIndexed { ref palette_id } => {
-                let decoded = load_image_rgba8(&batch.texture_path).map_err(|error| error.to_string())?;
+                let decoded =
+                    load_image_rgba8(&batch.texture_path).map_err(|error| error.to_string())?;
                 let presentation = materialize_indexed_image(
                     &decoded,
                     &batch.texture_path.display().to_string(),
@@ -222,7 +230,12 @@ fn post_process_cache_fragment(settings: &ResolvedPostProcessSettings) -> String
         .colors()
         .iter()
         .take(4)
-        .map(|color| format!("{:02x}{:02x}{:02x}{:02x}", color[0], color[1], color[2], color[3]))
+        .map(|color| {
+            format!(
+                "{:02x}{:02x}{:02x}{:02x}",
+                color[0], color[1], color[2], color[3]
+            )
+        })
         .collect::<Vec<_>>()
         .join("-");
     format!(
@@ -241,10 +254,7 @@ fn post_process_cache_fragment(settings: &ResolvedPostProcessSettings) -> String
     )
 }
 
-fn apply_post_process_to_image(
-    image: &mut DecodedImage,
-    settings: &ResolvedPostProcessSettings,
-) {
+fn apply_post_process_to_image(image: &mut DecodedImage, settings: &ResolvedPostProcessSettings) {
     if settings.mode == PostProcessMode::None {
         return;
     }
@@ -258,12 +268,8 @@ fn apply_post_process_to_image(
             (x as f32 + 0.5) / width as f32,
             (y as f32 + 0.5) / height as f32,
         ];
-        let processed = apply_post_process_pixel_at(
-            settings,
-            [rgba[0], rgba[1], rgba[2], rgba[3]],
-            [x, y],
-            uv,
-        );
+        let processed =
+            apply_post_process_pixel_at(settings, [rgba[0], rgba[1], rgba[2], rgba[3]], [x, y], uv);
         rgba.copy_from_slice(&processed);
     }
 }
@@ -410,7 +416,9 @@ fn apply_post_process_pixel_at(
                     let index = quantize_index(luminance(rgb));
                     settings.quantize_palette.color(index)
                 }
-                QuantizeStrategy::RgbDistance => nearest_palette_color(rgb, &settings.quantize_palette),
+                QuantizeStrategy::RgbDistance => {
+                    nearest_palette_color(rgb, &settings.quantize_palette)
+                }
             };
             [target[0], target[1], target[2], alpha]
         }
@@ -564,7 +572,10 @@ mod tests {
             size: UVec2::new(1, 1),
             tile_size: UVec2::new(1, 1),
             tileset: "atlas.json".into(),
-            layers: vec![TileLayer::new("ground", vec!["atlas/tile/tile".to_string()])],
+            layers: vec![TileLayer::new(
+                "ground",
+                vec!["atlas/tile/tile".to_string()],
+            )],
         };
 
         let batches = tilemap

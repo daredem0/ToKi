@@ -1,7 +1,5 @@
 use super::*;
-use crate::ui::sprite_editor::{
-    canonical_indexed_color_for_size, indexed_slot_for_authored_color,
-};
+use crate::ui::sprite_editor::{canonical_indexed_color_for_size, indexed_slot_for_authored_color};
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::{validate_indexed_rgba8, PaletteSize};
 

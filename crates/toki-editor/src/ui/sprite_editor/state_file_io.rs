@@ -1,8 +1,9 @@
 //! File I/O operations for SpriteEditorState.
 
 use super::{
-    canonical_indexed_color_for_size, DiscoveredSpriteAsset, PixelColor, SpriteAssetKind,
-    SpriteCanvas, SpriteCanvasViewport, SpriteEditorState,
+    canonical_indexed_color_for_size, four_bit_mask_for_visual_slot, AutoTileSpriteInfo,
+    DiscoveredSpriteAsset, PixelColor, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
+    SpriteEditorState,
 };
 
 struct SaveAssetRequest<'a> {
@@ -33,6 +34,7 @@ impl SpriteEditorState {
         cs.selected_cell = None;
         cs.original_cell_aliases = None;
         cs.show_cell_grid = false;
+        self.autotile_info = None;
         self.color_mode = toki_core::assets::atlas::ColorMode::TrueColor;
         self.authored_palette_id = None;
     }
@@ -182,7 +184,7 @@ impl SpriteEditorState {
         let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
             .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
 
-        let (cell_size, is_sheet, original_aliases, color_mode, authored_palette_id) =
+        let (cell_size, is_sheet, original_aliases, color_mode, authored_palette_id, autotile_info) =
             match asset.kind {
                 SpriteAssetKind::TileAtlas => {
                     let meta = AtlasMeta::load_from_file(&asset.json_path)
@@ -199,6 +201,7 @@ impl SpriteEditorState {
                         aliases,
                         meta.color_mode,
                         meta.palette.clone(),
+                        autotile_info_from_atlas(&meta),
                     )
                 }
                 SpriteAssetKind::ObjectSheet => {
@@ -216,11 +219,13 @@ impl SpriteEditorState {
                         aliases,
                         meta.color_mode,
                         meta.palette.clone(),
+                        None,
                     )
                 }
             };
 
         self.reset_canvas_state(canvas, false);
+        self.autotile_info = autotile_info;
         self.color_mode = color_mode;
         self.authored_palette_id = authored_palette_id;
         if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
@@ -536,7 +541,7 @@ impl SpriteEditorState {
             }
         }
 
-        let auto_tile_groups = self.build_auto_tile_groups(cols, &tiles);
+        let auto_tile_groups = self.build_auto_tile_groups(cols, &tiles, existing_meta.as_ref());
 
         AtlasMeta {
             image: png_filename.into(),
@@ -559,20 +564,29 @@ impl SpriteEditorState {
         &self,
         cols: u32,
         tiles: &std::collections::HashMap<String, toki_core::assets::atlas::TileInfo>,
+        existing_meta: Option<&toki_core::assets::atlas::AtlasMeta>,
     ) -> std::collections::HashMap<String, toki_core::assets::autotile::AutoTileGroup> {
         let mut groups = std::collections::HashMap::new();
         let Some(info) = &self.autotile_info else {
-            return groups;
+            return existing_meta
+                .map(|meta| meta.auto_tile_groups.clone())
+                .unwrap_or(groups);
         };
         let variant_count = match info.mode {
             toki_core::assets::autotile::AutoTileMode::FourBit => 16u8,
             toki_core::assets::autotile::AutoTileMode::EightBit => 47u8,
         };
         let mut variants = std::collections::HashMap::new();
-        for mask in 0..variant_count {
-            let row = u32::from(mask) / cols;
-            let col = u32::from(mask) % cols;
+        for slot_index in 0..variant_count {
+            let row = u32::from(slot_index) / cols;
+            let col = u32::from(slot_index) % cols;
             let pos = glam::UVec2::new(col, row);
+            let mask = match info.mode {
+                toki_core::assets::autotile::AutoTileMode::FourBit => {
+                    four_bit_mask_for_visual_slot(slot_index)
+                }
+                toki_core::assets::autotile::AutoTileMode::EightBit => slot_index,
+            };
             if let Some(tile_name) = tiles
                 .iter()
                 .find(|(_, ti)| ti.position == pos)
@@ -929,5 +943,157 @@ fn copy_image_to_canvas(
             ]);
             canvas.set_pixel(start_x + px, start_y + py, color);
         }
+    }
+}
+
+fn autotile_info_from_atlas(
+    meta: &toki_core::assets::atlas::AtlasMeta,
+) -> Option<AutoTileSpriteInfo> {
+    let mut groups = meta.auto_tile_groups.iter();
+    let (group_name, group) = groups.next()?;
+    if groups.next().is_some() {
+        return None;
+    }
+    Some(AutoTileSpriteInfo {
+        group_name: group_name.clone(),
+        mode: group.mode,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use tempfile::tempdir;
+    use toki_core::assets::atlas::AtlasMeta;
+    use toki_core::assets::autotile::{AutoTileGroup, AutoTileMode};
+
+    fn create_test_png(path: &std::path::Path, width: u32, height: u32) {
+        toki_core::graphics::image::save_image_rgba8(
+            path,
+            width,
+            height,
+            &vec![0u8; (width * height * 4) as usize],
+        )
+        .expect("png should save");
+    }
+
+    #[test]
+    fn create_atlas_with_names_maps_four_bit_visual_slots_to_runtime_masks() {
+        let mut state = SpriteEditorState::default();
+        state.new_sheet(64, 64, 16, 16);
+        state.active_mut().save_asset_kind = SpriteAssetKind::TileAtlas;
+        state.autotile_info = Some(AutoTileSpriteInfo {
+            group_name: "terrain".to_string(),
+            mode: AutoTileMode::FourBit,
+        });
+
+        let meta = state.create_atlas_with_names("terrain.png", 4, 4, None);
+        let group = meta
+            .auto_tile_groups
+            .get("terrain")
+            .expect("autotile group should exist");
+
+        let expected = [
+            (6, "tile_0"),
+            (14, "tile_1"),
+            (12, "tile_2"),
+            (1, "tile_3"),
+            (7, "tile_4"),
+            (15, "tile_5"),
+            (13, "tile_6"),
+            (2, "tile_7"),
+            (3, "tile_8"),
+            (11, "tile_9"),
+            (9, "tile_10"),
+            (4, "tile_11"),
+            (8, "tile_12"),
+            (5, "tile_13"),
+            (10, "tile_14"),
+            (0, "tile_15"),
+        ];
+
+        for (mask, tile_name) in expected {
+            assert_eq!(
+                group.variants.get(&mask).map(String::as_str),
+                Some(tile_name),
+                "mask {mask} should resolve to {tile_name}"
+            );
+        }
+
+        assert_eq!(group.preview_tile.as_deref(), Some("tile_5"));
+    }
+
+    #[test]
+    fn load_sprite_asset_restores_single_autotile_group_metadata() {
+        let temp = tempdir().expect("temp dir");
+        let png_path = temp.path().join("autotile.png");
+        let json_path = temp.path().join("autotile.json");
+        create_test_png(&png_path, 64, 64);
+
+        let mut meta = AtlasMeta::new_grid("autotile.png", glam::UVec2::new(16, 16), 4, 4);
+        meta.auto_tile_groups.insert(
+            "terrain".to_string(),
+            AutoTileGroup {
+                mode: AutoTileMode::FourBit,
+                preview_tile: Some("tile_5".to_string()),
+                variants: HashMap::new(),
+            },
+        );
+        meta.save_to_file(&json_path).expect("metadata should save");
+
+        let asset = DiscoveredSpriteAsset {
+            name: "autotile".to_string(),
+            json_path,
+            png_path,
+            kind: SpriteAssetKind::TileAtlas,
+        };
+
+        let mut state = SpriteEditorState::default();
+        state.autotile_info = Some(AutoTileSpriteInfo {
+            group_name: "stale".to_string(),
+            mode: AutoTileMode::EightBit,
+        });
+
+        state
+            .load_sprite_asset(&asset)
+            .expect("autotile asset should load");
+
+        let info = state
+            .autotile_info
+            .as_ref()
+            .expect("autotile info should be restored");
+        assert_eq!(info.group_name, "terrain");
+        assert_eq!(info.mode, AutoTileMode::FourBit);
+    }
+
+    #[test]
+    fn load_plain_tile_atlas_clears_stale_autotile_metadata() {
+        let temp = tempdir().expect("temp dir");
+        let png_path = temp.path().join("tiles.png");
+        let json_path = temp.path().join("tiles.json");
+        create_test_png(&png_path, 16, 16);
+
+        let meta = AtlasMeta::new_grid("tiles.png", glam::UVec2::new(16, 16), 1, 1);
+        meta.save_to_file(&json_path).expect("metadata should save");
+
+        let asset = DiscoveredSpriteAsset {
+            name: "tiles".to_string(),
+            json_path,
+            png_path,
+            kind: SpriteAssetKind::TileAtlas,
+        };
+
+        let mut state = SpriteEditorState::default();
+        state.autotile_info = Some(AutoTileSpriteInfo {
+            group_name: "stale".to_string(),
+            mode: AutoTileMode::FourBit,
+        });
+
+        state
+            .load_sprite_asset(&asset)
+            .expect("plain atlas should load");
+
+        assert!(state.autotile_info.is_none());
     }
 }

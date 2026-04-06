@@ -108,7 +108,11 @@ impl SceneViewport {
         let mut atlas_cache = std::collections::HashMap::new();
         for atlas_path in atlas_paths {
             let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-                anyhow::anyhow!("Failed to load linked atlas '{}': {}", atlas_path.display(), e)
+                anyhow::anyhow!(
+                    "Failed to load linked atlas '{}': {}",
+                    atlas_path.display(),
+                    e
+                )
             })?;
             let atlas_name = atlas_path
                 .file_stem()
@@ -126,7 +130,11 @@ impl SceneViewport {
             );
         }
         self.tileset_atlas_cache = atlas_cache;
-        tracing::info!("Loaded tileset '{}' with {} linked atlases", tileset_path.display(), self.tileset_atlas_cache.len());
+        tracing::info!(
+            "Loaded tileset '{}' with {} linked atlases",
+            tileset_path.display(),
+            self.tileset_atlas_cache.len()
+        );
         Ok(tileset)
     }
 

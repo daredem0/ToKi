@@ -188,7 +188,9 @@ impl PanelSystem {
             tile_x: tile_pos.x,
             tile_y: tile_pos.y,
             tile_name,
-            solid: tilemap.is_tile_solid_at(&tileset, tile_pos.x, tile_pos.y).unwrap_or(false),
+            solid: tilemap
+                .is_tile_solid_at(&tileset, tile_pos.x, tile_pos.y)
+                .unwrap_or(false),
             trigger: tileset
                 .is_tile_trigger_at(tilemap, tile_pos.x, tile_pos.y)
                 .unwrap_or(false),

@@ -114,11 +114,7 @@ impl TileSetMeta {
         self.entries.get(entry_id)
     }
 
-    pub fn build_entry_id(
-        atlas_name: &str,
-        kind: TileSetEntryKind,
-        source_name: &str,
-    ) -> String {
+    pub fn build_entry_id(atlas_name: &str, kind: TileSetEntryKind, source_name: &str) -> String {
         format!(
             "{}/{}/{}",
             normalize_asset_name(atlas_name),
@@ -290,13 +286,13 @@ impl<'a> TileSetResolver<'a> {
         &self,
         entry_id: &str,
     ) -> Result<(&'a TileSetEntry, &'a TileSetAtlasSource), CoreError> {
-        let entry: &'a TileSetEntry = self
-            .tileset
-            .entries
-            .get(entry_id)
-            .ok_or_else(|| CoreError::MissingTileInTileSet {
-                entry_id: entry_id.to_string(),
-            })?;
+        let entry: &'a TileSetEntry =
+            self.tileset
+                .entries
+                .get(entry_id)
+                .ok_or_else(|| CoreError::MissingTileInTileSet {
+                    entry_id: entry_id.to_string(),
+                })?;
         let atlas_source: &'a TileSetAtlasSource = self
             .atlas_source(&entry.atlas_name)
             .ok_or_else(|| CoreError::MissingAtlasInTileSet {
@@ -460,7 +456,8 @@ impl<'a> TileSetResolver<'a> {
             if entry_id.is_empty() {
                 continue;
             }
-            let resolved = self.resolve_cell_on_layer(tilemap, &layer.tiles, tile_x, tile_y, None)?;
+            let resolved =
+                self.resolve_cell_on_layer(tilemap, &layer.tiles, tile_x, tile_y, None)?;
             if resolved
                 .atlas_source
                 .meta
@@ -495,7 +492,8 @@ impl<'a> TileSetResolver<'a> {
             if entry_id.is_empty() {
                 continue;
             }
-            let resolved = self.resolve_cell_on_layer(tilemap, &layer.tiles, tile_x, tile_y, None)?;
+            let resolved =
+                self.resolve_cell_on_layer(tilemap, &layer.tiles, tile_x, tile_y, None)?;
             if resolved
                 .atlas_source
                 .meta
@@ -576,10 +574,11 @@ impl<'a> TileSetResolver<'a> {
 
                     let world_x = x as f32 * tilemap.tile_size.x as f32;
                     let world_y = y as f32 * tilemap.tile_size.y as f32;
-                    let color_material = match Self::resolved_palette_id(atlas, indexed_palette_override) {
-                        Some(palette_id) => TileRenderMaterial::PaletteIndexed { palette_id },
-                        None => TileRenderMaterial::TrueColor,
-                    };
+                    let color_material =
+                        match Self::resolved_palette_id(atlas, indexed_palette_override) {
+                            Some(palette_id) => TileRenderMaterial::PaletteIndexed { palette_id },
+                            None => TileRenderMaterial::TrueColor,
+                        };
                     let key = TilemapBatchKey {
                         atlas_name: resolved.entry.atlas_name.clone(),
                         above_entities: layer.above_entities,
@@ -688,7 +687,10 @@ mod tests {
             "terrain".to_string(),
             AutoTileGroup {
                 mode: AutoTileMode::FourBit,
-                variants: HashMap::from([(0, "terrain_0".to_string()), (15, "terrain_15".to_string())]),
+                variants: HashMap::from([
+                    (0, "terrain_0".to_string()),
+                    (15, "terrain_15".to_string()),
+                ]),
                 preview_tile: Some("terrain_15".to_string()),
             },
         );

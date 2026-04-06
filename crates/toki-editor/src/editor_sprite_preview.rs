@@ -102,6 +102,9 @@ mod tests {
 
         assert_eq!(presentation.palette_id.as_deref(), Some("poison"));
         let poison = resolve_palette("poison", &palettes).expect("poison palette should exist");
-        assert_eq!(presentation.image.data[..4].to_vec(), poison.color(0).to_vec());
+        assert_eq!(
+            presentation.image.data[..4].to_vec(),
+            poison.color(0).to_vec()
+        );
     }
 }

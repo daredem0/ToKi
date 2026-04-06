@@ -959,12 +959,9 @@ impl EditorApp {
         overlay_data: ViewportOverlayData,
     ) {
         scene_viewport.set_indexed_presentation_settings(presentation_settings);
-        if let Err(e) = scene_viewport.render_to_texture(
-            project_path,
-            project_assets,
-            renderer,
-            &overlay_data,
-        ) {
+        if let Err(e) =
+            scene_viewport.render_to_texture(project_path, project_assets, renderer, &overlay_data)
+        {
             tracing::error!("Failed to render scene to texture: {}", e);
         }
     }

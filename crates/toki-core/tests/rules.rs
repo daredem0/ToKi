@@ -1,8 +1,7 @@
 use glam::{IVec2, UVec2};
 mod support;
 use support::{
-    scene_with_test_player, test_atlas, test_tilemap, test_tileset_context,
-    test_tileset_resolver,
+    scene_with_test_player, test_atlas, test_tilemap, test_tileset_context, test_tileset_resolver,
 };
 use toki_core::animation::AnimationState;
 use toki_core::assets::{

@@ -109,9 +109,10 @@ impl<'de> Deserialize<'de> for TileMap {
                 ));
             }
         };
-        let tileset = wire.tileset.or(wire.atlas).ok_or_else(|| {
-            serde::de::Error::custom("tilemap must contain 'tileset'")
-        })?;
+        let tileset = wire
+            .tileset
+            .or(wire.atlas)
+            .ok_or_else(|| serde::de::Error::custom("tilemap must contain 'tileset'"))?;
         Ok(TileMap {
             size: wire.size,
             tile_size: wire.tile_size,
@@ -381,9 +382,12 @@ impl TileMap {
         let (tileset, atlases) = Self::legacy_resolver_storage(atlas);
         let resolver = TileSetResolver::new(&tileset, &atlases);
         let mut split = SplitTilemapVertices::default();
-        for batch in
-            resolver.generate_render_batches_best_effort(self, Some(visible_chunks), tile_anim, None)
-        {
+        for batch in resolver.generate_render_batches_best_effort(
+            self,
+            Some(visible_chunks),
+            tile_anim,
+            None,
+        ) {
             if batch.key.above_entities {
                 split.above.extend(batch.vertices);
             } else {

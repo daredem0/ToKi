@@ -20,13 +20,12 @@ pub use errors::RenderError;
 pub use gpu::GpuState;
 pub use pipelines::{
     debug::DebugPipeline, post_process::PostProcessPipeline,
-    presentation::PresentationBlitPipeline, sprite::SpritePipeline,
-    tilemap::TilemapPipeline, RenderPipeline,
+    presentation::PresentationBlitPipeline, sprite::SpritePipeline, tilemap::TilemapPipeline,
+    RenderPipeline,
 };
 pub use scene::{
     DebugShape, DebugShapeType, OverlayShape, OverlayShapeType, SceneData, SceneRenderer,
-    SceneTilemapBatch,
-    SpriteInstance,
+    SceneTilemapBatch, SpriteInstance,
 };
 pub use targets::{OffscreenTarget, RenderTarget, SurfaceProvider};
 pub use text::{GlyphonTextRenderer, TextBackgroundRect};

@@ -154,6 +154,9 @@ mod tests {
 
     #[test]
     fn presentation_blit_gamma_encodes_rgb_but_preserves_alpha() {
-        assert_eq!(apply_presentation_blit_pixel([0.5, 0.25, 1.0, 0.5]), [188, 137, 255, 128]);
+        assert_eq!(
+            apply_presentation_blit_pixel([0.5, 0.25, 1.0, 0.5]),
+            [188, 137, 255, 128]
+        );
     }
 }

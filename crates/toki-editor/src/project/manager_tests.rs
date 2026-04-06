@@ -447,7 +447,10 @@ fn test_tilemap() -> TileMap {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         tileset: PathBuf::from("atlas.json"),
-        layers: vec![TileLayer::new("ground", vec!["atlas/tile/floor".to_string()])],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["atlas/tile/floor".to_string()],
+        )],
     }
 }
 

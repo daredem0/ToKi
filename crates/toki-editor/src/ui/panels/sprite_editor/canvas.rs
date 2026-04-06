@@ -137,12 +137,7 @@ pub fn render_canvas_viewport(
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.canvas.is_some() {
-        ensure_canvas_texture_for_side(
-            ui_state,
-            ctx,
-            render_side,
-            renderer.as_deref_mut(),
-        );
+        ensure_canvas_texture_for_side(ui_state, ctx, render_side, renderer.as_deref_mut());
     }
 
     // Draw checkerboard and canvas
@@ -158,8 +153,7 @@ pub fn render_canvas_viewport(
     let canvas_state =
         crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.tile_preview {
-        if let (Some(canvas), Some(texture)) = (&canvas_state.canvas, canvas_state.canvas_texture)
-        {
+        if let (Some(canvas), Some(texture)) = (&canvas_state.canvas, canvas_state.canvas_texture) {
             draw_tile_preview(&painter, rect, &canvas_state.viewport, canvas, texture);
         }
     }
@@ -240,12 +234,7 @@ pub fn render_canvas_viewport(
     }
 
     // Keep floating-selection texture in sync before drawing
-    ensure_floating_texture(
-        ui_state,
-        ctx,
-        render_side,
-        renderer.as_deref_mut(),
-    );
+    ensure_floating_texture(ui_state, ctx, render_side, renderer.as_deref_mut());
 
     // Draw floating selection overlay OR static selection overlay
     let canvas_state =
@@ -489,13 +478,7 @@ fn draw_canvas_with_checkerboard(
         canvas_screen_min.y + canvas.height as f32 * zoom,
     );
     let canvas_screen_rect = egui::Rect::from_min_max(canvas_screen_min, canvas_screen_max);
-    draw_canvas_checkerboard(
-        painter,
-        rect,
-        canvas_screen_rect,
-        viewport,
-        canvas,
-    );
+    draw_canvas_checkerboard(painter, rect, canvas_screen_rect, viewport.zoom, canvas);
 
     let visible_rect = canvas_screen_rect.intersect(rect);
     if visible_rect.is_positive() {
@@ -561,7 +544,7 @@ fn draw_canvas_checkerboard(
     painter: &egui::Painter,
     clip_rect: egui::Rect,
     canvas_rect: egui::Rect,
-    viewport: &SpriteCanvasViewport,
+    zoom: f32,
     canvas: &SpriteCanvas,
 ) {
     let visible = canvas_rect.intersect(clip_rect);
@@ -569,8 +552,7 @@ fn draw_canvas_checkerboard(
         return;
     }
 
-    let zoom = viewport.zoom.max(0.01);
-    let checker = (zoom.max(4.0)).round();
+    let zoom = zoom.max(0.01);
     let light = egui::Color32::from_gray(220);
     let dark = egui::Color32::from_gray(180);
 
@@ -586,20 +568,28 @@ fn draw_canvas_checkerboard(
             if max_x < visible.left() || min_x > visible.right() {
                 continue;
             }
-            let alpha_index = ((x as f32 / checker).floor() as i32
-                + (y as f32 / checker).floor() as i32)
-                .rem_euclid(2);
-            let cell_rect = egui::Rect::from_min_max(
-                egui::pos2(min_x, min_y),
-                egui::pos2(max_x, max_y),
-            )
-            .intersect(visible);
+            let cell_rect =
+                egui::Rect::from_min_max(egui::pos2(min_x, min_y), egui::pos2(max_x, max_y))
+                    .intersect(visible);
             painter.rect_filled(
                 cell_rect,
                 0.0,
-                if alpha_index == 0 { light } else { dark },
+                checkerboard_color_for_pixel(x, y, light, dark),
             );
         }
+    }
+}
+
+fn checkerboard_color_for_pixel(
+    x: u32,
+    y: u32,
+    light: egui::Color32,
+    dark: egui::Color32,
+) -> egui::Color32 {
+    if ((x + y) & 1) == 0 {
+        light
+    } else {
+        dark
     }
 }
 
@@ -1284,8 +1274,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let palettes =
-            std::collections::BTreeMap::from([("preview".to_string(), palette.clone())]);
+        let palettes = std::collections::BTreeMap::from([("preview".to_string(), palette.clone())]);
         let settings = toki_core::indexed_presentation::IndexedPresentationSettings::default();
         let preview_image = DecodedImage {
             width: canvas.width,
@@ -1321,8 +1310,7 @@ mod tests {
             vec![[1, 2, 3, 255]; 4],
         )
         .unwrap();
-        let palettes =
-            std::collections::BTreeMap::from([("preview".to_string(), palette.clone())]);
+        let palettes = std::collections::BTreeMap::from([("preview".to_string(), palette.clone())]);
         let settings = toki_core::indexed_presentation::IndexedPresentationSettings::default();
         let preview_image = DecodedImage {
             width: canvas.width,
@@ -1349,8 +1337,7 @@ mod tests {
 
     #[test]
     fn canvas_display_pixels_runtime_preview_prefers_project_palette_override() {
-        let canvas =
-            SpriteCanvas::from_rgba(1, 1, vec![0x00, 0x00, 0x00, 0xFF]).expect("canvas");
+        let canvas = SpriteCanvas::from_rgba(1, 1, vec![0x00, 0x00, 0x00, 0xFF]).expect("canvas");
         let mut palettes = std::collections::BTreeMap::new();
         palettes.insert(
             "authored".to_string(),
@@ -1419,5 +1406,18 @@ mod tests {
             floating_preview_color(color, &origin),
             egui::Color32::from_rgba_unmultiplied(10, 20, 30, 125)
         );
+    }
+
+    #[test]
+    fn checkerboard_color_is_locked_to_canvas_pixel_parity() {
+        let light = egui::Color32::from_gray(220);
+        let dark = egui::Color32::from_gray(180);
+
+        assert_eq!(checkerboard_color_for_pixel(0, 0, light, dark), light);
+        assert_eq!(checkerboard_color_for_pixel(1, 0, light, dark), dark);
+        assert_eq!(checkerboard_color_for_pixel(0, 1, light, dark), dark);
+        assert_eq!(checkerboard_color_for_pixel(1, 1, light, dark), light);
+        assert_eq!(checkerboard_color_for_pixel(5, 7, light, dark), light);
+        assert_eq!(checkerboard_color_for_pixel(6, 7, light, dark), dark);
     }
 }

@@ -46,7 +46,10 @@ impl EditorApp {
             .ok_or_else(|| anyhow::anyhow!("Atlas path has no valid file name"))?;
         let tileset = TileSetMeta::from_atlas(atlas_file_name, &atlas_meta);
         let fill_tile = tileset.first_tile_entry_id().ok_or_else(|| {
-            anyhow::anyhow!("Atlas '{}' does not define any paintable tiles", chosen_atlas_name)
+            anyhow::anyhow!(
+                "Atlas '{}' does not define any paintable tiles",
+                chosen_atlas_name
+            )
         })?;
 
         let tilemap = TileMap {
@@ -203,18 +206,18 @@ impl EditorApp {
             request.tile_height,
         ) {
             Ok(draft) => {
-                let tileset = match Self::build_map_editor_tileset_draft(project_assets, &request.name)
-                {
-                    Ok(tileset) => tileset,
-                    Err(error) => {
-                        tracing::error!(
-                            "Failed to create tileset draft for new map '{}': {}",
-                            request.name,
-                            error
-                        );
-                        return;
-                    }
-                };
+                let tileset =
+                    match Self::build_map_editor_tileset_draft(project_assets, &request.name) {
+                        Ok(tileset) => tileset,
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to create tileset draft for new map '{}': {}",
+                                request.name,
+                                error
+                            );
+                            return;
+                        }
+                    };
                 let Some(viewport) = &mut self.viewport_manager.map_editor else {
                     tracing::warn!(
                         "No map editor viewport available for new map '{}'",
@@ -451,7 +454,10 @@ impl EditorApp {
     ) -> Option<std::path::PathBuf> {
         toki_core::project_assets::resolve_tilemap_tileset_path(
             project_path,
-            &project_path.join("assets").join("tilemaps").join("__editor__.json"),
+            &project_path
+                .join("assets")
+                .join("tilemaps")
+                .join("__editor__.json"),
             tilemap,
         )
     }

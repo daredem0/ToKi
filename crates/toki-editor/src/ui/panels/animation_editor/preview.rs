@@ -227,7 +227,8 @@ fn render_sprite_frame_scaled(
     max_width: f32,
     max_height: f32,
 ) -> bool {
-    let Some(texture_id) = crate::ui::editor_context::animation_state(ui_state).atlas_texture else {
+    let Some(texture_id) = crate::ui::editor_context::animation_state(ui_state).atlas_texture
+    else {
         return false;
     };
     let Some((default_cell_w, default_cell_h)) =

@@ -156,6 +156,15 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     cols,
                     rows
                 ));
+                if crate::ui::editor_context::sprite_state_mut(ui_state).new_autotile_mode
+                    == toki_core::assets::autotile::AutoTileMode::FourBit
+                {
+                    ui.label("4-bit visual order:");
+                    ui.monospace(crate::ui::sprite_editor::FOUR_BIT_VISUAL_LAYOUT_TEXT);
+                    ui.small(
+                        "TL/T/TR, L/C/R, BL/B/BR are blob tiles. N/E/S/W are one-neighbor caps. V/H are strips. I is isolated.",
+                    );
+                }
             } else if crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_is_sheet {
                 if source_image.is_some() {
                     match source_image_validation.as_ref() {

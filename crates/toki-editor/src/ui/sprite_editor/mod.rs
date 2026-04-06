@@ -3,6 +3,7 @@
 //! This module provides all the types and state needed for pixel-level sprite editing,
 //! including dual canvas support for side-by-side editing.
 
+mod autotile_layout;
 mod canvas;
 mod dual_canvas;
 mod floating;
@@ -18,6 +19,7 @@ mod types;
 mod viewport;
 
 // Re-export all public types
+pub(crate) use autotile_layout::{four_bit_mask_for_visual_slot, FOUR_BIT_VISUAL_LAYOUT_TEXT};
 pub use canvas::SpriteCanvas;
 pub use dual_canvas::{CanvasSide, CanvasState, DualCanvasLayout};
 pub use floating::{FloatingOrigin, FloatingSelection};

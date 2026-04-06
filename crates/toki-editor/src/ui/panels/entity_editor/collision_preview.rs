@@ -204,8 +204,7 @@ fn ensure_preview_texture(
         return;
     };
 
-    ui_state.collision_preview.image_size =
-        Some((texture.size.x, texture.size.y));
+    ui_state.collision_preview.image_size = Some((texture.size.x, texture.size.y));
     ui_state.collision_preview.cell_rect = source.cell_rect;
     ui_state.collision_preview.cache_key = Some(cache_key);
     ui_state.collision_preview.texture = Some(texture.texture_id);

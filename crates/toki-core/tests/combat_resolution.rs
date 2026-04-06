@@ -1,6 +1,8 @@
 use glam::{IVec2, UVec2};
 mod support;
-use support::{test_atlas, test_entity_definition, test_tilemap, test_tileset_context, test_tileset_resolver};
+use support::{
+    test_atlas, test_entity_definition, test_tilemap, test_tileset_context, test_tileset_resolver,
+};
 use toki_core::animation::{AnimationClip, AnimationState, LoopMode};
 use toki_core::entity::{CombatComponent, EntityStats, MovementProfile, PrimaryProjectileDef};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};

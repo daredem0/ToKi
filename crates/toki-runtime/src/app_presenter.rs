@@ -161,14 +161,8 @@ impl<'a> WorldFramePresenter<'a> {
         let queries = self.render_queries();
         let entity_boxes = queries.entity_collision_boxes();
         let tileset = self.resources.tileset_resolver();
-        let solid_tiles = queries.solid_tile_positions(
-            self.resources.get_tilemap(),
-            &tileset,
-        );
-        let trigger_tiles = queries.trigger_tile_positions(
-            self.resources.get_tilemap(),
-            &tileset,
-        );
+        let solid_tiles = queries.solid_tile_positions(self.resources.get_tilemap(), &tileset);
+        let trigger_tiles = queries.trigger_tile_positions(self.resources.get_tilemap(), &tileset);
 
         let entity_color = [1.0, 0.0, 0.0, 0.8];
         let solid_tile_color = [0.0, 0.0, 1.0, 0.6];

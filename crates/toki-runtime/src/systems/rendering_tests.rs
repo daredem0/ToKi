@@ -86,9 +86,7 @@ impl RenderFrameControl for FakeBackend {
 
     fn set_tilemap_batches(&mut self, batches: &[toki_render::SceneTilemapBatch]) {
         let total_vertices = batches.iter().map(|batch| batch.vertices.len()).sum();
-        self.tilemap_vertex_counts
-            .borrow_mut()
-            .push(total_vertices);
+        self.tilemap_vertex_counts.borrow_mut().push(total_vertices);
     }
 }
 

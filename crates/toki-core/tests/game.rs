@@ -1,8 +1,7 @@
 use glam::{IVec2, UVec2};
 mod support;
 use support::{
-    test_atlas, test_entity_definition, test_tilemap, test_tileset_context,
-    test_tileset_resolver,
+    test_atlas, test_entity_definition, test_tilemap, test_tileset_context, test_tileset_resolver,
 };
 use toki_core::entity::{
     build_decoration_entity, CombatComponent, DecorationSpec, Entity, EntityFootprint,

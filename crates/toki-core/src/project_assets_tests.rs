@@ -1167,7 +1167,10 @@ indexed_palette_override = "gb_default"
         Some("palette_demo_map.json")
     );
     assert_eq!(
-        resolved.tileset_path.file_name().and_then(|name| name.to_str()),
+        resolved
+            .tileset_path
+            .file_name()
+            .and_then(|name| name.to_str()),
         Some("palette_demo_map.json")
     );
     assert!(resolved

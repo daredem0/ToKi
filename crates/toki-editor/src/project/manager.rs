@@ -275,12 +275,18 @@ impl ProjectManager {
         Ok(map_path)
     }
 
-    pub fn save_tileset_asset(&mut self, tileset_name: &str, tileset: &TileSetMeta) -> Result<PathBuf> {
+    pub fn save_tileset_asset(
+        &mut self,
+        tileset_name: &str,
+        tileset: &TileSetMeta,
+    ) -> Result<PathBuf> {
         if tileset_name.trim().is_empty() {
             return Err(anyhow::anyhow!("Tileset name cannot be empty"));
         }
         if tileset_name.contains('/') || tileset_name.contains('\\') {
-            return Err(anyhow::anyhow!("Tileset name cannot contain path separators"));
+            return Err(anyhow::anyhow!(
+                "Tileset name cannot contain path separators"
+            ));
         }
 
         let project_path = self
@@ -299,7 +305,11 @@ impl ProjectManager {
             project_assets.scan_assets()?;
         }
 
-        tracing::info!("Saved tileset asset '{}' to {:?}", tileset_name, tileset_path);
+        tracing::info!(
+            "Saved tileset asset '{}' to {:?}",
+            tileset_name,
+            tileset_path
+        );
         Ok(tileset_path)
     }
 

@@ -129,7 +129,10 @@ fn resolve_tilemap_tileset_path_prefers_map_directory_relative_tileset() {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         tileset: PathBuf::from("terrain.json"),
-        layers: vec![TileLayer::new("ground", vec!["terrain/tile/floor".to_string()])],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["terrain/tile/floor".to_string()],
+        )],
     };
 
     let resolved = resolve_tilemap_tileset_path(&project_dir, &tilemap_path, &tilemap)
@@ -153,7 +156,10 @@ fn resolve_tilemap_tileset_path_falls_back_to_project_tilesets_dir() {
         size: glam::UVec2::new(1, 1),
         tile_size: glam::UVec2::new(16, 16),
         tileset: PathBuf::from("terrain.json"),
-        layers: vec![TileLayer::new("ground", vec!["terrain/tile/floor".to_string()])],
+        layers: vec![TileLayer::new(
+            "ground",
+            vec!["terrain/tile/floor".to_string()],
+        )],
     };
 
     let resolved = resolve_tilemap_tileset_path(&project_dir, &tilemap_path, &tilemap)

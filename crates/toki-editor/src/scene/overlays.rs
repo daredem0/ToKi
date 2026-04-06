@@ -6,7 +6,9 @@ use crate::scene::viewport::{DragPreviewSprite, OverlayLineInstance, OverlaySpri
 use std::collections::BTreeMap;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::entity::{ControlRole, Entity};
-use toki_core::indexed_presentation::{load_materialized_indexed_image, IndexedPresentationSettings};
+use toki_core::indexed_presentation::{
+    load_materialized_indexed_image, IndexedPresentationSettings,
+};
 use toki_core::palette::Palette;
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::Scene;
@@ -34,7 +36,9 @@ pub fn cached_preview_sprite_frame(
     let cache_key = (
         project_path.to_path_buf(),
         entity_def_name.to_string(),
-        indexed_presentation_settings.indexed_palette_override.clone(),
+        indexed_presentation_settings
+            .indexed_palette_override
+            .clone(),
     );
     let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
         load_preview_sprite_frame(
@@ -62,7 +66,9 @@ pub fn cached_decoration_preview_sprite_frame(
     let cache_key = (
         project_path.to_path_buf(),
         format!("decoration::{sheet_name}::{object_name}"),
-        indexed_presentation_settings.indexed_palette_override.clone(),
+        indexed_presentation_settings
+            .indexed_palette_override
+            .clone(),
     );
     let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
         load_decoration_preview_sprite_frame(
@@ -154,10 +160,9 @@ pub fn load_preview_sprite_frame(
                                 sprite_atlas.palette.as_deref(),
                                 false,
                             ) {
-                                Ok(presentation) if sprite_atlas.is_palette_indexed() => (
-                                    Some(presentation.image),
-                                    Some(presentation.cache_key),
-                                ),
+                                Ok(presentation) if sprite_atlas.is_palette_indexed() => {
+                                    (Some(presentation.image), Some(presentation.cache_key))
+                                }
                                 Ok(_) => (None, None),
                                 Err(error) => {
                                     tracing::warn!(
@@ -367,7 +372,9 @@ pub fn load_decoration_preview_sprite_frame(
             v1: uvs[3],
         },
         texture_path,
-        texture_image: indexed_presentation.as_ref().map(|presentation| presentation.image.clone()),
+        texture_image: indexed_presentation
+            .as_ref()
+            .map(|presentation| presentation.image.clone()),
         texture_cache_key: indexed_presentation.map(|presentation| presentation.cache_key),
         size: glam::UVec2::new(
             object_info.size_tiles.x * object_sheet.tile_size.x,

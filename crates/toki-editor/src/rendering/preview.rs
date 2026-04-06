@@ -9,9 +9,7 @@ use toki_core::indexed_presentation::{
     texture_preview_cache_key, IndexedImageMaterialization, IndexedPresentationSettings,
 };
 use toki_core::palette::Palette;
-use toki_core::project_runtime::{
-    ResolvedPostProcessSettings,
-};
+use toki_core::project_runtime::ResolvedPostProcessSettings;
 use toki_core::sprite::SpriteFrame;
 use toki_render::{
     OffscreenTarget, PresentationBlitPipeline, RenderTarget, SceneData, SceneRenderer,
@@ -35,18 +33,14 @@ pub struct PresentedOffscreenTexture {
 }
 
 impl PresentedOffscreenTexture {
-    pub fn new(
-        device: &wgpu::Device,
-        size: (u32, u32),
-    ) -> Result<Self, toki_render::RenderError> {
+    pub fn new(device: &wgpu::Device, size: (u32, u32)) -> Result<Self, toki_render::RenderError> {
         Ok(Self {
             scene_target: OffscreenTarget::new(device, size, PREVIEW_SCENE_FORMAT)?,
-            presentation_target: OffscreenTarget::new(
+            presentation_target: OffscreenTarget::new(device, size, PREVIEW_PRESENTATION_FORMAT)?,
+            presentation_pipeline: PresentationBlitPipeline::new(
                 device,
-                size,
                 PREVIEW_PRESENTATION_FORMAT,
-            )?,
-            presentation_pipeline: PresentationBlitPipeline::new(device, PREVIEW_PRESENTATION_FORMAT),
+            ),
             texture_id: None,
         })
     }
@@ -99,7 +93,7 @@ impl PresentedOffscreenTexture {
                     view: self.presentation_target.get_render_view()?,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -131,17 +125,22 @@ pub struct EditorPreviewRenderer {
 }
 
 impl EditorPreviewRenderer {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<Self, toki_render::RenderError> {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> Result<Self, toki_render::RenderError> {
+        let mut scene_renderer = SceneRenderer::new(
+            device.clone(),
+            queue.clone(),
+            PREVIEW_SCENE_FORMAT,
+            None,
+            None,
+        )?;
+        scene_renderer.set_clear_color(wgpu::Color::TRANSPARENT);
         Ok(Self {
             device: device.clone(),
             queue: queue.clone(),
-            scene_renderer: SceneRenderer::new(
-                device.clone(),
-                queue.clone(),
-                PREVIEW_SCENE_FORMAT,
-                None,
-                None,
-            )?,
+            scene_renderer,
             textures: HashMap::new(),
         })
     }

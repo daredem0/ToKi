@@ -112,13 +112,15 @@ impl SceneViewport {
                                                 (None, Some(image), Some(cache_key))
                                             }
                                         };
-                                    scene_data.tilemap_batches.push(toki_render::SceneTilemapBatch {
-                                        vertices: batch.vertices,
-                                        texture_path,
-                                        texture_image,
-                                        texture_cache_key,
-                                        above_entities: batch.above_entities,
-                                    });
+                                    scene_data.tilemap_batches.push(
+                                        toki_render::SceneTilemapBatch {
+                                            vertices: batch.vertices,
+                                            texture_path,
+                                            texture_image,
+                                            texture_cache_key,
+                                            above_entities: batch.above_entities,
+                                        },
+                                    );
                                 }
                             }
                             Err(error) => {

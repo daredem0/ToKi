@@ -47,7 +47,10 @@ pub enum CoreError {
     MissingTileInTileSet { entry_id: String },
 
     #[error("Tileset entry '{entry_id}' references missing atlas '{atlas_name}'")]
-    MissingAtlasInTileSet { entry_id: String, atlas_name: String },
+    MissingAtlasInTileSet {
+        entry_id: String,
+        atlas_name: String,
+    },
 
     #[error(
         "Tileset entry '{entry_id}' references missing source '{source_name}' in atlas '{atlas_name}'"

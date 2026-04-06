@@ -267,7 +267,10 @@ pub(crate) fn selected_map_editor_brush_entry<'a>(
 }
 
 pub(crate) fn map_editor_brush_entry_atlas_name(entry_id: &str) -> Option<&str> {
-    entry_id.split('/').next().filter(|segment| !segment.is_empty())
+    entry_id
+        .split('/')
+        .next()
+        .filter(|segment| !segment.is_empty())
 }
 
 fn build_map_editor_brush_entries_from_tileset(
@@ -278,9 +281,11 @@ fn build_map_editor_brush_entries_from_tileset(
         .entries
         .iter()
         .filter_map(|(entry_id, entry)| {
-            let atlas = atlases
-                .get(&entry.atlas_name)
-                .or_else(|| atlases.get(toki_core::project_assets::normalize_asset_name(&entry.atlas_name)))?;
+            let atlas = atlases.get(&entry.atlas_name).or_else(|| {
+                atlases.get(toki_core::project_assets::normalize_asset_name(
+                    &entry.atlas_name,
+                ))
+            })?;
             let (kind, prefix, preview_tile_id) = match entry.kind {
                 TileSetEntryKind::Tile => (
                     MapEditorBrushKind::Tile,
@@ -303,20 +308,33 @@ fn build_map_editor_brush_entries_from_tileset(
                 kind,
                 display_label: format!(
                     "{prefix}{}",
-                    entry.display_name.clone().unwrap_or_else(|| entry.source_name.clone())
+                    entry
+                        .display_name
+                        .clone()
+                        .unwrap_or_else(|| entry.source_name.clone())
                 ),
                 preview_tile_id,
             })
         })
         .collect::<Vec<_>>();
-    entries.sort_by(|left, right| left.display_label.cmp(&right.display_label).then(left.id.cmp(&right.id)));
+    entries.sort_by(|left, right| {
+        left.display_label
+            .cmp(&right.display_label)
+            .then(left.id.cmp(&right.id))
+    });
     entries
 }
 
-pub(crate) fn resolve_map_editor_tileset_path(project_path: &Path, tilemap: &TileMap) -> Option<PathBuf> {
+pub(crate) fn resolve_map_editor_tileset_path(
+    project_path: &Path,
+    tilemap: &TileMap,
+) -> Option<PathBuf> {
     toki_core::project_assets::resolve_tilemap_tileset_path(
         project_path,
-        &project_path.join("assets").join("tilemaps").join("__editor__.json"),
+        &project_path
+            .join("assets")
+            .join("tilemaps")
+            .join("__editor__.json"),
         tilemap,
     )
 }

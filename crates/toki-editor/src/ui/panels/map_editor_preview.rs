@@ -42,13 +42,11 @@ impl PanelSystem {
         ) else {
             return;
         };
-        let Some(brush_source) =
-            crate::ui::editor_ui::load_map_editor_brush_source_for_tilemap(
-                ui_state,
-                project_path,
-                tilemap,
-            )
-        else {
+        let Some(brush_source) = crate::ui::editor_ui::load_map_editor_brush_source_for_tilemap(
+            ui_state,
+            project_path,
+            tilemap,
+        ) else {
             return;
         };
         let Some(brush_entry) = crate::ui::editor_ui::selected_map_editor_brush_entry(
@@ -57,7 +55,8 @@ impl PanelSystem {
         ) else {
             return;
         };
-        let Some(atlas_name) = crate::ui::editor_ui::map_editor_brush_entry_atlas_name(&brush_entry.id)
+        let Some(atlas_name) =
+            crate::ui::editor_ui::map_editor_brush_entry_atlas_name(&brush_entry.id)
         else {
             return;
         };
@@ -156,14 +155,14 @@ impl PanelSystem {
 
         let texture = renderer
             .preview_texture_from_path(
-            texture_path,
-            atlas.color_mode,
-            &ui_state.project.available_palettes,
-            &presentation_settings,
-            None,
-            atlas.palette.as_deref(),
-        )
-        .ok()?;
+                texture_path,
+                atlas.color_mode,
+                &ui_state.project.available_palettes,
+                &presentation_settings,
+                None,
+                atlas.palette.as_deref(),
+            )
+            .ok()?;
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_cache_key =
             Some(cache_key);
         crate::ui::editor_context::map_state_mut(ui_state).brush_preview_image_path =

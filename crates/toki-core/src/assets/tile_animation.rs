@@ -86,7 +86,12 @@ impl TileAnimationClock {
     ) -> bool {
         let atlas_map = atlases
             .into_iter()
-            .flat_map(|atlas| atlas.animated_tiles.keys().map(move |name| (name.clone(), atlas)))
+            .flat_map(|atlas| {
+                atlas
+                    .animated_tiles
+                    .keys()
+                    .map(move |name| (name.clone(), atlas))
+            })
             .collect::<HashMap<_, _>>();
         self.any_frame_changed = false;
         for (name, playback) in &mut self.playbacks {

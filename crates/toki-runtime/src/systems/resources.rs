@@ -13,9 +13,9 @@ use toki_core::palette::{Palette, PaletteMismatchStrategy};
 pub use toki_core::project_assets::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
     load_project_palettes, normalize_asset_name, resolve_atlas_texture_path,
-    resolve_object_sheet_texture_path, resolve_project_resource_paths, resolve_tilemap_tileset_path,
-    resolve_tileset_atlas_paths,
-    ResolvedProjectResourcePaths, SpriteMetadataFileKind,
+    resolve_object_sheet_texture_path, resolve_project_resource_paths,
+    resolve_tilemap_tileset_path, resolve_tileset_atlas_paths, ResolvedProjectResourcePaths,
+    SpriteMetadataFileKind,
 };
 use toki_core::project_runtime::ProjectRuntimeMetadata;
 use toki_core::sprite_render::{
@@ -71,15 +71,12 @@ pub struct PreloadedResources {
 impl ResourceManager {
     /// Load all game resources from their respective files
     pub fn load_all() -> Result<Self, RenderError> {
-        let tileset = TileSetMeta::load_from_file("assets/tilesets/new_town_map_64x64_crossings.json")?;
+        let tileset =
+            TileSetMeta::load_from_file("assets/tilesets/new_town_map_64x64_crossings.json")?;
         let mut tileset_atlases = HashMap::new();
         let terrain_path = std::path::PathBuf::from("assets/sprites/terrain.json");
         let terrain_atlas = AtlasMeta::load_from_file(&terrain_path)?;
-        register_tileset_atlas(
-            &mut tileset_atlases,
-            &terrain_path,
-            terrain_atlas,
-        );
+        register_tileset_atlas(&mut tileset_atlases, &terrain_path, terrain_atlas);
         let mut sprite_atlases = HashMap::new();
         let mut sprite_texture_paths = HashMap::new();
         let object_sheets = HashMap::new();

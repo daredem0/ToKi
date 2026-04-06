@@ -170,7 +170,11 @@ fn placement_collision_assets() -> (TileMap, TileSetMeta, HashMap<String, TileSe
         },
     )]);
 
-    (tilemap, TileSetMeta::from_atlas("test_atlas", &atlas), atlas_sources)
+    (
+        tilemap,
+        TileSetMeta::from_atlas("test_atlas", &atlas),
+        atlas_sources,
+    )
 }
 
 #[test]
